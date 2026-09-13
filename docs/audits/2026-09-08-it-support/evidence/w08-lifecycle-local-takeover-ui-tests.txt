@@ -1,0 +1,9 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+
+ Test Files  11 passed (11)
+      Tests  175 passed (175)
+   Start at  06:45:19
+   Duration  46.06s (transform 6.17s, setup 19.49s, import 143.40s, tests 24.41s, environment 139.27s)
+

@@ -23,6 +23,7 @@ use App\Services\Tasks\Providers\HsCorrectiveActionProvider;
 use App\Services\Tasks\Providers\HsEventProvider;
 use App\Services\Tasks\Providers\HsInvestigationProvider;
 use App\Services\Tasks\Providers\IncidentFollowupProvider;
+use App\Services\Tasks\Providers\ItWorkTaskProvider;
 use App\Services\Tasks\Providers\MedicationErrorProvider;
 use App\Services\Tasks\Providers\RespiteTaskProvider;
 use App\Services\Tasks\Providers\RestraintReviewProvider;
@@ -40,7 +41,7 @@ use Illuminate\Support\Facades\Route;
 it('registers every task source behind exactly one authorization boundary', function () {
     $providers = TaskAggregator::defaultProviders();
 
-    expect($providers)->toHaveCount(23);
+    expect($providers)->toHaveCount(24);
     expect(collect($providers)->mapWithKeys(fn (TaskProvider $provider): array => [
         $provider::class => $provider->sourceKey(),
     ])->all())->toBe([
@@ -54,6 +55,7 @@ it('registers every task source behind exactly one authorization boundary', func
         SafeguardingConcernProvider::class => 'safeguarding',
         SafeguardingActionPlanProvider::class => 'safeguarding_action',
         ControlRoomAlertProvider::class => 'alert',
+        ItWorkTaskProvider::class => 'it_work_task',
         FleetIncidentProvider::class => 'fleet_incident',
         FleetMaintenanceProvider::class => 'fleet_maintenance',
         MedicationErrorProvider::class => 'med_error',
@@ -188,6 +190,6 @@ it('keeps atomic overdue delivery on the synchronous database notification chann
         ->toContain('new AppEventNotification($payload)')
         ->toContain('$u->notify($notification)')
         ->and($commandSource)
-        ->toContain("DB::transaction(function () use (")
+        ->toContain('DB::transaction(function () use (')
         ->toContain("DB::table('task_escalations')->insertOrIgnore(");
 });

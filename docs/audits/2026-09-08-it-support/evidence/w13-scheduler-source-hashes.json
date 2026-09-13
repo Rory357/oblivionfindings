@@ -1,0 +1,30 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItAutomationRunDiagnostics.php",
+    "sha256": "554ddd0133e5dd07abcb5dd655ab142eabb13e873a1aeebc40fafd4bdfb686fb"
+  },
+  {
+    "path": "app/Domain/It/Services/ItAutomationRunRecorder.php",
+    "sha256": "8546aea1e428619b7962b98e060876a9cf7d4dec5d8d0d5a8d0c7264be0aecbb"
+  },
+  {
+    "path": "app/Domain/It/Services/ItAttachmentCleanupReadService.php",
+    "sha256": "2ee76ba56730a12dc8c420ca65bd94eca94c90fbe9307690dc4dfec51310e1c6"
+  },
+  {
+    "path": "app/Models/ItAutomationRun.php",
+    "sha256": "abc1da117c6d9a1cbfc7738683cb248dbcac3c9b48fdf09aed2995ea67ce27c7"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+    "sha256": "06a4919bc22e027bb2b2601280660df7a6effebede348f134ee887e35b4b71d2"
+  },
+  {
+    "path": "tests/Feature/It/ItServiceOperationsTest.php",
+    "sha256": "42a72b62adbaad33c458f775b9c11ec01c528b0650c96482ccb786dad7cb9c1c"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w13-api-browser-fixture.php",
+    "sha256": "c65c57b5d2b78f6e9e577f8403186560b80c4331ed2fe934da60ae738b0cb0f1"
+  }
+]

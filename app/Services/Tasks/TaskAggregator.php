@@ -75,6 +75,8 @@ class TaskAggregator
             new Providers\SafeguardingConcernProvider,
             new Providers\SafeguardingActionPlanProvider,
             new Providers\ControlRoomAlertProvider,
+            new Providers\ItWorkTaskProvider,
+            new Providers\ItApprovalTaskProvider,
             new Providers\FleetIncidentProvider,
             new Providers\FleetMaintenanceProvider,
             new Providers\MedicationErrorProvider,

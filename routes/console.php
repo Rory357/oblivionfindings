@@ -77,6 +77,8 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 
+app(Schedule::class)->job(new \App\Jobs\SyncWorkCalendarsJob)->everyFifteenMinutes()->withoutOverlapping();
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
@@ -227,7 +229,7 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
 
-// IT service operations owns these three definitions so the scheduler and
+// IT service operations owns these definitions so the scheduler and
 // the HTTP health view consume one canonical cadence and name catalogue.
 app(ItAutomationScheduleCatalog::class)->register();
 

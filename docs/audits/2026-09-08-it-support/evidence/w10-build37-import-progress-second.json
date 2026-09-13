@@ -1,0 +1,24 @@
+{
+    "observed_at": "2026-09-10T10:47:49+00:00",
+    "table_count": 835,
+    "owned_process_states": [
+        {
+            "ID": 556,
+            "COMMAND": "Query",
+            "TIME": 1,
+            "STATE": "preparing for alter table"
+        },
+        {
+            "ID": 558,
+            "COMMAND": "Query",
+            "TIME": 1,
+            "STATE": "executing"
+        }
+    ],
+    "last_migrations": [
+        "2026_08_30_000200_create_facility_signal_delivery_outbox",
+        "2026_08_30_000110_govern_monitoring_metric_projection_cutover",
+        "2026_08_30_000100_govern_monitoring_metric_projection_replays"
+    ],
+    "mutations": false
+}

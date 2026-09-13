@@ -14,6 +14,7 @@ import {
 import {
     AlertTriangle,
     BedDouble,
+    BookOpen,
     CalendarDays,
     CheckCircle2,
     CheckSquare,
@@ -36,6 +37,7 @@ import {
     Truck,
     Users,
     Utensils,
+    Vote,
     Wrench,
     type LucideIcon,
 } from 'lucide-react';
@@ -49,6 +51,9 @@ import {
     type CSSProperties,
     type ReactNode,
 } from 'react';
+import { CalendarDayHeading } from './work-schedule';
+export { CalendarWorkRows, WorkSchedule } from './work-schedule';
+export type { CalendarWorkEntry } from './work-schedule';
 
 export type Density = 'comfortable' | 'compact';
 
@@ -90,6 +95,8 @@ const ICONS: Record<string, LucideIcon> = {
     Plus,
     Lock,
     Dot,
+    BookOpen,
+    Vote,
 };
 
 export function Icon({
@@ -410,6 +417,8 @@ function MiniChip({
 }) {
     const { colorBy, onSelect, onPreview, onPreviewEnd } = useCalUI();
     const overdue = ev.status === 'overdue';
+    const draggable =
+        !!onDragStart && ev.editable && !ev.recurrence && !ev.isOccurrence;
     return (
         <GuardrailButton
             unstyled
@@ -418,9 +427,15 @@ function MiniChip({
                 onPreviewEnd?.();
                 onSelect(ev);
             }}
-            draggable={!!onDragStart}
+            onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onPreviewEnd?.();
+                onSelect(ev);
+            }}
+            draggable={draggable}
             onDragStart={
-                onDragStart
+                draggable && onDragStart
                     ? (e) => {
                           onPreviewEnd?.();
                           onDragStart(e, ev);
@@ -428,7 +443,7 @@ function MiniChip({
                     : undefined
             }
             style={cv(ev, colorBy)}
-            className={`group flex w-full items-center gap-1.5 rounded-[6px] border px-1.5 py-[3px] text-left text-[11px] leading-tight transition-all hover:shadow-sm ${onDragStart ? 'cursor-grab active:cursor-grabbing' : ''}`}
+            className={`group flex w-full items-center gap-1.5 rounded-[6px] border px-1.5 py-[3px] text-left text-[11px] leading-tight transition-all hover:shadow-sm ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
             onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'var(--cb)';
                 onPreview?.(ev, e.currentTarget);
@@ -473,6 +488,55 @@ const HOURS = Array.from(
 );
 const topFor = (min: number): number => ((min - GRID_START * 60) / 60) * HOUR_H;
 
+/** One tab stop per day; arrow keys reach the other hours without 168 tab stops. */
+export function CalendarTimeSlot({ day, hour }: { day: Date; hour: number }) {
+    const { onCreateAt } = useCalUI();
+    if (!onCreateAt)
+        return (
+            <div
+                className="border-b border-border/60"
+                style={{ height: HOUR_H }}
+            />
+        );
+    const time = new Date(day);
+    time.setHours(hour, 0, 0, 0);
+    return (
+        <GuardrailButton unstyled
+            type="button"
+            data-calendar-slot
+            tabIndex={hour === 9 ? 0 : -1}
+            aria-label={`Create entry on ${time.toLocaleString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
+            className="block w-full border-b border-border/60 text-left hover:bg-primary/5 focus-visible:relative focus-visible:z-10 focus-visible:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            style={{ height: HOUR_H }}
+            onClick={() => onCreateAt(day, hour)}
+            onKeyDown={(e) => {
+                if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key))
+                    return;
+                e.preventDefault();
+                const slots = Array.from(
+                    e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                        '[data-calendar-slot]',
+                    ) ?? [],
+                );
+                const index = slots.indexOf(e.currentTarget);
+                slots[
+                    e.key === 'Home'
+                        ? 0
+                        : e.key === 'End'
+                          ? slots.length - 1
+                          : Math.max(
+                                0,
+                                Math.min(
+                                    slots.length - 1,
+                                    index + (e.key === 'ArrowDown' ? 1 : -1),
+                                ),
+                            )
+                ]?.focus();
+            }}
+        />
+    );
+}
+
 /** Scroll a time-grid to ~6am on mount / period change so the working day is in
  *  view even though the grid now spans the full 24 hours (midnight → midnight). */
 function useGridAutoScroll(navDate: Date) {
@@ -507,7 +571,13 @@ type Packed = Decorated & {
     _cols: number;
 };
 
-function packDay(list: Decorated[]): Packed[] {
+export function occursOnDay(entry: Decorated, day: Date): boolean {
+    const start = new Date(day); start.setHours(0, 0, 0, 0);
+    const end = new Date(start); end.setDate(end.getDate() + 1);
+    return entry._start < end && (entry._end && entry._end > entry._start ? entry._end > start : entry._start >= start);
+}
+
+export function packDay(list: Decorated[], day: Date): Packed[] {
     const evs = list
         .filter((e) => !e.allDay)
         .map((e) => ({ ...e, _s: 0, _e: 0, _col: 0, _cols: 1 }) as Packed)
@@ -540,8 +610,10 @@ function packDay(list: Decorated[]): Packed[] {
         clusterEnd = -1;
     };
     evs.forEach((e) => {
-        const s = minutes(e._start);
-        const en = e._end ? minutes(e._end) : s + 45;
+        const boundary = new Date(day); boundary.setHours(0, 0, 0, 0);
+        const next = new Date(boundary); next.setDate(next.getDate() + 1);
+        const s = e._start < boundary ? 0 : minutes(e._start);
+        const en = e._end ? (e._end >= next ? 1440 : minutes(e._end)) : Math.min(s + 45, 1440);
         e._s = s;
         e._e = en;
         if (cluster.length && s >= clusterEnd) flush();
@@ -556,6 +628,15 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
     const { colorBy, srcByKey, onSelect, onMove, onPreview, onPreviewEnd } =
         useCalUI();
     const top = topFor(ev._s);
+    const canDrag =
+        !!onMove &&
+        ev.editable &&
+        !ev.allDay &&
+        !ev.recurrence &&
+        !ev.isOccurrence;
+    const touch = useRef(false);
+    const dragCleanup = useRef<(() => void) | null>(null);
+    useEffect(() => () => dragCleanup.current?.(), []);
     const baseH = Math.max(((ev._e - ev._s) / 60) * HOUR_H - 3, 22);
     const [drag, setDrag] = useState<{
         mode: 'move' | 'resize';
@@ -564,9 +645,12 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
     const overdue = ev.status === 'overdue';
 
     const startDrag = (mode: 'move' | 'resize') => (e: React.PointerEvent) => {
+        touch.current = e.pointerType === 'touch';
+        // Let touch scrolling remain native. Tap opens the same date/time editor.
+        if (touch.current) return;
         if (e.button !== 0) return;
         onPreviewEnd?.();
-        if (!onMove || ev.allDay) {
+        if (!canDrag || !onMove) {
             if (mode === 'move') onSelect(ev);
             return;
         }
@@ -575,14 +659,23 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
         const startY = e.clientY;
         let dy = 0;
         let moved = false;
+        const cleanup = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            window.removeEventListener('pointercancel', cancel);
+            dragCleanup.current = null;
+        };
+        const cancel = () => {
+            cleanup();
+            setDrag(null);
+        };
         const move = (me: PointerEvent) => {
             dy = me.clientY - startY;
             if (Math.abs(dy) > 3) moved = true;
             setDrag({ mode, dy });
         };
         const up = () => {
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
+            cleanup();
             setDrag(null);
             const snap = Math.round(((dy / HOUR_H) * 60) / 15) * 15;
             if (moved && snap !== 0) {
@@ -604,6 +697,8 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
         };
         window.addEventListener('pointermove', move);
         window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', cancel);
+        dragCleanup.current = cleanup;
     };
 
     const dy = drag ? drag.dy : 0;
@@ -628,6 +723,15 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
                 }
             }}
             onPointerDown={startDrag('move')}
+            onClick={() => {
+                if (touch.current) onSelect(ev);
+            }}
+            onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onPreviewEnd?.();
+                onSelect(ev);
+            }}
             onMouseEnter={(e) => {
                 if (!drag) onPreview?.(ev, e.currentTarget);
             }}
@@ -643,7 +747,7 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
                 boxShadow: 'inset 3px 0 0 var(--c)',
                 zIndex: drag ? 30 : undefined,
             }}
-            className={`absolute overflow-hidden rounded-md border px-2 py-1 text-left transition-shadow select-none hover:z-10 hover:shadow-md focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${onMove ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${drag ? 'shadow-lg ring-1 ring-primary/40' : ''}`}
+            className={`absolute overflow-hidden rounded-md border px-2 py-1 text-left transition-shadow select-none hover:z-10 hover:shadow-md focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${drag ? 'shadow-lg ring-1 ring-primary/40' : ''}`}
         >
             <div
                 className="flex items-center gap-1"
@@ -675,7 +779,7 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
                     className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-status-critical"
                 />
             )}
-            {onMove && (
+            {canDrag && (
                 <div
                     aria-hidden="true"
                     onPointerDown={startDrag('resize')}
@@ -718,7 +822,7 @@ function AllDayRow({
                         className="min-h-[34px] space-y-1 border-l p-1"
                     >
                         {events
-                            .filter((e) => e.allDay && sameDay(e._start, d))
+                            .filter((e) => e.allDay && occursOnDay(e, d))
                             .map((e) => (
                                 <GuardrailButton
                                     unstyled
@@ -727,6 +831,7 @@ function AllDayRow({
                                         onPreviewEnd?.();
                                         onSelect(e);
                                     }}
+                                    onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onPreviewEnd?.(); onSelect(e); }}
                                     style={cv(e, colorBy)}
                                     aria-label={`${e.title}, all day, ${d.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}`}
                                     className="flex w-full items-center gap-1 rounded border px-1.5 py-1 text-left text-[11px] font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -850,6 +955,8 @@ export function MonthView({
         cellRefs.current[clamped]?.focus();
     };
     const onCellKey = (e: React.KeyboardEvent, i: number, d: Date) => {
+        // An event button owns its Enter/Space keys; only the date cell creates.
+        if (e.target !== e.currentTarget) return;
         switch (e.key) {
             case 'ArrowLeft':
                 e.preventDefault();
@@ -929,7 +1036,7 @@ export function MonthView({
                             const isWeekend =
                                 d.getDay() === 0 || d.getDay() === 6;
                             const dayEvents = events
-                                .filter((e) => sameDay(e._start, d))
+                                .filter((e) => occursOnDay(e, d))
                                 .sort(
                                     (a, b) =>
                                         (a.allDay ? -1 : 0) -
@@ -1130,7 +1237,7 @@ export function WeekView({
                     </div>
                     {days.map((d, i) => {
                         const packed = packDay(
-                            events.filter((e) => sameDay(e._start, d)),
+                            events.filter((e) => occursOnDay(e, d)), d,
                         );
                         return (
                             <div
@@ -1139,10 +1246,10 @@ export function WeekView({
                                 onContextMenu={(e) => ctxAt(e, d)}
                             >
                                 {HOURS.map((h) => (
-                                    <div
+                                    <CalendarTimeSlot
                                         key={h}
-                                        className="border-b border-border/60"
-                                        style={{ height: HOUR_H }}
+                                        day={d}
+                                        hour={h}
                                     />
                                 ))}
                                 <NowLine day={d} />
@@ -1168,10 +1275,9 @@ export function DayView({
     const { onContext } = useCalUI();
     const scrollRef = useGridAutoScroll(navDate);
     const sbw = useScrollbarWidth(scrollRef);
-    const TODAY = new Date();
     const day = navDate;
-    const dayEvents = events.filter((e) => sameDay(e._start, day));
-    const packed = packDay(dayEvents);
+    const dayEvents = events.filter((e) => occursOnDay(e, day));
+    const packed = packDay(dayEvents, day);
     const ctxAt = (e: React.MouseEvent) => {
         if (!onContext) return;
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -1189,27 +1295,10 @@ export function DayView({
             unstyled
             className="flex h-full flex-col overflow-hidden rounded-xl border bg-card"
         >
-            <div className="flex items-center gap-3 border-b px-4 py-3">
-                <span
-                    className={`tnum flex h-11 w-11 flex-col items-center justify-center rounded-xl ${sameDay(day, TODAY) ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}
-                >
-                    <span className="text-[9px] leading-none font-semibold uppercase">
-                        {WD[day.getDay()]}
-                    </span>
-                    <span className="text-lg leading-tight font-bold">
-                        {day.getDate()}
-                    </span>
-                </span>
-                <div>
-                    <div className="text-sm font-semibold">
-                        {WD_FULL[day.getDay()]}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                        {dayEvents.length}{' '}
-                        {dayEvents.length === 1 ? 'entry' : 'entries'} scheduled
-                    </div>
-                </div>
-            </div>
+            <CalendarDayHeading
+                date={Date.UTC(day.getFullYear(), day.getMonth(), day.getDate())}
+                caption={`${dayEvents.length} ${dayEvents.length === 1 ? 'entry' : 'entries'} scheduled`}
+            />
             <AllDayRow days={[day]} events={events} padRight={sbw} />
             <div
                 ref={scrollRef}
@@ -1236,11 +1325,7 @@ export function DayView({
                         onContextMenu={ctxAt}
                     >
                         {HOURS.map((h) => (
-                            <div
-                                key={h}
-                                className="border-b border-border/60"
-                                style={{ height: HOUR_H }}
-                            />
+                            <CalendarTimeSlot key={h} day={day} hour={h} />
                         ))}
                         <NowLine day={day} />
                         {packed.map((e) => (
@@ -1268,19 +1353,21 @@ export function AgendaView({
 }) {
     const { colorBy, srcByKey, onSelect, onContext } = useCalUI();
     const TODAY = new Date();
+    const monthStart = new Date(navDate.getFullYear(), navDate.getMonth(), 1);
+    const monthEnd = new Date(navDate.getFullYear(), navDate.getMonth() + 1, 1);
     const inMonth = events
         .filter(
             (e) =>
-                e._start.getMonth() === navDate.getMonth() &&
-                e._start.getFullYear() === navDate.getFullYear(),
+                e._start < monthEnd && (e._end ? e._end > monthStart : e._start >= monthStart),
         )
         .sort((a, b) => a._start.getTime() - b._start.getTime());
     const groups: { key: string; date: Date; items: Decorated[] }[] = [];
     inMonth.forEach((e) => {
-        const key = e._start.toDateString();
+        const visibleDate = e._start < monthStart ? monthStart : e._start;
+        const key = visibleDate.toDateString();
         let g = groups.find((x) => x.key === key);
         if (!g) {
-            g = { key, date: e._start, items: [] };
+            g = { key, date: visibleDate, items: [] };
             groups.push(g);
         }
         g.items.push(e);
@@ -1339,6 +1426,7 @@ export function AgendaView({
                                     unstyled
                                     key={e.id}
                                     onClick={() => onSelect(e)}
+                                    onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onSelect(e); }}
                                     className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
                                 >
                                     <span className="tnum w-20 shrink-0 text-[12px] font-medium text-muted-foreground">
@@ -1492,7 +1580,7 @@ export function TimelineView({
                                     const wknd =
                                         d.getDay() === 0 || d.getDay() === 6;
                                     const dayEvents = laneEvents.filter((e) =>
-                                        sameDay(e._start, d),
+                                        occursOnDay(e, d),
                                     );
                                     return (
                                         <div
@@ -1524,6 +1612,7 @@ export function TimelineView({
                                                                     onPreviewEnd?.();
                                                                     onSelect(e);
                                                                 }}
+                                                                onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onSelect(e); }}
                                                                 onMouseEnter={(
                                                                     me,
                                                                 ) =>
@@ -1574,7 +1663,8 @@ export function TimelineView({
 /* ---- today rail --------------------------------------------------------- */
 
 function srcLabel(key: string): string {
-    return key.charAt(0).toUpperCase() + key.slice(1);
+    const label = key.replaceAll('_', ' ');
+    return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function RailRow({
@@ -1651,7 +1741,7 @@ export function TodayRail({
             (dayStart(d).getTime() - dayStart(now).getTime()) / 86_400_000,
         );
     const todayItems = events
-        .filter((e) => sameDay(e._start, now))
+        .filter((e) => occursOnDay(e, now))
         .sort(
             (a, b) =>
                 (b.allDay ? 0 : 1) - (a.allDay ? 0 : 1) ||

@@ -7,18 +7,25 @@ import {
  * gold-standard HR hubs: bespoke table rows, hero stat chips and context-menu
  * triggers built from styled native elements. Every colour is a semantic
  * design token. */
-import { useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
+import { type HrTabItem } from '@/components/hr/hr-tabs';
 import { useLeaveContextMenu } from '@/components/hr/leave-context-menu';
 import { CsatRater } from '@/components/it/csat';
-import { ItHero } from '@/components/it/it-hero';
+import {
+    ItBulkResultPanel,
+    readItBulkResult,
+    type ItBulkResult,
+} from '@/components/it/it-bulk-result';
+import { ItHero, type ItHeroSummary } from '@/components/it/it-hero';
 import { ItModuleShell } from '@/components/it/it-module-shell';
 import { ItOverview, type OverviewPayload } from '@/components/it/it-overview';
+import { ItProvisioningList } from '@/components/it/it-provisioning-list';
 import { ItReports, REPORT_RANGES } from '@/components/it/it-reports';
 import {
     ItServiceCatalogue,
     type CatalogFieldOptions,
     type CatalogItem,
 } from '@/components/it/it-service-catalogue';
+import { ItTicketList } from '@/components/it/it-ticket-list';
 import {
     ItWizard,
     KbPreview,
@@ -42,27 +49,32 @@ import {
     type MyTicketRow,
 } from '@/components/it/my-tickets-list';
 import { ProvisioningCancelDialog } from '@/components/it/provisioning-cancel-dialog';
-import { SlaChip } from '@/components/it/sla-chip';
 import { TicketAdvancedFilters } from '@/components/it/ticket-advanced-filters';
 import { TicketCloseDialog } from '@/components/it/ticket-close-dialog';
 import { TicketDrawer } from '@/components/it/ticket-drawer';
+import type { TicketIntakePolicy } from '@/components/it/ticket-intake-fields';
+import { useTicketPropertyMutation } from '@/components/it/ticket-property-mutation';
 import { TicketReopenDialog } from '@/components/it/ticket-reopen-dialog';
-import { TicketRoutingSummary } from '@/components/it/ticket-routing-summary';
 import {
     TicketSavedFilters,
     type SavedTicketFilterRow,
 } from '@/components/it/ticket-saved-filters';
+import { TicketTriageReasonDialog } from '@/components/it/ticket-triage-reason-dialog';
 import {
-    TicketWaitingDialog,
-    waitingStatusLabel,
-} from '@/components/it/ticket-waiting-dialog';
+    ticketViewLabel,
+    ticketViewOptions,
+} from '@/components/it/ticket-view-options';
+import { TicketWaitingDialog } from '@/components/it/ticket-waiting-dialog';
 import { WorkflowTemplateDestination } from '@/components/it/workflow-template-destination';
+import { compactMenu } from '@/components/lists/entity-menu';
+import { ListCaption } from '@/components/lists/list-caption';
 import {
     PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderRail,
     PageHeaderSearch,
+    PageHeaderViewToggle,
 } from '@/components/page/page-header';
 import {
     AlertDialog,
@@ -94,18 +106,14 @@ import {
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { fireConfetti } from '@/lib/confetti';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Archive,
     BarChart3,
     BookMarked,
     BookOpen,
     CheckCircle2,
-    ChevronDown,
-    ChevronsUpDown,
-    ChevronUp,
     Copy,
     Download,
     GitMerge,
@@ -113,7 +121,9 @@ import {
     KeyRound,
     Laptop,
     LayoutDashboard,
+    LayoutGrid,
     Link2,
+    List,
     Mail,
     MessageSquare,
     MoreHorizontal,
@@ -131,7 +141,7 @@ import {
     UserCog,
     XCircle,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 /* ------------------------------------------------------------------ */
@@ -154,31 +164,7 @@ interface Paginated<T> {
 }
 
 /** Server summary — all-time counts feeding hero chips and tab badges. */
-interface Summary {
-    my: { open: number; waiting: number; resolved_30d: number };
-    tickets?: {
-        open: number;
-        unassigned: number;
-        urgent_unassigned: number;
-        urgent_open: number;
-        at_risk: number;
-        breached: number;
-        awaiting_reply: number;
-        waiting: number;
-        resolved_30d: number;
-        met_30d: number;
-        by_status: Record<string, number>;
-        views: Record<string, number>;
-    };
-    provisioning?: {
-        pending: number;
-        in_progress: number;
-        failed: number;
-        done_30d: number;
-        overdue: number;
-        pending_over_7d: number;
-    };
-}
+type Summary = ItHeroSummary;
 
 interface Filters {
     status: string | null;
@@ -225,6 +211,7 @@ interface KbPublishedRow {
 interface Props {
     /** Agent-only props — absent from self-service (requester) payloads. */
     requests?: Paginated<RequestRow> | null;
+    bulkResult?: ItBulkResult | null;
     provisioningWorkflows?: ProvisioningWorkflowRow[];
     tickets?: Paginated<TicketRow> | null;
     assignees?: AssigneeOption[];
@@ -238,12 +225,15 @@ interface Props {
     deviceOptions?: DeviceOption[];
     /** Active catalogue services for ticket classification and queue filtering. */
     serviceOptions?: ServiceOption[];
+    intakePolicy?: TicketIntakePolicy;
     /** Knowledge-base catalogue for the agent Knowledge tab (§I). */
     kbArticles?: KbRow[];
     kbOptions?: KbOptions;
     filters?: Filters;
     /** User-owned queue filters; their filter JSON never leaves the server. */
     savedTicketFilters?: SavedTicketFilterRow[];
+    draftRecovery?: { enabled: boolean };
+    conversation_ready?: boolean;
     activeSavedTicketFilterId?: number | null;
     /** §F1 Overview board — KPIs + needs-attention lanes (agents only). */
     overview?: OverviewPayload;
@@ -258,12 +248,14 @@ interface Props {
     catalogFieldOptions?: CatalogFieldOptions;
     /** Published KB articles for a requester's browse tab (§I). */
     kbPublished?: KbPublishedRow[];
-    summary: Summary;
+    summary: Summary | null;
     can: {
         view: boolean;
         manage: boolean;
         request: boolean;
         edit_sla?: boolean;
+        knowledge_author?: boolean;
+        knowledge_review?: boolean;
     };
 }
 
@@ -355,7 +347,7 @@ const TICKET_STATUSES = [
 ];
 const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 const TICKET_CATEGORIES = ['hardware', 'account', 'network', 'other'];
-const SLA_STATES = ['ok', 'at_risk', 'breached', 'met'];
+const SLA_STATES = ['ok', 'at_risk', 'breached', 'met', 'paused', 'unmeasured'];
 const VIEW_TABS = new Set([
     'overview',
     'tickets',
@@ -365,38 +357,13 @@ const VIEW_TABS = new Set([
 ]);
 const REQUEST_TABS = new Set(['catalog', 'my-tickets', 'knowledge']);
 
-/** Predefined views — server `view` param; counts come from `summary.tickets.views`
- *  keyed identically. Order mirrors the triage funnel (open → attention → done). */
-const TICKET_VIEWS: { key: string; label: string }[] = [
-    { key: 'all_open', label: 'All open' },
-    { key: 'unassigned', label: 'Unassigned' },
-    { key: 'mine', label: 'Mine' },
-    { key: 'owned_by_me', label: 'Owned by me' },
-    { key: 'my_team', label: "My team's work" },
-    { key: 'breaching', label: 'Breaching soon' },
-    { key: 'breached', label: 'Breached' },
-    { key: 'awaiting_reply', label: 'Awaiting reply' },
-    { key: 'waiting', label: 'All waiting work' },
-    { key: 'recently_resolved', label: 'Recently resolved' },
-];
-
-/** localStorage key for an agent's default tickets view (§F2). */
-const TICKETS_VIEW_KEY = 'it.ticketsView';
-
-const readStoredView = (): string | null => {
-    try {
-        return localStorage.getItem(TICKETS_VIEW_KEY);
-    } catch {
-        return null;
-    }
-};
-
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
 export default function ItIndex({
     requests,
+    bulkResult,
     provisioningWorkflows = [],
     tickets,
     assignees = [],
@@ -405,10 +372,13 @@ export default function ItIndex({
     siteOptions = [],
     deviceOptions = [],
     serviceOptions = [],
+    intakePolicy,
     kbArticles = [],
     kbOptions = { owners: [], sites: [], services: [] },
     filters,
     savedTicketFilters = [],
+    draftRecovery = { enabled: false },
+    conversation_ready = false,
     activeSavedTicketFilterId = null,
     overview,
     slaPolicies,
@@ -423,30 +393,51 @@ export default function ItIndex({
     // Default landing tab (§O): a right-click "Set as default view" persists to
     // localStorage; a `?tab=` deep link always wins over it. Validate the stored
     // id against what this user can actually see before trusting it.
-    const capabilityDefault = can.view ? 'overview' : 'my-tickets';
+    const availableTicketViews = ticketViewOptions(
+        can.manage,
+        conversation_ready === true,
+    );
+    const canAuthorKnowledge = can.knowledge_author === true;
+    const canReviewKnowledge = can.knowledge_review === true;
+    const showKnowledgeCatalogue =
+        can.view || canAuthorKnowledge || canReviewKnowledge;
+    const capabilityDefault = can.view
+        ? 'overview'
+        : can.request
+          ? 'my-tickets'
+          : 'knowledge';
     const tabIsAllowed = (id: string | null): id is string => {
         if (!id) return false;
-        if (id === 'knowledge') return can.view || can.request;
+        if (id === 'knowledge') return showKnowledgeCatalogue || can.request;
         if (VIEW_TABS.has(id)) return can.view;
         if (REQUEST_TABS.has(id)) return can.request;
 
         return false;
     };
+    const page = usePage();
+    const actorId = (page.props.auth as { user?: { id?: number } } | undefined)
+        ?.user?.id;
+    const defaultKey = `it.defaultTab.${actorId ?? 'anonymous'}`;
+    const pageQuery = new URL(page.url, 'http://local.invalid').searchParams;
+    const listView = pageQuery.get('list_view') === 'cards' ? 'cards' : 'table';
     const [storedDefault] = useState<string | null>(() => {
         if (typeof window === 'undefined') return null;
-        const v = window.localStorage.getItem('it.defaultTab');
+        let v: string | null = null;
+        try {
+            v = window.localStorage.getItem(defaultKey);
+        } catch {
+            /* Storage may be disabled. */
+        }
         return tabIsAllowed(v) ? v : null;
     });
     const [defaultTab, setDefaultTab] = useState<string | null>(storedDefault);
-    const [requestedTab, setTab] = useHrTab(storedDefault ?? capabilityDefault);
+    const requestedTab =
+        pageQuery.get('tab') ?? storedDefault ?? capabilityDefault;
+    const setTab = (id: string) => navigate({ tab: id });
     const tab = tabIsAllowed(requestedTab) ? requestedTab : capabilityDefault;
     const [modal, setModal] = useState<ItModal | null>(null);
     const [peekId, setPeekId] = useState<number | null>(null);
     const ctx = useLeaveContextMenu();
-
-    useEffect(() => {
-        if (requestedTab !== tab) setTab(tab);
-    }, [requestedTab, setTab, tab]);
 
     useEffect(() => {
         if (
@@ -488,7 +479,7 @@ export default function ItIndex({
                       label: 'Tickets',
                       icon: Ticket,
                       tone: 'info',
-                      badge: summary.tickets?.open ?? 0,
+                      badge: summary?.tickets?.open ?? 0,
                   },
                   {
                       id: 'provisioning',
@@ -496,9 +487,9 @@ export default function ItIndex({
                       icon: Server,
                       tone: 'primary',
                       badge:
-                          (summary.provisioning?.pending ?? 0) +
-                          (summary.provisioning?.in_progress ?? 0) +
-                          (summary.provisioning?.failed ?? 0),
+                          (summary?.provisioning?.pending ?? 0) +
+                          (summary?.provisioning?.in_progress ?? 0) +
+                          (summary?.provisioning?.failed ?? 0),
                   },
                   {
                       id: 'knowledge',
@@ -526,14 +517,14 @@ export default function ItIndex({
                   },
                   {
                       id: 'my-tickets',
-                      label: 'My tickets',
+                      label: 'My requests',
                       icon: Inbox,
                       tone: 'success',
-                      badge: summary.my.waiting,
+                      badge: summary?.my.total ?? myTickets.length,
                   },
                   // Requester-only Knowledge browse — agents get the manage
                   // version in their own (can.view) Knowledge tab above.
-                  ...(!can.view
+                  ...(!showKnowledgeCatalogue
                       ? [
                             {
                                 id: 'knowledge',
@@ -544,6 +535,17 @@ export default function ItIndex({
                         ]
                       : []),
               ] as HrTabItem[])
+            : []),
+        ...(!can.view && showKnowledgeCatalogue
+            ? [
+                  {
+                      id: 'knowledge',
+                      label: 'Knowledge',
+                      icon: BookOpen,
+                      tone: 'primary' as const,
+                      badge: kbArticles.length,
+                  },
+              ]
             : []),
     ];
 
@@ -559,7 +561,11 @@ export default function ItIndex({
                 icon: Star,
                 onSelect: () => {
                     if (typeof window !== 'undefined')
-                        window.localStorage.setItem('it.defaultTab', id);
+                        try {
+                            window.localStorage.setItem(defaultKey, id);
+                        } catch {
+                            /* Best-effort preference. */
+                        }
                     setDefaultTab(id);
                     const name = tabItems.find((t) => t.id === id)?.label ?? id;
                     toast.success(`${name} is now your default view.`);
@@ -589,94 +595,126 @@ export default function ItIndex({
           }
         : undefined;
 
-    /** Merge a param patch onto the current filters and reload the queue. A
-     *  filter change drops the page cursor (not in `filters`) → back to page 1. */
-    const navigate = (patch: Record<string, string | undefined>) =>
-        router.get(
-            '/it',
-            {
-                ...Object.fromEntries(
-                    Object.entries(filters ?? {}).filter(
-                        ([, v]) => v !== null && v !== '',
-                    ),
-                ),
-                ...patch,
-                tab,
-            },
-            { preserveState: true, preserveScroll: true, replace: true },
+    /** URL state is the history entry; Back restores filters, layout and page. */
+    const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const navigate = (
+        patch: Record<string, string | undefined>,
+        replace = false,
+    ) => {
+        if (searchTimer.current) clearTimeout(searchTimer.current);
+        const query = new URLSearchParams(pageQuery);
+        if (!Object.keys(patch).every((key) => key === 'list_view')) {
+            query.delete('tickets_page');
+            query.delete('requests_page');
+        }
+        Object.entries(patch).forEach(([key, value]) =>
+            value === undefined || value === ''
+                ? query.delete(key)
+                : query.set(key, value),
         );
+        if (!query.has('tab')) query.set('tab', tab);
+        router.get('/it', Object.fromEntries(query), {
+            preserveState: true,
+            preserveScroll: true,
+            replace,
+        });
+    };
 
     const applyFilter = (key: keyof Filters, value: string) =>
         navigate({ [key]: value === ALL || value === '' ? undefined : value });
 
-    /** Predefined-view chip: remember it as the agent's default, then filter. */
     const applyView = (key: string) => {
         try {
-            localStorage.setItem(TICKETS_VIEW_KEY, key);
+            localStorage.setItem(
+                `it.ticketsView.${actorId ?? 'anonymous'}`,
+                key,
+            );
         } catch {
-            /* private mode — persistence is best-effort */
+            /* Best-effort preference. */
         }
         navigate({ view: key });
     };
+    const restoredInitialView = useRef(false);
+    useEffect(() => {
+        if (restoredInitialView.current || !can.view || tab !== 'tickets')
+            return;
+        restoredInitialView.current = true;
+        // Only an otherwise-empty initial queue entry uses the saved default.
+        // Back and explicit filters always retain their own history state.
+        if (pageQuery.size !== 1 || !pageQuery.has('tab')) return;
+        try {
+            const stored = localStorage.getItem(
+                `it.ticketsView.${actorId ?? 'anonymous'}`,
+            );
+            if (
+                availableTicketViews.some(
+                    (view) =>
+                        view.key === stored &&
+                        (!view.operational || can.manage),
+                )
+            )
+                navigate({ view: stored ?? undefined }, true);
+        } catch {
+            /* Storage may be disabled. */
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab, actorId, can.view, can.manage, conversation_ready]);
 
     const applySavedTicketFilter = (id: number) =>
         router.get(
             '/it',
-            { tab: 'tickets', saved_filter: id },
+            { tab: 'tickets', saved_filter: id, list_view: listView },
             // Remount so a saved search term becomes the controlled search
             // input value instead of being overwritten by stale local state.
-            { preserveState: false, preserveScroll: true, replace: true },
+            { preserveState: false, preserveScroll: true },
         );
 
-    /** Sortable header: first click → desc, re-click toggles asc⇄desc. */
-    const applySort = (col: string) => {
-        const active = filters?.sort === col;
-        const dir = !active ? 'desc' : filters?.dir === 'asc' ? 'desc' : 'asc';
-        navigate({ sort: col, dir });
-    };
-
-    // Debounced free-text search over reference / title / requester.
     const [search, setSearch] = useState(filters?.q ?? '');
+    const myQuery = pageQuery.get('my_q') ?? '';
+    const myStatus = pageQuery.get('my_status') ?? ALL;
+    const [mySearch, setMySearch] = useState(myQuery);
     useEffect(() => {
-        if ((filters?.q ?? '') === search) return;
-        const timer = setTimeout(
-            () => navigate({ q: search.trim() === '' ? undefined : search }),
+        if (searchTimer.current) clearTimeout(searchTimer.current);
+        setSearch(filters?.q ?? '');
+        setMySearch(myQuery);
+        return () => {
+            if (searchTimer.current) clearTimeout(searchTimer.current);
+        };
+    }, [page.url, filters?.q, myQuery]);
+    const updateSearch = (value: string, mine = false) => {
+        (mine ? setMySearch : setSearch)(value);
+        if (searchTimer.current) clearTimeout(searchTimer.current);
+        searchTimer.current = setTimeout(
+            () =>
+                navigate(
+                    { [mine ? 'my_q' : 'q']: value.trim() || undefined },
+                    true,
+                ),
             350,
         );
-        return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search]);
-
-    // Land an agent on their remembered view when they open Tickets with none set
-    // (a hero deep-link carrying ?view= always wins).
-    useEffect(() => {
-        if (
-            !can.view ||
-            tab !== 'tickets' ||
-            filters?.view ||
-            activeSavedTicketFilterId !== null
-        )
-            return;
-        const stored = readStoredView();
-        if (stored) navigate({ view: stored });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tab]);
-
-    // Delight (§S): celebrate the moment an agent clears the breach queue —
-    // when the breached count goes from >0 to 0 across a reload. sessionStorage
-    // remembers the last-seen count so it fires once, not on every render.
-    const breachedCount = can.view ? (summary.tickets?.breached ?? 0) : 0;
-    useEffect(() => {
-        if (!can.view || typeof window === 'undefined') return;
-        const prev = Number(
-            window.sessionStorage.getItem('it.lastBreached') ?? '-1',
-        );
-        if (prev > 0 && breachedCount === 0) {
-            fireConfetti();
-            toast.success('Breach queue cleared — every SLA back on track.');
-        }
-        window.sessionStorage.setItem('it.lastBreached', String(breachedCount));
-    }, [can.view, breachedCount]);
+    };
+    const filteredMyTickets = myTickets.filter(
+        (ticket) =>
+            (myStatus === ALL || ticket.status === myStatus) &&
+            (!myQuery ||
+                [ticket.title, ticket.reference, ticket.description].some(
+                    (value) =>
+                        value
+                            ?.toLocaleLowerCase()
+                            .includes(myQuery.toLocaleLowerCase()),
+                )),
+    );
+    const layoutToggle = (
+        <PageHeaderViewToggle
+            value={listView}
+            onChange={(value) => navigate({ list_view: value })}
+            ariaLabel="List layout"
+            options={[
+                { value: 'cards', label: 'Cards', icon: LayoutGrid },
+                { value: 'table', label: 'Table', icon: List },
+            ]}
+        />
+    );
 
     const ticketFiltersActive = Boolean(
         search.trim() ||
@@ -734,11 +772,16 @@ export default function ItIndex({
 
     /** Wipe every tickets filter (and the search box) back to the full queue. */
     const clearTicketFilters = () => {
+        try {
+            localStorage.removeItem(`it.ticketsView.${actorId ?? 'anonymous'}`);
+        } catch {
+            /* Best-effort preference. */
+        }
         setSearch('');
         router.get(
             '/it',
-            { tab: 'tickets' },
-            { preserveState: true, preserveScroll: true, replace: true },
+            { tab: 'tickets', list_view: listView },
+            { preserveState: true, preserveScroll: true },
         );
     };
 
@@ -761,12 +804,25 @@ export default function ItIndex({
     // Both queues share one per-page selection hook (useRowSelection, below).
     // Only one tab is visible at a time, so the busy flag is shared.
 
-    const ticketSel = useRowSelection((tickets?.data ?? []).map((t) => t.id));
+    const canManageTicket = (ticket: TicketRow) =>
+        can.manage && ticket.can?.manage === true;
+    const manageableTickets = (tickets?.data ?? []).filter(canManageTicket);
+    const ticketSel = useRowSelection(
+        manageableTickets.map((t) => t.id),
+        Object.fromEntries(
+            manageableTickets.map((t) => [t.id, t.lock_version]),
+        ),
+    );
+    const propertyMutation = useTicketPropertyMutation({
+        actorId: actorId ?? null,
+        draftsEnabled: draftRecovery.enabled,
+    });
     const reqSel = useRowSelection((requests?.data ?? []).map((r) => r.id));
     const [closeSelectedTickets, setCloseSelectedTickets] = useState(false);
     const [closeTicket, setCloseTicket] = useState<TicketRow | null>(null);
     const [reopenTicket, setReopenTicket] = useState<{
         id: number;
+        lock_version: number;
         reference: string | null;
         audience: 'agent' | 'requester';
     } | null>(null);
@@ -775,14 +831,52 @@ export default function ItIndex({
     const [confirmBulkFulfil, setConfirmBulkFulfil] = useState(false);
     const [cancelRequest, setCancelRequest] = useState<RequestRow | null>(null);
     const [bulkBusy, setBulkBusy] = useState(false);
+    const [bulkOutcome, setBulkOutcome] = useState<{
+        actorId: number | undefined;
+        result: ItBulkResult | null;
+    }>({ actorId, result: bulkResult ?? null });
+    const [bulkError, setBulkError] = useState<string | null>(null);
+    const [bulkBlocked, setBulkBlocked] = useState(false);
+    const [bulkPlan, setBulkPlan] = useState<{
+        actorId: number | undefined;
+        ids: number[];
+        versions: Record<number, number>;
+        payload: Record<string, unknown>;
+        description: string;
+    } | null>(null);
+    const [reviewingBulk, setReviewingBulk] = useState(false);
+    const acceptBulkResult = (result: ItBulkResult) => {
+        setBulkOutcome({ actorId, result });
+        setBulkError(null);
+        const selection = result.resource === 'tickets' ? ticketSel : reqSel;
+        selection.remove(
+            result.items
+                .filter((item) =>
+                    ['updated', 'unchanged', 'unavailable'].includes(
+                        item.status,
+                    ),
+                )
+                .map((item) => item.id),
+        );
+        setBulkBlocked(result.rejected > 0);
+    };
+    const reviewBulk = () => {
+        setReviewingBulk(true);
+        router.reload({
+            onSuccess: () => {
+                ticketSel.clear();
+                reqSel.clear();
+                setBulkBlocked(false);
+            },
+            onFinish: () => setReviewingBulk(false),
+        });
+    };
     const [confirmKbDelete, setConfirmKbDelete] = useState<KbRow | null>(null);
     const [confirmKbRetire, setConfirmKbRetire] = useState<KbRow | null>(null);
     const [retirementReason, setRetirementReason] = useState('');
 
     /* ---------------- requester KB browse (§I) ---------------- */
-    const [readerArticle, setReaderArticle] = useState<KbPublishedRow | null>(
-        null,
-    );
+    const [readerArticleId, setReaderArticleId] = useState<number | null>(null);
     const [kbSearch, setKbSearch] = useState('');
     const [kbCategory, setKbCategory] = useState<string>(ALL);
     const [kbStatus, setKbStatus] = useState<string>(ALL);
@@ -791,7 +885,6 @@ export default function ItIndex({
     const [reportDays, setReportDays] = useState(30);
     const [catalogQuery, setCatalogQuery] = useState('');
     const [catalogCategory, setCatalogCategory] = useState<string>(ALL);
-    const [myStatus, setMyStatus] = useState<string>(ALL);
     // The server is canonical; this local overlay keeps the open reader in
     // sync while its partial Inertia refresh returns the updated payload.
     const [submittedKbVotes, setSubmittedKbVotes] = useState<
@@ -800,6 +893,24 @@ export default function ItIndex({
     const [submittingKbVoteFor, setSubmittingKbVoteFor] = useState<
         number | null
     >(null);
+    const ticketMutationAllowed = (id: number) =>
+        manageableTickets.some((ticket) => ticket.id === id);
+    useEffect(() => {
+        const allowed = (id: number) =>
+            can.manage &&
+            (tickets?.data ?? []).some(
+                (ticket) => ticket.id === id && ticket.can?.manage === true,
+            );
+        if (
+            (modal?.type === 'assign-ticket' || modal?.type === 'resolve') &&
+            !allowed(modal.ticket.id)
+        )
+            setModal(null);
+        if (closeTicket && !allowed(closeTicket.id)) setCloseTicket(null);
+        if (waitingTicket && !allowed(waitingTicket.id)) setWaitingTicket(null);
+        if (reopenTicket?.audience === 'agent' && !allowed(reopenTicket.id))
+            setReopenTicket(null);
+    }, [can.manage, tickets, modal, closeTicket, waitingTicket, reopenTicket]);
 
     const filteredKb = kbPublished.filter((a) => {
         const q = kbSearch.trim().toLowerCase();
@@ -821,18 +932,73 @@ export default function ItIndex({
                 (a.body ?? '').toLowerCase().includes(q))
         );
     });
-    const currentReaderArticle = readerArticle
-        ? (kbPublished.find((article) => article.id === readerArticle.id) ??
-          readerArticle)
-        : null;
+    const currentReaderArticle =
+        (showKnowledgeCatalogue ? kbArticles : kbPublished).find(
+            (article) => article.id === readerArticleId,
+        ) ?? null;
+    useEffect(() => {
+        if (readerArticleId !== null && currentReaderArticle === null) {
+            setReaderArticleId(null);
+        }
+    }, [readerArticleId, currentReaderArticle]);
+    useEffect(() => {
+        if (
+            modal?.type === 'kb' &&
+            (!canAuthorKnowledge ||
+                (modal.article &&
+                    !kbArticles.some(
+                        (a) =>
+                            a.id === modal.article?.id &&
+                            a.can.author &&
+                            a.status === 'draft',
+                    )))
+        ) {
+            setModal(null);
+        }
+        if (
+            confirmKbDelete &&
+            (!canAuthorKnowledge ||
+                !kbArticles.some(
+                    (a) =>
+                        a.id === confirmKbDelete.id &&
+                        a.can.author &&
+                        a.status === 'draft',
+                ))
+        ) {
+            setConfirmKbDelete(null);
+        }
+        if (
+            confirmKbRetire &&
+            (!canReviewKnowledge ||
+                !kbArticles.some(
+                    (a) =>
+                        a.id === confirmKbRetire.id &&
+                        a.can.review &&
+                        a.status === 'published',
+                ))
+        ) {
+            setConfirmKbRetire(null);
+            setRetirementReason('');
+        }
+    }, [
+        canAuthorKnowledge,
+        canReviewKnowledge,
+        kbArticles,
+        modal,
+        confirmKbDelete,
+        confirmKbRetire,
+    ]);
     const readerVote = currentReaderArticle
         ? (submittedKbVotes[currentReaderArticle.id] ??
-          currentReaderArticle.user_vote)
+          ('user_vote' in currentReaderArticle
+              ? currentReaderArticle.user_vote
+              : null))
         : null;
 
     /** Open the reader and count the read (server guards publication and access). */
     const openArticle = (a: KbPublishedRow) => {
-        setReaderArticle(a);
+        if (!kbPublished.some((article) => article.id === a.id)) return;
+        setReaderArticleId(a.id);
         router.post(
             `/it/kb/${a.id}/view`,
             {},
@@ -844,15 +1010,14 @@ export default function ItIndex({
         );
     };
 
-    const voteHelpful = (a: KbPublishedRow, helpful: boolean) => {
+    const voteHelpful = (a: Pick<KbPublishedRow, 'id'>, helpful: boolean) => {
         const serverArticle = kbPublished.find(
             (article) => article.id === a.id,
         );
         if (
+            !serverArticle ||
             submittingKbVoteFor !== null ||
-            (submittedKbVotes[a.id] ??
-                serverArticle?.user_vote ??
-                a.user_vote) !== null
+            (submittedKbVotes[a.id] ?? serverArticle.user_vote) !== null
         )
             return;
         setSubmittingKbVoteFor(a.id);
@@ -883,35 +1048,87 @@ export default function ItIndex({
         );
     };
 
-    /** POST a selection to a bulk endpoint; surface the flash, then clear it. */
     const runBulkTo = (
         url: string,
         sel: ReturnType<typeof useRowSelection>,
         payload: Record<string, unknown>,
+        selectedIds = [...sel.selected],
     ) => {
-        if (sel.selected.size === 0) return;
+        if (selectedIds.length === 0 || bulkBusy) return;
         setBulkBusy(true);
+        setBulkError(null);
+        let responded = false;
         router.post(
             url,
-            { ids: [...sel.selected], ...payload },
+            { ids: selectedIds, ...payload },
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: (page) => {
-                    const flash = page.props.flash as
-                        | { error?: string; success?: string }
-                        | undefined;
-                    if (flash?.error) toast.error(flash.error);
-                    else if (flash?.success) toast.success(flash.success);
-                    sel.clear();
+                onSuccess: (nextPage) => {
+                    responded = true;
+                    const result = readItBulkResult(
+                        nextPage.props.bulkResult,
+                        url.includes('/tickets/') ? 'tickets' : 'provisioning',
+                    );
+                    if (!result) {
+                        const flash = nextPage.props.flash as
+                            | { error?: string }
+                            | undefined;
+                        setBulkError(
+                            flash?.error ??
+                                'The response did not confirm each selected record. Review the current list before trying again.',
+                        );
+                        setBulkBlocked(true);
+                        return;
+                    }
+                    acceptBulkResult(result);
+                    if (result.rejected === 0) setBulkPlan(null);
+                    else
+                        setBulkError(
+                            'Some changes were not applied. Your explanation is retained here. Cancel this draft, review the current list and select the remaining records before retrying.',
+                        );
                 },
-                onFinish: () => setBulkBusy(false),
+                onError: (errors) => {
+                    responded = true;
+                    setBulkError(
+                        Object.values(errors).join(' ') ||
+                            'The change could not be saved. Review the validation messages and try again.',
+                    );
+                },
+                onFinish: () => {
+                    setBulkBusy(false);
+                    if (!responded) {
+                        setBulkError(
+                            'The connection ended before the outcome was confirmed. Review the current list before retrying.',
+                        );
+                        setBulkBlocked(true);
+                    }
+                },
             },
         );
     };
-
-    const runBulk = (payload: Record<string, unknown>) =>
-        runBulkTo('/it/tickets/bulk', ticketSel, payload);
+    const runBulk = (payload: Record<string, unknown>) => {
+        if (payload.action === 'assign' || payload.action === 'priority') {
+            setBulkError(null);
+            setBulkBlocked(false);
+            setBulkPlan({
+                actorId,
+                ids: [...ticketSel.selected],
+                versions: { ...ticketSel.versions },
+                payload,
+                description:
+                    payload.action === 'priority'
+                        ? `Priority: ${label(String(payload.priority))}`
+                        : payload.assigned_to_user_id === null
+                          ? 'Remove the individual technician assignment'
+                          : `Assign technician: ${assignees.find((person) => person.id === payload.assigned_to_user_id)?.name ?? 'Selected technician'}`,
+            });
+        } else
+            runBulkTo('/it/tickets/bulk', ticketSel, {
+                ...payload,
+                expected_versions: ticketSel.versions,
+            });
+    };
     const runProvisioningBulk = (payload: Record<string, unknown>) =>
         runBulkTo('/it/provisioning/bulk', reqSel, payload);
 
@@ -930,12 +1147,6 @@ export default function ItIndex({
     // Bulk select is agent-only (it.manage) — the checkbox column and action
     // bar only exist for people who can mutate. Each grid gains a leading
     // 36px checkbox track when it does.
-    const ticketGridCols = can.manage
-        ? 'grid-cols-[36px_3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px]'
-        : 'grid-cols-[3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px]';
-    const reqGridCols = can.manage
-        ? 'grid-cols-[36px_1.8fr_1.8fr_1.2fr_0.8fr_1fr_0.9fr_88px]'
-        : 'grid-cols-[1.8fr_1.8fr_1.2fr_0.8fr_1fr_0.9fr_88px]';
 
     /** Direct row action — surfaces the redirect flash as a toast. */
     const act = (
@@ -964,7 +1175,18 @@ export default function ItIndex({
     };
 
     const runKbRetire = () => {
-        if (!confirmKbRetire || retirementReason.trim() === '') {
+        if (
+            !confirmKbRetire ||
+            !canReviewKnowledge ||
+            !kbArticles.some(
+                (a) =>
+                    a.id === confirmKbRetire.id &&
+                    a.can.review &&
+                    a.status === 'published',
+            )
+        )
+            return;
+        if (retirementReason.trim() === '') {
             toast.error('Add a reason so the retirement remains auditable.');
             return;
         }
@@ -976,8 +1198,10 @@ export default function ItIndex({
     };
 
     const kbMenu = (a: KbRow) => {
+        const canAuthor = canAuthorKnowledge && a.can.author;
+        const canReview = canReviewKnowledge && a.can.review;
         const lifecycleActions =
-            a.status === 'draft'
+            a.status === 'draft' && canAuthor
                 ? [
                       {
                           kind: 'item' as const,
@@ -989,23 +1213,31 @@ export default function ItIndex({
                   ]
                 : a.status === 'in_review'
                   ? [
-                        {
-                            kind: 'item' as const,
-                            label: 'Approve & publish',
-                            icon: CheckCircle2,
-                            tone: 'success' as const,
-                            onSelect: () =>
-                                act('post', `/it/kb/${a.id}/publish`),
-                        },
-                        {
-                            kind: 'item' as const,
-                            label: 'Return to draft',
-                            icon: RotateCcw,
-                            onSelect: () =>
-                                act('post', `/it/kb/${a.id}/restore`),
-                        },
+                        ...(canReview
+                            ? [
+                                  {
+                                      kind: 'item' as const,
+                                      label: 'Approve & publish',
+                                      icon: CheckCircle2,
+                                      tone: 'success' as const,
+                                      onSelect: () =>
+                                          act('post', `/it/kb/${a.id}/publish`),
+                                  },
+                              ]
+                            : []),
+                        ...(canAuthor
+                            ? [
+                                  {
+                                      kind: 'item' as const,
+                                      label: 'Return to draft',
+                                      icon: RotateCcw,
+                                      onSelect: () =>
+                                          act('post', `/it/kb/${a.id}/restore`),
+                                  },
+                              ]
+                            : []),
                     ]
-                  : a.status === 'published'
+                  : a.status === 'published' && canReview
                     ? [
                           {
                               kind: 'item' as const,
@@ -1014,18 +1246,20 @@ export default function ItIndex({
                               onSelect: () => setConfirmKbRetire(a),
                           },
                       ]
-                    : [
-                          {
-                              kind: 'item' as const,
-                              label: 'Restore as draft',
-                              icon: RotateCcw,
-                              onSelect: () =>
-                                  act('post', `/it/kb/${a.id}/restore`),
-                          },
-                      ];
+                    : a.status === 'retired' && canAuthor
+                      ? [
+                            {
+                                kind: 'item' as const,
+                                label: 'Restore as draft',
+                                icon: RotateCcw,
+                                onSelect: () =>
+                                    act('post', `/it/kb/${a.id}/restore`),
+                            },
+                        ]
+                      : [];
 
         const deleteDraft =
-            a.status === 'draft'
+            a.status === 'draft' && canAuthor
                 ? [
                       { kind: 'divider' as const },
                       {
@@ -1039,12 +1273,16 @@ export default function ItIndex({
                 : [];
 
         return ctx.open([
-            {
-                kind: 'item' as const,
-                label: 'Edit',
-                icon: Pencil,
-                onSelect: () => setModal({ type: 'kb', article: a }),
-            },
+            ...(a.status === 'draft' && canAuthor
+                ? [
+                      {
+                          kind: 'item' as const,
+                          label: 'Edit',
+                          icon: Pencil,
+                          onSelect: () => setModal({ type: 'kb', article: a }),
+                      },
+                  ]
+                : []),
             ...lifecycleActions,
             ...deleteDraft,
         ]);
@@ -1052,18 +1290,27 @@ export default function ItIndex({
 
     /* ---------------- row context menus ---------------- */
 
-    const requestMenu = (r: RequestRow) => {
+    const requestActions = (r: RequestRow) => {
         const open =
-            r.status === 'pending' ||
-            r.status === 'in_progress' ||
-            r.status === 'failed';
-        return ctx.open([
+            can.manage &&
+            (r.status === 'pending' ||
+                r.status === 'in_progress' ||
+                r.status === 'failed');
+        return compactMenu([
             // Available on any request — a fulfilled item can still arrive broken.
             {
-                kind: 'item' as const,
+                label: 'Copy request summary',
+                icon: Copy,
+                onClick: () =>
+                    copyText(
+                        `${r.employee.name} · ${r.item}`,
+                        'Request summary',
+                    ),
+            },
+            can.manage && {
                 label: 'Raise linked ticket',
                 icon: Ticket,
-                onSelect: () =>
+                onClick: () =>
                     setModal({
                         type: 'ticket',
                         provisioning: { id: r.id, item: r.item },
@@ -1072,16 +1319,14 @@ export default function ItIndex({
             ...(r.linked_ticket
                 ? [
                       {
-                          kind: 'item' as const,
                           label: `Open ${r.linked_ticket.reference ?? 'linked ticket'}`,
                           icon: Inbox,
-                          onSelect: () => setPeekId(r.linked_ticket!.id),
+                          onClick: () => setPeekId(r.linked_ticket!.id),
                       },
                       {
-                          kind: 'item' as const,
                           label: 'Copy link',
                           icon: Link2,
-                          onSelect: () =>
+                          onClick: () =>
                               copyText(
                                   `${window.location.origin}/it/tickets/${r.linked_ticket!.id}`,
                                   'Link',
@@ -1091,23 +1336,21 @@ export default function ItIndex({
                 : []),
             ...(open
                 ? ([
-                      { kind: 'divider' as const },
+                      { separator: true },
                       {
-                          kind: 'item' as const,
                           label: 'Fulfil…',
                           icon: CheckCircle2,
-                          tone: 'success' as const,
-                          onSelect: () =>
+
+                          onClick: () =>
                               setModal({ type: 'fulfil', request: r }),
                       },
                       ...(r.approval_required &&
                       r.approval_status !== 'approved'
                           ? [
                                 {
-                                    kind: 'item' as const,
                                     label: 'Approve step',
                                     icon: UserCog,
-                                    onSelect: () =>
+                                    onClick: () =>
                                         act(
                                             'post',
                                             `/it/provisioning/${r.id}/approve`,
@@ -1116,94 +1359,92 @@ export default function ItIndex({
                             ]
                           : []),
                       {
-                          kind: 'item' as const,
                           label: r.assignee ? 'Reassign…' : 'Assign…',
                           icon: UserCog,
-                          onSelect: () =>
+                          onClick: () =>
                               setModal({ type: 'assign-request', request: r }),
                       },
                       {
-                          kind: 'item' as const,
                           label: 'Record failure…',
                           icon: XCircle,
-                          tone: 'critical' as const,
-                          onSelect: () =>
+                          danger: true,
+                          onClick: () =>
                               setModal({ type: 'fail-request', request: r }),
                       },
-                      { kind: 'divider' as const },
+                      { separator: true },
                       {
-                          kind: 'item' as const,
                           label: 'Cancel request',
                           icon: XCircle,
-                          tone: 'critical' as const,
-                          onSelect: () => setCancelRequest(r),
+                          danger: true,
+                          onClick: () => setCancelRequest(r),
                       },
                   ] as const)
                 : []),
         ]);
     };
 
-    const ticketMenu = (t: TicketRow) => {
+    const ticketActions = (t: TicketRow) => {
+        const canManageRow = canManageTicket(t);
         const workable =
-            t.status === 'open' ||
-            t.status === 'in_progress' ||
-            t.status === 'waiting';
-        return ctx.open([
+            canManageRow &&
+            (t.status === 'open' ||
+                t.status === 'in_progress' ||
+                t.status === 'waiting');
+        return compactMenu([
             {
-                kind: 'item' as const,
                 label: 'Open',
                 icon: Ticket,
-                onSelect: () => router.visit(`/it/tickets/${t.id}`),
+                onClick: () => router.visit(`/it/tickets/${t.id}`),
             },
             {
-                kind: 'item' as const,
                 label: 'Quick peek',
                 icon: Inbox,
-                onSelect: () => setPeekId(t.id),
+                onClick: () => setPeekId(t.id),
             },
-            { kind: 'divider' as const },
+            { separator: true },
             ...(workable
                 ? [
                       ...(t.status === 'open'
                           ? [
                                 {
-                                    kind: 'item' as const,
                                     label: 'Start work',
                                     icon: Play,
-                                    onSelect: () =>
-                                        act('patch', `/it/tickets/${t.id}`, {
-                                            status: 'in_progress',
-                                        }),
+                                    onClick: () =>
+                                        propertyMutation.submit(
+                                            t.id,
+                                            t.lock_version,
+                                            {
+                                                status: 'in_progress',
+                                            },
+                                        ),
                                 },
                             ]
                           : []),
                       {
-                          kind: 'item' as const,
                           label: t.assignee ? 'Reassign…' : 'Assign…',
                           icon: UserCog,
-                          onSelect: () =>
+                          onClick: () =>
                               setModal({ type: 'assign-ticket', ticket: t }),
                       },
                       {
-                          kind: 'item' as const,
                           label:
                               t.status === 'waiting'
                                   ? 'Edit waiting details…'
                                   : 'Set waiting…',
                           icon: Timer,
-                          onSelect: () => setWaitingTicket(t),
+                          onClick: () => setWaitingTicket(t),
                       },
-                      { kind: 'divider' as const },
+                      { separator: true },
                       {
-                          kind: 'item' as const,
                           label: 'Resolve…',
                           icon: CheckCircle2,
-                          tone: 'success' as const,
-                          onSelect: () =>
+
+                          onClick: () =>
                               setModal({
                                   type: 'resolve',
                                   ticket: {
                                       id: t.id,
+                                      lock_version: t.lock_version,
                                       reference: t.reference,
                                       title: t.title,
                                   },
@@ -1211,55 +1452,52 @@ export default function ItIndex({
                       },
                   ]
                 : []),
-            ...(t.status === 'resolved'
+            ...(canManageRow && t.status === 'resolved'
                 ? [
                       {
-                          kind: 'item' as const,
                           label: 'Close ticket…',
                           icon: XCircle,
-                          onSelect: () => setCloseTicket(t),
+                          onClick: () => setCloseTicket(t),
                       },
                       {
-                          kind: 'item' as const,
                           label: 'Reopen…',
                           icon: RotateCcw,
-                          onSelect: () =>
+                          onClick: () =>
                               setReopenTicket({
                                   id: t.id,
                                   reference: t.reference,
+                                  lock_version: t.lock_version,
                                   audience: 'agent',
                               }),
                       },
                   ]
                 : []),
-            ...(t.status === 'closed'
+            ...(canManageRow && t.status === 'closed'
                 ? [
                       {
-                          kind: 'item' as const,
                           label: 'Reopen…',
                           icon: RotateCcw,
-                          onSelect: () =>
+                          onClick: () =>
                               setReopenTicket({
                                   id: t.id,
                                   reference: t.reference,
+                                  lock_version: t.lock_version,
                                   audience: 'agent',
                               }),
                       },
                   ]
                 : []),
-            { kind: 'divider' as const },
+            { separator: true },
             {
-                kind: 'item' as const,
                 label: 'Copy reference',
                 icon: Copy,
-                onSelect: () =>
+                onClick: () =>
                     copyText(t.reference, t.reference ?? 'Reference'),
             },
             {
-                kind: 'item' as const,
                 label: 'Copy link',
                 icon: Link2,
-                onSelect: () =>
+                onClick: () =>
                     copyText(
                         `${window.location.origin}/it/tickets/${t.id}`,
                         'Link',
@@ -1269,41 +1507,38 @@ export default function ItIndex({
     };
 
     /** My-tickets row menu (requester-facing, §O). */
-    const myTicketMenu = (t: MyTicketRow) =>
-        ctx.open([
+    const myTicketActions = (t: MyTicketRow) =>
+        compactMenu([
             {
-                kind: 'item' as const,
                 label: 'Open',
                 icon: Ticket,
-                onSelect: () => router.visit(`/it/tickets/${t.id}`),
+                onClick: () => router.visit(`/it/tickets/${t.id}`),
             },
-            {
-                kind: 'item' as const,
+            t.can_reply === true && {
                 label: 'Reply',
                 icon: MessageSquare,
-                onSelect: () => router.visit(`/it/tickets/${t.id}`),
+                onClick: () => router.visit(`/it/tickets/${t.id}`),
             },
-            ...(t.status === 'resolved'
+            ...(t.can_reopen === true
                 ? ([
                       {
-                          kind: 'item' as const,
                           label: 'Reopen…',
                           icon: RotateCcw,
-                          onSelect: () =>
+                          onClick: () =>
                               setReopenTicket({
                                   id: t.id,
                                   reference: t.reference,
+                                  lock_version: t.lock_version,
                                   audience: 'requester',
                               }),
                       },
                   ] as const)
                 : []),
-            { kind: 'divider' as const },
+            { separator: true },
             {
-                kind: 'item' as const,
                 label: 'Copy reference',
                 icon: Copy,
-                onSelect: () =>
+                onClick: () =>
                     copyText(t.reference, t.reference ?? 'Reference'),
             },
         ]);
@@ -1313,15 +1548,81 @@ export default function ItIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="IT & Support" />
+            {propertyMutation.recovery}
+            <TicketTriageReasonDialog
+                open={
+                    bulkPlan !== null &&
+                    bulkPlan.actorId === actorId &&
+                    can.manage &&
+                    bulkPlan.ids.every(ticketMutationAllowed)
+                }
+                descriptions={
+                    bulkPlan
+                        ? [
+                              {
+                                  label: 'Selected tickets',
+                                  value: String(bulkPlan.ids.length),
+                              },
+                              { label: 'Change', value: bulkPlan.description },
+                          ]
+                        : []
+                }
+                processing={bulkBusy}
+                blocked={bulkBlocked}
+                error={bulkError}
+                onCancel={() => {
+                    setBulkPlan(null);
+                    setBulkError(null);
+                }}
+                onConfirm={(reason) => {
+                    if (
+                        !bulkPlan ||
+                        bulkPlan.actorId !== actorId ||
+                        !can.manage ||
+                        !bulkPlan.ids.every(ticketMutationAllowed)
+                    )
+                        return;
+                    runBulkTo(
+                        '/it/tickets/bulk',
+                        ticketSel,
+                        {
+                            ...bulkPlan.payload,
+                            expected_versions: bulkPlan.versions,
+                            [bulkPlan.payload.action === 'priority'
+                                ? 'priority_reason'
+                                : 'routing_reason']: reason,
+                        },
+                        bulkPlan.ids,
+                    );
+                }}
+            />
             {ctx.element}
             <ItWizard
-                modal={modal}
+                modal={
+                    modal?.type === 'kb'
+                        ? canAuthorKnowledge &&
+                          (!modal.article ||
+                              kbArticles.some(
+                                  (a) =>
+                                      a.id === modal.article?.id &&
+                                      a.can.author &&
+                                      a.status === 'draft',
+                              ))
+                            ? modal
+                            : null
+                        : (modal?.type === 'assign-ticket' ||
+                                modal?.type === 'resolve') &&
+                            !ticketMutationAllowed(modal.ticket.id)
+                          ? null
+                          : modal
+                }
                 assignees={assignees}
                 employeeOptions={employeeOptions}
                 assetOptions={assetOptions}
                 siteOptions={siteOptions}
                 deviceOptions={deviceOptions}
                 serviceOptions={serviceOptions}
+                intakePolicy={intakePolicy}
                 slaPolicies={slaPolicies}
                 slaCalendar={slaCalendar}
                 kbSuggestions={kbPublished}
@@ -1329,143 +1630,184 @@ export default function ItIndex({
                 onOpenArticle={(id) => {
                     const a = kbPublished.find((x) => x.id === id);
                     if (a) {
-                        setModal(null);
                         openArticle(a);
                     }
                 }}
-                onDraftKb={(draft) => setModal({ type: 'kb', draft })}
+                onDraftKb={
+                    canAuthorKnowledge
+                        ? (draft) => setModal({ type: 'kb', draft })
+                        : undefined
+                }
                 onClose={() => setModal(null)}
             />
             <TicketDrawer ticketId={peekId} onClose={() => setPeekId(null)} />
 
             {/* KB reader (requester browse) */}
             <Dialog
-                open={readerArticle !== null}
-                onOpenChange={(open) => !open && setReaderArticle(null)}
+                open={currentReaderArticle !== null}
+                onOpenChange={(open) => !open && setReaderArticleId(null)}
             >
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>{readerArticle?.title}</DialogTitle>
+                        <DialogTitle>{currentReaderArticle?.title}</DialogTitle>
                         <DialogDescription>
-                            Read this published support article, then record
-                            whether it helped resolve the request.
+                            {showKnowledgeCatalogue
+                                ? 'Read the current article content and lifecycle status before taking a permitted action.'
+                                : 'Read this published support article, then record whether it helped resolve the request.'}
                         </DialogDescription>
                     </DialogHeader>
-                    {readerArticle ? (
+                    {currentReaderArticle ? (
                         <div className="space-y-4">
                             <StatusBadge variant="info" size="sm">
-                                {label(readerArticle.category)}
+                                {label(currentReaderArticle.category)}
                             </StatusBadge>
-                            {readerArticle.related_service ? (
+                            {'status' in currentReaderArticle && (
+                                <StatusBadge variant="neutral" size="sm">
+                                    {label(currentReaderArticle.status)}
+                                </StatusBadge>
+                            )}
+                            {currentReaderArticle.related_service ? (
                                 <p className="text-[12px] text-muted-foreground">
                                     Service:{' '}
                                     <span className="font-semibold text-foreground">
-                                        {readerArticle.related_service}
+                                        {currentReaderArticle.related_service}
                                     </span>
                                 </p>
                             ) : null}
                             <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-muted/30 p-4">
-                                <KbPreview body={readerArticle.body ?? ''} />
+                                <KbPreview
+                                    body={currentReaderArticle.body ?? ''}
+                                />
                             </div>
-                            <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                                <span className="text-[13px] font-medium">
-                                    Was this helpful?
-                                </span>
-                                {readerVote !== null ? (
-                                    <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                                        {readerVote ? (
-                                            <ThumbsUp className="h-4 w-4" />
-                                        ) : (
-                                            <ThumbsDown className="h-4 w-4" />
-                                        )}
-                                        Feedback recorded:{' '}
-                                        {readerVote ? 'Helpful' : 'Not helpful'}
-                                        .
+                            {!showKnowledgeCatalogue && (
+                                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                                    <span className="text-[13px] font-medium">
+                                        Was this helpful?
                                     </span>
-                                ) : (
-                                    <>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="min-h-11"
-                                            disabled={
-                                                submittingKbVoteFor ===
-                                                readerArticle.id
-                                            }
-                                            onClick={() =>
-                                                voteHelpful(readerArticle, true)
-                                            }
-                                        >
-                                            <ThumbsUp className="h-3.5 w-3.5" />{' '}
-                                            Yes
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="min-h-11"
-                                            disabled={
-                                                submittingKbVoteFor ===
-                                                readerArticle.id
-                                            }
-                                            onClick={() =>
-                                                voteHelpful(
-                                                    readerArticle,
-                                                    false,
-                                                )
-                                            }
-                                        >
-                                            <ThumbsDown className="h-3.5 w-3.5" />{' '}
-                                            No
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
+                                    {readerVote !== null ? (
+                                        <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                                            {readerVote ? (
+                                                <ThumbsUp className="h-4 w-4" />
+                                            ) : (
+                                                <ThumbsDown className="h-4 w-4" />
+                                            )}
+                                            Feedback recorded:{' '}
+                                            {readerVote
+                                                ? 'Helpful'
+                                                : 'Not helpful'}
+                                            .
+                                        </span>
+                                    ) : (
+                                        <>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="min-h-11"
+                                                disabled={
+                                                    submittingKbVoteFor ===
+                                                    currentReaderArticle.id
+                                                }
+                                                onClick={() =>
+                                                    voteHelpful(
+                                                        currentReaderArticle,
+                                                        true,
+                                                    )
+                                                }
+                                            >
+                                                <ThumbsUp className="h-3.5 w-3.5" />{' '}
+                                                Yes
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="min-h-11"
+                                                disabled={
+                                                    submittingKbVoteFor ===
+                                                    currentReaderArticle.id
+                                                }
+                                                onClick={() =>
+                                                    voteHelpful(
+                                                        currentReaderArticle,
+                                                        false,
+                                                    )
+                                                }
+                                            >
+                                                <ThumbsDown className="h-3.5 w-3.5" />{' '}
+                                                No
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ) : null}
                 </DialogContent>
             </Dialog>
 
             <TicketCloseDialog
-                open={closeSelectedTickets}
+                open={closeSelectedTickets && ticketSel.selected.size > 0}
                 onOpenChange={setCloseSelectedTickets}
                 scope="bulk"
                 ticketIds={[...ticketSel.selected]}
-                onCompleted={() => ticketSel.clear()}
+                expectedVersions={ticketSel.versions}
+                onBulkResult={acceptBulkResult}
             />
             <TicketCloseDialog
-                open={closeTicket !== null}
+                open={
+                    closeTicket !== null &&
+                    ticketMutationAllowed(closeTicket.id)
+                }
                 onOpenChange={(open) => !open && setCloseTicket(null)}
                 scope="single"
                 ticketIds={closeTicket ? [closeTicket.id] : []}
+                expectedVersions={
+                    closeTicket
+                        ? { [closeTicket.id]: closeTicket.lock_version }
+                        : {}
+                }
                 ticketReference={closeTicket?.reference}
             />
             <TicketReopenDialog
-                open={reopenTicket !== null}
+                open={
+                    reopenTicket !== null &&
+                    (reopenTicket.audience === 'requester' ||
+                        ticketMutationAllowed(reopenTicket.id))
+                }
                 onOpenChange={(open) => !open && setReopenTicket(null)}
                 ticketId={reopenTicket?.id ?? null}
+                expectedVersion={reopenTicket?.lock_version ?? null}
                 ticketReference={reopenTicket?.reference}
                 audience={reopenTicket?.audience ?? 'agent'}
             />
             <TicketWaitingDialog
-                open={waitingSelectedTickets}
+                open={waitingSelectedTickets && ticketSel.selected.size > 0}
                 onOpenChange={setWaitingSelectedTickets}
                 scope="bulk"
                 ticketIds={[...ticketSel.selected]}
-                onCompleted={() => ticketSel.clear()}
+                expectedVersions={ticketSel.versions}
+                onBulkResult={acceptBulkResult}
             />
             <TicketWaitingDialog
-                open={waitingTicket !== null}
+                open={
+                    waitingTicket !== null &&
+                    ticketMutationAllowed(waitingTicket.id)
+                }
                 onOpenChange={(open) => !open && setWaitingTicket(null)}
                 scope="single"
                 ticketIds={waitingTicket ? [waitingTicket.id] : []}
+                expectedVersions={
+                    waitingTicket
+                        ? { [waitingTicket.id]: waitingTicket.lock_version }
+                        : {}
+                }
                 ticketReference={waitingTicket?.reference}
                 current={
                     waitingTicket?.status === 'waiting'
                         ? {
                               party: waitingTicket.waiting_party ?? 'other',
-                              reason: waitingTicket.waiting_reason,
-                              next_action: waitingTicket.next_action,
-                              since: waitingTicket.waiting_since,
+                              reason: waitingTicket.waiting_reason ?? null,
+                              next_action: waitingTicket.next_action ?? null,
+                              since: waitingTicket.waiting_since ?? null,
                               since_human: null,
                           }
                         : null
@@ -1479,8 +1821,17 @@ export default function ItIndex({
             />
 
             <KnowledgeDraftDeleteDialog
-                article={confirmKbDelete}
-                open={confirmKbDelete !== null}
+                article={canAuthorKnowledge ? confirmKbDelete : null}
+                open={
+                    confirmKbDelete !== null &&
+                    canAuthorKnowledge &&
+                    kbArticles.some(
+                        (a) =>
+                            a.id === confirmKbDelete.id &&
+                            a.can.author &&
+                            a.status === 'draft',
+                    )
+                }
                 onOpenChange={(open) => !open && setConfirmKbDelete(null)}
             />
 
@@ -1513,7 +1864,16 @@ export default function ItIndex({
             </AlertDialog>
 
             <Dialog
-                open={confirmKbRetire !== null}
+                open={
+                    confirmKbRetire !== null &&
+                    canReviewKnowledge &&
+                    kbArticles.some(
+                        (a) =>
+                            a.id === confirmKbRetire.id &&
+                            a.can.review &&
+                            a.status === 'published',
+                    )
+                }
                 onOpenChange={(open) => {
                     if (!open) {
                         setConfirmKbRetire(null);
@@ -1578,8 +1938,16 @@ export default function ItIndex({
                             can.view && tab === 'tickets' ? (
                                 <PageHeaderSearch
                                     value={search}
-                                    onChange={setSearch}
+                                    onChange={(value) => updateSearch(value)}
                                     placeholder="Search reference, title, requester…"
+                                />
+                            ) : can.request && tab === 'my-tickets' ? (
+                                <PageHeaderSearch
+                                    value={mySearch}
+                                    onChange={(value) =>
+                                        updateSearch(value, true)
+                                    }
+                                    placeholder="Search your requests…"
                                 />
                             ) : tab === 'knowledge' ? (
                                 <PageHeaderSearch
@@ -1598,20 +1966,79 @@ export default function ItIndex({
                         filters={
                             can.view && tab === 'tickets' ? (
                                 <>
+                                    {layoutToggle}
                                     <PageHeaderFilterSelect
-                                        label="Queue"
+                                        label="Sort"
+                                        value={filters?.sort ?? ALL}
+                                        allValue={ALL}
+                                        options={[
+                                            {
+                                                value: 'reference',
+                                                label: 'Reference',
+                                            },
+                                            {
+                                                value: 'created',
+                                                label: 'Raised',
+                                            },
+                                            {
+                                                value: 'updated',
+                                                label: 'Updated',
+                                            },
+                                            {
+                                                value: 'priority',
+                                                label: 'Priority',
+                                            },
+                                            {
+                                                value: 'status',
+                                                label: 'Status',
+                                            },
+                                        ]}
+                                        onChange={(value) =>
+                                            navigate({
+                                                sort:
+                                                    value === ALL
+                                                        ? undefined
+                                                        : value,
+                                                dir:
+                                                    value === ALL
+                                                        ? undefined
+                                                        : (filters?.dir ??
+                                                          'desc'),
+                                            })
+                                        }
+                                    />
+                                    {filters?.sort && (
+                                        <PageHeaderFilterButton
+                                            onClick={() =>
+                                                navigate({
+                                                    dir:
+                                                        filters?.dir === 'asc'
+                                                            ? 'desc'
+                                                            : 'asc',
+                                                })
+                                            }
+                                        >
+                                            {filters?.dir === 'asc'
+                                                ? 'Ascending'
+                                                : 'Descending'}
+                                        </PageHeaderFilterButton>
+                                    )}
+
+                                    <PageHeaderFilterSelect
+                                        label="Queue totals"
                                         value={filters?.view ?? ALL}
                                         allValue={ALL}
-                                        options={TICKET_VIEWS.map((v) => ({
-                                            value: v.key,
-                                            label:
-                                                v.label +
-                                                ' (' +
-                                                (summary.tickets?.views[
-                                                    v.key
-                                                ] ?? 0) +
-                                                ')',
-                                        }))}
+                                        options={availableTicketViews.map(
+                                            (v) => ({
+                                                value: v.key,
+                                                label: ticketViewLabel(
+                                                    v,
+                                                    summary?.tickets?.views?.[
+                                                        v.key
+                                                    ],
+                                                ),
+                                            }),
+                                        )}
                                         onChange={(v) =>
                                             v === ALL
                                                 ? clearTicketFilters()
@@ -1771,6 +2198,7 @@ export default function ItIndex({
                                 </>
                             ) : can.view && tab === 'provisioning' ? (
                                 <>
+                                    {layoutToggle}
                                     <PageHeaderFilterSelect
                                         label="Status"
                                         value={filters?.status ?? ALL}
@@ -1821,7 +2249,8 @@ export default function ItIndex({
                                     }))}
                                     onChange={setOverviewPriority}
                                 />
-                            ) : can.view && tab === 'knowledge' ? (
+                            ) : showKnowledgeCatalogue &&
+                              tab === 'knowledge' ? (
                                 <>
                                     <PageHeaderFilterSelect
                                         label="Category"
@@ -1875,21 +2304,31 @@ export default function ItIndex({
                                     onChange={setCatalogCategory}
                                 />
                             ) : can.request && tab === 'my-tickets' ? (
-                                <PageHeaderFilterSelect
-                                    label="Status"
-                                    value={myStatus}
-                                    allValue={ALL}
-                                    options={[
-                                        ...new Set(
-                                            myTickets.map((t) => t.status),
-                                        ),
-                                    ].map((v) => ({
-                                        value: v,
-                                        label: label(v),
-                                    }))}
-                                    onChange={setMyStatus}
-                                />
-                            ) : !can.view &&
+                                <>
+                                    {layoutToggle}
+                                    <PageHeaderFilterSelect
+                                        label="Status"
+                                        value={myStatus}
+                                        allValue={ALL}
+                                        options={[
+                                            ...new Set(
+                                                myTickets.map((t) => t.status),
+                                            ),
+                                        ].map((v) => ({
+                                            value: v,
+                                            label: label(v),
+                                        }))}
+                                        onChange={(value) =>
+                                            navigate({
+                                                my_status:
+                                                    value === ALL
+                                                        ? undefined
+                                                        : value,
+                                            })
+                                        }
+                                    />
+                                </>
+                            ) : !showKnowledgeCatalogue &&
                               can.request &&
                               tab === 'knowledge' ? (
                                 <PageHeaderFilterSelect
@@ -1923,11 +2362,28 @@ export default function ItIndex({
                             />
                         }
                     />
+                    {can.view &&
+                        (tab === 'tickets' || tab === 'provisioning') && (
+                            <ItBulkResultPanel
+                                result={
+                                    bulkOutcome.actorId === actorId &&
+                                    bulkOutcome.result?.resource ===
+                                        (tab === 'tickets'
+                                            ? 'tickets'
+                                            : 'provisioning')
+                                        ? bulkOutcome.result
+                                        : null
+                                }
+                                error={bulkError}
+                                onReview={reviewBulk}
+                                reviewing={reviewingBulk}
+                            />
+                        )}
                     {/* ── Overview (agents) ── */}
                     {can.view &&
                         tab === 'overview' &&
                         overview &&
-                        summary.tickets && (
+                        summary?.tickets && (
                             <ItOverview
                                 overview={overview}
                                 priority={
@@ -2149,6 +2605,7 @@ export default function ItIndex({
                                         aria-hidden
                                     />
                                     <Select
+                                        disabled={bulkBusy || bulkBlocked}
                                         value=""
                                         onValueChange={(v) =>
                                             runProvisioningBulk({
@@ -2196,13 +2653,16 @@ export default function ItIndex({
                                 </div>
                             ) : null}
 
-                            <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                                <div
-                                    className={`grid ${reqGridCols} gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase`}
-                                >
-                                    {can.manage ? (
-                                        <span className="flex items-center">
+                            <ListCaption
+                                title="Provisioning steps"
+                                caption={`${requests?.data.length ?? 0} of ${requests?.total ?? 0} shown`}
+                                right={
+                                    can.manage &&
+                                    (requests?.data.length ?? 0) > 0 ? (
+                                        <label className="flex min-h-11 items-center gap-2 text-sm">
                                             <Checkbox
+                                                aria-label="Select all provisioning steps on this page"
+                                                disabled={bulkBusy}
                                                 checked={
                                                     reqSel.allOnPage
                                                         ? true
@@ -2210,235 +2670,36 @@ export default function ItIndex({
                                                           ? 'indeterminate'
                                                           : false
                                                 }
-                                                onCheckedChange={(v) =>
-                                                    reqSel.toggleAll(v === true)
+                                                onCheckedChange={(checked) =>
+                                                    reqSel.toggleAll(
+                                                        checked === true,
+                                                    )
                                                 }
-                                                aria-label="Select all requests on this page"
                                             />
-                                        </span>
-                                    ) : null}
-                                    <span>Employee</span>
-                                    <span>Item</span>
-                                    <span>Assignee</span>
-                                    <span>Priority</span>
-                                    <span>Status</span>
-                                    <span>Due</span>
-                                    <span />
-                                </div>
-                                {(requests?.data ?? []).map((r) => {
-                                    const Icon = typeIcon[r.type] ?? Server;
-                                    const actionable =
-                                        can.manage &&
-                                        (r.status === 'pending' ||
-                                            r.status === 'in_progress' ||
-                                            r.status === 'failed');
-                                    const overdue =
-                                        r.due_date != null &&
-                                        r.status !== 'done' &&
-                                        r.status !== 'cancelled' &&
-                                        r.due_date < todayISO();
-                                    return (
-                                        <div
-                                            key={r.id}
-                                            onContextMenu={
-                                                can.manage
-                                                    ? requestMenu(r)
-                                                    : undefined
-                                            }
-                                            className={`grid ${reqGridCols} items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0 ${reqSel.selected.has(r.id) ? 'bg-primary/5' : overdue ? 'bg-[color:var(--status-critical)]/5' : ''}`}
-                                        >
-                                            {can.manage ? (
-                                                <span className="flex items-center">
-                                                    <Checkbox
-                                                        checked={reqSel.selected.has(
-                                                            r.id,
-                                                        )}
-                                                        onCheckedChange={(v) =>
-                                                            reqSel.toggle(
-                                                                r.id,
-                                                                v === true,
-                                                            )
-                                                        }
-                                                        aria-label={`Select ${r.item}`}
-                                                    />
-                                                </span>
-                                            ) : null}
-                                            <div className="min-w-0">
-                                                <div className="truncate text-[13.5px] font-semibold">
-                                                    {r.employee.name}
-                                                </div>
-                                                <div className="truncate text-[11.5px] text-muted-foreground">
-                                                    {r.workflow
-                                                        ? `${label(r.workflow.lifecycle_type)} workflow${r.employee.role ? ` · ${r.employee.role}` : ''}`
-                                                        : r.from_onboarding
-                                                          ? `Onboarding${r.employee.role ? ` · ${r.employee.role}` : ''}`
-                                                          : (r.employee.role ??
-                                                            '—')}
-                                                </div>
-                                            </div>
-                                            <div className="flex min-w-0 items-center gap-2">
-                                                <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
-                                                    <Icon className="h-3.5 w-3.5" />
-                                                </span>
-                                                <span className="min-w-0">
-                                                    <span className="block truncate text-[13px]">
-                                                        {r.item}
-                                                    </span>
-                                                    {r.workflow ? (
-                                                        <span className="block truncate text-[10.5px] text-muted-foreground">
-                                                            Stage {r.stage ?? 1}
-                                                            {r.action
-                                                                ? ` · ${label(r.action)}`
-                                                                : ''}
-                                                            {r.approval_required
-                                                                ? ` · ${r.approval_status === 'approved' ? 'Approved' : 'Approval needed'}`
-                                                                : ''}
-                                                            {r.evidence_required
-                                                                ? ' · Evidence needed'
-                                                                : ''}
-                                                        </span>
-                                                    ) : null}
-                                                    {r.external_ref ? (
-                                                        <span className="block truncate text-[11px] text-muted-foreground">
-                                                            Ref:{' '}
-                                                            {r.external_ref}
-                                                        </span>
-                                                    ) : null}
-                                                    {r.linked_ticket ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setPeekId(
-                                                                    r
-                                                                        .linked_ticket!
-                                                                        .id,
-                                                                )
-                                                            }
-                                                            className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-[10.5px] font-semibold text-primary transition-colors hover:bg-primary/10"
-                                                        >
-                                                            <Ticket className="h-3 w-3" />
-                                                            {r.linked_ticket
-                                                                .reference ??
-                                                                'Linked ticket'}
-                                                            {r.linked_ticket_count >
-                                                            1
-                                                                ? ` +${r.linked_ticket_count - 1}`
-                                                                : ''}
-                                                        </button>
-                                                    ) : null}
-                                                </span>
-                                            </div>
-                                            <span className="truncate text-[12.5px] text-muted-foreground">
-                                                {r.assignee?.name ??
-                                                    r.responsible_team?.name ??
-                                                    'Unassigned'}
-                                            </span>
-                                            <span>
-                                                <StatusBadge
-                                                    variant={
-                                                        priorityVariant[
-                                                            r.priority
-                                                        ] ?? 'neutral'
-                                                    }
-                                                    size="sm"
-                                                >
-                                                    {label(r.priority)}
-                                                </StatusBadge>
-                                            </span>
-                                            <span className="flex flex-col items-start gap-0.5">
-                                                <StatusBadge
-                                                    variant={
-                                                        requestStatusVariant[
-                                                            r.status
-                                                        ] ?? 'neutral'
-                                                    }
-                                                    size="sm"
-                                                >
-                                                    {label(r.status)}
-                                                </StatusBadge>
-                                                <span className="text-[10.5px] text-muted-foreground">
-                                                    {r.status === 'done'
-                                                        ? r.fulfilled
-                                                            ? `Done ${r.fulfilled}`
-                                                            : ''
-                                                        : r.created
-                                                          ? `Raised ${r.created}`
-                                                          : ''}
-                                                </span>
-                                                {r.failure_reason ? (
-                                                    <span
-                                                        className="max-w-[150px] truncate text-[10.5px] text-[color:var(--status-critical)]"
-                                                        title={r.failure_reason}
-                                                    >
-                                                        {r.failure_reason}
-                                                    </span>
-                                                ) : null}
-                                            </span>
-                                            <span
-                                                className={
-                                                    overdue
-                                                        ? 'text-[12px] font-semibold text-[color:var(--status-critical)]'
-                                                        : 'text-[12px] text-muted-foreground'
-                                                }
-                                            >
-                                                {r.due_date
-                                                    ? formatDue(r.due_date)
-                                                    : '—'}
-                                                {overdue ? (
-                                                    <span className="block text-[10px] font-semibold">
-                                                        Overdue
-                                                    </span>
-                                                ) : null}
-                                            </span>
-                                            <span className="flex items-center justify-end gap-1.5">
-                                                {actionable ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            r.approval_required &&
-                                                            r.approval_status !==
-                                                                'approved'
-                                                                ? act(
-                                                                      'post',
-                                                                      `/it/provisioning/${r.id}/approve`,
-                                                                  )
-                                                                : setModal({
-                                                                      type: 'fulfil',
-                                                                      request:
-                                                                          r,
-                                                                  })
-                                                        }
-                                                        className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold transition-colors hover:border-primary/50 hover:text-primary"
-                                                    >
-                                                        {r.approval_required &&
-                                                        r.approval_status !==
-                                                            'approved'
-                                                            ? 'Approve'
-                                                            : 'Fulfil'}
-                                                    </button>
-                                                ) : null}
-                                                {can.manage ? (
-                                                    <button
-                                                        type="button"
-                                                        aria-label={`Actions for ${r.item}`}
-                                                        onClick={requestMenu(r)}
-                                                        className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                    >
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </button>
-                                                ) : null}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                                {(requests?.data ?? []).length === 0 ? (
+                                            Select this page
+                                        </label>
+                                    ) : undefined
+                                }
+                            />
+                            <ItProvisioningList
+                                rows={requests?.data ?? []}
+                                view={listView}
+                                actionsFor={requestActions}
+                                selected={reqSel.selected}
+                                onSelect={(row, checked) =>
+                                    reqSel.toggle(row.id, checked)
+                                }
+                                canManage={can.manage}
+                                busy={bulkBusy}
+                                today={todayISO()}
+                                emptyState={
                                     <EmptyState
                                         icon={Inbox}
-                                        title="No provisioning requests"
-                                        blurb="Matching HR joiner, mover and leaver events create ordered IT steps here automatically. Manual requests remain available when needed."
+                                        title="No provisioning steps match"
+                                        blurb="Change the filters to see other permitted work. Matching HR events and manual requests create steps here."
                                     />
-                                ) : null}
-                            </div>
+                                }
+                            />
                             {requests ? (
                                 <LaravelPagination
                                     links={requests.links}
@@ -2462,6 +2723,7 @@ export default function ItIndex({
                                         aria-hidden
                                     />
                                     <Select
+                                        disabled={bulkBusy || bulkBlocked}
                                         value=""
                                         onValueChange={(v) =>
                                             runBulk({
@@ -2494,6 +2756,7 @@ export default function ItIndex({
                                         </SelectContent>
                                     </Select>
                                     <Select
+                                        disabled={bulkBusy || bulkBlocked}
                                         value=""
                                         onValueChange={(v) =>
                                             runBulk({
@@ -2517,6 +2780,7 @@ export default function ItIndex({
                                         </SelectContent>
                                     </Select>
                                     <Select
+                                        disabled={bulkBusy || bulkBlocked}
                                         value=""
                                         onValueChange={(v) => {
                                             if (v === 'waiting') {
@@ -2570,13 +2834,16 @@ export default function ItIndex({
                                 </div>
                             ) : null}
 
-                            <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                                <div
-                                    className={`grid ${ticketGridCols} gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase`}
-                                >
-                                    {can.manage ? (
-                                        <span className="flex items-center">
+                            <ListCaption
+                                title="Tickets"
+                                caption={`${tickets?.data.length ?? 0} of ${tickets?.total ?? 0} shown · filtered results`}
+                                right={
+                                    can.manage &&
+                                    manageableTickets.length > 0 ? (
+                                        <label className="flex min-h-11 items-center gap-2 text-sm">
                                             <Checkbox
+                                                aria-label="Select all manageable tickets on this page"
+                                                disabled={bulkBusy}
                                                 checked={
                                                     ticketSel.allOnPage
                                                         ? true
@@ -2584,170 +2851,35 @@ export default function ItIndex({
                                                           ? 'indeterminate'
                                                           : false
                                                 }
-                                                onCheckedChange={(v) =>
+                                                onCheckedChange={(checked) =>
                                                     ticketSel.toggleAll(
-                                                        v === true,
+                                                        checked === true,
                                                     )
                                                 }
-                                                aria-label="Select all tickets on this page"
                                             />
-                                        </span>
-                                    ) : null}
-                                    <SortHeader
-                                        label="Ticket"
-                                        col="reference"
-                                        filters={filters}
-                                        onSort={applySort}
-                                    />
-                                    <span>Requester</span>
-                                    <span>Ownership</span>
-                                    <SortHeader
-                                        label="Priority"
-                                        col="priority"
-                                        filters={filters}
-                                        onSort={applySort}
-                                    />
-                                    <SortHeader
-                                        label="Status"
-                                        col="status"
-                                        filters={filters}
-                                        onSort={applySort}
-                                    />
-                                    <span>SLA</span>
-                                    <SortHeader
-                                        label="Age"
-                                        col="created"
-                                        filters={filters}
-                                        onSort={applySort}
-                                    />
-                                    <span />
-                                </div>
-                                {(tickets?.data ?? []).map((t) => (
-                                    <div
-                                        key={t.id}
-                                        onContextMenu={
-                                            can.manage
-                                                ? ticketMenu(t)
-                                                : undefined
-                                        }
-                                        onClick={(e) => openTicket(t.id, e)}
-                                        onDoubleClick={() =>
-                                            router.visit(`/it/tickets/${t.id}`)
-                                        }
-                                        className={`grid cursor-pointer ${ticketGridCols} items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40 ${ticketSel.selected.has(t.id) ? 'bg-primary/5' : ''}`}
-                                    >
-                                        {can.manage ? (
-                                            <span className="flex items-center">
-                                                <Checkbox
-                                                    checked={ticketSel.selected.has(
-                                                        t.id,
-                                                    )}
-                                                    onCheckedChange={(v) =>
-                                                        ticketSel.toggle(
-                                                            t.id,
-                                                            v === true,
-                                                        )
-                                                    }
-                                                    onClick={(e) =>
-                                                        e.stopPropagation()
-                                                    }
-                                                    aria-label={`Select ${t.reference ?? t.title}`}
-                                                />
-                                            </span>
-                                        ) : null}
-                                        <div className="flex min-w-0 items-center gap-2">
-                                            <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
-                                                <Ticket className="h-3.5 w-3.5" />
-                                            </span>
-                                            <span className="min-w-0">
-                                                <span className="block truncate text-[13px] font-semibold">
-                                                    {t.title}
-                                                </span>
-                                                <span className="block truncate text-[11px] text-muted-foreground">
-                                                    {t.reference
-                                                        ? `${t.reference} · `
-                                                        : ''}
-                                                    {label(t.work_type)}
-                                                    {t.service
-                                                        ? ` · ${t.service.name}`
-                                                        : ''}
-                                                    {` · ${label(t.category)}`}
-                                                    {t.description
-                                                        ? ` · ${t.description}`
-                                                        : ''}
-                                                </span>
-                                            </span>
-                                        </div>
-                                        <span className="truncate text-[12.5px] text-muted-foreground">
-                                            {t.requester}
-                                        </span>
-                                        <span className="min-w-0 text-[12.5px] text-muted-foreground">
-                                            <span className="block truncate">
-                                                {t.assignee?.name ??
-                                                    'Unassigned'}
-                                            </span>
-                                            <TicketRoutingSummary
-                                                routing={t.routing}
-                                                compact
-                                            />
-                                        </span>
-                                        <span>
-                                            <StatusBadge
-                                                variant={
-                                                    priorityVariant[
-                                                        t.priority
-                                                    ] ?? 'neutral'
-                                                }
-                                                size="sm"
-                                            >
-                                                {label(t.priority)}
-                                            </StatusBadge>
-                                        </span>
-                                        <span>
-                                            <StatusBadge
-                                                variant={
-                                                    ticketStatusVariant[
-                                                        t.status
-                                                    ] ?? 'neutral'
-                                                }
-                                                size="sm"
-                                            >
-                                                {t.status === 'waiting'
-                                                    ? waitingStatusLabel(
-                                                          t.waiting_party,
-                                                      )
-                                                    : label(t.status)}
-                                            </StatusBadge>
-                                        </span>
-                                        <span className="min-w-0">
-                                            <SlaChip ticket={t} />
-                                        </span>
-                                        <span className="text-[12px] text-muted-foreground">
-                                            {t.age ?? '—'}
-                                        </span>
-                                        <span className="flex justify-end">
-                                            {can.manage ? (
-                                                <button
-                                                    type="button"
-                                                    aria-label={`Actions for ${t.title}`}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        ticketMenu(t)(e);
-                                                    }}
-                                                    className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                >
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </button>
-                                            ) : null}
-                                        </span>
-                                    </div>
-                                ))}
-                                {(tickets?.data ?? []).length === 0 ? (
+                                            Select this page
+                                        </label>
+                                    ) : undefined
+                                }
+                            />
+                            <ItTicketList
+                                conversationReady={conversation_ready === true}
+                                rows={tickets?.data ?? []}
+                                view={listView}
+                                actionsFor={ticketActions}
+                                onPeek={(ticket) => openTicket(ticket.id)}
+                                canSelect={canManageTicket}
+                                selected={ticketSel.selected}
+                                onSelect={(ticket, checked) =>
+                                    ticketSel.toggle(ticket.id, checked)
+                                }
+                                busy={bulkBusy}
+                                emptyState={
                                     ticketFiltersActive ? (
                                         <EmptyState
                                             icon={Ticket}
                                             title="No tickets match"
-                                            blurb="Nothing fits these filters. Widen or clear them to see more of the queue."
+                                            blurb="Widen or clear the filters to see more of the queue."
                                             action={{
                                                 label: 'Clear filters',
                                                 onClick: clearTicketFilters,
@@ -2759,13 +2891,13 @@ export default function ItIndex({
                                             title="No tickets"
                                             blurb={
                                                 can.manage
-                                                    ? 'Log the first helpdesk ticket with the button above.'
-                                                    : 'The helpdesk queue is clear.'
+                                                    ? 'Log a helpdesk ticket with the button above.'
+                                                    : 'There are no tickets in your permitted queue.'
                                             }
                                         />
                                     )
-                                ) : null}
-                            </div>
+                                }
+                            />
                             {tickets ? (
                                 <LaravelPagination
                                     links={tickets.links}
@@ -2792,17 +2924,9 @@ export default function ItIndex({
                         <>
                             <div className="flex flex-wrap items-center gap-2">
                                 <p className="text-[12.5px] text-muted-foreground">
-                                    Tickets you’ve raised — IT sees new ones
-                                    instantly.
+                                    Requests you raised or that were raised for
+                                    you.
                                 </p>
-                                <Button
-                                    size="sm"
-                                    className="ml-auto"
-                                    onClick={() => setModal({ type: 'raise' })}
-                                >
-                                    <Plus className="h-3.5 w-3.5" /> Raise a
-                                    ticket
-                                </Button>
                             </div>
 
                             {/* CSAT prompt (§K) — a nudge to rate freshly resolved tickets;
@@ -2852,6 +2976,9 @@ export default function ItIndex({
                                                     <div className="mt-2">
                                                         <CsatRater
                                                             ticketId={t.id}
+                                                            expectedVersion={
+                                                                t.lock_version
+                                                            }
                                                         />
                                                     </div>
                                                 </div>
@@ -2860,20 +2987,28 @@ export default function ItIndex({
                                 </div>
                             ) : null}
 
+                            <ListCaption
+                                title="My requests"
+                                caption={`${filteredMyTickets.length} of ${myTickets.length} shown`}
+                            />
                             <MyTicketsList
-                                tickets={
-                                    myStatus === ALL
-                                        ? myTickets
-                                        : myTickets.filter(
-                                              (t) => t.status === myStatus,
-                                          )
-                                }
-                                onTicketContextMenu={myTicketMenu}
+                                conversationReady={conversation_ready === true}
+                                tickets={filteredMyTickets}
+                                view={listView}
+                                actionsFor={myTicketActions}
                                 emptyState={
                                     <EmptyState
                                         icon={Inbox}
-                                        title="No tickets yet"
-                                        blurb="Broken phone? Locked out? Raise it here — IT sees it instantly and you can track progress on this tab."
+                                        title={
+                                            myQuery || myStatus !== ALL
+                                                ? 'No requests match'
+                                                : 'No requests yet'
+                                        }
+                                        blurb={
+                                            myQuery || myStatus !== ALL
+                                                ? 'Change the search or status filter to see your other requests.'
+                                                : 'Raise a request to ask IT for help and track its progress here.'
+                                        }
                                     />
                                 }
                             />
@@ -2881,14 +3016,14 @@ export default function ItIndex({
                     )}
 
                     {/* ── Knowledge base (agents) ── */}
-                    {can.view && tab === 'knowledge' && (
+                    {showKnowledgeCatalogue && tab === 'knowledge' && (
                         <>
                             <div className="flex flex-wrap items-center gap-2">
                                 <p className="text-[12.5px] text-muted-foreground">
                                     Articles that deflect repeat tickets —
                                     publish the fixes people keep asking for.
                                 </p>
-                                {can.manage ? (
+                                {canAuthorKnowledge ? (
                                     <Button
                                         size="sm"
                                         variant="outline"
@@ -2914,7 +3049,11 @@ export default function ItIndex({
                                     <div
                                         key={a.id}
                                         onContextMenu={
-                                            can.manage ? kbMenu(a) : undefined
+                                            (canAuthorKnowledge &&
+                                                a.can.author) ||
+                                            (canReviewKnowledge && a.can.review)
+                                                ? kbMenu(a)
+                                                : undefined
                                         }
                                         className="grid min-w-[920px] grid-cols-[2.5fr_1.15fr_1.6fr_1.1fr_1.1fr_44px] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
                                     >
@@ -2923,9 +3062,15 @@ export default function ItIndex({
                                                 <BookOpen className="h-3.5 w-3.5" />
                                             </span>
                                             <span className="min-w-0">
-                                                <span className="block truncate text-[13px] font-semibold">
+                                                <Button
+                                                    variant="link"
+                                                    className="h-auto max-w-full justify-start truncate p-0 text-[13px] font-semibold"
+                                                    onClick={() =>
+                                                        setReaderArticleId(a.id)
+                                                    }
+                                                >
                                                     {a.title}
-                                                </span>
+                                                </Button>
                                                 {a.author ? (
                                                     <span className="block truncate text-[11px] text-muted-foreground">
                                                         by {a.author}
@@ -2981,7 +3126,15 @@ export default function ItIndex({
                                             </span>
                                         </span>
                                         <span className="flex justify-end">
-                                            {can.manage ? (
+                                            {(canAuthorKnowledge &&
+                                                a.can.author &&
+                                                a.status !== 'published') ||
+                                            (canReviewKnowledge &&
+                                                a.can.review &&
+                                                [
+                                                    'in_review',
+                                                    'published',
+                                                ].includes(a.status)) ? (
                                                 <button
                                                     type="button"
                                                     aria-label={`Actions for ${a.title}`}
@@ -2999,12 +3152,12 @@ export default function ItIndex({
                                         icon={BookOpen}
                                         title="No articles yet"
                                         blurb={
-                                            can.manage
+                                            canAuthorKnowledge
                                                 ? 'Write the first fix people keep asking for — it deflects the ticket every time after.'
                                                 : 'The knowledge base is empty.'
                                         }
                                         action={
-                                            can.manage
+                                            canAuthorKnowledge
                                                 ? {
                                                       label: 'New KB article',
                                                       onClick: () =>
@@ -3021,69 +3174,76 @@ export default function ItIndex({
                     )}
 
                     {/* ── Knowledge browse (requesters) ── */}
-                    {!can.view && can.request && tab === 'knowledge' && (
-                        <>
-                            {filteredKb.length === 0 ? (
-                                <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                                    <EmptyState
-                                        icon={BookOpen}
-                                        title={
-                                            kbPublished.length === 0
-                                                ? 'No articles yet'
-                                                : 'No matches'
-                                        }
-                                        blurb={
-                                            kbPublished.length === 0
-                                                ? 'IT will publish fixes here — check back, or raise a ticket and they’ll sort it.'
-                                                : 'Nothing matches your search. Try a different word or category.'
-                                        }
-                                    />
-                                </div>
-                            ) : (
-                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                    {filteredKb.map((a) => (
-                                        <button
-                                            key={a.id}
-                                            type="button"
-                                            onClick={() => openArticle(a)}
-                                            className="flex flex-col rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/40"
-                                        >
-                                            <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-primary">
-                                                <BookOpen className="h-4 w-4" />
-                                            </span>
-                                            <span className="mt-2 text-[14px] font-semibold">
-                                                {a.title}
-                                            </span>
-                                            <span className="mt-1 line-clamp-2 text-[12.5px] text-muted-foreground">
-                                                {(a.body ?? '')
-                                                    .replace(/[#>*\-\n]+/g, ' ')
-                                                    .trim()}
-                                            </span>
-                                            <span className="mt-3 flex items-center gap-2 text-[11.5px] text-muted-foreground">
-                                                <StatusBadge
-                                                    variant="info"
-                                                    size="sm"
-                                                >
-                                                    {label(a.category)}
-                                                </StatusBadge>
-                                                {a.helpful_percent != null ? (
-                                                    <span>
-                                                        {a.helpful_percent}%
-                                                        helpful
+                    {!showKnowledgeCatalogue &&
+                        can.request &&
+                        tab === 'knowledge' && (
+                            <>
+                                {filteredKb.length === 0 ? (
+                                    <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                                        <EmptyState
+                                            icon={BookOpen}
+                                            title={
+                                                kbPublished.length === 0
+                                                    ? 'No articles yet'
+                                                    : 'No matches'
+                                            }
+                                            blurb={
+                                                kbPublished.length === 0
+                                                    ? 'IT will publish fixes here — check back, or raise a ticket and they’ll sort it.'
+                                                    : 'Nothing matches your search. Try a different word or category.'
+                                            }
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                        {filteredKb.map((a) => (
+                                            <button
+                                                key={a.id}
+                                                type="button"
+                                                onClick={() => openArticle(a)}
+                                                className="flex flex-col rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/40"
+                                            >
+                                                <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-primary">
+                                                    <BookOpen className="h-4 w-4" />
+                                                </span>
+                                                <span className="mt-2 text-[14px] font-semibold">
+                                                    {a.title}
+                                                </span>
+                                                <span className="mt-1 line-clamp-2 text-[12.5px] text-muted-foreground">
+                                                    {(a.body ?? '')
+                                                        .replace(
+                                                            /[#>*\-\n]+/g,
+                                                            ' ',
+                                                        )
+                                                        .trim()}
+                                                </span>
+                                                <span className="mt-3 flex items-center gap-2 text-[11.5px] text-muted-foreground">
+                                                    <StatusBadge
+                                                        variant="info"
+                                                        size="sm"
+                                                    >
+                                                        {label(a.category)}
+                                                    </StatusBadge>
+                                                    {a.helpful_percent !=
+                                                    null ? (
+                                                        <span>
+                                                            {a.helpful_percent}%
+                                                            helpful
+                                                        </span>
+                                                    ) : null}
+                                                </span>
+                                                {a.related_service ? (
+                                                    <span className="mt-2 text-[11.5px] text-muted-foreground">
+                                                        Service:{' '}
+                                                        {a.related_service}
                                                     </span>
                                                 ) : null}
-                                            </span>
-                                            {a.related_service ? (
-                                                <span className="mt-2 text-[11.5px] text-muted-foreground">
-                                                    Service: {a.related_service}
-                                                </span>
-                                            ) : null}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
                 </div>
             </ItModuleShell>
         </AppLayout>
@@ -3097,31 +3257,79 @@ export default function ItIndex({
 /** Per-page row selection for the bulk-action queues (tickets & provisioning).
  *  The selection is per-view: it clears whenever the visible page changes
  *  (filter, sort, page, or a bulk action that reshuffles rows). */
-function useRowSelection(pageIds: number[]) {
+function useRowSelection(
+    pageIds: number[],
+    pageVersions: Record<number, number> = {},
+) {
     const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [versions, setVersions] = useState<Record<number, number>>({});
     const key = pageIds.join(',');
     useEffect(() => {
         setSelected(new Set());
+        setVersions({});
     }, [key]);
 
-    const toggle = (id: number, on: boolean) =>
+    const toggle = (id: number, on: boolean) => {
+        if (!pageIds.includes(id)) return;
+        setVersions((previous) => {
+            const next = { ...previous };
+            if (on && pageVersions[id] !== undefined)
+                next[id] = previous[id] ?? pageVersions[id];
+            else if (!on) delete next[id];
+            return next;
+        });
         setSelected((prev) => {
             const next = new Set(prev);
-            if (on) next.add(id);
+            if (on && next.size < 50) next.add(id);
             else next.delete(id);
             return next;
         });
+    };
 
-    const toggleAll = (on: boolean) =>
+    const toggleAll = (on: boolean) => {
+        setVersions((previous) =>
+            on
+                ? Object.fromEntries(
+                      pageIds
+                          .filter((id) => pageVersions[id] !== undefined)
+                          .map((id) => [id, previous[id] ?? pageVersions[id]]),
+                  )
+                : {},
+        );
         setSelected((prev) => {
             const next = new Set(prev);
-            pageIds.forEach((id) => (on ? next.add(id) : next.delete(id)));
+            pageIds.forEach((id) => {
+                if (on && next.size < 50) next.add(id);
+                else if (!on) next.delete(id);
+            });
             return next;
         });
+    };
 
     return {
-        selected,
-        clear: () => setSelected(new Set()),
+        selected: new Set([...selected].filter((id) => pageIds.includes(id))),
+        versions: Object.fromEntries(
+            Object.entries(versions).filter(([id]) =>
+                pageIds.includes(Number(id)),
+            ),
+        ),
+        clear: () => {
+            setSelected(new Set());
+            setVersions({});
+        },
+        remove: (ids: number[]) => {
+            setSelected(
+                (previous) =>
+                    new Set([...previous].filter((id) => !ids.includes(id))),
+            );
+            setVersions((previous) =>
+                Object.fromEntries(
+                    Object.entries(previous).filter(
+                        ([id]) => !ids.includes(Number(id)),
+                    ),
+                ),
+            );
+        },
         toggle,
         toggleAll,
         allOnPage:
@@ -3164,41 +3372,6 @@ function DateRange({
         </div>
     );
 }
-
-/** A sortable column header — chevron shows the active direction. */
-function SortHeader({
-    label,
-    col,
-    filters,
-    onSort,
-}: {
-    label: string;
-    col: string;
-    filters?: Filters;
-    onSort: (col: string) => void;
-}) {
-    const active = filters?.sort === col;
-    return (
-        <button
-            type="button"
-            onClick={() => onSort(col)}
-            aria-label={`Sort by ${label}`}
-            className="flex items-center gap-1 text-left tracking-wide uppercase transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
-        >
-            {label}
-            {active ? (
-                filters?.dir === 'asc' ? (
-                    <ChevronUp className="h-3 w-3" />
-                ) : (
-                    <ChevronDown className="h-3 w-3" />
-                )
-            ) : (
-                <ChevronsUpDown className="h-3 w-3 opacity-40" />
-            )}
-        </button>
-    );
-}
-
 function EmptyState({
     icon: Icon,
     title,

@@ -1,0 +1,176 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/ticket-work-task-focus.test.tsx (6 tests | 1 failed | 5 skipped) 1307ms
+     × keeps nested cancellation inside the original dialog, then returns explicit discard to its opener 1305ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-work-task-focus.test.tsx > Task action dialog focus return > keeps nested cancellation inside the original dialog, then returns explicit discard to its opener
+AssertionError: Settled focus target: BODY: expected false to be true // Object.is equality
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body
+    data-scroll-locked="1"
+    style="pointer-events: none;"
+  >
+    <span
+      aria-hidden="true"
+      data-aria-hidden="true"
+      data-radix-focus-guard=""
+      style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+      tabindex="0"
+    />
+    <div
+      aria-hidden="true"
+      data-aria-hidden="true"
+    >
+      <header
+        tabindex="-1"
+      >
+        Ticket workspace
+      </header>
+      <main
+        aria-label="Authorized task workspace"
+        tabindex="-1"
+      >
+        <section
+          aria-labelledby="ticket-work-tasks"
+          class="space-y-4"
+        >
+          <div
+            class="flex flex-wrap items-center justify-between gap-3"
+          >
+            <div
+              class="flex items-center gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-list-checks size-4 text-muted-foreground"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="m3 17 2 2 4-4"
+                />
+                <path
+                  d="m3 7 2 2 4-4"
+                />
+                <path
+                  d="M13 6h8"
+                />
+                <path
+                  d="M13 12h8"
+                />
+                <path
+                  d="M13 18h8"
+                />
+              </svg>
+              <h2
+                class="text-section-title"
+                id="ticket-work-tasks"
+              >
+                Work tasks
+              </h2>
+            </div>
+            <div
+              class="flex gap-2"
+            >
+              <button
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+                data-slot="button"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-list-ordered size-4"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M10 12h11"
+                  />
+                  <path
+                    d="M10 18h11"
+                  />
+                  <path
+                    d="M10 6h11"
+                  />
+                  <path
+                    d="M4 10h2"
+                  />
+                  <path
+                    d="M4 6h1v4"
+                  />
+                  <path
+                    d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"
+                  />
+                </svg>
+                Reorder tasks
+              </button>
+              <button
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+                data-slot="button"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-plus size-4"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M5 12h14"
+                  />
+                  <path
+                    d="M12 5v14"
+                  />
+                </svg>
+                Add task[...
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ resources/js/components/it/__tests__/ticket-work-task-focus.test.tsx:171:15
+    169|                 dialog.contains(document.activeElement),
+    170|                 `Settled focus target: ${document.activeElement?.tagNa…
+    171|             ).toBe(true),
+       |               ^
+    172|         );
+    173|         fireEvent.click(
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 skipped (6)
+   Start at  00:16:19
+   Duration  4.22s (transform 265ms, setup 107ms, import 1.86s, tests 1.31s, environment 788ms)
+

@@ -1,0 +1,5 @@
+npm notice run npx
+npm notice run prettier --write resources/js/hooks/use-it-ticket-approval-command.ts resources/js/hooks/use-it-ticket-approval-command.test.tsx resources/js/hooks/use-it-work-task-history.ts
+resources/js/hooks/use-it-ticket-approval-command.ts 502ms (unchanged)
+resources/js/hooks/use-it-ticket-approval-command.test.tsx 127ms
+resources/js/hooks/use-it-work-task-history.ts 31ms

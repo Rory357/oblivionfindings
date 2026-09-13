@@ -131,6 +131,19 @@ meter row).
 
 ## Recurring patterns — where the canonical version lives
 
+- **Calendars — always the Site Calendar style** (approved 2026-09-13).
+  `resources/js/pages/sites/calendar/SiteCalendar.tsx` and `_parts.tsx`
+  are the canonical calendar UI for My Calendar, site calendars and
+  module calendars. Reuse the component with a data adapter for a
+  different module's feed; do not create a separate FullCalendar skin,
+  toolbar, month grid, colour scheme or calendar header. Keep each
+  module's permissions, data ownership and workflows intact. Follow
+  `design_styles/CALENDAR_STYLE_GUIDE.md` for the shared views, date
+  anchor, source filters and responsive checks. **The viewed day,
+  month and year must be obvious in the header**, not only in a small
+  date picker. Existing calendars using other designs are migration
+  targets; new calendar work must use this standard.
+
 - **Entity add/edit — the wizard dialog is the default.** Any add or edit of
   an entity record (site, client, staff, asset, incident, …) or any form with
   2+ sections uses the `WizardShell` modal from

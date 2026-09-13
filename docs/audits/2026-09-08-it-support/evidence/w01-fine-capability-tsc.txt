@@ -1,0 +1,1 @@
+resources/js/pages/it/setup/index.tsx(300,19): error TS2339: Property 'defaults' does not exist on type 'InertiaFormProps<{ configuration_version: string; key: string; name: string; description: string; team_id: string; routing_priority: number; is_default: boolean; work_types: string[]; categories: string[]; priorities: string[]; ... 4 more ...; is_active: boolean; }>'.

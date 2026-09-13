@@ -60,6 +60,22 @@ class ItStaffDirectory
             ->values();
     }
 
+    /** Current eligible public-update audience; membership is not an entitlement. */
+    public static function watchersForTicket(ItTicket $ticket): Collection
+    {
+        $access = app(ItWorkAccessService::class);
+
+        $candidateIds = collect(['it.view', 'it.manage'])
+            ->flatMap(fn (string $permission): Collection => static::holdingPermission($permission))
+            ->pluck('id')->push($ticket->requester_user_id, $ticket->requested_for_user_id)
+            ->filter()->unique()->values();
+
+        return User::query()->whereKey($candidateIds->all())
+            ->with(['roles.permissions', 'permissionOverrides'])->get()
+            ->filter(fn (User $user): bool => $access->canReceiveTicketUpdates($user, $ticket))
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
+    }
+
     /** @return Collection<int, User> */
     public static function agentsForSharedSites(User $viewer): Collection
     {

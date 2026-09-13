@@ -1,0 +1,136 @@
+{
+    "database": "oblivion_it_draft_browser_472da947a1b04395",
+    "table_count": 784,
+    "last_table_names": [
+        "users",
+        "votes",
+        "work_capacity_assessments",
+        "workplace_injuries",
+        "workplace_injury_attachments"
+    ],
+    "counts": {
+        "migrations": 905,
+        "users": 0,
+        "roles": 0,
+        "permissions": 0,
+        "sites": 0,
+        "it_tickets": 0,
+        "it_ticket_drafts": null
+    },
+    "last_migrations": [
+        "2026_08_04_000027_add_site_provenance_to_fleet_key_logs",
+        "2026_08_04_000026_make_asset_tracker_lineage_optional",
+        "2026_08_03_000025_create_monitoring_external_heartbeat_states",
+        "2026_08_03_000024_realign_roadmap_application_identity",
+        "2026_08_03_000023_realign_hr_succession_site_identity",
+        "2026_08_02_000022_realign_hr_saved_report_application_identity",
+        "2026_08_02_000021_realign_hr_cases_disciplinary_application_indexes",
+        "2026_08_02_000020_realign_hr_training_driver_application_identity"
+    ],
+    "database_mutations_performed": false
+}
+{
+    "configuration_error": {
+        "class": "Illuminate\\Contracts\\Container\\BindingResolutionException",
+        "file": "Container.php",
+        "line": 1127,
+        "trace": [
+            {
+                "file": "Container.php",
+                "line": 936,
+                "class": "Illuminate\\Container\\Container",
+                "function": "build"
+            },
+            {
+                "file": "Application.php",
+                "line": 1078,
+                "class": "Illuminate\\Container\\Container",
+                "function": "resolve"
+            },
+            {
+                "file": "Container.php",
+                "line": 864,
+                "class": "Illuminate\\Foundation\\Application",
+                "function": "resolve"
+            },
+            {
+                "file": "Application.php",
+                "line": 1058,
+                "class": "Illuminate\\Container\\Container",
+                "function": "make"
+            },
+            {
+                "file": "Container.php",
+                "line": 1810,
+                "class": "Illuminate\\Foundation\\Application",
+                "function": "make"
+            },
+            {
+                "file": "Application.php",
+                "line": 1333,
+                "class": "Illuminate\\Container\\Container",
+                "function": "offsetGet"
+            },
+            {
+                "file": "w06-draft-browser-runtime.php",
+                "line": 97,
+                "class": "Illuminate\\Foundation\\Application",
+                "function": "routesAreCached"
+            },
+            {
+                "file": "Dispatcher.php",
+                "line": 499,
+                "function": "{closure:w06BrowserApplication():95}"
+            },
+            {
+                "file": "Dispatcher.php",
+                "line": 329,
+                "class": "Illuminate\\Events\\Dispatcher",
+                "function": "{closure:Illuminate\\Events\\Dispatcher::makeListener():494}"
+            },
+            {
+                "file": "Dispatcher.php",
+                "line": 309,
+                "class": "Illuminate\\Events\\Dispatcher",
+                "function": "invokeListeners"
+            },
+            {
+                "file": "Application.php",
+                "line": 344,
+                "class": "Illuminate\\Events\\Dispatcher",
+                "function": "dispatch"
+            },
+            {
+                "file": "w06-owned-browser-readonly-diagnosis.php",
+                "line": 55,
+                "class": "Illuminate\\Foundation\\Application",
+                "function": "bootstrapWith"
+            }
+        ]
+    },
+    "checks": {
+        "config_not_cached": true,
+        "routes_not_cached": true,
+        "local": true,
+        "debug_false": true,
+        "mysql": true,
+        "owned_database": true,
+        "loopback": true,
+        "port": true,
+        "no_url": true,
+        "no_read": true,
+        "no_write": true,
+        "mail_array": true,
+        "array_transport": true,
+        "sync": true,
+        "cache_array": true,
+        "broadcast_disabled": true,
+        "database_session": true,
+        "session_domain_null": true,
+        "session_secure_false": true,
+        "private_storage_owned": true,
+        "local_storage_owned": true
+    },
+    "providers_booted": false,
+    "database_mutations_performed": false
+}

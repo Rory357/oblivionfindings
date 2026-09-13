@@ -1,7 +1,7 @@
 /* Shared types + helpers for the All Tasks queue (page + drawer).
  * Mirrors app/Services/Tasks/TaskItem::toArray(). */
 import type { StatusVariant } from '@/components/ui/status-badge';
-import { formatDate } from '@/lib/datetime';
+import { formatDate, formatRelative } from '@/lib/datetime';
 
 export type NamedRef = { id: number; name: string };
 
@@ -89,17 +89,25 @@ export function taskStateLabel(
 }
 
 /** Relative due label + tone class. Overdue rows read critical. */
-export function dueInfo(item: TaskItem): { label: string; className: string } {
+export function dueInfo(item: Pick<TaskItem, 'dueAt' | 'overdue'>): {
+    label: string;
+    className: string;
+} {
     if (!item.dueAt) return { label: '—', className: 'text-muted-foreground' };
-    const days = Math.ceil(
-        (new Date(item.dueAt).getTime() - Date.now()) / 86_400_000,
-    );
+    const now = Date.now();
+    const remaining = new Date(item.dueAt).getTime() - now;
+    const days = Math.ceil(remaining / 86_400_000);
     if (item.overdue) {
         return {
             label: days >= 0 ? 'Overdue' : `${Math.abs(days)}d overdue`,
             className: 'font-semibold text-status-critical',
         };
     }
+    if (remaining > 0 && remaining < 86_400_000)
+        return {
+            label: `Due ${formatRelative(item.dueAt, now)}`,
+            className: 'font-semibold text-status-warning',
+        };
     if (days <= 0)
         return {
             label: 'Due today',

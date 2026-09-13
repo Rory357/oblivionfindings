@@ -409,7 +409,7 @@ class SiteCredentialController extends Controller
     public function auditLog(Request $request, Site $site, SiteCredential $credential)
     {
         $this->concealSite($request, $site);
-        $request->user()->canDo('credentials.reveal') || abort(403);
+        $request->user()->canDo('credentials.audit') || abort(403);
         $this->assertCredentialBelongsToSite($site, $credential);
 
         $logs = SiteCredentialAuditLog::query()

@@ -1,0 +1,3178 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > canonical task command contracts > binds every mutation to its canonical route without passing context fields as task data 6ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > canonical task command contracts > freezes ordered dependencies and rejects forged transport or completion state fields 1ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > canonical task command contracts > requires exact actor, task, operation and original version even on replay, with genuine no-op acknowledgement 1ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > canonical task command contracts > accepts only an explicit exact cancellation tombstone 0ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > task command recovery > announces success only after an exact committed result and clears only its opaque reference 96ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > IT draft response boundary > normalizes PHP empty fields, numeric IDs and booleans without accepting another audience or arbitrary fields 4ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > makes no requests or browser content storage while disabled 22ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > task command recovery > keeps unknown payload and UUID exact across retry without adopting a newer task version 146ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > reports supplied current counts without turning provider acceptance into delivery 235ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > does not label an accepted-only message delivered 14ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > distinguishes historical unrecorded tracking from no requested notification 20ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > does not invent a queued or delivered attempt when a notification has no attempt record 14ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > withholds invalid counts (-1) instead of rendering a partial success 9ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > withholds invalid counts (1.5) instead of rendering a partial success 7ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > withholds invalid counts (NaN) instead of rendering a partial success 7ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > does not echo unexpected recipient/provider fields 3ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > exposes the supplied canonical scoped log link and removes it when permission projection changes 20ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > omits an invalid log destination: https://outside.example/log 2ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > checks metadata without hydration and requires explicit resume before overwriting existing work 91ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > freezes an exact save retry and never labels newer local text saved 89ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > omits an invalid log destination: //outside.example/log 2ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > omits an invalid log destination: javascript:alert(1) 2ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > omits an invalid log destination: /it/setup/../tickets 1ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > omits an invalid log destination: /it/setup\outside 2ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > delegates refresh without submitting a form and disables duplicate refresh while pending 25ms
+ ✓ resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx > read-only ticket comment delivery status > shows the server check time in the approved Auckland format and handles an invalid time honestly 7ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > task command recovery > retains an unknown original after current review; adoption cannot abandon the pending write 83ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > keeps a pristine public_reply quiet without claiming a save 18ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > keeps a pristine ticket_edit quiet without claiming a save 3ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > does not adopt a stale revision until saved content has been explicitly reviewed 73ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > keeps an untouched older generation quiet, but shows the conflict as soon as a proposal exists 166ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > shows unsaved edits but does not offer to discard an empty saved generation 19ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > keeps save available for saved text cleared back to the initial empty form 33ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > rejects HTML or a mismatched generation instead of announcing a save 77ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > retains exact pending work across session expiry and requires a current actor check before retry 77ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > task command recovery > uses receipt 404 as unknown, then explicit serialized cancellation permits a separate reviewed proposal 231ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > preserves an actionable error on a pristine draft without inventing changes 48ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > keeps canonical pending files and browser warnings visible without local text 14ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > uses the host matched-commit action only for terminal state and preserves ordinary error recovery 21ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > renders no control or action while recovery is disabled 2ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > conceals a previously reviewed server payload when the session expires 76ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > task command recovery > definitive validation is editable while a validation error after unknown outcome keeps the frozen intent 182ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > purges private client state on permission loss and ignores late responses from an old actor 79ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > cancels the wait without forgetting a potentially committed mutation 77ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > requires a deliberate confirmation before replacing local work and only hydrates after the acknowledgement 188ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > keeps the host buffer when discard is unconfirmed and binds confirmation to its original generation 73ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > shows the host-defined saved fields and adopting a reviewed revision does not save 13ms
+ ✓ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > exposes exact retry and cancellation separately and never labels unsaved work saved 21ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > task command recovery > requires explicit current review and adoption after a known stale rejection without auto-submit 79ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > task command recovery > conceals session-expired private work until exact current proof; actor mismatch purges it 77ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > task command recovery > ignores a cancelled wait response and retains the original command 3ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > task command recovery > ignores late review after cancellation without exposing an adoptable version 2ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > reconciles a lost start-new acknowledgement by context without replaying into a new generation 76ms
+ ✓ resources/js/hooks/use-it-work-task-command.test.tsx > task command recovery > hard-remount recovers opaque identity without reading or fabricating a missing private body 147ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > keeps a visible warning when starting a new generation leaves old file cleanup pending 80ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > rejects a later revision from a concurrent command and preserves the original base ticket version 72ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > rejects disallowed names and oversize selections without losing saved text or files, then accepts a corrected name 83ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > replaces an earlier server attachment error when a later local file selection is rejected 74ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > retains the same File and upload UUID on retry without claiming text saved 81ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > keeps the exact selected file after reviewing and adopting its reserved upload 71ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > requires an explicit release before replacing an upload removed elsewhere 78ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > does not clear a newer local edit or accept another generation commit 77ms
+ ✓ resources/js/hooks/use-it-ticket-draft.test.tsx > useItTicketDraft > keeps validation recoverable without reusing a rejected frozen snapshot 77ms
+ ✓ resources/js/components/it/__tests__/it-service-operations.test.tsx > Operations cleanup and scheduler evidence > uses authoritative staleness rather than the historical successful status 275ms
+ ✓ resources/js/components/it/__tests__/it-service-operations.test.tsx > Operations cleanup and scheduler evidence > renders recovered freshness without changing the retained failed batch counts 68ms
+ ✓ resources/js/components/it/__tests__/it-service-operations.test.tsx > Operations cleanup and scheduler evidence > does not manufacture freshness when no watchdog evidence arrived 31ms
+ ✓ resources/js/components/it/__tests__/it-service-operations.test.tsx > Operations cleanup and scheduler evidence > shows authorized live counts separately from the selected historical batch 46ms
+ ✓ resources/js/components/it/__tests__/it-service-operations.test.tsx > Operations cleanup and scheduler evidence > conceals stale private counts immediately after current audit authority changes 35ms
+ ✓ resources/js/components/it/__tests__/it-service-operations.test.tsx > Operations cleanup and scheduler evidence > conceals stale private counts immediately after current manage authority changes 46ms
+ ✓ resources/js/components/it/__tests__/it-service-operations.test.tsx > Operations cleanup and scheduler evidence > conceals stale private counts immediately after current actor authority changes 38ms
+ ✓ resources/js/components/it/__tests__/it-service-operations.test.tsx > Operations cleanup and scheduler evidence > respects the fresh server denial even if cached client capabilities still allow audit 27ms
+ ✓ resources/js/components/it/__tests__/it-service-operations.test.tsx > Operations cleanup and scheduler evidence > shows not_ready without substituting zero for unavailable counts 27ms
+ ✓ resources/js/components/it/__tests__/it-service-operations.test.tsx > Operations cleanup and scheduler evidence > shows unavailable without substituting zero for unavailable counts 20ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command acknowledgement > binds actor, ticket, target, desired membership and incremented version 3ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command acknowledgement > accepts a no-op only at the original or later current version 1ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > replaces an incomplete no-op projection with the refreshed equal-version register 30ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > keeps an unknown original through same-version opposite-state adoption and close 7ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > sends the exact actor/version/desired state and acknowledges only once 3ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > retains a cancelled wait and ignores its late valid acknowledgement 4ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > keeps malformed successful responses unknown without a success callback 2ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > preserves a stale proposal and separates read, version adoption and apply 4ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > allows a newly ineligible existing watcher to be removed, not added 3ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > does not allow an ineligible add after fresh review 3ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > conceals session-expired details and requires a fresh matching actor review 2ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > purges and conceals after a review account mismatch 2ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > ignores cancelled review results and never adopts their version 4ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > retains exact unknown membership across unmount without browser storage 3ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > keeps an unknown command while the drawer is still authorizing its data 3ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > does not erase an unresolved command when an old version still shows the opposite state 2ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher command recovery > keeps confirmed success when only the refresh callback fails 2ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher management controls > shows paused subscriptions, confirms removal and labels the exact person 381ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher management controls > offers no add/remove/self-watch action to a reader without the canonical capability 36ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher management controls > keeps a rejected add visible with focus and no success message 237ms
+ ✓ resources/js/components/it/__tests__/ticket-watchers.test.tsx > watcher management controls > uses accurate self, delegated and historical activity descriptions 0ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > settles a rejected local reply before returning to its active saved-draft generation 26ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > recovers the exact local edit while persistent drafts are disabled, using only permission validation 51ms
+ ✓ resources/js/hooks/it-work-task-memory.test.tsx > task work in the existing bounded RAM inventory > separates different nested tasks and operations and never recognizes a persisted task draft 5ms
+ ✓ resources/js/hooks/it-work-task-memory.test.tsx > task work in the existing bounded RAM inventory > rejects cross-operation fields, file inventory and mismatched pending identity 2ms
+ ✓ resources/js/hooks/it-work-task-memory.test.tsx > task work in the existing bounded RAM inventory > freezes pending UUID/version/body while newer working text can remain recoverable 1ms
+ ✓ resources/js/hooks/it-work-task-memory.test.tsx > task work in the existing bounded RAM inventory > retains the latest form across unmount and sends exact task context plus all historical selections before disclosure 37ms
+ ✓ resources/js/hooks/it-work-task-memory.test.tsx > task work in the existing bounded RAM inventory > requires nonce-bound proof for exact nested context; malformed proof retains the concealed copy 4ms
+ ✓ resources/js/hooks/it-work-task-memory.test.tsx > task work in the existing bounded RAM inventory > includes exact pending command in fresh proof and retains a handoff until its command client accepts it 7ms
+ ✓ resources/js/hooks/it-work-task-memory.test.tsx > task work in the existing bounded RAM inventory > removes denied work but retains concealed session-expired recovery 5ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > preserves A→B→clear bindings and all original files in local intake, with opaque request discovery 41ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > warns before losing an excessive reference history and preserves all earlier bindings 84ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > retains the final mounted edit before traversal and performs no network call until explicit Resume 5ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > replaces only the mounted pre-initialization copy with the latest canonical draft buffer 4ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > retains original selected files without adoption when the current form mode cannot represent them 3ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > excludes live sibling buffers and makes only the departed form available 18ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > preserves cleared fields when they differ from the acknowledged saved snapshot even if form dirty is false 3ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > drops an exact acknowledged mounted copy without claiming to discard the canonical draft 8ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > does not resurrect explicitly discarded text during immediate unmount, but retains a later deliberate edit 5ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > clears only the current form on success or deliberate discard, preserving another departed editor in the same context 3ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > releases only the mounted frozen save after a definitive rejection, retaining newer edits without a previous successful save 4ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > does not treat an older successful save as acknowledgement of a frozen operation 2ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > cancels only the recovery wait and ignores a late response while retaining a retryable local copy 4ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > requires exact nonce proof before the canonical read and preserves the buffer on malformed proof 2ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > retains unsupported false editor fields before authorization or adoption 2ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > retains unsupported true editor fields before authorization or adoption 2ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > checks host value compatibility only after current authorization and preserves an incompatible pending snapshot 2ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > rejects a generation that changes between proof and canonical resume without releasing private candidate data 2ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > conceals expired-session recovery 401 and requires a new authorized attempt 2ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > conceals expired-session recovery 419 and requires a new authorized attempt 3ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > purges revoked context and removes another actor’s buffers on actor change 4ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > does not let an older still-mounted actor republish or restore content after another actor becomes current 3ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > ignores an old response after scope change and aborts its wait 5ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > shows capacity rejection while mounted without evicting older browser work 14ms
+ ✓ resources/js/hooks/use-it-ticket-draft-memory.test.tsx > draft memory client lifecycle > does not recover while another canonical request owns the client and does not write during unmount 1ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > keeps exit, Close and GET guards for session-concealed retained work (pending false) 732ms
+ ✓ resources/js/components/it/__tests__/ticket-thread.test.tsx > TicketThread > shows current public delivery, preserves the scoped review link and delegates refresh to its host 330ms
+ ✓ resources/js/components/it/__tests__/ticket-thread.test.tsx > TicketThread > never renders delivery controls for an internal note even when a stale payload contains them 35ms
+ ✓ resources/js/components/it/__tests__/ticket-thread.test.tsx > TicketThread > conceals another author’s stale delivery after in-place access loss while retaining the actor’s public result 59ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > conceals a wrong record/component before application even when the scope changes: {"component":"it/tickets/show","ticketId":99} 19ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > conceals a wrong record/component before application even when the scope changes: {"component":"another/component","ticketId":42} 3ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > shows pending until the matching canonical page is acknowledged without remounting 3ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > does not claim refresh when Inertia finishes without a page acknowledgement 2ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > rejects a redirected or different actor page as confirmation 2ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > bounds a lost refresh and ignores late callbacks 4ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > cancels a departed actor scope without surfacing its late result 2ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > coalesces a commit during an older pending read into a later read, including same-tick calls 3ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > conceals before applying a mismatched actor and stays blocked across the new auth props 3ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > conceals only its own HTTP 401 response and ignores unrelated visits 2ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > conceals only its own HTTP 419 response and ignores unrelated visits 1ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > conceals only its own HTTP 403 response and ignores unrelated visits 3ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > conceals only its own HTTP 404 response and ignores unrelated visits 1ms
+ ✓ resources/js/hooks/use-ticket-page-refresh.test.tsx > ticket page delivery refresh > does not reveal a concealed draft after a failed retry; requires fresh matching auth and ticket 1ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > starts the next matching audience draft through one explicit action (internal false) 528ms
+ ✓ resources/js/components/it/__tests__/ticket-thread.test.tsx > TicketThread > conceals previously loaded internal comments and their file links when internal access changes 79ms
+ ✓ resources/js/components/it/__tests__/ticket-thread.test.tsx > TicketThread > shows explicit triage reasons and assessment without exposing unrelated payload fields 46ms
+ ✓ resources/js/components/it/__tests__/ticket-thread.test.tsx > TicketThread > replaces the composer with a clear read-only explanation for settled work 25ms
+ ✓ resources/js/components/it/__tests__/ticket-thread.test.tsx > TicketThread > turns specialised work activity into clear technician language 95ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > keeps exit, Close and GET guards for session-concealed retained work (pending true) 381ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > starts the next matching audience draft through one explicit action (internal true) 213ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > drops the departed work guard after confirmed access denial and purge 170ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"draft_uuid":"3a966432-a1ce-40ef-8e9c-ac2716e1ecdd"} 181ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"revision":4} 154ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > retains the same concealed composer across session expiry and requires an authorized retry 250ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"state":"active","has_content":true,"capabilities":{"read":true,"start_new":false}} 158ms
+ ✓ resources/js/pages/it/setup/setup-workspace.test.tsx > Setup workspace presentation > keeps old reply history scoped, counts visible page matches and offers bounded canonical pagination 359ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > retains an immutable pending reply separately from newer text and counts shared File bytes once 5ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > atomically initializes a mounted local draft at capacity, retaining the original if replacement fails 3ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > authorizes a local generation without invented canonical draft metadata and preserves the stale base version 2ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > counts and retains original local selections without generating staged upload identities 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > keeps historical reference snapshots private and rejects invalid or excessive scope history without eviction 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > discovers metadata only and reveals the exact private candidate only after fresh proof and one-use adoption 2ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > rejects mismatched candidate proof without disclosing or discarding content 0 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > rejects mismatched candidate proof without disclosing or discarding content 1 0ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > rejects mismatched candidate proof without disclosing or discarding content 2 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > rejects mismatched candidate proof without disclosing or discarding content 3 0ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > rejects mismatched candidate proof without disclosing or discarding content 4 0ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > rejects mismatched candidate proof without disclosing or discarding content 5 0ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > rejects mismatched candidate proof without disclosing or discarding content 6 0ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > rejects mismatched candidate proof without disclosing or discarding content 7 0ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > requires HTTP200 and matching currently readable canonical metadata 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > never calls candidate authorization for another actor, ticket or audience 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > conceals session expiry and conflicts but purges a denied exact candidate only 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > does not expose content after it changes while fresh authorization is pending 0ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > invalidates old permits on fresh checks, replacement and actor purge 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > ignores stale denial after a later authorization and actor purge during a request 0ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > isolates caller and authorization copies while preserving the exact pending File and upload UUID 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > never silently evicts an existing buffer or loses it on capacity rejection 0ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > uses secure random bytes when randomUUID is unavailable 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > refuses to overwrite an unknown original outcome or reuse a buffer identity across scopes 0ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > retains newer typed text separately from an immutable unconfirmed save and counts both snapshots 12ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > requires an explicit reviewed authorization revision while preserving original retry and ticket versions 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > rejects a pending save if its extra bytes exceed capacity and keeps the previous buffer 0ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > consumes only the acknowledged exact snapshot and explicitly purges only the selected generation/context 1ms
+ ✓ resources/js/hooks/it-ticket-draft-memory.test.ts > canonical draft memory handoff > rejects invalid fields, forbidden resolution files and absent resource bounds 1ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"audience":"internal"} 127ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > manages watchers from People and feedback through the actor-bound command 327ms
+ ✓ resources/js/pages/it/setup/setup-workspace.test.tsx > Setup workspace presentation > uses one connected header and filters the actual list while keeping scoped meters factual 207ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > resumes an unknown team create after traversal and retries its exact command once
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > resumes an unknown team create after traversal and retries its exact command once
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"capabilities":{"read":false,"start_new":false}} 144ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > purges entered agent-side work when current ticket capabilities narrow 124ms
+stderr | resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > raise raw intake file selection > rejects a mixed drag selection without changing prior files or text, then accepts a corrected picker selection
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > IT attachment selection limits > accepts every approved extension, including uppercase, at the exact size and count limits 2ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > IT attachment selection limits > rejects the whole mixed selection containing program.exe 0ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > IT attachment selection limits > rejects the whole mixed selection containing report.txt.html 0ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > IT attachment selection limits > rejects the whole mixed selection containing report 0ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > IT attachment selection limits > rejects the whole mixed selection containing drawing.svg 0ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > IT attachment selection limits > includes existing files in the count and rejects one byte beyond the per-file limit 0ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"blocker":{"code":"ticket_settled","message":"Reopen this ticket."}} 155ms
+ ✓ resources/js/components/it/__tests__/ticket-version-conflict.test.tsx > ticket version recovery > permits a requester to review a reply version without granting ticket management 231ms
+ ✓ resources/js/components/it/__tests__/ticket-version-conflict.test.tsx > ticket version recovery > conceals an internal-note review if public comment access remains but internal work access is lost 30ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > protects browser exit and generic GET navigation while allowing comment POST 117ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > conceals a changed-account response and offers a normal page reload 89ms
+ ✓ resources/js/pages/it/setup/setup-workspace.test.tsx > Setup workspace presentation > links meters and rail to real filtered views using history-preserving navigation 156ms
+ ✓ resources/js/pages/it/setup/setup-workspace.test.tsx > Setup workspace presentation > shows empty counts without an undefined zero-of-zero percentage 50ms
+ ✓ resources/js/components/it/__tests__/ticket-version-conflict.test.tsx > ticket version recovery > keeps closure evidence and its old version through a refresh until explicit review 198ms
+ ✓ resources/js/components/it/__tests__/ticket-version-conflict.test.tsx > ticket version recovery > shows denial without accepting a version or pretending the review succeeded 30ms
+ ✓ resources/js/components/it/__tests__/ticket-version-conflict.test.tsx > ticket version recovery > keeps review unavailable when current ticket details are incomplete 18ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > keeps a failed next-message check retryable without rotating or claiming readiness 160ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > keeps entered work through an unrelated parent render with a fresh close callback 66ms
+ ✓ resources/js/components/it/__tests__/ticket-version-conflict.test.tsx > ticket version recovery > allows retry after a failed review without submitting anything 38ms
+ ✓ resources/js/components/it/__tests__/ticket-version-conflict.test.tsx > ticket version recovery > cancels a review request and leaves the draft decision pending 37ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > resumes an unknown team create after traversal and retries its exact command once 1191ms
+ ✓ resources/js/pages/it/setup/setup-workspace.test.tsx > Setup workspace presentation > preserves search across layout and filters and restores Back without a stale delayed search 260ms
+ ✓ resources/js/pages/it/setup/setup-workspace.test.tsx > Setup workspace presentation > restores URL-selected table and active filters and keeps row context actions available 154ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > ignores a late successful next-message check after session loss 136ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > requires an explicit decision before Escape discards work 224ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > does not consume an unrelated resumed proposal when an older receipt is confirmed 947ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > ignores a late successful next-message check after access loss 126ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > ignores a late successful next-message check after unmount loss 93ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > does not lose work during full-page handoff without an explicit discard 106ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > resumes an unknown service create after traversal and retries its exact command once
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > resumes an unknown service create after traversal and retries its exact command once
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > keeps the current composer mounted when refreshing or retrying a failed refresh 111ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > shows session recovery inline and never treats a settled error as loading 93ms
+stderr | resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > restores the latest text and selected File after same-document unmount with saved drafts disabled
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > retains an editable rejected request across Back after definitive create validation 1373ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > preserves a newer File selection when a recovered original reply has the same body and base version 83ms
+stderr | resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > raise raw intake file selection > rejects all excess files rather than silently keeping the first five and allows a smaller correction
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > raise raw intake file selection > rejects a mixed drag selection without changing prior files or text, then accepts a corrected picker selection 1111ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > returns keyboard focus to the opening control after an ordinary close 139ms
+stderr | resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > restores the latest text and selected File after same-document unmount with saved drafts disabled
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > resumes an unknown service create after traversal and retries its exact command once 733ms
+stderr | resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > restores the latest text and selected File after same-document unmount with saved drafts disabled
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > purges an open private task editor when the same actor becomes a participant 1125ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > recovers the whole team form after native-style unmount only after explicit fresh authorization
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > recovers the whole team form after native-style unmount only after explicit fresh authorization
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > a cancellation finding a committed reply preserves the ACK hold until explicit review (saved drafts false) 322ms
+stderr | resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > raise raw intake file selection > rejects an oversized selection and clears its actionable error when the user removes a prior file
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > raise raw intake file selection > rejects all excess files rather than silently keeping the first five and allows a smaller correction 722ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > recovers the whole team form after native-style unmount only after explicit fresh authorization 395ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > upgrades a matching opaque unknown command after 404 to its freshly authorized original RAM body 964ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > shows owned progress, dependencies and completion evidence 61ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > does not expose task mutation controls in read-only mode 15ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > restores the latest text and selected File after same-document unmount with saved drafts disabled 629ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > a cancellation finding a committed reply preserves the ACK hold until explicit review (saved drafts true) 383ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > replaces both audience forms when scope changes {"actorId":8} without rebinding old private work 99ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > recovers the whole service form after native-style unmount only after explicit fresh authorization
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > recovers the whole service form after native-style unmount only after explicit fresh authorization
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > reviews all steps before creating with the original actor and ticket version 371ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > purges an open private approval decision when current decision permission is removed 336ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > reopens completed work only through the reasoned lifecycle 92ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > replaces both audience forms when scope changes {"ticketId":12} without rebinding old private work 95ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > does not resurrect explicitly discarded current browser work on close 388ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > refreshes the whole canonical audience so narrowed Site and worker permissions remove old KB hints and linked work 508ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > recovers the whole service form after native-style unmount only after explicit fresh authorization 373ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > prefills team details, changes only intended fields and requires an explicit save after Review
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > prefills team details, changes only intended fields and requires an explicit save after Review
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > purges both audience buffers when the host confirms access loss 85ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > purges both audience buffers when the host confirms actor loss 83ms
+stderr | resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > raise raw intake file selection > submits the original accepted File objects and unchanged text after a rejected batch
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+stderr | resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > raise raw intake file selection > submits the original accepted File objects and unchanged text after a rejected batch
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > records required evidence through the canonical completion route 108ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > raise raw intake file selection > rejects an oversized selection and clears its actionable error when the user removes a prior file 488ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > conceals session-bound work and restores both audiences only after the host clears the session blocker 107ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > refreshes the committed conversation while retaining an unmatched saved draft 61ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > prefills team details, changes only intended fields and requires an explicit save after Review 265ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > validates and focuses identity before native implicit submission can create
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > validates and focuses identity before native implicit submission can create
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > requires explicit Resume and restores the approved Site and text without browser content storage 359ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > purges confirmed denied text and files from the current audience RAM input 42ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > conceals and purges both audiences after generic403 until each receives fresh access proof 99ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > conceals reply and record data after scoped HTTP 419 and only restores session work after proof 439ms
+stderr | resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > ticket raw intake file selection > rejects a mixed drag selection without changing prior files or text, then accepts a corrected picker selection
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > raise raw intake file selection > submits the original accepted File objects and unchanged text after a rejected batch 577ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > focuses missing title and never submits while advancing or validating steps 295ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > validates and focuses identity before native implicit submission can create 217ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > uses categorical status choices and confirms discard while retaining the service draft
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > uses categorical status choices and confirms discard while retaining the service draft
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > conceals reply and record data after scoped HTTP 403 and only restores session work after proof 197ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > registers the original pending body and version while retaining newer RAM text after commit 167ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > a failed second RAM proof withholds restored content and offers a deliberate retry 83ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > saves the exact intake draft before creating once with original actor and a consumed-generation reference 336ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > uses categorical status choices and confirms discard while retaining the service draft 296ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > retains validation errors and focuses the rejected field instead of acknowledging success
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > retains validation errors and focuses the rejected field instead of acknowledging success
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > draft419 before a command keeps entered work concealed and provides login plus canonical draft retry 59ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > conceals the original composer before changed auth props apply and requires a full reload 122ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > current-ticket review419 without a UUID conceals but preserves text and recovers through explicit current-version review 117ms
+stderr | resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > ticket raw intake file selection > rejects all excess files rather than silently keeping the first five and allows a smaller correction
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > ticket raw intake file selection > rejects a mixed drag selection without changing prior files or text, then accepts a corrected picker selection 255ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > preserves a rejected proposal and permits correction without a success acknowledgement 341ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > retains validation errors and focuses the rejected field instead of acknowledging success 170ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > cancels an uncertain command only after explicit confirmation and retains the entered text 124ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > requires explicit current-version review and a separate save, retaining draft and unrelated concurrent fields
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > keeps independent public/internal text and never converts a private note when switching audience 112ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > requires explicit current-version review and a separate save, retaining draft and unrelated concurrent fields
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > keeps text and does not create if draft saving is rejected 462ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > retains submitted text/files while the outcome is unknown and blocks a different new reply 102ms
+stderr | resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > ticket raw intake file selection > rejects an oversized selection and clears its actionable error when the user removes a prior file
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > ticket raw intake file selection > rejects all excess files rather than silently keeping the first five and allows a smaller correction 432ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-file-selection.test.tsx > ticket raw intake file selection > rejects an oversized selection and clears its actionable error when the user removes a prior file 358ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > requires explicit current-version review and a separate save, retaining draft and unrelated concurrent fields 365ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > clears only a confirmed matching message, reports delivery failure, and permits a second reply with the committed version 132ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > keeps a newer unsent message when recovering an earlier command receipt 46ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > keeps uncertain responses and expired-session recovery drafts until current setup can be reviewed
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > keeps uncertain responses and expired-session recovery drafts until current setup can be reviewed
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > recovers raw classification through the canonical property editor after unmount with its original version 525ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not quietly replace the original version when the ticket changes during editing 61ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > removes private note controls and content when internal access is revoked 60ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > conceals a denied message without falsely showing a successful post 38ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > rejects an over-limit file selection as a whole instead of silently dropping files 17ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > retains a canonical locator synchronously before acknowledged Save draft and close 402ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > honours a pending W02 command before another saved draft context 38ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > keeps uncertain responses and expired-session recovery drafts until current setup can be reviewed 339ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > rejects a review response for another resource even when its row shape could match
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > rejects a review response for another resource even when its row shape could match
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > keeps the exact unknown command frozen through retry and closing 584ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > shows refreshed canonical classification when the field has not been edited 327ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > rejects a review response for another resource even when its row shape could match 187ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > rejects an error acknowledgement even when another success flash and a visible record coexist
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > rejects an error acknowledgement even when another success flash and a visible record coexist
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > rejects an error acknowledgement even when another success flash and a visible record coexist 121ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > uses explicit current review and applies only the changed edit fields 698ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > does not show success for a definitive create rejection and preserves correctable values
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > does not show success for a definitive create rejection and preserves correctable values
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > does not show success for a definitive create rejection and preserves correctable values 187ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > conceals session-expired fields and keeps the hard-reload warning 105ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > purges the private register and open proposal after confirmed access loss 94ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > submits the version at the start of classification editing after a newer ticket refresh 231ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > keeps the corrected create proposal recoverable after a definitive rejection and native traversal
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > keeps the corrected create proposal recoverable after a definitive rejection and native traversal
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > omits redacted work rather than claiming zero, including an open private dialog 95ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > keeps the corrected create proposal recoverable after a definitive rejection and native traversal 245ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > retains unsaved classification text on refresh but never renders it for another actor or ticket 495ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > requires meaningful evidence and trims each reference before completing 153ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > requires an explicit cancellation confirmation before releasing an unconfirmed create and retains the entered proposal
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > requires an explicit cancellation confirmation before releasing an unconfirmed create and retains the entered proposal
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > returns to current server values after a matching classification commit is observed 215ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > keeps an unsent reply through section changes and browser Back while exposing canonical section links 91ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > debounces current text into a saved draft and never autosubmits a ticket 1074ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > uses keyboard tab navigation and a real scoped section search 127ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > requires an explicit cancellation confirmation before releasing an unconfirmed create and retains the entered proposal 370ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > recovers unsent task text after page traversal only after fresh actor and context proof 123ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 401 review response
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 401 review response
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > keeps the current ineligible assignee visible and permits removal of a cancelled prerequisite 402ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > opens settled work directly for an authorized technician without editing controls 93ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > invalid section input falls back to the conversation and actor changes clear the unsent field 47ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > does not offer reply on settled work and gives the permitted reopen action 47ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 401 review response 277ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > reorders the full register with labelled controls and a separate explicit save 143ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 419 review response
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 419 review response
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > offers honest reference-only exit after an unknown save 523ms
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 419 review response 239ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 403 review response
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 403 review response
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > retains a dirty form when closing is cancelled and discards only on explicit confirmation 138ms
+stderr | resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > reports clipboard failure without a copied success message
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 403 review response 124ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > retains an honest failure and retry action if watching is rejected 417ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 404 review response
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 404 review response
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > conceals private edited values after a confirmed 404 review response 130ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > requires explicit reconciliation when a stale order review contains a new task 294ms
+ ✓ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > reports completion only after the exact committed actor, command and version acknowledgement 76ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > reports clipboard failure without a copied success message 123ms
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > cancelled review cannot publish a version from a late JSON body
+An update to SetupRecordWizard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > cancelled review cannot publish a version from a late JSON body
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to FocusScope inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Presence inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DismissableLayer inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > cancelled review cannot publish a version from a late JSON body 158ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > confirms a watch only for the returned actor, ticket, version and desired state: 'non-command response' 251ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > confirms a watch only for the returned actor, ticket, version and desired state: 'another ticket' 202ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > confirms a watch only for the returned actor, ticket, version and desired state: 'exact watcher command' 289ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > links each header meter to an actual section while preserving unsent fields 137ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > omits private work summaries and navigation for a participant, including a copied work-section URL 89ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > persists an intentional clear even when the form returns to its initial values 1734ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > saves technician dimensions and preserves automatic priority through the canonical create command 403ms
+ ✓ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > stages a real selected File once and sends only its canonical draft reference on create 356ms
+
+ Test Files  20 passed (20)
+      Tests  331 passed (331)
+   Start at  23:30:00
+   Duration  14.99s (transform 6.63s, setup 3.88s, import 48.45s, tests 46.40s, environment 36.39s)
+

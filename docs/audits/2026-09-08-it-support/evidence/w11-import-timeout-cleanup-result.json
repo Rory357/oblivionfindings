@@ -1,0 +1,26 @@
+{
+    "mode": "apply",
+    "fingerprint": "aef870964c1218fe0211a44388faf650ba526322fbd758ae535c2e974c7f0e8a",
+    "before": [
+        {
+            "schema": "oblivion_it_support_test_it_e4d5db4448984ce7",
+            "exists": true,
+            "table_count": 767,
+            "active_connections": 0
+        }
+    ],
+    "database_mutations_performed": false
+}
+{
+    "mode": "postflight",
+    "after": [
+        {
+            "schema": "oblivion_it_support_test_it_e4d5db4448984ce7",
+            "exists": false,
+            "table_count": 0,
+            "active_connections": 0
+        }
+    ],
+    "database_mutations_performed": true,
+    "all_exact_schemas_absent": true
+}

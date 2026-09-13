@@ -1,0 +1,2 @@
+npm notice run npx
+npm notice run eslint resources/js/components/it/resolve-ticket-dialog.tsx resources/js/components/it/__tests__/resolve-ticket-dialog.test.tsx resources/js/components/it/ticket-workspace-header.tsx resources/js/pages/it/setup/_header.tsx --max-warnings=0

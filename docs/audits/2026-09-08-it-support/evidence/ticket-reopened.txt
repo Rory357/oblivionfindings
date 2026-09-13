@@ -1,0 +1,3 @@
+Browser tab: 1, Title: "IT-000007 — AUDIT 2026-09-08 — disposable printer workflow - Laravel", URL: "https://oblivionfindings.test/it/tickets/7".
+There has been no change in the accessibility tree.
+The focused UI element is 94 container main-content

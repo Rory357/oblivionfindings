@@ -10,6 +10,8 @@ use App\Support\It\BusinessHours;
 use Carbon\CarbonImmutable;
 use Database\Seeders\ItSlaPolicySeeder;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 
 function itSlaUser(string $role): User
 {
@@ -102,7 +104,11 @@ test('a priority change re-targets the clock without restarting it', function ()
     // Two hours pass before triage bumps it to urgent.
     $this->travel(2)->hours();
     $this->actingAs($this->hr)
-        ->patch("/it/tickets/{$ticket->id}", ['priority' => 'urgent'])
+        ->patch("/it/tickets/{$ticket->id}", [
+            'expected_version' => $ticket->fresh()->lock_version,
+            'priority' => 'urgent', 'priority_reason' => 'Service impact was confirmed during triage.',
+        ])
+        ->assertSessionHasNoErrors()
         ->assertRedirect();
 
     $ticket->refresh();
@@ -334,4 +340,34 @@ test('enabling business hours requires at least one working day', function () {
         ]))
         ->assertRedirect('/it?tab=tickets')
         ->assertSessionHasErrors('working_days');
+});
+
+test('the grid rejects targets that its working calendar cannot measure', function () {
+    $admin = itSlaUser('admin');
+    $this->actingAs($admin)->putJson('/it/sla-policies', [
+        ...itSlaGrid(), 'business_hours_enabled' => true,
+        'open_time' => '08:00', 'close_time' => '08:01', 'working_days' => ['mon'],
+    ])->assertUnprocessable()->assertJsonValidationErrors('normal.resolution_minutes');
+    expect(ItSlaPolicy::query()->count())->toBe(0);
+});
+
+test('the entire SLA grid and its audit roll back together and a corrected retry succeeds', function () {
+    $admin = itSlaUser('admin');
+    $eventName = 'eloquent.saving: '.ItSlaPolicy::class;
+    Event::listen($eventName, function (ItSlaPolicy $policy) {
+        if ($policy->priority === 'high') {
+            throw new RuntimeException('Synthetic policy persistence failure.');
+        }
+    });
+    $this->withoutExceptionHandling();
+    try {
+        expect(fn () => $this->actingAs($admin)->putJson('/it/sla-policies', itSlaGrid()))->toThrow(RuntimeException::class);
+    } finally {
+        Event::forget($eventName);
+    }
+    expect(ItSlaPolicy::query()->count())->toBe(0)
+        ->and(DB::table('audit_logs')->where('action', 'it.sla.policy.updated')->count())->toBe(0);
+    $this->actingAs($admin)->put('/it/sla-policies', itSlaGrid())->assertRedirect()->assertSessionHasNoErrors();
+    expect(ItSlaPolicy::query()->count())->toBe(4)
+        ->and(DB::table('audit_logs')->where('action', 'it.sla.policy.updated')->count())->toBe(4);
 });

@@ -1,0 +1,1 @@
+resources/js/components/it/__tests__/it-module-navigation.test.tsx(138,21): error TS2741: Property 'readiness' is missing in type '{ id: number; key: string; name: string; description: null; is_active: true; team: { id: number; name: string; }; filter_rules: {}; workload: { open_tickets: number; unassigned: number; sla_risk: number; }; }' but required in type 'Queue'.

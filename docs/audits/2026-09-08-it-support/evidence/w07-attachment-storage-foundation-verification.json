@@ -1,0 +1,44 @@
+{
+  "source_hashes": [
+    {
+      "sha256": "e603747493ec3769bdbfc94392520492e032c9657fa5ca789a2e315f657554e2",
+      "path": "app/Domain/It/Data/ItAttachmentStorageReservation.php"
+    },
+    {
+      "sha256": "3aa998dcbdace874b018a752e18bbc3e9efff92562176cbbb7fef8f20bcd5ea5",
+      "path": "app/Domain/It/Services/ItAttachmentStorageIntentService.php"
+    },
+    {
+      "sha256": "929d6fd937464b86fc6f775c7022214a75f0751520bf9b42a2ba819922a47c86",
+      "path": "app/Domain/It/Services/ItAttachmentStorageService.php"
+    },
+    {
+      "sha256": "cb45ce353903c9f4f134e25aac127b54340f9eeb5b7725586994ad215c6db73d",
+      "path": "app/Models/ItAttachmentStorageIntent.php"
+    },
+    {
+      "sha256": "7065627c06a212627f12cbccd605af2b7f1528cd3571d006c19afb8d927f3082",
+      "path": "app/Services/AuditLogger.php"
+    },
+    {
+      "sha256": "0f5d3487ab98361b9f9fafa90a4b0017666f6a636f0eb4e2bff823aba5443f31",
+      "path": "database/migrations/2026_09_09_000010_create_it_attachment_storage_intents.php"
+    },
+    {
+      "sha256": "dcc3912d2ffb61b909e159b5c98665862dc040264c46739f4fbe074fb5c65930",
+      "path": "tests/Concurrency/It/ItAttachmentStorageIntentTest.php"
+    },
+    {
+      "sha256": "be88da21d9b4eab80ced0c91c4fb93fc9b041254a6dd2f3f1151f87127b7742f",
+      "path": "tests/Support/It/attachment-storage-concurrency-worker.php"
+    }
+  ],
+  "test_result_source": "PHPUnit diagnostic TestPassed and TestFinished; wrapper exit 0",
+  "schema_absent": true,
+  "assertions": 113,
+  "private_directory_absent": true,
+  "token": "it_ccd8ce3eecce461f",
+  "checked_at_utc": "2026-09-09T09:47:52.7584311Z",
+  "tests": 1,
+  "schema_absence_source": "wrapper read-only postflight"
+}

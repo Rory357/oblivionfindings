@@ -1,0 +1,167 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_451790dc40f04d01",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketRoutingDecisionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpriority decisions cover every impact and urgency with monotonic escalation[39m[90m                               [39m [90m198.35s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy priority adapters preserve their level while new dimensions govern assessment[39m[90m                        [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnew responsibility cannot inherit site access from an old assignment or inactive employment[39m[90m                 [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcover selection consumes approved HR absence without exposing or copying private leave details[39m[90m              [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpriority overrides preserve their reason through later impact changes until explicit release[39m[90m                [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfallback activation requires a distinct current scoped cover while incomplete setup remains editable inacti[39m[90m…[39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester chooses either approved site and cannot submit an active third site[39m[90m                             [39m [90m1.48s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser email and scoped service API intake share the same accountable fallback rule[39m[90m                        [39m [90m1.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mspecific routing is deterministic and a fallback cannot ignore its site restriction[39m[90m                         [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproved absence routes to named cover and returning primary resumes automatic responsibility[39m[90m               [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanual queue and unassigned choices survive classification until a reasoned explicit release[39m[90m                [39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90man inactive manual assignee is suspended without erasing the recorded intention[39m[90m                             [39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreceipts committed by the W02 payload contract still replay after dimensional intake is added[39m[90m               [39m [90m0.80s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketVersionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpersisted versions are monotonic even for same-second writes from older model instances[39m[90m                     [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma property update returns its version and a stale assignment cannot overwrite it[39m[90m                            [39m [90m0.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90minertia receives field errors and an authorized reload reference without a success flash[39m[90m                    [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "properties"[39m[90m                       [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "workflow"[39m[90m                         [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "resolve"[39m[90m                          [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "close"[39m[90m                            [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "reopen"[39m[90m                           [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma versioned lifecycle command cannot be replayed into duplicate activity[39m[90m                                    [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresolve close and reopen reject stale browser commands without duplicate notes or transitions[39m[90m               [39m [90m0.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocked commands recheck approval and role instead of trusting a cached actor with ('approval')[39m[90m              [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocked commands recheck approval and role instead of trusting a cached actor with ('role')[39m[90m                  [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma changed ticket site denies the old actor before returning a version conflict[39m[90m                              [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester can reopen with a current version but cannot change triage properties[39m[90m                           [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma failed atomic command rolls its version and activity back with its ticket changes[39m[90m                         [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk commands validate one version per selected ticket and skip stale rows independently[39m[90m                    [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon-browser canonical adapters remain compatible and still advance persisted versions[39m[90m                       [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthorized detail and queue payloads expose the persisted ticket version[39m[90m                                    [39m [90m5.36s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmigration rollback refuses to discard active concurrency versions[39m[90m                                           [39m [90m0.94s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItTicketBulkTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbulk assign hands a selection to one agent and notifies them once per ticket[39m[90m                                [39m [90m1.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk assign to yourself never self-notifies[39m[90m                                                                 [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk priority restamps the SLA clock from the new target[39m[90m                                                    [39m [90m1.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk status moves working tickets and starts the waiting pause[39m[90m                                              [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk close requires and preserves one operational reason per ticket[39m[90m                                         [39m [90m0.89s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mbulk close settles everything still open and skips the already-closed[39m[90m                                       [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk is agent-only and constrained to canonical Site access[39m[90m                                                 [39m [90m0.97s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketAuthzTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma support worker can raise a ticket but the triage fields are ignored[39m[90m                                       [39m [90m0.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents can still log-and-triage with an assignee in one step[39m[90m                                                [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester sees only their own tickets in the payload[39m[90m                                                      [39m [90m5.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequesters cannot work the queue or the provisioning routes[39m[90m                                                 [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe ticket policy scopes view, reopen and delete correctly[39m[90m                                                  [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexternal portal personas hold no it.request grant[39m[90m                                                           [39m [90m0.83s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItTicketWorkspaceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcanonical routed ownership is technician visible and requester private[39m[90m                                      [39m [90m1.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket associations expose only canonical destinations the viewer can open[39m[90m                                  [39m [90m1.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket associations withhold HR and asset links outside the viewers Sites despite module permissions[39m[90m        [39m [90m1.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlinked context follows canonical device and alert permissions without leaking raw payloads[39m[90m                  [39m [90m1.37s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents govern affected Device links while monitoring evidence remains immutable[39m[90m                             [39m [90m4.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe workspace strips internal notes from requester payloads server-side[39m[90m                                     [39m [90m5.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "sen[39m[90m…[39m [90m7.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "sen[39m[90m…[39m [90m7.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "una[39m[90m…[39m [90m7.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "una[39m[90m…[39m [90m8.00s[39m  
+  [32;1m✓[39;22m[90m [39m[90mread-only IT access does not widen the internal work boundary[39m[90m                                               [39m [90m0.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcomments respect the internal gate and stamp the first agent response[39m[90m                                       [39m [90m1.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90msettled ticket conversations are read only until the ticket is reopened[39m[90m                                     [39m [90m3.09s[39m  
+  [31;1m⨯[39;22m[90m [39m[90ma requester reply resumes a waiting ticket and banks the paused minutes[39m[90m                                     [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic replies notify the other side of the conversation only[39m[90m                                               [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe quick-peek JSON branch mirrors the page payload and its stripping[39m[90m                                       [39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe rail can classify reroute and retag a ticket[39m[90m                                                            [39m [90m5.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly an explicitly application-wide manager can move a ticket to all Sites[39m[90m                                  [39m [90m5.58s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe composer carries published KB to agents for suggestion, never to requesters[39m[90m                             [39m [90m5.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwatch and unwatch are agent actions recorded on the trail[39m[90m                                                   [39m [90m1.00s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtriage updates write the activity trail and notify the new assignee[39m[90m                                         [39m [90m1.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwaiting ownership is explicit revisable and requester safe[39m[90m                                                  [39m [90m1.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtriage cannot bypass configured approval by changing the ticket category[39m[90m                                    [39m [90m0.88s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketCommandTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma browser retry returns the same committed ticket without duplicate activity or notifications[39m[90m               [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mchanged command content conflicts without changing the saved ticket[39m[90m                                         [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery is actor owned and returns only a current authorized reference[39m[90m                                     [39m [90m0.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery and conflicting replays distinguish only an owned command whose record is unavailable with ('inacc[39m[90m…[39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery and conflicting replays distinguish only an owned command whose record is unavailable with ('unlin[39m[90m…[39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid input does not reserve the command identity and can be corrected safely[39m[90m                             [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy browser submissions remain compatible while newly served forms adopt command identities[39m[90m              [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnormalized identifiers and watcher ordering do not create false conflicts[39m[90m                                   [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mattachment fingerprints reject replacement content under the same request identity[39m[90m                          [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket audit attachments and command receipt roll back together if the binding cannot persist[39m[90m               [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnotification dispatch failure preserves a successful committed response and a recoverable intent[39m[90m            [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe database rejects a duplicate actor channel and operation command binding[39m[90m                                [39m [90m0.83s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketNotificationOutboxTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma committed intent survives a lost post-response dispatch and drains only once[39m[90m                              [39m [90m0.26s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnotification intent persistence failure rolls back the entire ticket command[39m[90m                                [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpending intent checks revoked access before either channel executes[39m[90m                                         [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery does not repeat accepted uncertain or failed provider attempts with ('accepted')[39m[90m                   [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery does not repeat accepted uncertain or failed provider attempts with ('sending')[39m[90m                    [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery does not repeat accepted uncertain or failed provider attempts with ('failed')[39m[90m                     [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery skips a database channel already persisted before interruption[39m[90m                                     [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma transport exception after sending starts stays uncertain until provider reconciliation[39m[90m                    [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90maccess revocation does not turn an interrupted send into a retryable failure[39m[90m                                [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma local failure after a provider callback never regresses the authoritative result with ('delivered')[39m[90m       [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma local failure after a provider callback never regresses the authoritative result with ('bounced')[39m[90m         [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma local failure after a provider callback never regresses the authoritative result with ('failed')[39m[90m          [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly an authoritative provider failure unlocks retry after a lost acknowledgement[39m[90m                           [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma contending dispatcher leaves an intent pending for the lock owner[39m[90m                                         [39m [90m0.24s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTicketBulkTest[22m [90m>[39m bulk close settles everything still open and skips the already-closed    
+[39;1m  Failed asserting that 0 is equal to 29 or is greater than 29.[39;22m
+
+  at [32mtests\Feature\It\ItTicketBulkTest.php[39m:[32m206[39m
+    202▕ 
+    203▕     expect($open->refresh()->status)->toBe('closed');
+    204▕     $waiting->refresh();
+    205▕     expect($waiting->status)->toBe('closed');
+  ➜ 206▕     expect((int) $waiting->sla_paused_minutes)->toBeGreaterThanOrEqual(29); // pause banked on the way out
+    207▕     expect($open->events()->where('type', 'closed')->count())->toBe(1);
+    208▕ });
+    209▕ 
+    210▕ test('bulk is agent-only and constrained to canonical Site access', function () {
+
+  [33m1   [39m[39;1mtests\Feature\It\ItTicketBulkTest.php[39;22m:[39;1m206[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTicketWorkspaceTest[22m [90m>[39m a requester reply resumes a waiting ticket and banks the paused…    
+[39;1m  Failed asserting that 0 is equal to 29 or is greater than 29.[39;22m
+
+  at [32mtests\Feature\It\ItTicketWorkspaceTest.php[39m:[32m623[39m
+    619▕ 
+    620▕     $ticket->refresh();
+    621▕     expect($ticket->status)->toBe('in_progress');
+    622▕     expect($ticket->waiting_since)->toBeNull();
+  ➜ 623▕     expect($ticket->sla_paused_minutes)->toBeGreaterThanOrEqual(29);
+    624▕     expect(
+    625▕         $ticket->events()->where('type', 'status_changed')->get()
+    626▕             ->contains(fn (ItTicketEvent $e) => ($e->payload['via'] ?? null) === 'requester_reply'),
+    627▕     )->toBeTrue();
+
+  [33m1   [39m[39;1mtests\Feature\It\ItTicketWorkspaceTest.php[39;22m:[39;1m623[39;22m
+
+
+  [90mTests:[39m    [31;1m2 failed[39;22m[90m,[39m[39m [39m[32;1m92 passed[39;22m[90m (1323 assertions)[39m
+  [90mDuration:[39m [39m333.74s[39m
+

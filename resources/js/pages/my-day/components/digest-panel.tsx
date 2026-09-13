@@ -2,33 +2,32 @@ import { Link } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
-    Bell,
     Check,
     ClipboardList,
     ShieldCheck,
-    StickyNote,
     type LucideIcon,
 } from 'lucide-react';
 import { useMemo } from 'react';
 
-import { PageTabs } from '@/components/page/page-tabs';
+import HandoverPersonNotes from '@/components/handover-person-notes';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { TabsContent } from '@/components/ui/tabs';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
+import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
+import { HandoverFollowUps } from './handover-follow-ups';
 
 import type {
     MyDayHandover,
     MyDayIncident,
     MyDayNotification,
+    MyDayShiftTask,
     MyDayTaskFollowup,
 } from '../lib/types';
 
 interface DigestPanelProps {
-    tab: 'handover' | 'alerts' | 'notifs';
-    onTabChange: (tab: 'handover' | 'alerts' | 'notifs') => void;
+    mode?: 'handover' | 'attention';
     handover?: MyDayHandover | null;
     /** Control-room alerts + note follow-ups from /my-day's `tasks` payload. */
     alertTasks: MyDayTaskFollowup[];
@@ -38,6 +37,8 @@ interface DigestPanelProps {
     onAckAlert?: (alert: MyDayTaskFollowup) => void;
     onSnoozeAlert?: (alert: MyDayTaskFollowup) => void;
     onConfirmHandoverRead?: () => void;
+    onFollowUpAdded?: (task: MyDayShiftTask) => void;
+    onOpenTask?: (id: number) => void;
 }
 
 /**
@@ -102,8 +103,7 @@ const TONE_BADGE: Record<'critical' | 'warning' | 'info', string> = {
 };
 
 export function DigestPanel({
-    tab,
-    onTabChange,
+    mode = 'handover',
     handover,
     alertTasks,
     incidents,
@@ -111,75 +111,70 @@ export function DigestPanel({
     onAckAlert,
     onSnoozeAlert,
     onConfirmHandoverRead,
+    onFollowUpAdded,
+    onOpenTask,
 }: DigestPanelProps) {
-    const t = useMyDayLabels();
     const openItems = useMemo(
         () => combineOpenItems(alertTasks, incidents),
         [alertTasks, incidents],
     );
 
+    if (mode === 'attention') {
+        return (
+            <section
+                aria-label="Alerts and follow-ups"
+                className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+            >
+                <h2 className="text-section-title border-b border-border p-5">
+                    Alerts and follow-ups
+                </h2>
+                <NeedsYouPane
+                    items={openItems}
+                    onAck={onAckAlert}
+                    onSnooze={onSnoozeAlert}
+                />
+            </section>
+        );
+    }
     return (
-        <div
-            data-test="my-day-digest"
-            className="overflow-hidden rounded-2xl border border-border bg-card"
-        >
-            <div className="px-2">
-                <PageTabs
-                    value={tab}
-                    onValueChange={(next) =>
-                        onTabChange(next as 'handover' | 'alerts' | 'notifs')
-                    }
-                    dense
-                    items={[
-                        {
-                            value: 'handover',
-                            label: t('digest_handover'),
-                            icon: StickyNote,
-                            badge: handover?.unread ? (
-                                <Badge
-                                    variant="outline"
-                                    className="border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning"
-                                >
-                                    {t('digest_new_badge')}
-                                </Badge>
-                            ) : null,
-                        },
-                        {
-                            value: 'alerts',
-                            label: t('digest_needs_you'),
-                            icon: AlertTriangle,
-                            badge:
-                                openItems.length > 0 ? openItems.length : null,
-                        },
-                        {
-                            value: 'notifs',
-                            label: t('digest_updates'),
-                            icon: Bell,
-                            badge:
-                                notifications.length > 0
-                                    ? notifications.length
-                                    : null,
-                        },
-                    ]}
+        <div data-test="my-day-digest" className="space-y-5">
+            <section
+                aria-label="From the last shift"
+                className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+            >
+                <h2 className="text-section-title border-b border-border p-5">
+                    From the last shift
+                </h2>
+                <HandoverPane
+                    handover={handover}
+                    onConfirmRead={onConfirmHandoverRead}
+                    onFollowUpAdded={onFollowUpAdded}
+                    onOpenTask={onOpenTask}
+                />
+            </section>
+            {openItems.length > 0 && (
+                <section
+                    aria-label="Other follow-ups"
+                    className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
                 >
-                    <TabsContent value="handover" className="m-0">
-                        <HandoverPane
-                            handover={handover}
-                            onConfirmRead={onConfirmHandoverRead}
-                        />
-                    </TabsContent>
-                    <TabsContent value="alerts" className="m-0">
-                        <NeedsYouPane
-                            items={openItems}
-                            onAck={onAckAlert}
-                            onSnooze={onSnoozeAlert}
-                        />
-                    </TabsContent>
-                    <TabsContent value="notifs" className="m-0">
-                        <NotifsPane notifications={notifications} />
-                    </TabsContent>
-                </PageTabs>
-            </div>
+                    <h2 className="text-section-title border-b border-border p-5">
+                        Other things to follow up
+                    </h2>
+                    <NeedsYouPane
+                        items={openItems}
+                        onAck={onAckAlert}
+                        onSnooze={onSnoozeAlert}
+                    />
+                </section>
+            )}
+            {notifications.length > 0 && (
+                <details className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                    <summary className="frontline-focus frontline-tap cursor-pointer px-5 py-4 font-semibold">
+                        Team updates · {notifications.length}
+                    </summary>
+                    <NotifsPane notifications={notifications} />
+                </details>
+            )}
         </div>
     );
 }
@@ -187,20 +182,30 @@ export function DigestPanel({
 function HandoverPane({
     handover,
     onConfirmRead,
+    onFollowUpAdded,
+    onOpenTask,
 }: {
     handover?: MyDayHandover | null;
     onConfirmRead?: () => void;
+    onFollowUpAdded?: (task: MyDayShiftTask) => void;
+    onOpenTask?: (id: number) => void;
 }) {
     const t = useMyDayLabels();
     if (!handover) {
         return (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                {t('digest_no_handover')}
+                <h3 className="font-semibold text-foreground">
+                    No handover to read yet
+                </h3>
+                <p className="mt-2">
+                    Notes from the previous shift will appear here when they are
+                    shared with you.
+                </p>
             </div>
         );
     }
     return (
-        <div className="px-4 py-3.5">
+        <div className="p-5">
             <div className="mb-2.5 flex items-center gap-2.5">
                 {handover.from ? (
                     <Avatar className="h-8 w-8">
@@ -216,21 +221,15 @@ function HandoverPane({
                     </Avatar>
                 ) : null}
                 <div>
-                    <div className="text-[13.5px] font-semibold">
+                    <div className="text-base font-semibold">
                         {handover.from?.name ?? t('digest_previous_shift')}
                     </div>
-                    <div className="text-[11.5px] text-muted-foreground">
+                    <div className="text-subtle">
                         {handover.from?.role ?? t('digest_previous_shift')}
                         {handover.recorded_at ? (
                             <>
-                                {' · '}ended{' '}
-                                {new Date(
-                                    handover.recorded_at,
-                                ).toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    hour12: false,
-                                })}
+                                {' · '}Submitted{' '}
+                                {formatDateTime(handover.recorded_at)}
                             </>
                         ) : null}
                     </div>
@@ -244,8 +243,9 @@ function HandoverPane({
                     </Badge>
                 ) : null}
             </div>
-            {handover.summary ? (
-                <p className="mt-2.5 text-[13px] leading-[1.55]">
+            <HandoverPersonNotes notes={handover.worker_notes} />
+            {!handover.worker_notes && handover.summary ? (
+                <p className="mt-4 max-w-prose text-sm leading-relaxed">
                     {handover.summary}
                 </p>
             ) : null}
@@ -267,17 +267,34 @@ function HandoverPane({
                     ))}
                 </div>
             ) : null}
-            <div className="mt-3 flex gap-1.5">
-                <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => onConfirmRead?.()}
-                    disabled={!onConfirmRead}
-                >
-                    {t('digest_confirm_read')}
-                    <Check className="ml-1 h-3 w-3" />
-                </Button>
-            </div>
+            <HandoverFollowUps
+                key={handover.id}
+                handover={handover}
+                onSaved={onFollowUpAdded}
+                onOpen={onOpenTask}
+            />
+            {handover.unread && handover.can_acknowledge !== false ? (
+                <div className="mt-3 flex gap-1.5">
+                    <Button
+                        size="sm"
+                        className="frontline-tap"
+                        onClick={() => onConfirmRead?.()}
+                        disabled={!onConfirmRead}
+                    >
+                        I’ve read this handover
+                        <Check className="ml-1 h-3 w-3" />
+                    </Button>
+                </div>
+            ) : !handover.unread ? (
+                <p className="mt-3 flex items-center gap-2 text-sm text-status-success">
+                    <Check className="size-4" />
+                    Handover read
+                </p>
+            ) : (
+                <p className="mt-3 text-sm text-muted-foreground">
+                    This handover is available for reference.
+                </p>
+            )}
         </div>
     );
 }
@@ -311,7 +328,7 @@ function NeedsYouPane({
                         variant="outline"
                         className="border-status-critical/30 bg-status-critical-bg text-[10px] text-status-critical"
                     >
-                        {p1} P1
+                        {p1} urgent
                     </Badge>
                 ) : null}
             </div>
@@ -368,7 +385,7 @@ function OpenItemRow({
                             variant="outline"
                             className="border-status-critical/30 bg-status-critical-bg text-[10px] text-status-critical"
                         >
-                            P1
+                            Urgent
                         </Badge>
                     ) : null}
                     <span className="ml-auto text-[10.5px] text-muted-foreground">
@@ -387,18 +404,27 @@ function OpenItemRow({
                     {[item.clientName, item.sla].filter(Boolean).join(' · ') ||
                         '—'}
                 </div>
-                {isCrit && item.raw ? (
+                {isCrit &&
+                item.raw &&
+                (item.raw.meta?.can_ack || item.raw.meta?.can_snooze) ? (
                     <div className="mt-2 flex gap-1.5">
-                        <Button size="sm" onClick={() => onAck?.(item.raw!)}>
-                            {t('digest_acknowledge')}
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => onSnooze?.(item.raw!)}
-                        >
-                            {t('digest_snooze_15m')}
-                        </Button>
+                        {item.raw.meta?.can_ack && (
+                            <Button
+                                size="sm"
+                                onClick={() => onAck?.(item.raw!)}
+                            >
+                                {t('digest_acknowledge')}
+                            </Button>
+                        )}
+                        {item.raw.meta?.can_snooze && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => onSnooze?.(item.raw!)}
+                            >
+                                {t('digest_snooze_15m')}
+                            </Button>
+                        )}
                     </div>
                 ) : item.href ? (
                     <div className="mt-2">
@@ -514,8 +540,8 @@ function mapSeverity(s: string): 'critical' | 'high' | 'medium' | 'low' {
 }
 
 function humaniseSla(s: 'on_track' | 'at_risk' | 'breached'): string {
-    if (s === 'breached') return 'SLA breached';
-    if (s === 'at_risk') return 'SLA at risk';
+    if (s === 'breached') return 'Response overdue';
+    if (s === 'at_risk') return 'Response due soon';
     return 'On track';
 }
 

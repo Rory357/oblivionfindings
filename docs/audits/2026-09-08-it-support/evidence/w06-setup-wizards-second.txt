@@ -1,0 +1,247 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx (7 tests | 1 failed) 1916ms
+     × requires explicit current-version review and a separate save, retaining draft and unrelated concurrent fields 208ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > requires explicit current-version review and a separate save, retaining draft and unrelated concurrent fields
+TestingLibraryElementError: Found multiple elements with the role "button" and name `/Review/`
+
+Here are the matching elements:
+
+Ignored nodes: comments, script, style
+<button
+  class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-accent"
+  type="button"
+>
+  <span
+    class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-muted text-muted-foreground"
+  >
+    <svg
+      class="lucide lucide-clipboard-check h-3.5 w-3.5"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect
+        height="4"
+        rx="1"
+        ry="1"
+        width="8"
+        x="8"
+        y="2"
+      />
+      <path
+        d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+      />
+      <path
+        d="m9 14 2 2 4-4"
+      />
+    </svg>
+  </span>
+  <span
+    class="min-w-0"
+  >
+    <span
+      class="block text-[13px] font-semibold text-muted-foreground"
+    >
+      Review
+    </span>
+    <span
+      class="block truncate text-[11px] text-muted-foreground"
+    >
+      Check before saving
+    </span>
+  </span>
+</button>
+
+Ignored nodes: comments, script, style
+<button
+  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+  data-slot="button"
+  type="button"
+>
+  Review current setup
+</button>
+
+(If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_q_"
+    aria-labelledby="radix-_r_p_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_o_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_p_"
+    >
+      Edit team
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_q_"
+    >
+      Review identity and accountable ownership before saving.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-users-round h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M18 21a8 8 0 0 0-16 0"
+              />
+              <circle
+                cx="10"
+                cy="8"
+                r="5"
+              />
+              <path
+                d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Edit team
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT setup
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-file-text h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"
+              />
+              <path
+                d="M14 2v4a2 2 0 0 0 2 2h4"
+              />
+              <path
+                d="M10 9H8"
+              />
+              <path
+                d="M16 13H8"
+              />
+              <path
+                d="M16 17H8"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Identity
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Name and purpose
+            </span>
+          </span>
+        </button>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors hov...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ getElementError node_modules/@testing-library/dom/dist/query-helpers.js:20:35
+ ❯ getMultipleElementsFoundError node_modules/@testing-library/dom/dist/query-helpers.js:23:10
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:55:13
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ step resources/js/pages/it/setup/setup-record-wizard.test.tsx:11:54
+
+ ❯ review resources/js/pages/it/setup/setup-record-wizard.test.tsx:12:22
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx:83:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 16 passed (17)
+   Start at  15:33:58
+   Duration  8.84s (transform 578ms, setup 232ms, import 4.20s, tests 7.28s, environment 1.77s)
+

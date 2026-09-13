@@ -1,0 +1,109 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\visualizations\2026\09\12\01a094e0-dd40-7b73-b7c8-d0216a4a0e5c\myday-publish\phpunit.xml
+
+..................
+   PASS  Tests\Feature\MyDayTaskWorkTest
+  ✓ it keeps the roster completion route subject to step state versions and current privacy                    191.39s
+  ✓ it shows medication occurrences across the whole current shift                                               0.32s
+  ✓ it creates an audited person task on the existing shift record and replays one submission                    0.20s
+  ✓ it does not reuse a creation key for different work                                                          0.17s
+  ✓ it keeps a whole site task unassigned to any individual client                                               0.17s
+  ✓ it rejects a private co-resident or a client from another site with (false)                                  0.15s
+  ✓ it rejects a private co-resident or a client from another site with (true)                                   0.16s
+  ✓ it requires the explicit self-create permission                                                              0.12s
+  ✓ it rejects creating or completing a task on another workers shift                                            0.16s
+  ✓ it locks task writes when the shift is finished                                                              0.18s
+  ✓ it preserves the actual day for a task after midnight on an overnight shift                                  0.19s
+  ✓ it uses an idempotent completion state and rejects a stale reversal                                          0.19s
+  ✓ it preserves worker-added tasks when a stale roster form synchronises its older list                         0.19s
+  ✓ it saves an encrypted private draft and rejects stale edits from another window                              0.23s
+  ✓ it denies another worker access to a private draft                                                           0.21s
+  ✓ it does not let the legacy completion shortcut change a finished shift                                       0.16s
+  ✓ it keeps steps with the draft and creates one checklist with stable identities                               0.22s
+  ✓ it adds steps after creation and refuses stale step changes                                                  0.18s
+...........
+   PASS  Tests\Feature\MyDayTaskHelpTest
+  ✓ it offers only eligible colleagues and records a retry as one request                                        0.34s
+  ✓ it requires recipient acceptance before helper completion and retains an accepted task after shift end       0.27s
+  ✓ it does not let the requester accept on behalf of their colleague                                            0.19s
+  ✓ it rechecks recipient site permission privacy and cancelled shift at response time with ('site')             0.17s
+  ✓ it rechecks recipient site permission privacy and cancelled shift at response time with ('permission')       0.22s
+  ✓ it rechecks recipient site permission privacy and cancelled shift at response time with ('privacy')          0.23s
+  ✓ it rechecks recipient site permission privacy and cancelled shift at response time with ('cancelled')        0.22s
+  ✓ it closes the actual attendance session with an accepted owner while retaining unfinished work               0.37s
+  ✓ it saves a new handover and multiple person task outcomes in the same clock-out transaction                  0.34s
+  ✓ it allows a new request when the previously accepted colleague loses eligibility                             0.33s
+  ✓ it counts unfinished work as a shift blocker until another eligible person accepts                           0.25s
+........
+   PASS  Tests\Feature\MyDayHandoverFollowUpTest
+  ✓ it creates a linked follow-up once and copies only remaining steps without marking handover read             0.24s
+  ✓ it still offers follow-ups after the handover is acknowledged                                                0.22s
+  ✓ it shows linked work in My Day while applying the canonical medication snapshot privacy rule                 0.34s
+  ✓ it rejects invented source items and drafts with ('key')                                                     0.18s
+  ✓ it rejects invented source items and drafts with ('draft')                                                   0.16s
+  ✓ it denies current assignment privacy and create-permission revocation with ('assignment')                    0.17s
+  ✓ it denies current assignment privacy and create-permission revocation with ('privacy')                       0.17s
+  ✓ it denies current assignment privacy and create-permission revocation with ('permission')                    0.17s
+.............
+   PASS  Tests\Feature\MyDayPersonHandoverTest
+  ✓ it saves three person sections without filing other people under the primary client                          0.30s
+  ✓ it rejects a private or foreign person and rolls back the whole handover with (false)                        0.21s
+  ✓ it rejects a private or foreign person and rolls back the whole handover with (true)                         0.20s
+  ✓ it rejects duplicate person sections                                                                         0.18s
+  ✓ it reloads the saved draft and protects it from stale edits                                                  0.24s
+  ✓ it filters each read by current person privacy and preserves sections hidden by a privacy change             0.23s
+  ✓ it keeps attendance open when a clock-out note includes an inaccessible person                               0.19s
+  ✓ it shows separate notes to the incoming worker using each persons current privacy                            0.30s
+  ✓ it does not clear medication evidence when saving the person note form                                       0.23s
+  ✓ it saves every named section through the finish-shift workflow                                               0.27s
+  ✓ it returns the committed private draft version for autosave and rejects a stale JSON write                   0.24s
+  ✓ it records an explicit unsupported person and presents privacy-filtered progress without note contents       0.18s
+  ✓ it does not accept contradictory support status or erase its saved notes                                     0.21s
+............... 65 / 78 ( 83%)
+......
+   PASS  Tests\Feature\MyDayTimesheetReviewAuditTest
+  ✓ it offers all three people on the authorised site for time attribution                                       0.16s
+  ✓ it saves an unfinished split and reopens it without changing paid hours                                      0.21s
+  ✓ it submits a three-person split once through the canonical workflow                                          0.22s
+  ✓ it can save the reviewed split after a blocked payroll check changes only reconciliation metadata            0.25s
+  ✓ it rejects stale changes and preserves the latest saved split                                                0.22s
+  ✓ it rejects a person from another site without changing allocation or status                                  0.20s
+  ✓ it rejects mixed methods duplicate people and rounding mismatches with ('mixed')                             0.17s
+  ✓ it rejects mixed methods duplicate people and rounding mismatches with ('duplicate')                         0.17s
+  ✓ it rejects mixed methods duplicate people and rounding mismatches with ('rounding')                          0.17s
+  ✓ it rejects overlapping support periods even when their total balances                                        0.21s
+  ✓ it rechecks current site access and submission permission with ('site')                                      0.16s
+  ✓ it rechecks current site access and submission permission with ('permission')                                0.18s
+  ✓ it does not submit while the worker is still clocked in                                                      0.19s
+  ✓ it cannot bypass an unfinished saved split through the legacy submit command                                 0.19s
+  ✓ it rejects both saving and submitting an approved timesheet                                                  0.18s
+  ✓ it uses the requested current shift when two shifts share a work date                                        0.22s
+  ✓ it finds an open overnight shift by its attendance rather than the current date                              0.23s
+  ✓ it keeps complete dates for support periods across midnight                                                  0.18s
+  ✓ it rejects support periods outside the paid shift even when balanced                                         0.18s
+  ✓ it rejects ambiguous or nonexistent local times instead of silently changing their meaning with ('2026-04-0… 0.18s
+  ✓ it rejects ambiguous or nonexistent local times instead of silently changing their meaning with ('2026-09-2… 0.21s
+.
+   PASS  Tests\Feature\MyDayTimesheetAllocationTest
+  ✓ time segmented allocation hours must match the submitted segment duration                                    0.94s
+...
+   PASS  Tests\Feature\MyDayHandoverDigestTest
+  ✓ it populates the My Day digest handover prop for the incoming worker                                         0.32s
+  ✓ it does not surface an unassigned handover for a resident outside the worker site shift                      0.24s
+  ✓ it does not let a worker claim an unassigned handover for a foreign resident                                 0.21s
+...                                                     78 / 78 (100%)
+   PASS  Tests\Feature\Tasks\ShiftTaskProviderTest
+  ✓ shift tasks expose the rostered staff assignee while enforcing canonical Site access                         0.79s
+  ✓ it renders the rostered worker without loading an undefined shift relationship                               0.78s
+  ✓ it counts zero and populated rostered shift tasks for the navigation badge                                   0.85s
+
+  Tests:    78 passed (455 assertions)
+  Duration: 211.82s
+
+
+
+Time: 03:30.438, Memory: 158.00 MB
+
+OK (78 tests, 455 assertions)

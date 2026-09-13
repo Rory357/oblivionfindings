@@ -1,0 +1,32 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx (8 tests | 1 failed | 7 skipped) 301ms
+     × rejects an error acknowledgement even when another success flash and a visible record coexist 299ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > rejects an error acknowledgement even when another success flash and a visible record coexist
+Error: expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <h2
+  class="text-2xl font-bold"
+>
+  Team saved
+</h2> instead
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx:316:54
+    314|         fireEvent.click(screen.getByRole('button', { name: 'Save team'…
+    315|         await act(async () => patch.mock.calls[0][2]?.onSuccess?.({ pr…
+    316|         expect(screen.queryByText('Team saved')).not.toBeInTheDocument…
+       |                                                      ^
+    317|         expect(screen.getByRole('button', { name: 'Save team' })).toBe…
+    318|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  15:43:23
+   Duration  3.24s (transform 178ms, setup 119ms, import 1.80s, tests 301ms, environment 854ms)
+

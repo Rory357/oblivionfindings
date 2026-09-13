@@ -1,0 +1,43 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_b175533d28d7408c",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSetupVersionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mteam editors cannot overwrite a newer member role and must explicitly review a new version[39m[90m                [39m [90m245.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mservice editor rejects an obsolete version and preserves the newer status on an explicit retry[39m[90m              [39m [90m1.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam and service update endpoints require the displayed version[39m[90m                                             [39m [90m1.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical setup mutation rechecks a cached actor permission and approval before writing[39m[90m                     [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical setup service cannot bypass the version check by omitting transport validation[39m[90m                    [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma failed required audit leaves the service configuration and version unchanged[39m[90m                              [39m [90m0.73s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItServiceManagementSetupTest[39m
+  [32;1m✓[39;22m[90m [39m[90mIT pages share the approved grouped navigation while preserving existing deep links[39m[90m                         [39m [90m6.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation emits the requester catalogue only with exact request access[39m[90m                                  [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation never produces an unsupported SLA tab[39m[90m                                                         [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation requires the exact Security destination permissions and module access[39m[90m                         [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents configure application teams membership roles services and queue routing with audit[39m[90m                   [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket intake applies the highest priority matching queue service owner team and default assignee[39m[90m           [39m [90m4.31s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup exposes Site-scoped workload counts and keeps configuration application-wide[39m[90m                          [39m [90m3.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup queue and service risk counts use authorized live clock evidence instead of cached states[39m[90m             [39m [90m2.95s[39m  
+
+  [90mTests:[39m    [32;1m14 passed[39;22m[90m (170 assertions)[39m
+  [90mDuration:[39m [39m270.29s[39m
+

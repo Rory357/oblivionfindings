@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Domain\It\Services\ItMailboxConfigurationService;
+use App\Domain\It\Services\ItMailboxConnectionPresenter;
 use App\Http\Controllers\Controller;
 use App\Models\ItMailboxConnection;
+use App\Services\AuditLogger;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Laravel\Socialite\Facades\Socialite;
 
 /**
@@ -72,18 +77,23 @@ class ItMailboxOAuthController extends Controller
             $oauthUser = Socialite::driver($driver)
                 ->redirectUrl($this->callbackUrl($provider))
                 ->user();
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             return redirect()->route('settings.it-mailbox')
-                ->withErrors([$provider => 'Could not connect '.ucfirst($provider).': '.$e->getMessage()]);
+                ->withErrors([$provider => 'Could not connect '.ucfirst($provider).'. Restart the approved sign-in and consent flow.']);
+        }
+        if (! is_string($oauthUser->token) || trim($oauthUser->token) === ''
+            || ! is_string($oauthUser->getEmail()) || ! filter_var($oauthUser->getEmail(), FILTER_VALIDATE_EMAIL)) {
+            return redirect()->route('settings.it-mailbox')
+                ->withErrors([$provider => 'The provider did not return a usable account identity and access token. Restart the approved connection flow.']);
         }
 
         // mailbox_email is deliberately NOT touched: a previously configured
         // delegated support mailbox survives a token reconnect.
-        ItMailboxConnection::updateOrCreate(
-            [
-                'provider' => $provider,
-            ],
-            [
+        DB::transaction(function () use ($provider, $oauthUser, $request): void {
+            abort_unless($request->user()?->fresh()?->canDo('integrations.manage_secrets'), 403);
+            $connection = ItMailboxConnection::query()->where('provider', $provider)->lockForUpdate()->first()
+                ?? new ItMailboxConnection(['provider' => $provider]);
+            $connection->fill([
                 'status' => ItMailboxConnection::STATUS_CONNECTED,
                 'access_token' => $oauthUser->token,
                 'refresh_token' => $oauthUser->refreshToken,
@@ -93,21 +103,35 @@ class ItMailboxOAuthController extends Controller
                 'account_name' => $oauthUser->getName(),
                 'last_error' => null,
                 'created_by' => $request->user()->id,
-            ],
-        );
+            ])->forceFill([
+                'configuration_version' => (int) $connection->configuration_version + ($connection->exists ? 1 : 0),
+                'last_polled_at' => null, 'last_poll_attempt_at' => null,
+                'last_poll_failure_code' => null, 'consecutive_poll_failures' => 0,
+                'next_poll_at' => null, 'poll_claim_token' => null, 'poll_claim_expires_at' => null,
+            ])->save();
+            AuditLogger::logOrFail('settings.it_mailbox.connected', $connection, [
+                'provider' => $provider, 'configuration_version' => $connection->configuration_version,
+            ], $request);
+        });
 
         return redirect()->route('settings.it-mailbox')
             ->with('success', ucfirst($provider).' support mailbox connected.');
     }
 
-    public function disconnect(Request $request, string $provider): RedirectResponse
+    public function disconnect(Request $request, string $provider): RedirectResponse|JsonResponse
     {
         $this->authorizeManage($request);
         $this->driver($provider); // validates provider
 
-        ItMailboxConnection::query()
-            ->where('provider', $provider)
-            ->delete();
+        $input = $request->validate([
+            'connection_id' => ['required', 'integer', 'min:1'],
+            'expected_version' => ['required', 'integer', 'min:1'],
+        ]);
+        app(ItMailboxConfigurationService::class)->disconnect($request, $provider, $input);
+        if ($request->expectsJson()) {
+            return response()->json(['status' => 'disconnected',
+                'connection' => app(ItMailboxConnectionPresenter::class)->present($provider, null)]);
+        }
 
         return redirect()->route('settings.it-mailbox')
             ->with('success', ucfirst($provider).' support mailbox disconnected.');

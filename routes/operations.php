@@ -26,7 +26,6 @@ use App\Http\Controllers\CoverageGapController;
 use App\Http\Controllers\CoverageReservationController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\Operations\ActivityFeedController;
-use App\Http\Controllers\Operations\CalendarSyncController;
 // New Operations controllers
 use App\Http\Controllers\Operations\CareNoteTemplateController;
 use App\Http\Controllers\Operations\CarePlanController;
@@ -1317,14 +1316,15 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     });
 
     // -------------------------------------------------------------------------
-    // Calendar Sync (Phase 11)
+    // Old Calendar Sync bookmarks now open the single admin settings page.
     // -------------------------------------------------------------------------
 
-    Route::get('/calendar-sync', [CalendarSyncController::class, 'index'])->name('operations.calendar_sync.index');
-    Route::get('/calendar-sync/create', [CalendarSyncController::class, 'create'])->name('operations.calendar_sync.create');
-    Route::post('/calendar-sync', [CalendarSyncController::class, 'store'])->name('operations.calendar_sync.store');
-    Route::delete('/calendar-sync/{sync}', [CalendarSyncController::class, 'destroy'])->name('operations.calendar_sync.destroy');
-    Route::post('/calendar-sync/{sync}/trigger', [CalendarSyncController::class, 'triggerSync'])->name('operations.calendar_sync.trigger');
+    Route::middleware('permission:integrations.manage_secrets')->group(function () {
+        Route::get('/calendar-sync', fn () => redirect('/settings/calendar-sync', 301))
+            ->name('operations.calendar_sync.index');
+        Route::get('/calendar-sync/create', fn () => redirect('/settings/calendar-sync', 301))
+            ->name('operations.calendar_sync.create');
+    });
 
     // -------------------------------------------------------------------------
     // Geofence compatibility routes. The canonical register is asset_geofences;

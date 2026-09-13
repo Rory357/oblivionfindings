@@ -1,0 +1,12 @@
+{
+  "app/Domain/It/Services/ItTicketMergeService.php": "aef68fbb2e7bfa4793a8ae6fba718cdd14ae4a7e3459c4c81237bc2a6499508b",
+  "app/Domain/It/Presenters/ItTicketActivityPresenter.php": "0ae83c82c18d5e71b27213e5f81f804cbac2af69b311ad79c7617119e7ae7281",
+  "app/Http/Controllers/It/ItTicketController.php": "4cd09ee8abbe2c9465e9606505bfda5d5e0ac1717f18cfc2f015916560cd8ad7",
+  "routes/web.php": "d32b931252484ccb02a2ae41407a481779b5adcee92de730c798ac3224789fcd",
+  "resources/js/pages/it/tickets/show.tsx": "d4062171438c0b3b73e8f3b170860592c9f11c3d49c6d4e365c73f739c8e57f0",
+  "resources/js/components/it/ticket-workspace-header.tsx": "2cdd423fb685a1c8dd8ec3acae874f2962f369c6e4382ee30e03028a61d70cf6",
+  "tests/Feature/It/ItTicketMergeTest.php": "8509fd4feaf23cbc66053c6ee3d630a8c01eedd236b01db5b38de04f5e78a03f",
+  "tests/Feature/It/ItTicketWorkspaceTest.php": "b521ef8216e910f32bdf52c45dca24748904815191bc1ac18ddcd169a62a09e5",
+  "resources/js/pages/it/tickets/show.test.tsx": "c9e953a9790cc2a9d96c190c6a657c3b252f2726b906b46cdc29dd0cb64fb942",
+  "app/Policies/ItTicketPolicy.php": "eb5b0adca47a93f653f3c2f9a2f48c1be66d19739850f3f3476de1be60f9107f"
+}

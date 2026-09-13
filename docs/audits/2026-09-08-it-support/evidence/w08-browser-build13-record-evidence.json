@@ -1,0 +1,144 @@
+{
+    "observed_at": "2026-09-09T21:19:50+00:00",
+    "token": "a1a5ffb2afc14c6b",
+    "database": "oblivion_it_draft_browser_a1a5ffb2afc14c6b",
+    "time_context": {
+        "elapsed_ms": 0.08,
+        "rows": [
+            {
+                "session_time_zone": "SYSTEM",
+                "system_time_zone": "New Zealand Standard Time"
+            }
+        ]
+    },
+    "tickets": {
+        "elapsed_ms": 0.38,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 1,
+                "status": "open"
+            },
+            {
+                "id": 4,
+                "lock_version": 1,
+                "status": "open"
+            }
+        ]
+    },
+    "tasks": {
+        "elapsed_ms": 0.33,
+        "rows": []
+    },
+    "dependencies": {
+        "elapsed_ms": 1.18,
+        "rows": []
+    },
+    "receipts": {
+        "elapsed_ms": 0.23,
+        "rows": []
+    },
+    "events": {
+        "elapsed_ms": 0.26,
+        "rows": []
+    },
+    "audits": {
+        "elapsed_ms": 0.27,
+        "rows": []
+    },
+    "approvals": {
+        "ticket": {
+            "elapsed_ms": 0.14,
+            "rows": [
+                {
+                    "id": 5,
+                    "lock_version": 3,
+                    "status": "open"
+                }
+            ]
+        },
+        "requests": {
+            "elapsed_ms": 0.29,
+            "rows": [
+                {
+                    "id": 1,
+                    "it_ticket_id": 5,
+                    "status": "cancelled",
+                    "requested_by": 3,
+                    "primary_approver_user_id": 4,
+                    "cover_approver_user_id": 5,
+                    "approver_id": null,
+                    "expires_at": null,
+                    "remind_at": null,
+                    "decided_at": null,
+                    "expired_at": null,
+                    "cancelled_at": "2026-09-10 09:15:58",
+                    "cancelled_by_user_id": 3,
+                    "request_reason_sha256": "f61af60d448a962c4e4be998391c7a054015dc6e32b946222d77f03635b3da1a",
+                    "decision_reason_sha256": null,
+                    "cancellation_reason_sha256": "93dd9e7c645154c26e62fa891b0267d02d3e46130b16672b6540ae4f6038b441"
+                }
+            ]
+        },
+        "receipts": {
+            "elapsed_ms": 0.18,
+            "rows": [
+                {
+                    "id": 1,
+                    "actor_user_id": 3,
+                    "operation": "approval.request",
+                    "request_uuid": "086a598b-12b8-4699-ba7a-196a2a9e2743",
+                    "it_ticket_id": 5,
+                    "committed_ticket_version": 2,
+                    "committed_at": "2026-09-10 09:13:30"
+                },
+                {
+                    "id": 2,
+                    "actor_user_id": 3,
+                    "operation": "approval.withdraw",
+                    "request_uuid": "c4957e47-f838-41e3-bbbd-2cb681a48485",
+                    "it_ticket_id": 5,
+                    "committed_ticket_version": 3,
+                    "committed_at": "2026-09-10 09:15:58"
+                }
+            ]
+        },
+        "events": {
+            "elapsed_ms": 0.17,
+            "rows": [
+                {
+                    "id": 1,
+                    "actor_user_id": 3,
+                    "type": "approval_requested",
+                    "created_at": "2026-09-09 21:13:30"
+                },
+                {
+                    "id": 2,
+                    "actor_user_id": 3,
+                    "type": "approval_cancelled",
+                    "created_at": "2026-09-09 21:15:58"
+                }
+            ]
+        },
+        "audits": {
+            "elapsed_ms": 0.16,
+            "rows": [
+                {
+                    "id": 18,
+                    "user_id": 3,
+                    "action": "it.ticket.approval.requested",
+                    "created_at": "2026-09-10 09:13:30"
+                },
+                {
+                    "id": 20,
+                    "user_id": 3,
+                    "action": "it.ticket.approval.cancelled",
+                    "created_at": "2026-09-10 09:15:58"
+                }
+            ]
+        }
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false
+}

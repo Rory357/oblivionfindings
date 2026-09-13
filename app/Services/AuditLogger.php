@@ -32,15 +32,16 @@ class AuditLogger
         ?Model $auditable = null,
         array $meta = [],
         ?Request $request = null,
+        bool $systemActor = false,
     ): void {
         $request = $request ?? request();
-        $user = $request?->user() ?? auth()->user();
+        $user = $systemActor ? null : ($request?->user() ?? auth()->user());
         $actorId = $user?->id;
 
         // Service/listener calls may run without an HTTP user even though
         // their domain command carries an explicit actor. Preserve that
         // attribution instead of presenting the event as a system write.
-        if ($actorId === null && is_int($meta['actor_id'] ?? null) && $meta['actor_id'] > 0) {
+        if (! $systemActor && $actorId === null && is_int($meta['actor_id'] ?? null) && $meta['actor_id'] > 0) {
             $actorId = $meta['actor_id'];
         }
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Contracts\CalendarOAuthToken;
+use App\Services\Integration\Exceptions\MailboxProviderFailure;
 use App\Services\MicrosoftGraphService;
 use Illuminate\Support\Facades\Http;
 
@@ -78,10 +79,13 @@ test('listUnreadMessages filters unread and normalises for the ingestor', functi
     });
 });
 
-test('listUnreadMessages returns empty on a Graph error and drops malformed rows', function () {
+test('listUnreadMessages reports Graph permission errors instead of an empty inbox', function () {
     Http::fake(['graph.microsoft.com/*' => Http::response(['error' => 'denied'], 403)]);
-    expect(itGraphMailService()->listUnreadMessages('support@example.test'))->toBe([]);
+    expect(fn () => itGraphMailService()->listUnreadMessages('support@example.test'))
+        ->toThrow(MailboxProviderFailure::class, 'denied mailbox access');
+});
 
+test('listUnreadMessages reports malformed Graph identities instead of dropping them', function () {
     Http::fake([
         'graph.microsoft.com/*' => Http::response([
             'value' => [
@@ -90,7 +94,8 @@ test('listUnreadMessages returns empty on a Graph error and drops malformed rows
             ],
         ], 200),
     ]);
-    expect(itGraphMailService()->listUnreadMessages('support@example.test'))->toBe([]);
+    expect(fn () => itGraphMailService()->listUnreadMessages('support@example.test'))
+        ->toThrow(MailboxProviderFailure::class, 'invalid response');
 });
 
 test('markRead PATCHes isRead=true on the mailbox message', function () {

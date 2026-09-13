@@ -4,6 +4,7 @@ namespace App\Domain\It\Presenters;
 
 use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\It\Services\ItWorkTaskReadinessService;
 use App\Domain\Monitoring\Presenters\MonitoringIncidentEvidencePresenter;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -23,10 +24,11 @@ final class ItTicketContextPresenter
         private readonly SecurityDevicesAccessService $deviceAccess,
         private readonly UserSiteAccessService $siteAccess,
         private readonly MonitoringIncidentEvidencePresenter $incidentEvidence,
+        private readonly ItWorkTaskReadinessService $taskReadiness,
     ) {}
 
     /**
-     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, incident_evidence: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>, problems: array<int, array<string, mixed>>, changes: array<int, array<string, mixed>>, major_incidents: array<int, array<string, mixed>>}
+     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, incident_evidence: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>, problems: array<int, array<string, mixed>>, changes: array<int, array<string, mixed>>, major_incidents: array<int, array<string, mixed>>, related_tickets_count: int}
      */
     public function present(ItTicket $ticket, User $viewer): array
     {
@@ -39,6 +41,7 @@ final class ItTicketContextPresenter
                 'problems' => [],
                 'changes' => [],
                 'major_incidents' => [],
+                'related_tickets_count' => 0,
             ];
         }
 
@@ -72,6 +75,7 @@ final class ItTicketContextPresenter
             'problems' => $this->presentProblems($ticket, $viewer),
             'changes' => $this->presentChanges($ticket, $viewer),
             'major_incidents' => $this->presentMajorIncidents($ticket, $viewer),
+            'related_tickets_count' => app(ItTicketLinkService::class)->relatedCount($ticket, $viewer),
         ];
     }
 
@@ -191,14 +195,20 @@ final class ItTicketContextPresenter
             return [];
         }
 
-        return $ticket->tasks()
-            ->with(['dependencies:id,title,status', 'team:id,name', 'assignee:id,name', 'completedBy:id,name'])
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get()
+        $work = $this->taskReadiness->forTicket($ticket, $viewer);
+        if ($work['storage_ready']) {
+            $work['tasks']->loadMissing('approval:id,it_ticket_id,status');
+        }
+
+        return $work['tasks']
+            ->sortBy(fn (ItWorkTask $task): array => [$task->sort_order, $task->id])
             ->filter(fn (ItWorkTask $task): bool => Gate::forUser($viewer)->allows('view', $task))
             ->map(fn (ItWorkTask $task): array => [
                 'id' => $task->id,
+                'current_completion_id' => $work['storage_ready'] ? $task->current_completion_id : null,
+                'approval' => $work['storage_ready'] && $task->approval && (int) $task->approval->it_ticket_id === (int) $ticket->id
+                    ? ['id' => (int) $task->approval->id, 'status' => $task->approval->status] : null,
+                'readiness' => $work['verdicts'][$task->id],
                 'title' => $task->title,
                 'description' => $task->description,
                 'status' => $task->status,
@@ -215,6 +225,7 @@ final class ItTicketContextPresenter
                     ? ['id' => $task->completedBy->id, 'name' => $task->completedBy->name]
                     : null,
                 'dependencies' => $task->dependencies
+                    ->filter(fn (ItWorkTask $dependency): bool => (int) $dependency->ticket_id === (int) $ticket->id)
                     ->map(fn (ItWorkTask $dependency): array => [
                         'id' => $dependency->id,
                         'title' => $dependency->title,

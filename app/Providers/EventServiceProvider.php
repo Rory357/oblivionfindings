@@ -6,6 +6,7 @@ use App\Domain\It\Services\ItAutomationRunRecorder;
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
 use App\Events\CoverageSupplyAdded;
 use App\Events\RosterPeriodPublished;
+use App\Listeners\AuthEventSubscriber;
 use App\Listeners\Care\NotifyOnBedExit;
 use App\Listeners\Care\NotifyOnFallDetected;
 use App\Listeners\Care\NotifyOnMedicationCabinetOpen;
@@ -18,6 +19,7 @@ use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskSkipped;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Notifications\Events\NotificationSent;
@@ -52,13 +54,16 @@ class EventServiceProvider extends ServiceProvider
             RecordRosterPeriodPublishedAudit::class,
         ],
         NotificationSending::class => [
-            RecordItEmailDelivery::class,
+            RecordItEmailDelivery::class.'@record',
+        ],
+        MessageSending::class => [
+            RecordItEmailDelivery::class.'@prepareMessage',
         ],
         NotificationSent::class => [
-            RecordItEmailDelivery::class,
+            RecordItEmailDelivery::class.'@record',
         ],
         NotificationFailed::class => [
-            RecordItEmailDelivery::class,
+            RecordItEmailDelivery::class.'@record',
         ],
         ScheduledTaskStarting::class => [
             ItAutomationRunRecorder::class.'@starting',
@@ -80,7 +85,7 @@ class EventServiceProvider extends ServiceProvider
      * @var array<int, class-string>
      */
     protected $subscribe = [
-        \App\Listeners\AuthEventSubscriber::class,
+        AuthEventSubscriber::class,
     ];
 
     /**

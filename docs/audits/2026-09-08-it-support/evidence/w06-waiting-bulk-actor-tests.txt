@@ -1,0 +1,129 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_8b45ac8aa3af4c26",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItTicketBulkTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbulk assign hands a selection to one agent and notifies them once per ticket[39m[90m                              [39m [90m165.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk assign to yourself never self-notifies[39m[90m                                                                 [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk priority restamps the SLA clock from the new target[39m[90m                                                    [39m [90m3.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk status moves working tickets and starts the waiting pause[39m[90m                                              [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk close requires and preserves one operational reason per ticket[39m[90m                                         [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk close settles everything still open and skips the already-closed[39m[90m                                       [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk is agent-only and constrained to canonical Site access[39m[90m                                                 [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk outcomes preserve selection order and conceal unavailable records while explaining stale and blocked r[39m[90m…[39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk unassign accepts an explicit null with its routing reason and rejects missing or duplicate selection i[39m[90m…[39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mone failed bulk transaction is reported without rolling back successful siblings or exposing exception cont[39m[90m…[39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk result receipts are projected only to the actor who performed the selection[39m[90m                            [39m [90m5.29s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mbulk waiting binds the originating browser actor before writing private operational evidence[39m[90m                [39m [90m1.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk waiting acknowledges the actual viewer and exact selected outcomes in JSON[39m[90m                             [39m [90m0.74s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTicketBulkTest[22m [90m>[39m bulk waiting binds the originating browser actor before writing priva…   
+[39;1m  Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+-    'lock_version' => 1,
++    'id' => 24,
+     'tenant_id' => 1,
++    'reference' => 'IT-000001',
+     'title' => 'Qui modi pariatur.',
+     'description' => 'Dolor quibusdam quis et minus dolore nihil earum molestiae aut.',
+     'requester_user_id' => 130,
++    'requested_for_user_id' => null,
++    'assigned_to_user_id' => null,
++    'owner_user_id' => null,
++    'asset_id' => null,
++    'site_id' => 14,
++    'is_organisation_wide' => 0,
++    'team_id' => null,
++    'queue_id' => null,
++    'it_service_id' => null,
++    'provisioning_request_id' => null,
++    'merged_into_ticket_id' => null,
++    'merged_at' => null,
+     'category' => 'hardware',
++    'subcategory' => null,
++    'source' => 'portal',
++    'work_type' => 'incident',
++    'workflow_state' => 'submitted',
+     'priority' => 'normal',
+     'impact' => 'individual',
+     'urgency' => 'normal',
++    'is_sensitive' => 0,
+     'status' => 'open',
+-    'source' => 'portal',
+-    'work_type' => 'incident',
+-    'site_id' => 14,
+-    'reference' => 'IT-000001',
++    'status_reason' => null,
++    'waiting_reason' => null,
++    'waiting_party' => null,
++    'next_action' => null,
++    'requires_approval' => 0,
++    'resolved_at' => null,
++    'resolution_code' => null,
++    'resolution_summary' => null,
++    'monitoring_recovered_at' => null,
++    'created_at' => '2026-09-09 05:23:28',
+     'updated_at' => '2026-09-09 05:23:28',
+-    'created_at' => '2026-09-09 05:23:28',
+-    'id' => 24,
++    'first_response_due_at' => null,
++    'resolution_due_at' => null,
++    'due_at' => null,
++    'first_responded_at' => null,
++    'sla_state' => 'ok',
++    'sla_paused_minutes' => 0,
++    'waiting_since' => null,
++    'closed_at' => null,
++    'reopened_count' => 0,
++    'csat_score' => null,
++    'csat_comment' => null,
++    'csat_submitted_at' => null,
++    'lock_version' => 1,
++    'priority_decision' => null,
++    'routing_decision' => null,
++    'routing_override' => null,
++    'sla_original_policy_snapshot' => null,
++    'sla_policy_snapshot' => null,
++    'first_response_breached_at' => null,
++    'resolution_breached_at' => null,
++    'sla_checked_at' => null,
+ ][39;22m
+
+  at [32mtests\Feature\It\ItTicketBulkTest.php[39m:[32m327[39m
+    323▕         'expected_versions' => [$ticket->id => $ticket->lock_version],
+    324▕         'action' => 'status', 'status' => 'waiting', 'waiting_party' => 'vendor',
+    325▕         'waiting_reason' => 'Private reason from a previous signed-in account',
+    326▕     ])->assertForbidden();
+  ➜ 327▕     expect($ticket->refresh()->getRawOriginal())->toBe($before)
+    328▕         ->and($ticket->events()->count())->toBe(0);
+    329▕ });
+    330▕ 
+    331▕ test('bulk waiting acknowledges the actual viewer and exact selected outcomes in JSON', function () {
+
+  [33m1   [39m[39;1mtests\Feature\It\ItTicketBulkTest.php[39;22m:[39;1m327[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m12 passed[39;22m[90m (129 assertions)[39m
+  [90mDuration:[39m [39m183.15s[39m
+

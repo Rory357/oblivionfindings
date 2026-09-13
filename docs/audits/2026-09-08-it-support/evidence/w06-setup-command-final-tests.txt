@@ -1,0 +1,81 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_237045224e754d5a",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSetupCommandTest[39m
+  [32;1m✓[39;22m[90m [39m[90msetup create commands replay exactly once without repeating configuration or audits with ('teams')[39m[90m        [39m [90m172.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup create commands replay exactly once without repeating configuration or audits with ('queues')[39m[90m         [39m [90m0.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup create commands replay exactly once without repeating configuration or audits with ('services')[39m[90m       [39m [90m0.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup command identity cannot be reused with changed fields or another resource[39m[90m                             [39m [90m1.00s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup receipts remain exact after the saved configuration is independently edited[39m[90m                           [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup command recovery refuses changed actors and fresh permission loss[39m[90m                                     [39m [90m1.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfailed audit rolls back the setup record and receipt so the exact command can be retried[39m[90m                    [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma new command retains normal uniqueness validation without mistaking another saved record for success[39m[90m       [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexplicit cancellation prevents a late original create and is itself replayable[39m[90m                              [39m [90m0.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcancelling an already committed create reports that exact result without undoing it[39m[90m                         [39m [90m0.95s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItServiceManagementSetupTest[39m
+  [32;1m✓[39;22m[90m [39m[90mIT pages share the approved grouped navigation while preserving existing deep links[39m[90m                         [39m [90m5.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation emits the requester catalogue only with exact request access[39m[90m                                  [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation never produces an unsupported SLA tab[39m[90m                                                         [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation requires the exact Security destination permissions and module access[39m[90m                         [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents configure application teams membership roles services and queue routing with audit[39m[90m                   [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket intake applies the highest priority matching queue service owner team and default assignee[39m[90m           [39m [90m0.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup exposes Site-scoped workload counts and keeps configuration application-wide[39m[90m                          [39m [90m2.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup queue and service risk counts use authorized live clock evidence instead of cached states[39m[90m             [39m [90m2.83s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSetupVersionTest[39m
+  [32;1m✓[39;22m[90m [39m[90msetup review returns only the requested current canonical register without an Inertia version with ('teams'[39m[90m…[39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup review returns only the requested current canonical register without an Inertia version with ('queues[39m[90m…[39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup review returns only the requested current canonical register without an Inertia version with ('servic[39m[90m…[39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup review rejects unsupported resources and current restricted access[39m[90m                                    [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam editors cannot overwrite a newer member role and must explicitly review a new version[39m[90m                  [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mservice editor rejects an obsolete version and preserves the newer status on an explicit retry[39m[90m              [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam and service update endpoints require the displayed version[39m[90m                                             [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical setup mutation rechecks a cached actor permission and approval before writing[39m[90m                     [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical setup service cannot bypass the version check by omitting transport validation[39m[90m                    [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma failed required audit leaves the service configuration and version unchanged[39m[90m                              [39m [90m0.57s[39m  
+
+  [90mTests:[39m    [32;1m28 passed[39;22m[90m (323 assertions)[39m
+  [90mDuration:[39m [39m204.34s[39m
+
+{"exit_code":0,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_237045224e754d5a",
+    "database_mutations_performed": false
+}

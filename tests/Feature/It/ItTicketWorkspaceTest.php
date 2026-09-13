@@ -1,12 +1,16 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Presenters\ItTicketActivityPresenter;
+use App\Domain\It\Services\ItEmailDeliveryService;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\AuditLog;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
 use App\Models\ControlRoomAlert;
+use App\Models\ItAttachment;
 use App\Models\ItKbArticle;
 use App\Models\ItQueue;
 use App\Models\ItService;
@@ -22,6 +26,7 @@ use App\Notifications\It\TicketRepliedNotification;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 
 function itWorkspaceUser(string $role): User
 {
@@ -379,6 +384,190 @@ test('the workspace strips internal notes from requester payloads server-side', 
     $this->actingAs($stranger)->get("/it/tickets/{$ticket->id}")->assertNotFound();
 });
 
+test('participant-only technicians receive public ticket projections in every workspace surface', function (bool $sensitive, string $participantColumn) {
+    Storage::fake(ItAttachment::DISK);
+    $ticketSite = $sensitive ? $this->site : Site::factory()->create();
+    $technician = itWorkspaceUser('admin');
+    assignItWorkspaceUserToSite($technician, $ticketSite);
+    $ticket = ItTicket::factory()->create([
+        'site_id' => $ticketSite->id,
+        'requester_user_id' => $this->worker->id,
+        $participantColumn => $this->hr->id,
+        'assigned_to_user_id' => $technician->id,
+        'is_sensitive' => $sensitive,
+        'status' => 'waiting',
+        'waiting_party' => 'supplier',
+        'waiting_reason' => 'Private supplier investigation waiting reason.',
+        'next_action' => 'Private supplier escalation next action.',
+        'waiting_since' => now()->subHour(),
+        'routing_override' => [
+            'reason' => 'Private routing override reason.',
+            'actor_user_id' => $technician->id,
+            'fields' => ['assigned_to_user_id' => $technician->id],
+        ],
+    ]);
+    $access = app(ItWorkAccessService::class);
+    expect($this->hr->canDo('it.manage'))->toBeTrue()
+        ->and($access->canView($this->hr, $ticket))->toBeTrue()
+        ->and($access->canWork($this->hr, $ticket))->toBeFalse()
+        ->and($access->canWork($technician, $ticket))->toBeTrue();
+
+    $publicComment = $ticket->comments()->create([
+        'author_user_id' => $technician->id,
+        'body' => 'Public update for the participant.',
+        'is_internal' => false,
+    ]);
+    $internalComment = $ticket->comments()->create([
+        'author_user_id' => $technician->id,
+        'body' => 'Restricted investigation must remain internal.',
+        'is_internal' => true,
+    ]);
+    $files = collect([$publicComment, $internalComment])->map(function ($comment) use ($technician) {
+        $name = $comment->is_internal ? 'restricted-evidence.txt' : 'public-evidence.txt';
+        $path = "it/privacy/{$comment->id}/{$name}";
+        Storage::disk(ItAttachment::DISK)->put($path, 'Disposable privacy evidence.');
+
+        return $comment->attachments()->create([
+            'path' => $path,
+            'original_name' => $name,
+            'mime' => 'text/plain',
+            'size' => 28,
+            'uploaded_by' => $technician->id,
+        ]);
+    });
+    $publicEvent = ItTicketEvent::record($ticket, 'workflow_transitioned', $technician->id, [
+        'from' => 'open',
+        'to' => 'in_progress',
+        'reason' => 'Private transition explanation.',
+    ]);
+    $internalEvent = ItTicketEvent::record($ticket, 'priority_changed', $technician->id, [
+        'from' => 'normal',
+        'to' => 'high',
+        'reason' => 'Restricted investigation priority.',
+    ]);
+
+    $this->actingAs($this->hr)->get(route('it.tickets.show', $ticket))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('it/tickets/show')
+            ->has('comments', 1)
+            ->where('comments.0.id', $publicComment->id)
+            ->has('comments.0.attachments', 1)
+            ->where('comments.0.attachments.0.id', $files[0]->id)
+            ->has('events', 1)
+            ->where('events.0.id', $publicEvent->id)
+            ->missing('events.0.payload.reason')
+            ->missing('ticket.routing')
+            ->where('can.view', false)
+            ->where('can.manage', false)
+            ->where('can.internal', false)
+            ->has('kbSuggestions', 0));
+
+    $this->actingAs($this->hr)->getJson(route('it.tickets.show', $ticket))
+        ->assertOk()
+        ->assertJsonCount(1, 'comments')
+        ->assertJsonPath('comments.0.id', $publicComment->id)
+        ->assertJsonCount(1, 'events')
+        ->assertJsonCount(2, 'events.0.payload')
+        ->assertJsonPath('events.0.payload.from', 'open')
+        ->assertJsonPath('events.0.payload.to', 'in_progress')
+        ->assertJsonMissingPath('ticket.routing')
+        ->assertJsonPath('can.view', false)
+        ->assertJsonMissing(['body' => $internalComment->body])
+        ->assertJsonMissing(['name' => $files[1]->original_name]);
+
+    $this->actingAs($this->hr)->get(route('it.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('tickets.data', 1)
+            ->where('tickets.data.0.can.manage', false)
+            ->where('tickets.data.0.waiting_party', 'other')
+            ->missing('tickets.data.0.waiting_reason')
+            ->missing('tickets.data.0.next_action')
+            ->missing('tickets.data.0.waiting_since')
+            ->missing('tickets.data.0.routing')
+            ->has('overview.recent_activity', 1)
+            ->where('overview.recent_activity.0.id', $publicEvent->id)
+            ->missing('overview.recent_activity.0.payload.reason'));
+    $this->actingAs($this->hr)->get(route('it.attachments.download', $files[0]))->assertOk();
+    $this->actingAs($this->hr)->get(route('it.attachments.download', $files[1]))->assertNotFound();
+    $this->actingAs($this->hr)->post(route('it.tickets.comments.store', $ticket), [
+        'body' => 'An internal note is not participant work.',
+        'is_internal' => true,
+    ])->assertForbidden();
+
+    $this->actingAs($technician)->getJson(route('it.tickets.show', $ticket))
+        ->assertOk()
+        ->assertJsonCount(2, 'comments')
+        ->assertJsonPath('comments.1.attachments.0.id', $files[1]->id)
+        ->assertJsonCount(2, 'events')
+        ->assertJsonPath('events.1.id', $internalEvent->id)
+        ->assertJsonPath('events.0.payload.reason', 'Private transition explanation.')
+        ->assertJsonPath('can.view', true)
+        ->assertJsonPath('can.internal', true);
+    $this->actingAs($technician)->get(route('it.attachments.download', $files[1]))->assertOk();
+    $this->actingAs($technician)->get(route('it.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('tickets.data.0.can.manage', true)
+            ->where('tickets.data.0.waiting_reason', 'Private supplier investigation waiting reason.')
+            ->where('tickets.data.0.next_action', 'Private supplier escalation next action.')
+            ->where('tickets.data.0.routing.override.reason', 'Private routing override reason.')
+            ->has('overview.recent_activity', 2)
+            ->where('overview.recent_activity', fn ($events) => collect($events)
+                ->contains(fn ($event) => $event['id'] === $internalEvent->id
+                    && $event['payload']['reason'] === 'Restricted investigation priority.')));
+
+    // An already-open preview does not authorize a later request after the
+    // canonical participant link is revoked.
+    $ticket->update([$participantColumn => $this->worker->id]);
+    expect(app(ItTicketActivityPresenter::class)->present($ticket, $this->hr))->toBe([])
+        ->and(app(ItTicketActivityPresenter::class)->presentEvent($publicEvent, $this->hr))->toBeNull();
+    $this->actingAs($this->hr)->getJson(route('it.tickets.show', $ticket))->assertNotFound();
+    $this->actingAs($this->hr)->get(route('it.attachments.download', $files[0]))->assertNotFound();
+    $this->actingAs($this->hr)->post(route('it.tickets.comments.store', $ticket), [
+        'body' => 'A stale participant reply.',
+    ])->assertNotFound();
+})->with([
+    'sensitive requester' => [true, 'requester_user_id'],
+    'sensitive requested-for' => [true, 'requested_for_user_id'],
+    'unapproved-site requester' => [false, 'requester_user_id'],
+    'unapproved-site requested-for' => [false, 'requested_for_user_id'],
+]);
+
+test('read-only IT access does not widen the internal work boundary', function () {
+    $managePermission = Permission::query()->where('key', 'it.manage')->firstOrFail();
+    $this->hr->permissionOverrides()->syncWithoutDetaching([$managePermission->id => ['allowed' => false]]);
+    $ticket = ItTicket::factory()->create([
+        'site_id' => $this->site->id,
+        'requester_user_id' => $this->worker->id,
+    ]);
+    $ticket->comments()->create([
+        'author_user_id' => $this->worker->id,
+        'body' => 'A public request update.',
+        'is_internal' => false,
+    ]);
+    $ticket->comments()->create([
+        'author_user_id' => $this->hr->id,
+        'body' => 'A historical internal investigation.',
+        'is_internal' => true,
+    ]);
+
+    expect($this->hr->canDo('it.view'))->toBeTrue()
+        ->and(app(ItWorkAccessService::class)->canView($this->hr, $ticket))->toBeTrue()
+        ->and(app(ItWorkAccessService::class)->canWork($this->hr, $ticket))->toBeFalse();
+    $this->actingAs($this->hr)->getJson(route('it.tickets.show', $ticket))
+        ->assertOk()
+        ->assertJsonCount(1, 'comments')
+        ->assertJsonMissingPath('ticket.routing')
+        ->assertJsonPath('can.view', false)
+        ->assertJsonPath('can.internal', false);
+    $this->actingAs($this->hr)->get('/it?tab=tickets')->assertOk()
+        ->assertInertia(fn ($page) => $page->where('tickets.data.0.can.manage', false)
+            ->missing('tickets.data.0.routing')->missing('tickets.data.0.waiting_reason')
+            ->missing('tickets.data.0.next_action')->missing('tickets.data.0.waiting_since'));
+});
+
 test('comments respect the internal gate and stamp the first agent response', function () {
     Notification::fake();
     $ticket = ItTicket::factory()->create([
@@ -437,12 +626,13 @@ test('settled ticket conversations are read only until the ticket is reopened', 
     $this->actingAs($this->worker)
         ->post("/it/tickets/{$ticket->id}/comments", ['body' => 'This did not stay fixed.'])
         ->assertRedirect()
-        ->assertSessionHas('error', 'Reopen this ticket before adding another reply or note.');
+        ->assertSessionHasErrors(['body' => 'Reopen this ticket before adding another reply or note.'])
+        ->assertSessionMissing('success');
 
     expect($ticket->comments()->count())->toBe(0);
 });
 
-test('a requester reply resumes a waiting ticket and banks the paused minutes', function () {
+test('a requester reply resumes a legacy wait without inventing measured pause minutes', function () {
     $ticket = ItTicket::factory()->create([
         'site_id' => $this->site->id,
         'requester_user_id' => $this->worker->id,
@@ -457,7 +647,9 @@ test('a requester reply resumes a waiting ticket and banks the paused minutes', 
     $ticket->refresh();
     expect($ticket->status)->toBe('in_progress');
     expect($ticket->waiting_since)->toBeNull();
-    expect($ticket->sla_paused_minutes)->toBeGreaterThanOrEqual(29);
+    expect($ticket->sla_paused_minutes)->toBe(0)
+        ->and($ticket->sla_state)->toBe('unmeasured')
+        ->and($ticket->sla_policy_snapshot['pause_unit'])->toBe('legacy_unknown');
     expect(
         $ticket->events()->where('type', 'status_changed')->get()
             ->contains(fn (ItTicketEvent $e) => ($e->payload['via'] ?? null) === 'requester_reply'),
@@ -467,6 +659,7 @@ test('a requester reply resumes a waiting ticket and banks the paused minutes', 
 test('public replies notify the other side of the conversation only', function () {
     Notification::fake();
     $watcher = itWorkspaceUser('hr');
+    assignItWorkspaceUserToSite($watcher, $this->site);
     $ticket = ItTicket::factory()->create([
         'site_id' => $this->site->id,
         'requester_user_id' => $this->worker->id,
@@ -570,6 +763,7 @@ test('the rail can classify reroute and retag a ticket', function () {
 
     $this->actingAs($this->hr)
         ->patch("/it/tickets/{$ticket->id}", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'category' => 'network',
             'work_type' => 'service_request',
             'it_service_id' => $service->id,
@@ -618,6 +812,7 @@ test('the rail can classify reroute and retag a ticket', function () {
     // A Site-only move cannot strand a linked Asset in the old Site.
     $this->actingAs($this->hr)
         ->patch("/it/tickets/{$ticket->id}", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'site_id' => $secondSite->id,
             'is_organisation_wide' => false,
         ])
@@ -629,6 +824,7 @@ test('the rail can classify reroute and retag a ticket', function () {
     // stale routing and an assignee without the new Site are released.
     $this->actingAs($this->hr)
         ->patch("/it/tickets/{$ticket->id}", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'asset_id' => null,
             'site_id' => $secondSite->id,
             'is_organisation_wide' => false,
@@ -660,6 +856,7 @@ test('only an explicitly application-wide manager can move a ticket to all Sites
 
     $this->actingAs($admin)
         ->patch("/it/tickets/{$ticket->id}", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'site_id' => null,
             'is_organisation_wide' => true,
         ])
@@ -747,26 +944,31 @@ test('triage updates write the activity trail and notify the new assignee', func
 
     $this->actingAs($this->hr)
         ->patch("/it/tickets/{$ticket->id}", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'assigned_to_user_id' => $colleague->id,
+            'routing_reason' => 'The colleague is handling the replacement.',
             'priority' => 'high',
         ])
         ->assertRedirect();
 
     expect($ticket->events()->where('type', 'assigned')->count())->toBe(1);
     expect($ticket->events()->where('type', 'priority_changed')->count())->toBe(1);
+    app(ItEmailDeliveryService::class)->dispatchPending();
     Notification::assertSentTo($colleague, TicketAssignedNotification::class);
 
     Notification::fake();
 
     // Assign-to-self never self-notifies.
     $this->actingAs($this->hr)
-        ->patch("/it/tickets/{$ticket->id}", ['assigned_to_user_id' => $this->hr->id])
+        ->patch("/it/tickets/{$ticket->id}", ['expected_version' => $ticket->fresh()->lock_version, 'assigned_to_user_id' => $this->hr->id,
+            'routing_reason' => 'I am taking over the replacement.'])
         ->assertRedirect();
     Notification::assertNotSentTo($this->hr, TicketAssignedNotification::class);
 
     // waiting via PATCH pauses; leaving banks the minutes.
     $this->actingAs($this->hr)
         ->patch("/it/tickets/{$ticket->id}", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'status' => 'waiting',
             'waiting_party' => 'requester',
             'waiting_reason' => 'Waiting for the requester to confirm the result.',
@@ -777,7 +979,7 @@ test('triage updates write the activity trail and notify the new assignee', func
 
     $this->travel(45)->minutes();
     $this->actingAs($this->hr)
-        ->patch("/it/tickets/{$ticket->id}", ['status' => 'in_progress'])
+        ->patch("/it/tickets/{$ticket->id}", ['expected_version' => $ticket->fresh()->lock_version, 'status' => 'in_progress'])
         ->assertRedirect();
     $ticket->refresh();
     expect($ticket->status)->toBe('in_progress');
@@ -795,6 +997,7 @@ test('waiting ownership is explicit revisable and requester safe', function () {
 
     $this->actingAs($this->hr)
         ->patch("/it/tickets/{$ticket->id}", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'status' => 'waiting',
             'waiting_party' => 'vendor',
             'waiting_reason' => 'The supplier must confirm the replacement serial number.',
@@ -829,6 +1032,7 @@ test('waiting ownership is explicit revisable and requester safe', function () {
     $this->travel(10)->minutes();
     $this->actingAs($this->hr)
         ->patch("/it/tickets/{$ticket->id}", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'status' => 'waiting',
             'waiting_party' => 'approver',
             'waiting_reason' => 'The change owner must approve the revised scope.',
@@ -852,6 +1056,7 @@ test('waiting ownership is explicit revisable and requester safe', function () {
 
     $this->actingAs($this->hr)
         ->patch("/it/tickets/{$ticket->id}", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'status' => 'waiting',
             'waiting_party' => '',
             'waiting_reason' => '',
@@ -873,7 +1078,7 @@ test('triage cannot bypass configured approval by changing the ticket category',
     ]);
 
     $this->actingAs($this->hr)
-        ->patch("/it/tickets/{$ticket->id}", ['category' => 'account'])
+        ->patch("/it/tickets/{$ticket->id}", ['expected_version' => $ticket->fresh()->lock_version, 'category' => 'account'])
         ->assertRedirect();
 
     expect($ticket->refresh()->requires_approval)->toBeTrue()
@@ -884,7 +1089,12 @@ test('triage cannot bypass configured approval by changing the ticket category',
             ->count())->toBe(1);
 
     $this->actingAs($this->hr)
-        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Account restored.'])
+        ->post("/it/tickets/{$ticket->id}/resolve", [
+            'expected_version' => $ticket->fresh()->lock_version,
+            'note' => 'Account restored.',
+            'resolution_code' => 'restored',
+            'resolution_verification' => 'Checked the synthetic account access twice.',
+        ])
         ->assertSessionHas('error', 'Required approval must be approved before settlement.');
 
     expect($ticket->refresh()->status)->not->toBe('resolved');

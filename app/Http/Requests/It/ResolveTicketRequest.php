@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests\It;
 
+use App\Domain\It\Data\ItTicketResolutionInput;
+use App\Http\Requests\It\Concerns\BindsItBrowserActor;
 use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
+use App\Http\Requests\It\Concerns\HasItDraftCommit;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -11,19 +14,24 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class ResolveTicketRequest extends FormRequest
 {
+    use BindsItBrowserActor;
     use ConcealsInaccessibleItWork;
+    use HasItDraftCommit;
 
     public function authorize(): bool
     {
         $this->workableTicketOrNotFound();
 
-        return (bool) $this->user()?->canDo('it.manage');
+        return $this->hasCurrentBrowserActor() && (bool) $this->user()?->canDo('it.manage');
     }
 
     public function rules(): array
     {
         return [
-            'note' => ['required', 'string', 'max:5000'],
+            ...$this->browserActorRules(),
+            ...$this->draftCommitRules(),
+            'expected_version' => ['required', 'integer', 'min:1'],
+            ...ItTicketResolutionInput::rules(),
             'notify_requester' => ['sometimes', 'boolean'],
         ];
     }

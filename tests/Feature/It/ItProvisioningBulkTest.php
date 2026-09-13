@@ -4,10 +4,12 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Models\ItProvisioningRequest;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Facades\Event;
 
 function provBulkUser(string $role): User
 {
@@ -70,7 +72,7 @@ test('bulk assign moves pending requests to in progress and records an event', f
             'assigned_to_user_id' => $this->agent->id,
         ])
         ->assertRedirect()
-        ->assertSessionHas('success', '2 request(s) assigned · 1 unchanged.');
+        ->assertSessionHas('warning', '2 request(s) assigned · 1 unchanged.');
 
     foreach ([$pendingA, $pendingB] as $r) {
         $r->refresh();
@@ -87,7 +89,8 @@ test('bulk assign moves pending requests to in progress and records an event', f
         'ids' => [$pendingA->id, $pendingB->id, $done->id],
         'action' => 'assign',
         'assigned_to_user_id' => $this->agent->id,
-    ])->assertSessionHas('success', '0 request(s) assigned · 3 unchanged.');
+    ])->assertSessionHas('warning', '0 request(s) assigned · 3 unchanged.')
+        ->assertSessionMissing('success');
 });
 
 test('bulk fulfil marks requests done and completes the linked onboarding task', function () {
@@ -130,7 +133,7 @@ test('bulk fulfil marks requests done and completes the linked onboarding task',
             'action' => 'fulfil',
         ])
         ->assertRedirect()
-        ->assertSessionHas('success', '2 request(s) fulfilled · 1 unchanged.');
+        ->assertSessionHas('warning', '2 request(s) fulfilled · 1 unchanged.');
 
     foreach ([$linked, $manual] as $r) {
         $r->refresh();
@@ -171,9 +174,53 @@ test('provisioning bulk is agent-only and Site-scoped', function () {
         'ids' => [$mine->id, $remote->id],
         'action' => 'assign',
         'assigned_to_user_id' => $this->agent->id,
-    ])->assertSessionHas('success', '1 request(s) assigned · 1 unchanged.');
+    ])->assertSessionHas('warning', '1 request(s) assigned · 1 unchanged.');
 
     expect($mine->refresh()->status)->toBe('in_progress');
     expect($remote->refresh()->status)->toBe('pending');
     expect($remote->assigned_to_user_id)->toBeNull();
+});
+
+test('provisioning bulk outcomes separate blockers from unavailable records without disclosing private context', function () {
+    $profile = provBulkProfile($this->site);
+    $pending = ItProvisioningRequest::query()->create(['employee_profile_id' => $profile->id, 'type' => 'account', 'item' => 'Account', 'status' => 'pending']);
+    $blocked = ItProvisioningRequest::query()->create(['employee_profile_id' => $profile->id, 'type' => 'equipment', 'item' => 'Device', 'status' => 'pending', 'evidence_required' => true]);
+    $outside = ItProvisioningRequest::query()->create([
+        'employee_profile_id' => provBulkProfile(Site::factory()->create())->id,
+        'type' => 'access', 'item' => 'Private outside item', 'status' => 'pending',
+    ]);
+    $missingId = $outside->id + 10000;
+    $ids = [$missingId, $pending->id, $blocked->id, $outside->id];
+    $response = $this->actingAs($this->hr)->postJson('/it/provisioning/bulk', ['ids' => $ids, 'action' => 'fulfil'])
+        ->assertOk()->assertJsonPath('result.selected', 4)->assertJsonPath('result.updated', 1)
+        ->assertJsonPath('result.rejected', 3);
+    $items = $response->json('result.items');
+    expect(array_column($items, 'id'))->toBe($ids)
+        ->and(array_column($items, 'status'))->toBe(['unavailable', 'updated', 'blocked', 'unavailable'])
+        ->and($items[0]['message'])->toBe($items[3]['message'])
+        ->and($response->getContent())->not->toContain('Private outside item')
+        ->and($blocked->fresh()->status)->toBe('pending')
+        ->and($outside->events()->count())->toBe(0);
+    foreach ($items as $item) {
+        expect(array_keys($item))->toBe(['id', 'status', 'message']);
+    }
+    $this->postJson('/it/provisioning/bulk', ['ids' => [$pending->id, $pending->id], 'action' => 'fulfil'])
+        ->assertUnprocessable()->assertJsonValidationErrors('ids.0');
+});
+
+test('provisioning bulk rechecks lost actor access between locked item writes', function () {
+    $profile = provBulkProfile($this->site);
+    $first = ItProvisioningRequest::query()->create(['employee_profile_id' => $profile->id, 'type' => 'account', 'item' => 'First', 'status' => 'pending']);
+    $next = ItProvisioningRequest::query()->create(['employee_profile_id' => $profile->id, 'type' => 'account', 'item' => 'Next', 'status' => 'pending']);
+    $permission = Permission::query()->where('key', 'it.manage')->firstOrFail();
+    Event::listen('eloquent.updated: '.ItProvisioningRequest::class, function (ItProvisioningRequest $request) use ($first, $permission): void {
+        if ($request->id === $first->id) {
+            $this->hr->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
+        }
+    });
+    $this->actingAs($this->hr)->postJson('/it/provisioning/bulk', [
+        'ids' => [$first->id, $next->id], 'action' => 'assign', 'assigned_to_user_id' => $this->agent->id,
+    ])->assertOk()->assertJsonPath('result.items.0.status', 'updated')->assertJsonPath('result.items.1.status', 'unavailable');
+    expect($first->fresh()->status)->toBe('in_progress')->and($next->fresh()->status)->toBe('pending')
+        ->and($next->events()->count())->toBe(0);
 });

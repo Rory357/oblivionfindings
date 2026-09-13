@@ -1,0 +1,2 @@
+npm notice run npx
+npm notice run eslint resources/js/components/it/ticket-close-dialog.tsx resources/js/components/it/use-ticket-form-command.tsx resources/js/components/it/__tests__/ticket-close-dialog.test.tsx

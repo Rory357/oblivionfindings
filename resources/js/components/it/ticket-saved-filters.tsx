@@ -50,6 +50,7 @@ export function TicketSavedFilters({
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState<SavedTicketFilterRow | null>(null);
     const [deleteBusy, setDeleteBusy] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!saveOpen) {
@@ -61,7 +62,7 @@ export function TicketSavedFilters({
     const save = (event: FormEvent) => {
         event.preventDefault();
         const cleanName = name.trim();
-        if (!cleanName || !canSave) return;
+        if (!cleanName || !canSave || saving) return;
 
         setSaving(true);
         setNameError(null);
@@ -70,8 +71,18 @@ export function TicketSavedFilters({
             { name: cleanName, filters: currentFilters },
             {
                 preserveScroll: true,
-                onSuccess: () => {
-                    toast.success('Personal ticket filter saved.');
+                onSuccess: (page) => {
+                    const flash = page.props.flash as
+                        | { success?: string; error?: string }
+                        | undefined;
+                    if (!flash?.success || flash.error) {
+                        setNameError(
+                            flash?.error ??
+                                'The save was not confirmed. Review your current saved filters before trying again.',
+                        );
+                        return;
+                    }
+                    toast.success(flash.success);
                     setSaveOpen(false);
                 },
                 onError: (errors) =>
@@ -88,15 +99,35 @@ export function TicketSavedFilters({
     };
 
     const destroy = () => {
-        if (!deleting) return;
+        if (!deleting || deleteBusy) return;
 
         setDeleteBusy(true);
+        setDeleteError(null);
         router.delete(`/it/ticket-filters/${deleting.id}`, {
             preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Personal ticket filter deleted.');
+            onSuccess: (page) => {
+                const flash = page.props.flash as
+                    | { success?: string; error?: string }
+                    | undefined;
+                if (!flash?.success || flash.error) {
+                    setDeleteError(
+                        flash?.error ??
+                            'The deletion was not confirmed. Your selection is retained.',
+                    );
+                    return;
+                }
+                toast.success(flash.success);
                 setDeleting(null);
             },
+            onError: (errors) =>
+                setDeleteError(
+                    Object.values(errors).join(' ') ||
+                        'This filter could not be deleted.',
+                ),
+            onCancel: () =>
+                setDeleteError(
+                    'The connection ended before deletion was confirmed. Review the saved filters before trying again.',
+                ),
             onFinish: () => setDeleteBusy(false),
         });
     };
@@ -174,7 +205,10 @@ export function TicketSavedFilters({
                 )}
             </div>
 
-            <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+            <Dialog
+                open={saveOpen}
+                onOpenChange={(next) => !saving && setSaveOpen(next)}
+            >
                 <DialogContent>
                     <form onSubmit={save}>
                         <DialogHeader>
@@ -192,6 +226,7 @@ export function TicketSavedFilters({
                             <Input
                                 id="saved-ticket-filter-name"
                                 value={name}
+                                disabled={saving}
                                 onChange={(event) =>
                                     setName(event.target.value)
                                 }
@@ -208,6 +243,7 @@ export function TicketSavedFilters({
                             {nameError ? (
                                 <p
                                     id="saved-ticket-filter-error"
+                                    role="alert"
                                     className="text-sm text-destructive"
                                 >
                                     {nameError}
@@ -218,6 +254,7 @@ export function TicketSavedFilters({
                             <Button
                                 type="button"
                                 variant="outline"
+                                disabled={saving}
                                 onClick={() => setSaveOpen(false)}
                             >
                                 Cancel
@@ -251,13 +288,24 @@ export function TicketSavedFilters({
                             views.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    {deleteError && (
+                        <p
+                            role="alert"
+                            className="text-sm text-status-critical"
+                        >
+                            {deleteError}
+                        </p>
+                    )}
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={deleteBusy}>
                             Keep filter
                         </AlertDialogCancel>
                         <AlertDialogAction
                             disabled={deleteBusy}
-                            onClick={destroy}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                destroy();
+                            }}
                         >
                             {deleteBusy ? 'Deleting…' : 'Delete filter'}
                         </AlertDialogAction>

@@ -1,0 +1,100 @@
+{
+  "sources": [
+    {
+      "path": "app/Services/Integration/MailboxResponseBody.php",
+      "sha256": "fa61a2b5a36b692be3b8c5f53987958345a4fc630e87a0a075e3ae020990b098"
+    },
+    {
+      "path": "app/Services/Integration/MailboxProviderHttp.php",
+      "sha256": "ec5baadf86e3832c659e68d61a93b177fc9fa6d140e73bdf1bd7b1102deeb061"
+    },
+    {
+      "path": "app/Services/Integration/Exceptions/MailboxProviderFailure.php",
+      "sha256": "40dc7f3067feeae501781ef660624d2bc6bf94d7354d661e9823a1d41bf32b20"
+    },
+    {
+      "path": "tests/Unit/It/MailboxResponseBodyTest.php",
+      "sha256": "571fe1bf14a9b4755b63af3d84ef34e39b36a4da1e45b1083a70c91734a93caa"
+    },
+    {
+      "path": "tests/Support/It/mailbox-response-server.php",
+      "sha256": "b7cb3dd695a6c51ed4698eb008a6792c6f3b35069f330ad0c8cec1382aa71729"
+    },
+    {
+      "path": "tests/Feature/It/ItMailboxProviderFailureTest.php",
+      "sha256": "ad49ac1f0164ebe85e11437d917270c7b2f4c1469aca69c07a3da2d7aaeec7f1"
+    },
+    {
+      "path": "tests/Feature/It/ItMailboxPollTest.php",
+      "sha256": "d73ca8e0989b91aac855f44f63d2d4d17d8202f5b6688f7ea0da8205ab3f074b"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "DESIGN.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/DESIGN_TOKENS.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LIST_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LOADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/oblivion-loader-01-demo.html",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "unchanged": true
+    }
+  ],
+  "tests": [
+    {
+      "token": "it_ef4a86ec12ec42e0",
+      "passed": 4,
+      "failed": 0,
+      "errors": 1,
+      "assertions": 9,
+      "seconds": 0
+    },
+    {
+      "token": "it_723d2bcbe4cc4659",
+      "passed": 17,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 80,
+      "seconds": 9
+    },
+    {
+      "token": "it_980a3a5360e14b78",
+      "passed": 101,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 705,
+      "seconds": 188
+    }
+  ]
+}

@@ -53,7 +53,20 @@ export default function HandoversIndex({
     const [view, setView] = useState<ViewMode>('cards');
     const [wizardOpen, setWizardOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
-    const [detailId, setDetailId] = useState<number | null>(null);
+    const [detailId, setDetailId] = useState<number | null>(() => {
+        const requested =
+            typeof window === 'undefined'
+                ? null
+                : Number(
+                      new URLSearchParams(window.location.search).get(
+                          'handover',
+                      ),
+                  );
+        return requested &&
+            handovers.some((handover) => handover.id === requested)
+            ? requested
+            : null;
+    });
     const [addClientOpen, setAddClientOpen] = useState(false);
     const [pendingClientId, setPendingClientId] = useState<number | null>(null);
 

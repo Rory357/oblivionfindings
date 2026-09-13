@@ -1,0 +1,53 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/pages/it/knowledge-access.test.tsx (6 tests | 6 failed) 30ms
+     × conceals an open reader when refreshed authorized articles remove it and does not reopen from stale selection 18ms
+     × renders a refreshed authorized publication instead of its previously selected body 2ms
+     × shows mutation controls only for articles whose current capability permits management 2ms
+     × lets a knowledge-only author read current draft content and use author actions without reviewer or ticket controls 3ms
+     × lets a knowledge-only reviewer read and publish without draft editing or author actions 2ms
+     × restricts queue controls and bulk selection to current per-record work capability, including revocation 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > conceals an open reader when refreshed authorized articles remove it and does not reopen from stale selection
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > renders a refreshed authorized publication instead of its previously selected body
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > shows mutation controls only for articles whose current capability permits management
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > lets a knowledge-only author read current draft content and use author actions without reviewer or ticket controls
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > lets a knowledge-only reviewer read and publish without draft editing or author actions
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > restricts queue controls and bulk selection to current per-record work capability, including revocation
+Error: [vitest] No "usePage" export is defined on the "@inertiajs/react" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+vi.mock(import("@inertiajs/react"), async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+ ❯ ItIndex resources/js/pages/it/index.tsx:433:18
+    431|         return false;
+    432|     };
+    433|     const page = usePage();
+       |                  ^
+    434|     const actorId = (page.props.auth as { user?: { id?: number } } | u…
+    435|         ?.user?.id;
+ ❯ Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:20
+ ❯ renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:22
+ ❯ updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:19
+ ❯ beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:18
+ ❯ runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ ❯ performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:22
+ ❯ workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:41
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  6 failed | 6 passed (12)
+   Start at  14:53:26
+   Duration  3.94s (transform 832ms, setup 538ms, import 7.24s, tests 771ms, environment 3.99s)
+

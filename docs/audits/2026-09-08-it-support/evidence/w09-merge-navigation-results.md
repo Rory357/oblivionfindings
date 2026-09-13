@@ -1,0 +1,27 @@
+# W09 canonical navigation and original history
+
+10 September 2026. W09 / B07 / E08. This is one merge lifecycle slice; the complete merge preview, record transfer, related-ticket commands and scoped duplicate suggestions remain open.
+
+## Current source
+
+- `ItTicketMergeService::destinationForViewer` refreshes the actor and every existing merge hop, requires approval and canonical view access at every hop, and returns no destination for a cycle, missing record or inaccessible hop. It does not mutate evidence or reinterpret historical command IDs.
+- `ItTicketController::show` redirects ordinary and Inertia browser navigation to the authorized final survivor. JSON drawer reads retain their actor/record-bound original ID; they receive only an authorized destination. The original record remains readable at `/it/tickets/{ticket}/original`. Its private history requires existing work access; editing controls are disabled. The survivor reached through an old link includes an independently authorized link back to the original record.
+- `ItTicketActivityPresenter` applies counterpart access to merge references and reasons in both the workspace and hub feed. A visible source is not permission to inspect its private destination. Stored events are unchanged.
+- Ticket workspace/header reuse the approved merge banner and existing history/task/approval panels. Original-history tab clicks and native tab URLs retain the original route. No design guide was changed; no viewport resize is planned.
+
+## Verification checkpoints
+
+- First attempted React launch could not read the bundler configuration under the filesystem sandbox; no tests ran. Log: `w09-merge-navigation-ui-initial.txt`.
+- First executable React run: 42 passed / 1 failed / 1 unhandled error. The new navigation assertion had omitted the router spy; this was corrected. Log: `w09-merge-navigation-ui-run.txt`.
+- Corrected React run: **43 passed, 2 files, 11.74s, exit0**. Includes source-history tab/native link, authorized origin link, inaccessible destination explanation and existing drawer/recovery cases. Log: `w09-merge-navigation-ui-final.txt`.
+- Full TypeScript processes17147 and87722 both exit0. Scoped three-file ESLint exit0 (`w09-merge-navigation-eslint-final.txt`). Scoped Pint exit0.
+- Initial isolated PHP process28003, exact token `it_267c4c8baf4f443e`: **42 passed / 1 failed / 43 finished, 958 assertions, exit1**. The older workspace approval-bypass test omitted the now-required resolution code and verification, so validation prevented it reaching the approval assertion. Its fixture now supplies valid evidence and retains the original approval-blocking expectation. The exact initial schema is independently absent in wrapper postflight. Logs: `w09-merge-navigation-php-initial.txt`, token diagnostic JSONL.
+- Final backend process96748, exact token `it_5a707380ae034ffb`: **43 passed / 961 assertions / exit0** with the corrected approval fixture and added old-link section redirect assertion. The reviewed wrapper's independent postflight confirms the exact schema absent. No provider communications.
+- Build28 process66718 **exit0, 4m38s**, entry `app-5s_A4obS.js`, manifest `cdd72acb1f41a16f8da82ca9ee389baa612d52b09c1474fce698d47b9edbdcd4`. Read-only preview fingerprint `9c846b0b64ec9958867ea3235ccca75a25718af0bd9a2696e72ae08b1fd3885a`; all six runtime helpers, all migrations and schema match reviewed Build27. Token `68bc520ebf5d468d` bootstrap82534 exit0, actual browser journeys completed, cleanup39583/postflight exit0: exact schema/root absent. See `w09-browser-build28-results.md` for actual proof and open defects.
+- Browser-discovered merged Reopen affordance fixed in `ItTicketPolicy`; source/history/private projections now deny that action. First affected policy regression10250/token `it_58503cc8f6ab41f9`: **38 passed / 1 failed / 39 finished / 364 assertions, exit1**; exact schema absent. The older merge test expected a redirect refusal from the writer; the corrected policy now rejects earlier with403. Updated its assertion to require403 and no comment/event writes. Final recheck31241/token `it_8ef3726b4a4947c4`: **39 passed / 367 assertions / exit0**, exact schema absent. The browser confirmed no Reopen control after fresh reload. These test groups overlap and must not be summed as distinct coverage.
+
+## Remaining merge work
+
+Merge currently moves comments/watchers but not all attached records and lacks a guarded preview/version acknowledgement. This navigation change does not certify record transfer. Preserve immutable approval parents and task completion evidence; extend canonical owners rather than bypassing their guards with bulk reparenting. Implement the explicit inventory/preview and full command failure/recovery path, source history discovery, related-ticket types and scoped duplicate suggestions. Browser verification must cover actual surviving/original navigation and restricted history using fresh built assets and a disposable environment.
+
+At the final16:41NZ checkpoint all processes and the Build28 disposable environment are finished/removed. Next repair the Build28-discovered W07 acknowledged-note draft/RAM state and W08 approval-pager focus/read-only guidance, then continue the full W09 merge preview/record lifecycle. The goal, W09 and E08 remain open. Design files remain untouched; scoped diff check passed. Initial/final source hashes are preserved in the two `w09-merge-navigation-*-hashes.json` artifacts.

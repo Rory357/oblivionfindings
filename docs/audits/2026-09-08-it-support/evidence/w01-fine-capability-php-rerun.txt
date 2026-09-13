@@ -1,0 +1,74 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_57e7811935da4008",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItKnowledgeCapabilityTest[39m
+  [32;1m✓[39;22m[90m [39m[90mfine knowledge and credential audit grants are admin-only defaults and migration is additive and idempote[39m[90m…[39m [90m232.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma knowledge-only author reaches scoped drafts and owner options without any ticket or provisioning rights[39m[90m   [39m [90m3.53s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma separate knowledge reviewer can publish and retire within current audience but cannot author or restore[39m[90m   [39m [90m2.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge grants preserve full-audience mutation denial and capability revocation returns authorization fai[39m[90m…[39m [90m2.84s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItKnowledgeAccessTest[39m
+  [32;1m✓[39;22m[90m [39m[90mknowledge discovery filters draft bodies and published suggestions to current approved Sites[39m[90m                [39m [90m4.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge service reauthorizes the canonical audience and preserves permitted authoring[39m[90m                     [39m [90m6.53s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly the existing explicit all-Sites capability extends scoped knowledge governance[39m[90m                         [39m [90m0.14s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItKbTest[39m
+  [32;1m✓[39;22m[90m [39m[90man agent creates a KB article with an application-unique slug[39m[90m                                               [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents edit articles and use the governed publish lifecycle while the slug stays stable[39m[90m                     [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mKB authoring requires its explicit grant while deletion is reasoned and draft-only[39m[90m                          [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe knowledge catalogue reaches agents but never a self-service payload[39m[90m                                     [39m [90m4.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpure requesters browse only published articles; agents get the full catalogue instead[39m[90m                       [39m [90m4.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester read is recorded while helpful feedback is one canonical vote per user[39m[90m                          [39m [90m2.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowse endpoints never touch a draft article[39m[90m                                                                [39m [90m0.72s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItServiceOperationsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mservice operations schema records knowledge evidence email delivery and canonical scheduler runs[39m[90m            [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge can only enter managed lifecycle states through lifecycle actions[39m[90m                                 [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge follows review publish and retire lifecycle with ownership scope and evidence[39m[90m                     [39m [90m2.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90msite-scoped and agent-only knowledge never leaks to the wrong requester[39m[90m                                     [39m [90m2.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic ticket replies create visible outbound delivery records and failed mail can be retried[39m[90m               [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery mail-capable IT notification exposes delivery tracking context[39m[90m                                        [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning cancellation mail is visible and can be retried safely[39m[90m                                         [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocal mail acceptance remains distinct from provider delivery and provider events are ordered[39m[90m               [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovider delivery status rejects excessive future skew without poisoning later ordering[39m[90m                     [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthenticated delivery callbacks reject excessive future skew without mutating the delivery[39m[90m                 [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery IT mail type creates a visible delivery and can be retried safely[39m[90m                                     [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe authenticated delivery callback records ordered bounces without exposing other deliveries[39m[90m               [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexisting IT schedules are named once and their runs are recorded from Laravel scheduler events[39m[90m              [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomation completions update the exact run when executions overlap[39m[90m                                         [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmailbox polling records the queued job outcome rather than scheduler dispatch[39m[90m                               [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreports reconcile expanded operations metrics to drill-down filters[39m[90m                                         [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfirst contact resolution includes tickets with internal notes and reconciles to its drill down[39m[90m              [39m [90m2.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbacklog age buckets are half open and never double count boundaries[39m[90m                                         [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup shows an access-safe operations audit for channels automations and configuration gaps[39m[90m                 [39m [90m2.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe automation catalogue remains visible when console routes are not loaded[39m[90m                                 [39m [90m0.66s[39m  
+
+  [90mTests:[39m    [32;1m41 passed[39;22m[90m (591 assertions)[39m
+  [90mDuration:[39m [39m292.90s[39m
+

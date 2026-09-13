@@ -3,7 +3,7 @@ import {
     type SavedTicketFilterRow,
 } from '@/components/it/ticket-saved-filters';
 import { router } from '@inertiajs/react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@inertiajs/react', () => ({
@@ -116,5 +116,37 @@ describe('personal IT ticket filters', () => {
         expect(
             screen.getByText('No personal filters saved yet.'),
         ).toBeVisible();
+    });
+
+    it('retains the proposed name after current permission/filter validation rejects saving', () => {
+        render(
+            <TicketSavedFilters
+                filters={[]}
+                activeId={null}
+                currentFilters={{ view: 'unowned' }}
+                canSave
+                onApply={vi.fn()}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Save current' }));
+        fireEvent.change(screen.getByLabelText('Filter name'), {
+            target: { value: 'My open queue' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Save filter' }));
+        act(() => {
+            vi.mocked(router.post).mock.lastCall?.[2]?.onError?.({
+                filters: 'The selected queue is no longer available.',
+            });
+            vi.mocked(router.post).mock.lastCall?.[2]?.onFinish?.({} as never);
+        });
+        expect(screen.getByLabelText('Filter name')).toHaveValue(
+            'My open queue',
+        );
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'no longer available',
+        );
+        expect(
+            screen.getByRole('button', { name: 'Save filter' }),
+        ).toBeEnabled();
     });
 });

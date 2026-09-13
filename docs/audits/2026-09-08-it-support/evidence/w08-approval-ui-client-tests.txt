@@ -1,0 +1,463 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/ticket-approval-controls.test.tsx (8 tests | 3 failed) 6403ms
+     × requires a named approver, reviews the proposal, and acknowledges only its exact saved command 1824ms
+     × requires current review and explicit version adoption after a stale request without changing the proposal 1631ms
+     × hides private fields on session expiry and rejects a review from another actor 1515ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-approval-controls.test.tsx > approval workspace and governed forms > requires a named approver, reviews the proposal, and acknowledges only its exact saved command
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body
+    data-scroll-locked="1"
+    style="pointer-events: none;"
+  >
+    <span
+      aria-hidden="true"
+      data-aria-hidden="true"
+      data-radix-focus-guard=""
+      style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+      tabindex="0"
+    />
+    <div
+      aria-hidden="true"
+      data-aria-hidden="true"
+    >
+      <div
+        class="space-y-5"
+      >
+        <div
+          class="flex flex-wrap items-center justify-between gap-3"
+        >
+          <div
+            class="flex flex-wrap items-center gap-2"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-shield-check h-4 w-4 text-muted-foreground"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+              />
+              <path
+                d="m9 12 2 2 4-4"
+              />
+            </svg>
+            <span
+              class="text-sm font-semibold"
+            >
+              Manager approval
+            </span>
+            <span
+              class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-warning-bg text-status-warning border-status-warning/30"
+            >
+              Approval needed
+            </span>
+          </div>
+          <div
+            class="flex flex-wrap gap-2"
+          >
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+              data-slot="button"
+            >
+              Request approval
+            </button>
+          </div>
+        </div>
+        <p
+          class="text-sm text-muted-foreground"
+        >
+          No approval request has been recorded. Choose the responsible approver to begin.
+        </p>
+      </div>
+    </div>
+    <div
+      aria-hidden="true"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+      data-aria-hidden="true"
+      data-slot="dialog-overlay"
+      data-state="open"
+      style="pointer-events: auto;"
+    />
+    <div
+      aria-describedby="radix-_r_3_"
+      aria-labelledby="radix-_r_2_"
+      class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+      data-slot="dialog-content"
+      data-state="open"
+      id="radix-_r_1_"
+      role="dialog"
+      style="max-width: min(94vw, 980px); pointer-events: auto;"
+      tabindex="-1"
+    >
+      <h2
+        class="text-lg leading-none font-semibold sr-only"
+        data-slot="dialog-title"
+        id="radix-_r_2_"
+      >
+        Request manager approval
+      </h2>
+      <p
+        class="text-muted-foreground text-sm sr-only"
+        data-slot="dialog-description"
+        id="radix-_r_3_"
+      >
+        Choose responsibility, set the reason and timing, then review this request.
+      </p>
+      <div
+        class="flex min-h-0 overflow-hidden"
+      >
+        <aside
+          class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+          data-wizard-region="rail"
+        >
+          <div
+            class="mb-3 flex items-center gap-2.5"
+          >
+            <span
+              class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+            >
+              <svg
+                class="lucide lucide-shield-check h-5 w-5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3....
+ ❯ resources/js/components/it/__tests__/ticket-approval-controls.test.tsx:136:43
+    134|         );
+    135|         await waitFor(() =>
+    136|             expect(callbacks.onCommitted).toHaveBeenCalledTimes(1),
+       |                                           ^
+    137|         );
+    138|         expect(transport.post).toHaveBeenCalledWith(
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-approval-controls.test.tsx > approval workspace and governed forms > requires current review and explicit version adoption after a stale request without changing the proposal
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body
+    data-scroll-locked="1"
+    style="pointer-events: none;"
+  >
+    <span
+      aria-hidden="true"
+      data-aria-hidden="true"
+      data-radix-focus-guard=""
+      style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+      tabindex="0"
+    />
+    <div
+      aria-hidden="true"
+      data-aria-hidden="true"
+    >
+      <div
+        class="space-y-5"
+      >
+        <div
+          class="flex flex-wrap items-center justify-between gap-3"
+        >
+          <div
+            class="flex flex-wrap items-center gap-2"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-shield-check h-4 w-4 text-muted-foreground"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+              />
+              <path
+                d="m9 12 2 2 4-4"
+              />
+            </svg>
+            <span
+              class="text-sm font-semibold"
+            >
+              Manager approval
+            </span>
+            <span
+              class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-warning-bg text-status-warning border-status-warning/30"
+            >
+              Approval needed
+            </span>
+          </div>
+          <div
+            class="flex flex-wrap gap-2"
+          >
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+              data-slot="button"
+            >
+              Request approval
+            </button>
+          </div>
+        </div>
+        <p
+          class="text-sm text-muted-foreground"
+        >
+          No approval request has been recorded. Choose the responsible approver to begin.
+        </p>
+      </div>
+    </div>
+    <div
+      aria-hidden="true"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+      data-aria-hidden="true"
+      data-slot="dialog-overlay"
+      data-state="open"
+      style="pointer-events: auto;"
+    />
+    <div
+      aria-describedby="radix-_r_37_"
+      aria-labelledby="radix-_r_36_"
+      class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+      data-slot="dialog-content"
+      data-state="open"
+      id="radix-_r_35_"
+      role="dialog"
+      style="max-width: min(94vw, 980px); pointer-events: auto;"
+      tabindex="-1"
+    >
+      <h2
+        class="text-lg leading-none font-semibold sr-only"
+        data-slot="dialog-title"
+        id="radix-_r_36_"
+      >
+        Request manager approval
+      </h2>
+      <p
+        class="text-muted-foreground text-sm sr-only"
+        data-slot="dialog-description"
+        id="radix-_r_37_"
+      >
+        Choose responsibility, set the reason and timing, then review this request.
+      </p>
+      <div
+        class="flex min-h-0 overflow-hidden"
+      >
+        <aside
+          class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+          data-wizard-region="rail"
+        >
+          <div
+            class="mb-3 flex items-center gap-2.5"
+          >
+            <span
+              class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+            >
+              <svg
+                class="lucide lucide-shield-check h-5 w-5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://ww...
+ ❯ resources/js/components/it/__tests__/ticket-approval-controls.test.tsx:303:43
+    301|         );
+    302|         await waitFor(() =>
+    303|             expect(callbacks.onCommitted).toHaveBeenCalledTimes(1),
+       |                                           ^
+    304|         );
+    305|         expect(transport.post.mock.calls[1][1]).toMatchObject({
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-approval-controls.test.tsx > approval workspace and governed forms > hides private fields on session expiry and rejects a review from another actor
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body
+    data-scroll-locked="1"
+    style="pointer-events: none;"
+  >
+    <span
+      aria-hidden="true"
+      data-aria-hidden="true"
+      data-radix-focus-guard=""
+      style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+      tabindex="0"
+    />
+    <div
+      aria-hidden="true"
+      data-aria-hidden="true"
+    >
+      <div
+        class="space-y-5"
+      >
+        <div
+          class="flex flex-wrap items-center justify-between gap-3"
+        >
+          <div
+            class="flex flex-wrap items-center gap-2"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-shield-check h-4 w-4 text-muted-foreground"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+              />
+              <path
+                d="m9 12 2 2 4-4"
+              />
+            </svg>
+            <span
+              class="text-sm font-semibold"
+            >
+              Manager approval
+            </span>
+            <span
+              class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-warning-bg text-status-warning border-status-warning/30"
+            >
+              Approval needed
+            </span>
+          </div>
+          <div
+            class="flex flex-wrap gap-2"
+          >
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+              data-slot="button"
+            >
+              Request approval
+            </button>
+          </div>
+        </div>
+        <p
+          class="text-sm text-muted-foreground"
+        >
+          No approval request has been recorded. Choose the responsible approver to begin.
+        </p>
+      </div>
+    </div>
+    <div
+      aria-hidden="true"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+      data-aria-hidden="true"
+      data-slot="dialog-overlay"
+      data-state="open"
+      style="pointer-events: auto;"
+    />
+    <div
+      aria-describedby="radix-_r_4l_"
+      aria-labelledby="radix-_r_4k_"
+      class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+      data-slot="dialog-content"
+      data-state="open"
+      id="radix-_r_4j_"
+      role="dialog"
+      style="max-width: min(94vw, 980px); pointer-events: auto;"
+      tabindex="-1"
+    >
+      <h2
+        class="text-lg leading-none font-semibold sr-only"
+        data-slot="dialog-title"
+        id="radix-_r_4k_"
+      >
+        Request manager approval
+      </h2>
+      <p
+        class="text-muted-foreground text-sm sr-only"
+        data-slot="dialog-description"
+        id="radix-_r_4l_"
+      >
+        Choose responsibility, set the reason and timing, then review this request.
+      </p>
+      <div
+        class="flex min-h-0 overflow-hidden"
+      >
+        <aside
+          class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+          data-wizard-region="rail"
+        >
+          <div
+            class="mb-3 flex items-center gap-2.5"
+          >
+            <span
+              class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+            >
+              <svg
+                class="lucide lucide-shield-check h-5 w-5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://ww...
+ ❯ resources/js/components/it/__tests__/ticket-approval-controls.test.tsx:363:44
+    361|         );
+    362|         await waitFor(() =>
+    363|             expect(callbacks.onAccessLost).toHaveBeenCalledTimes(1),
+       |                                            ^
+    364|         );
+    365|         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  3 failed | 66 passed (69)
+   Start at  08:46:06
+   Duration  9.62s (transform 713ms, setup 583ms, import 2.49s, tests 8.50s, environment 4.08s)
+

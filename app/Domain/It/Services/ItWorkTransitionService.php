@@ -2,12 +2,17 @@
 
 namespace App\Domain\It\Services;
 
+use App\Domain\It\Data\ItTicketResolutionInput;
 use App\Domain\It\Data\ItTransitionInput;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Enums\ItWorkType;
+use App\Domain\It\Exceptions\ItSettlementBlocked;
 use App\Models\ItTicket;
+use App\Models\ItTicketComment;
 use App\Models\ItTicketEvent;
+use App\Models\User;
 use App\Services\AuditLogger;
+use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -15,6 +20,8 @@ final class ItWorkTransitionService
 {
     public function __construct(
         private readonly ItWorkAccessService $workAccess,
+        private readonly ItTicketVersionService $versions,
+        private readonly ItWorkTaskReadinessService $taskReadiness,
     ) {}
 
     /**
@@ -102,11 +109,44 @@ final class ItWorkTransitionService
     {
         return DB::transaction(function () use ($ticket, $input): ItTicket {
             $locked = ItTicket::query()->whereKey($ticket->getKey())->lockForUpdate()->firstOrFail();
+            $input = $input->withActor($this->versions->currentActor($input->actor, $input->source === 'service_api'));
 
             $from = $this->currentState($locked);
             $to = $input->to->value;
+            $isReopen = $this->isReopening($locked, $input->to);
 
             $this->authorizeActor($locked, $input, $from);
+            $this->versions->assertCurrent($locked, $input->expectedVersion);
+
+            if ($input->to === ItWorkflowState::Closed) {
+                if ($locked->isMerged()) {
+                    throw new DomainException('This ticket was merged and cannot be closed again.');
+                }
+                if ($locked->status === 'closed') {
+                    throw new DomainException('This ticket is already closed.');
+                }
+                $reason = $input->source === 'requester_confirmation'
+                    ? 'Requester confirmed the fix'
+                    : trim($input->reason ?? '');
+                if ($reason === '' || mb_strlen($reason) > 1000) {
+                    throw new DomainException('Record a reason of up to 1000 characters before closing the ticket.');
+                }
+                $input = $input->withReason($reason);
+            }
+
+            if (in_array($input->source, ['reopen', 'legacy_reopen'], true) && ! $isReopen) {
+                throw new DomainException('Only settled work can return through the reopen action.');
+            }
+            if ($isReopen) {
+                if ($locked->isMerged()) {
+                    throw new DomainException('Reopen the surviving ticket instead.');
+                }
+                $reason = trim($input->reason ?? '');
+                if (mb_strlen($reason) < 5 || mb_strlen($reason) > 2000) {
+                    throw new DomainException('Explain what still needs attention in 5 to 2000 characters before reopening the ticket.');
+                }
+                $input = $input->withReason($reason);
+            }
 
             if ($from === $to) {
                 if ($to === ItWorkflowState::Waiting->value
@@ -126,12 +166,16 @@ final class ItWorkTransitionService
             $this->guardSettlement($locked, $input);
 
             $fromStatus = (string) $locked->status;
-            $this->applyState($locked, $input, $targetStatus);
+            $previousResolution = $isReopen
+                    ? $locked->only(['resolution_code', 'resolution_summary', 'resolution_verification'])
+                    : null;
+            $this->applyState($locked, $input, $targetStatus, $isReopen);
             $locked->save();
+            $reopenComment = $isReopen ? $this->recordReopenReason($locked, $input) : null;
 
             ItTicketEvent::record(
                 $locked,
-                $this->eventType($input->source),
+                $isReopen ? 'reopened' : $this->eventType($input->source),
                 $input->actor->id,
                 [
                     'from' => $fromStatus,
@@ -140,6 +184,14 @@ final class ItWorkTransitionService
                     'to_workflow_state' => $to,
                     'reason' => $input->reason,
                     'via' => $input->source,
+                    ...($targetStatus === 'resolved' ? ['resolution' => $locked->only([
+                        'resolution_code', 'resolution_summary', 'resolution_verification',
+                    ])] : []),
+                    ...($previousResolution !== null ? ['previous_resolution' => $previousResolution] : []),
+                    ...($reopenComment !== null ? [
+                        'comment_id' => (int) $reopenComment->id,
+                        'comment_visibility' => $reopenComment->is_internal ? 'internal' : 'public',
+                    ] : []),
                 ],
             );
 
@@ -151,11 +203,57 @@ final class ItWorkTransitionService
                 'to_workflow_state' => $to,
                 'reason' => $input->reason,
                 'source' => $input->source,
-                'resolution_code' => $input->resolutionCode,
+                'resolution_code' => $locked->resolution_code,
                 'application_scope' => 'single_application',
             ]);
 
+            if ($this->requiresPublicResolution($locked, $input)) {
+                $this->recordPublicResolution($locked, $input->actor);
+            }
+
             return $locked->refresh();
+        });
+    }
+
+    /**
+     * The scheduler's candidate list is advisory. Recheck under the same parent
+     * lock as reopen, task and approval commands before making a system close.
+     */
+    public function autoCloseResolved(int $ticketId, CarbonInterface $cutoff, int $days): bool
+    {
+        return DB::transaction(function () use ($ticketId, $cutoff, $days): bool {
+            $ticket = ItTicket::query()->whereKey($ticketId)->lockForUpdate()->first();
+            if (! $ticket || $ticket->isMerged() || $ticket->status !== 'resolved'
+                || $ticket->resolved_at === null || $ticket->resolved_at->greaterThan($cutoff)) {
+                return false;
+            }
+
+            $this->guardRequiredWork($ticket);
+            $from = $this->currentState($ticket);
+            app(ItSlaClockService::class)->synchronize($ticket, now());
+            $ticket->forceFill([
+                'status' => 'closed',
+                'workflow_state' => ItWorkflowState::Closed->value,
+                'closed_at' => now(),
+                'waiting_party' => null,
+                'waiting_reason' => null,
+                'next_action' => null,
+            ])->save();
+
+            ItTicketEvent::record($ticket, 'closed', null, [
+                'via' => 'auto_close', 'after_days' => $days,
+                'from' => 'resolved', 'to' => 'closed',
+                'from_workflow_state' => $from, 'to_workflow_state' => 'closed',
+            ]);
+            AuditLogger::logOrFail('it.ticket.auto_closed', $ticket, [
+                'source' => 'auto_close', 'after_days' => $days,
+                'from_status' => 'resolved', 'to_status' => 'closed',
+                'from_workflow_state' => $from, 'to_workflow_state' => 'closed',
+                'resolution_code' => $ticket->resolution_code,
+                'application_scope' => 'single_application',
+            ], systemActor: true);
+
+            return true;
         });
     }
 
@@ -234,22 +332,37 @@ final class ItWorkTransitionService
     private function authorizeActor(ItTicket $ticket, ItTransitionInput $input, string $from): void
     {
         $requesterReply = $input->source === 'requester_reply'
-            && (int) $ticket->requester_user_id === (int) $input->actor->id
+            && in_array((int) $input->actor->id, [(int) $ticket->requester_user_id, (int) $ticket->requested_for_user_id], true)
+            && $this->workAccess->canView($input->actor, $ticket)
             && $from === ItWorkflowState::Waiting->value
             && $input->to === ItWorkflowState::InProgress;
 
         $requesterReopen = in_array($input->source, ['reopen', 'legacy_reopen'], true)
+            && $this->isReopening($ticket, $input->to)
             && $input->actor->can('reopen', $ticket);
+
+        $requesterConfirmation = $input->source === 'requester_confirmation'
+            && $input->to === ItWorkflowState::Closed
+            && $input->actor->can('confirmResolution', $ticket);
+
+        if ($input->source === 'requester_confirmation' && ! $requesterConfirmation) {
+            throw new DomainException('Only the requester can confirm this resolved ticket.');
+        }
 
         if (! $requesterReply
             && ! $requesterReopen
-            && ! $this->workAccess->canWork($input->actor, $ticket)) {
+            && ! $requesterConfirmation
+            && ! $this->workAccess->canWork($input->actor, $ticket, $input->source === 'service_api')) {
             throw new DomainException('The actor is not allowed to transition this work item.');
         }
     }
 
     private function isAllowed(ItTicket $ticket, ItTransitionInput $input, string $from, string $to): bool
     {
+        if ($input->source === 'requester_confirmation') {
+            return $ticket->status === 'resolved' && $to === 'closed';
+        }
+
         if ($input->source === 'requester_reply') {
             return $from === 'waiting' && $to === 'in_progress';
         }
@@ -329,25 +442,61 @@ final class ItWorkTransitionService
             return;
         }
 
-        if ($ticket->requires_approval && $ticket->approvalState() !== 'approved') {
-            throw new DomainException('Required approval must be approved before settlement.');
-        }
-
-        if ($ticket->tasks()->where('is_required', true)->where('status', '!=', 'completed')->exists()) {
-            throw new DomainException('All required tasks must be completed before settlement.');
-        }
+        // A requester can confirm without gaining access to the private task
+        // graph. The internal gate is identical to automatic closure's gate.
+        $this->guardRequiredWork($ticket, $input->source === 'requester_confirmation' ? null : $input->actor);
 
         $requiresResolutionEvidence = $input->to !== ItWorkflowState::Closed;
         if ($requiresResolutionEvidence
             && (blank($input->resolutionCode) || blank($input->resolutionSummary))) {
             throw new DomainException('A resolution code and summary are required before settlement.');
         }
+        if ($this->requiresPublicResolution($ticket, $input)) {
+            ItTicketResolutionInput::normalize([
+                'resolution_code' => $input->resolutionCode,
+                'note' => $input->resolutionSummary,
+                'resolution_verification' => $input->resolutionVerification,
+            ]);
+        }
     }
 
-    private function applyState(ItTicket $ticket, ItTransitionInput $input, string $targetStatus): void
+    private function guardRequiredWork(ItTicket $ticket, ?User $actor = null): void
     {
+        if ($ticket->requires_approval && $ticket->approvalState() !== 'approved') {
+            throw new ItSettlementBlocked('Required approval must be approved before settlement.', (int) $ticket->id, 'approval', $ticket->approvals()->latest('id')->value('id'));
+        }
+
+        if ($unfinished = $ticket->tasks()->where('is_required', true)->where('status', '!=', 'completed')->orderBy('sort_order')->orderBy('id')->first()) {
+            throw new ItSettlementBlocked('All required tasks must be completed before settlement. Review task “'.$unfinished->title.'”.', (int) $ticket->id, 'task', (int) $unfinished->id);
+        }
+        if ($ticket->tasks()->where('is_required', true)->exists()) {
+            $work = $actor === null
+                ? $this->taskReadiness->forSettlement($ticket)
+                : $this->taskReadiness->forTicket($ticket, $actor, lock: true);
+            foreach ($work['tasks']->where('is_required', true) as $task) {
+                $verdict = $work['verdicts'][$task->id];
+                if ($verdict['completion'] === 'invalid') {
+                    throw new ItSettlementBlocked('Required task evidence is no longer current. Review task “'.$task->title.'” in Tasks & evidence before resolving this ticket.', (int) $ticket->id, 'task', (int) $task->id);
+                }
+                // Missing legacy provenance remains explicitly unknown. The
+                // separately reviewed legacy policy must not be inferred here.
+            }
+        }
+
+    }
+
+    /** Post-implementation reviews continue the existing lifecycle, without reopening it. */
+    private function isReopening(ItTicket $ticket, ItWorkflowState $to): bool
+    {
+        return in_array((string) $ticket->status, ['resolved', 'closed'], true)
+            && ! in_array($this->normalizedStatus($to), ['resolved', 'closed'], true)
+            && $to !== ItWorkflowState::Review;
+    }
+
+    private function applyState(ItTicket $ticket, ItTransitionInput $input, string $targetStatus, bool $isReopen): void
+    {
+        app(ItSlaClockService::class)->synchronize($ticket, now());
         $wasSettled = in_array((string) $ticket->status, ['resolved', 'closed'], true);
-        $isReopen = in_array($input->source, ['reopen', 'legacy_reopen'], true);
 
         if ($targetStatus === 'waiting') {
             if ($ticket->status !== 'waiting') {
@@ -374,15 +523,15 @@ final class ItWorkTransitionService
             ItWorkflowState::Fulfilled,
             ItWorkflowState::Completed,
         ], true)) {
+            $evidence = $this->requiresPublicResolution($ticket, $input) ? ItTicketResolutionInput::normalize([
+                'resolution_code' => $input->resolutionCode,
+                'note' => $input->resolutionSummary,
+                'resolution_verification' => $input->resolutionVerification,
+            ]) : null;
             $ticket->resolved_at = now();
-            $ticket->resolution_code = $input->resolutionCode;
-            $ticket->resolution_summary = $input->resolutionSummary;
-            $ticket->first_responded_at ??= now();
-
-            if ($ticket->resolution_due_at
-                && now()->lte($ticket->resolution_due_at->copy()->addMinutes((int) $ticket->sla_paused_minutes))) {
-                $ticket->sla_state = 'met';
-            }
+            $ticket->resolution_code = $evidence['resolution_code'] ?? $input->resolutionCode;
+            $ticket->resolution_summary = $evidence['note'] ?? $input->resolutionSummary;
+            $ticket->resolution_verification = $evidence['resolution_verification'] ?? $input->resolutionVerification;
         }
 
         if ($input->to === ItWorkflowState::Closed) {
@@ -394,15 +543,89 @@ final class ItWorkTransitionService
             $ticket->closed_at = null;
             $ticket->resolution_code = null;
             $ticket->resolution_summary = null;
+            $ticket->resolution_verification = null;
             $ticket->reopened_count = (int) $ticket->reopened_count + 1;
-            $ticket->sla_state = 'ok';
+            if (ItTicket::hasConversationEvidence()) {
+                $ticket->next_response_party = 'it';
+            }
         }
+        app(ItSlaClockService::class)->synchronize($ticket, now());
+    }
+
+    /** Every reopen route records one reason under the canonical parent lock. */
+    private function recordReopenReason(ItTicket $ticket, ItTransitionInput $input): ItTicketComment
+    {
+        $isRequester = (int) $ticket->requester_user_id === (int) $input->actor->id;
+        $comment = $ticket->comments()->create([
+            'author_user_id' => $input->actor->id,
+            'body' => $input->reason,
+            'is_internal' => ! $isRequester,
+            ...(ItTicket::hasConversationEvidence() ? [
+                'speaker_side' => $isRequester ? 'requester' : 'it',
+                'source_channel' => $input->channel?->value ?? (in_array($input->source, ['legacy_reopen', 'workspace'], true) ? 'browser' : null),
+            ] : []),
+        ]);
+        if (ItTicket::hasConversationEvidence() && $isRequester) {
+            $ticket->forceFill([
+                'last_public_comment_id' => $comment->id,
+                'last_public_commented_at' => $comment->created_at,
+                'last_public_speaker_side' => 'requester',
+                'next_response_party' => 'it',
+            ])->save();
+        }
+        AuditLogger::logOrFail('it.ticket.reopened', $ticket, [
+            'actor_id' => $input->actor->id,
+            'comment_id' => $comment->id,
+            'comment_visibility' => $isRequester ? 'public' : 'internal',
+            'reason_recorded' => true,
+            'source' => $input->source,
+            'application_scope' => 'single_application',
+        ]);
+
+        return $comment;
+    }
+
+    private function requiresPublicResolution(ItTicket $ticket, ItTransitionInput $input): bool
+    {
+        return in_array($input->to, [ItWorkflowState::Resolved, ItWorkflowState::Fulfilled], true)
+            && ($input->source === 'legacy_resolve' || in_array($ticket->work_type, [
+                ItWorkType::Incident->value, ItWorkType::ServiceRequest->value, ItWorkType::SecurityRequest->value,
+            ], true));
+    }
+
+    /** Shared by the public Resolve action and generic ticket settlement. */
+    private function recordPublicResolution(ItTicket $ticket, User $actor): void
+    {
+        $requesterSide = in_array((int) $actor->id, [(int) $ticket->requester_user_id, (int) $ticket->requested_for_user_id], true);
+        $comment = $ticket->comments()->create([
+            'author_user_id' => $actor->id,
+            'body' => $ticket->resolution_summary."\n\nHow it was checked: ".$ticket->resolution_verification,
+            'is_internal' => false,
+            ...(ItTicket::hasConversationEvidence() ? ['speaker_side' => $requesterSide ? 'requester' : 'it', 'source_channel' => 'browser'] : []),
+        ]);
+        if (ItTicket::hasConversationEvidence()) {
+            $ticket->forceFill([
+                'last_public_comment_id' => $comment->id, 'last_public_commented_at' => $comment->created_at,
+                'last_public_speaker_side' => $comment->speaker_side, 'next_response_party' => $requesterSide ? 'it' : 'requester',
+            ])->save();
+        }
+        if ($ticket->first_responded_at === null && ! $requesterSide) {
+            $ticket->first_responded_at = $comment->created_at;
+            app(ItSlaClockService::class)->synchronize($ticket, now());
+            $ticket->save();
+            ItTicketEvent::record($ticket, 'first_response_recorded', $actor->id, ['comment_id' => $comment->id]);
+        }
+        AuditLogger::logOrFail('it.ticket.resolved', $ticket, [
+            'actor_id' => $actor->id, 'comment_id' => $comment->id, 'resolution_code' => $ticket->resolution_code,
+            'public_resolution_recorded' => true, 'verification_recorded' => true, 'application_scope' => 'single_application',
+        ]);
     }
 
     private function eventType(string $source): string
     {
         return match ($source) {
             'legacy_resolve' => 'resolved',
+            'requester_confirmation' => 'resolution_confirmed',
             'legacy_close', 'bulk_close' => 'closed',
             'legacy_reopen' => 'reopened',
             'legacy_status', 'bulk_status', 'requester_reply' => 'status_changed',

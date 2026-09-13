@@ -1,0 +1,58 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItAutomationRunOutcome.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Domain/It/Services/ItAutomationOperationsPresenter.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Domain/It/Services/ItAutomationScheduleCatalog.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Domain/It/Services/ItAutomationFreshnessService.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Feature/It/ItServiceOperationsTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Feature/It/ItMailboxPagingTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "resources/js/components/it/it-automation-history.tsx",
+    "unchanged": true
+  },
+  {
+    "path": "resources/js/components/it/it-automation-history.test.tsx",
+    "unchanged": true
+  },
+  {
+    "path": "resources/js/components/it/it-service-operations.tsx",
+    "unchanged": true
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w13-api-browser-fixture.php",
+    "unchanged": true
+  },
+  {
+    "path": "resources/js/components/ui/laravel-pagination.tsx",
+    "unchanged": true
+  },
+  {
+    "path": "resources/js/pages/it/setup/index.tsx",
+    "unchanged": true
+  },
+  {
+    "path": "resources/js/pages/it/setup/setup-workspace.test.tsx",
+    "unchanged": true
+  }
+]

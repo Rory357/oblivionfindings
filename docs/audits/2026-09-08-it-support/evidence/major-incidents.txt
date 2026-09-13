@@ -1,0 +1,42 @@
+IT & Support
+Major incidents
+IT COMMAND
+Major incidents
+
+Coordinate technical response, link operational impact, and publish audience-safe updates from one accountable command record.
+
+Declare major incident
+Search major incidents
+Severity
+All
+Sev1
+Sev2
+Sev3
+Sev4
+Command state
+All
+Declared
+Responding
+Monitoring
+Restored
+Resolved
+Review
+Closed
+Apply filters
+Command register
+
+1 accountable records
+
+SEV2
+Declared
+Update overdue
+IT-000004
+E2E regional connectivity outage
+
+Multiple sites cannot reach centrally hosted services.
+
+COMMANDER
+Demo Admin
+COMMUNICATIONS
+Demo Admin
+Next update 10 Aug 2026, 12:31 am

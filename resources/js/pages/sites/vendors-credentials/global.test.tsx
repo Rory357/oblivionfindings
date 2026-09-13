@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the app shell so the page renders without the full sidebar/layout tree.
 vi.mock('@/layouts/app-layout', () => ({
@@ -120,28 +120,31 @@ const baseProps = {
         vendorsManage: true,
         credentialsManage: true,
         credentialsReveal: true,
+        credentialsAudit: true,
         manageCredentialTypes: true,
     },
 };
 
 describe('GlobalVendorsCredentials', () => {
+    afterEach(() => vi.unstubAllGlobals());
     it('renders the hero, health strip and vendor table without crashing', () => {
         render(<GlobalVendorsCredentials {...baseProps} />);
 
-        // Personalised hero greeting + scope.
-        expect(screen.getByText(/Kia ora Rangi/)).toBeInTheDocument();
+        expect(
+            screen.getByRole('heading', { name: 'Vendors & Credentials' }),
+        ).toBeInTheDocument();
         // Default (vendors) tab table + row.
         expect(screen.getByText('Service providers')).toBeInTheDocument();
         expect(screen.getByText('Capital Plumbing & Gas')).toBeInTheDocument();
         // Health strip zones.
-        expect(screen.getByText('Credential health')).toBeInTheDocument();
-        expect(screen.getByText('Vendor coverage')).toBeInTheDocument();
+        expect(screen.getByText('Vault health')).toBeInTheDocument();
+        expect(screen.getByText('Rotation due')).toBeInTheDocument();
     });
 
     it('switches to the credentials tab and shows rotation health', () => {
         render(<GlobalVendorsCredentials {...baseProps} />);
 
-        fireEvent.click(screen.getByRole('button', { name: /Credentials/ }));
+        fireEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
 
         expect(screen.getByText('Access vault')).toBeInTheDocument();
         expect(screen.getByText('Front Door Smart Lock')).toBeInTheDocument();
@@ -175,5 +178,61 @@ describe('GlobalVendorsCredentials', () => {
         // Read-first detail dialog shows contact affordances + Edit action.
         expect(await screen.findByText('Call now')).toBeInTheDocument();
         expect(screen.getByText('Preferred method')).toBeInTheDocument();
+    });
+
+    it('offers history to an auditor without reveal rights and conceals it immediately after grant revocation', async () => {
+        const fetchAudit = vi
+            .fn()
+            .mockResolvedValue({ ok: true, json: async () => ({ logs: [] }) });
+        vi.stubGlobal('fetch', fetchAudit);
+        const auditorCan = {
+            ...baseProps.can,
+            vendorsManage: false,
+            credentialsManage: false,
+            credentialsReveal: false,
+            credentialsAudit: true,
+            manageCredentialTypes: false,
+        };
+        const { rerender } = render(
+            <GlobalVendorsCredentials {...baseProps} can={auditorCan} />,
+        );
+        fireEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
+        fireEvent.click(screen.getByText('Front Door Smart Lock'));
+        expect(
+            screen.getByRole('button', { name: 'Re-authenticate & reveal' }),
+        ).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Reveal history' }));
+        expect(await screen.findByText('Reveal & audit log')).toBeVisible();
+        expect(fetchAudit).toHaveBeenCalledWith(
+            expect.stringContaining('/vendors/audit'),
+            expect.objectContaining({ signal: expect.any(AbortSignal) }),
+        );
+        rerender(
+            <GlobalVendorsCredentials
+                {...baseProps}
+                can={{ ...auditorCan, credentialsAudit: false }}
+            />,
+        );
+        expect(
+            screen.queryByText('Reveal & audit log'),
+        ).not.toBeInTheDocument();
+        expect(
+            (fetchAudit.mock.calls[0][1] as { signal: AbortSignal }).signal
+                .aborted,
+        ).toBe(true);
+    });
+
+    it('does not offer history solely because an actor can reveal credentials', () => {
+        render(
+            <GlobalVendorsCredentials
+                {...baseProps}
+                can={{ ...baseProps.can, credentialsAudit: false }}
+            />,
+        );
+        fireEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
+        fireEvent.click(screen.getByText('Front Door Smart Lock'));
+        expect(
+            screen.queryByRole('button', { name: 'Reveal history' }),
+        ).not.toBeInTheDocument();
     });
 });

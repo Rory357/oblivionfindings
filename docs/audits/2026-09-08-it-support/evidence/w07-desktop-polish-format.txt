@@ -1,0 +1,7 @@
+npm notice run npx
+npm notice run prettier --write resources/js/components/page/page-header.tsx resources/js/components/it/ticket-workspace-header.tsx resources/js/pages/it/setup/index.tsx
+resources/js/components/page/page-header.tsx 562ms
+[error] Unable to write file "resources/js/components/page/page-header.tsx":
+[error] UNKNOWN: unknown error, open 'C:\Users\steph\Herd\oblivionfindings\resources\js\components\page\page-header.tsx'
+resources/js/components/it/ticket-workspace-header.tsx 67ms (unchanged)
+resources/js/pages/it/setup/index.tsx 181ms (unchanged)

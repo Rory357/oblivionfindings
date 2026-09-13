@@ -1,5 +1,6 @@
+import HandoverPersonNotes from '@/components/handover-person-notes';
 /* Handover detail pop-up — full record with flow, lists, audit trail + actions. */
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import {
@@ -10,7 +11,6 @@ import {
     ClipboardCheck,
     Clock,
     FileText,
-    Home,
     ListChecks,
     Pill,
     Send,
@@ -149,32 +149,11 @@ function TimelineRow({
 }
 
 function lockNote(h: Handover) {
-    const { reason, days_left, age_days } = h.lock;
-    if (reason === 'window_closed')
-        return {
-            icon: ShieldAlert,
-            critical: true,
-            text: `Edit window closed${age_days != null ? ` (${age_days} days old)` : ''} — only managers can edit.`,
-        };
     if (h.status === 'draft')
-        return {
-            icon: FileText,
-            critical: false,
-            text: 'Draft — visible only to the outgoing worker until submitted.',
-        };
-    if (reason === 'within_window' && days_left != null)
-        return {
-            icon: Clock,
-            critical: false,
-            text: `Staff can edit for ${days_left} more day${days_left === 1 ? '' : 's'}.`,
-        };
-    if (reason === 'manager')
-        return {
-            icon: UserCheck,
-            critical: false,
-            text: 'Manager access — editable anytime.',
-        };
-    return null;
+        return 'Saved draft. It has not been sent to the next worker.';
+    if (h.status === 'acknowledged')
+        return 'The incoming worker has acknowledged this handover.';
+    return 'Sent to the incoming shift. The submitted record is kept unchanged.';
 }
 
 /** Inline Inertia link for an entity name/label inside the detail body. Renders
@@ -215,7 +194,7 @@ function OptionLink({
     return (
         <Link
             href={href}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
         >
             <Icon className="h-3.5 w-3.5" />
             {children}
@@ -247,6 +226,10 @@ export function HandoverDetailDialog({
      *  the eMAR side). Operations leaves it false. */
     emarLens?: boolean;
 }) {
+    const [section, setSection] = useState(0);
+    useEffect(() => {
+        setSection(0);
+    }, [open, handover?.id]);
     const [snapshot, setSnapshot] = useState<ShiftMedSnapshot | null>(null);
     const [snapLoading, setSnapLoading] = useState(false);
     const shiftId = handover?.outgoing_shift?.id ?? null;
@@ -287,432 +270,422 @@ export function HandoverDetailDialog({
     );
     const note = lockNote(h);
 
+    const needsIncoming = h.status === 'draft' && !h.incoming_shift;
+    const editable = h.can_edit && !h.edit_lock;
+    const sections = [
+        {
+            key: 'notes',
+            label: 'Shift notes',
+            blurb: 'People, site and follow-up',
+            icon: FileText,
+        },
+        {
+            key: 'next',
+            label: 'Next worker',
+            blurb: 'Who this handover goes to',
+            icon: Users,
+        },
+        {
+            key: 'history',
+            label: 'History and links',
+            blurb: 'Saved, sent and read',
+            icon: Activity,
+        },
+    ];
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[720px]">
-                {/* Header */}
-                <div className="flex items-start gap-3 border-b border-border px-5 py-4">
-                    <HueAvatar name={clientName(h.client)} size={44} />
-                    <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <DialogTitle className="text-base font-bold">
-                                {clientName(h.client)}
-                            </DialogTitle>
-                            <StatusPill status={h.status} />
-                            {h.lock.locked ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2 py-0.5 text-[11px] font-semibold text-status-critical">
-                                    <ShieldAlert className="h-3 w-3" />
-                                    Locked · manager only
-                                </span>
+        <WizardShell
+            open={open}
+            onClose={() => onOpenChange(false)}
+            title="Shift handover"
+            description="Read each person's notes, check who receives the handover, and review its history."
+            railIcon={FileText}
+            railTitle="Shift handover"
+            railSub={h.site?.name ?? 'Your shift'}
+            steps={sections}
+            stepIndex={section}
+            onStepClick={setSection}
+            headerLabel={sections[section].label}
+            pct={null}
+            railExtra={
+                <div className="space-y-3 text-sm">
+                    <StatusPill status={h.status} />
+                    <p className="text-muted-foreground">{note}</p>
+                    {needsIncoming && (
+                        <p className="text-status-warning">
+                            Choose an incoming shift before sending.
+                        </p>
+                    )}
+                </div>
+            }
+            footerStart={
+                <GuardrailButton
+                    variant="outline"
+                    className="min-h-11"
+                    onClick={() => onOpenChange(false)}
+                >
+                    Close
+                </GuardrailButton>
+            }
+            footerEnd={
+                <>
+                    {editable && (
+                        <GuardrailButton
+                            variant={needsIncoming ? 'default' : 'outline'}
+                            className="min-h-11"
+                            onClick={() => onEdit(h)}
+                        >
+                            <FileText />
+                            {needsIncoming
+                                ? 'Choose incoming shift'
+                                : 'Edit handover'}
+                        </GuardrailButton>
+                    )}
+                    {h.status === 'draft' &&
+                        h.can_submit &&
+                        !needsIncoming &&
+                        !h.edit_lock && (
+                            <GuardrailButton
+                                className="min-h-11"
+                                onClick={() => onSubmit(h)}
+                            >
+                                <Send />
+                                Send handover
+                            </GuardrailButton>
+                        )}
+                    {h.status === 'submitted' && h.can_acknowledge && (
+                        <GuardrailButton
+                            className="min-h-11"
+                            onClick={() => onAcknowledge(h)}
+                        >
+                            <Check />
+                            I've read this handover
+                        </GuardrailButton>
+                    )}
+                </>
+            }
+        >
+            <WizardStepPane key={`${h.id}-${section}`}>
+                <div className="mb-4 border-b border-border pb-4 text-sm text-muted-foreground">
+                    {handoverDate(h).toLocaleDateString('en-NZ', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                    })}
+                    {h.outgoing_shift && (
+                        <span> · {fmtShiftRange(h.outgoing_shift)}</span>
+                    )}
+                </div>
+                {section === 0 && (
+                    <div className="space-y-4">
+                        {/* Narrative */}
+                        <HandoverPersonNotes notes={h.worker_notes} />
+                        {!h.worker_notes && (
+                            <div>
+                                <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
+                                    <FileText className="h-3.5 w-3.5" />
+                                    Notes for {clientName(h.client)}
+                                </div>
+                                <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">
+                                    {h.handover_notes || 'No notes recorded.'}
+                                </p>
+                            </div>
+                        )}
+
+                        {medicationSnapshotUrl ? (
+                            <ShiftMedSummary
+                                snapshot={snapshot}
+                                loading={snapLoading}
+                                hasShift={!!h.outgoing_shift}
+                            />
+                        ) : null}
+
+                        {h.cd_verification ? (
+                            <div
+                                className={cn(
+                                    'rounded-xl border p-3.5',
+                                    h.cd_verification.result === 'discrepancy'
+                                        ? 'border-status-critical/30 bg-status-critical-bg/50'
+                                        : 'border-status-success/30 bg-status-success-bg/50',
+                                )}
+                            >
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span
+                                        className={cn(
+                                            'flex h-6 w-6 items-center justify-center rounded-md',
+                                            h.cd_verification.result ===
+                                                'discrepancy'
+                                                ? 'bg-status-critical-bg text-status-critical'
+                                                : 'bg-status-success-bg text-status-success',
+                                        )}
+                                    >
+                                        {h.cd_verification.result ===
+                                        'discrepancy' ? (
+                                            <ShieldAlert className="h-3.5 w-3.5" />
+                                        ) : (
+                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                        )}
+                                    </span>
+                                    <span className="text-[13px] font-semibold">
+                                        Controlled-drug count{' '}
+                                        {h.cd_verification.result ===
+                                        'discrepancy'
+                                            ? '— discrepancy found'
+                                            : 'verified'}
+                                    </span>
+                                    <Link
+                                        href="/emar/controlled"
+                                        className="ml-auto text-[12px] font-semibold text-primary hover:underline"
+                                    >
+                                        CD register
+                                    </Link>
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">
+                                    {h.cd_verification.witness_name ? (
+                                        <span>
+                                            Witness:{' '}
+                                            <b className="text-foreground">
+                                                {h.cd_verification.witness_name}
+                                            </b>
+                                        </span>
+                                    ) : null}
+                                    {h.cd_verification.verified_by_name ? (
+                                        <span>
+                                            Checked by{' '}
+                                            {h.cd_verification.verified_by_name}
+                                        </span>
+                                    ) : null}
+                                    {h.cd_verification.verified_at ? (
+                                        <span>
+                                            {formatDate(
+                                                h.cd_verification.verified_at,
+                                            )}{' '}
+                                            {fmtTime(
+                                                h.cd_verification.verified_at,
+                                            )}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                {h.cd_verification.notes ? (
+                                    <p className="mt-1.5 text-[12.5px] leading-snug">
+                                        {h.cd_verification.notes}
+                                    </p>
+                                ) : null}
+                            </div>
+                        ) : null}
+
+                        <DetailList
+                            icon={Pill}
+                            tone="critical"
+                            title="Medications due"
+                            items={h.medications_due}
+                        />
+                        <DetailList
+                            icon={ShieldAlert}
+                            tone="critical"
+                            title="Incidents to note"
+                            items={h.incidents_to_note}
+                        />
+                        <DetailList
+                            icon={ListChecks}
+                            tone="primary"
+                            title="Follow-up items"
+                            items={h.follow_up_items}
+                        />
+                        <DetailList
+                            icon={ClipboardCheck}
+                            tone="warning"
+                            title="Tasks pending"
+                            items={h.tasks_pending}
+                        />
+                    </div>
+                )}
+                {section === 1 && (
+                    <div className="space-y-4">
+                        {/* Flow */}
+                        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                            {out ? (
+                                <div className="flex items-center gap-2">
+                                    <HueAvatar name={out.name} size={38} />
+                                    <div className="leading-tight">
+                                        <EntityLink
+                                            href={`/staff/${out.id}`}
+                                            className="block text-[13px] font-bold"
+                                        >
+                                            {out.name}
+                                        </EntityLink>
+                                        <div className="text-[11px] text-muted-foreground">
+                                            Outgoing
+                                            {humanizeRole(out.role)
+                                                ? ` · ${humanizeRole(out.role)}`
+                                                : ''}
+                                        </div>
+                                    </div>
+                                </div>
                             ) : null}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
-                            {h.site ? (
-                                <span className="inline-flex items-center gap-1">
-                                    <Home className="h-3 w-3" />
-                                    {h.site.name}
+                            <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                            {inc ? (
+                                <div className="flex items-center gap-2">
+                                    <HueAvatar name={inc.name} size={38} />
+                                    <div className="leading-tight">
+                                        <EntityLink
+                                            href={`/staff/${inc.id}`}
+                                            className="block text-[13px] font-bold"
+                                        >
+                                            {inc.name}
+                                        </EntityLink>
+                                        <div className="text-[11px] text-muted-foreground">
+                                            Incoming
+                                            {humanizeRole(inc.role)
+                                                ? ` · ${humanizeRole(inc.role)}`
+                                                : ''}
+                                            {h.incoming_shift
+                                                ? ` · ${h.incoming_shift.label} ${fmtShiftRange(h.incoming_shift)}`
+                                                : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-status-warning/50 bg-status-warning-bg px-2.5 py-1 text-[11px] font-semibold text-status-warning">
+                                    <ShieldAlert className="h-3.5 w-3.5" />
+                                    Incoming shift open — needs cover
                                 </span>
+                            )}
+                            <span className="ml-auto">
+                                <MoodChip mood={h.client_mood} />
+                            </span>
+                        </div>
+
+                        {immutableRecipientEvidence ? (
+                            <div className="grid gap-2 rounded-xl border border-border bg-muted/20 px-4 py-3 text-[12px] sm:grid-cols-2">
+                                <div>
+                                    <div className="font-semibold text-muted-foreground">
+                                        Submitted recipient
+                                    </div>
+                                    <div className="mt-0.5 font-medium">
+                                        {submittedRecipient?.name ??
+                                            'Not recorded'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="font-semibold text-muted-foreground">
+                                        Current acknowledgement assignee
+                                    </div>
+                                    <div className="mt-0.5 font-medium">
+                                        {currentAcknowledgementAssignee?.name ??
+                                            'No worker currently assigned'}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {emarLens ? (
+                            <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-[11.5px] text-muted-foreground">
+                                <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                                Same shift-handover record as{' '}
+                                <Link
+                                    href="/operations/handovers"
+                                    className="font-semibold text-primary hover:underline"
+                                >
+                                    Operations handovers
+                                </Link>{' '}
+                                — the eMAR view focuses on the medication slice;
+                                concurrent edits are version-locked.
+                            </div>
+                        ) : null}
+
+                        {h.edit_lock ? (
+                            <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-status-warning/30 bg-status-warning-bg/60 px-3 py-2 text-[12px] font-medium text-status-warning">
+                                <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+                                Being edited by {h.edit_lock.held_by_name} —
+                                editing is disabled here to avoid a conflict.
+                            </div>
+                        ) : null}
+                    </div>
+                )}
+                {section === 2 && (
+                    <div className="space-y-5">
+                        {/* Audit trail */}
+                        <div>
+                            <div className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
+                                <Activity className="h-3.5 w-3.5" />
+                                Audit trail
+                            </div>
+                            <div className="divide-y divide-border">
+                                <TimelineRow
+                                    icon={FileText}
+                                    tone="muted"
+                                    label="Created"
+                                    who={out?.name ?? 'Unknown'}
+                                    iso={h.created_at}
+                                />
+                                <TimelineRow
+                                    icon={Send}
+                                    tone="warning"
+                                    label="Submitted"
+                                    who={
+                                        h.submitted_at
+                                            ? (out?.name ?? 'Outgoing worker')
+                                            : 'Not yet submitted'
+                                    }
+                                    iso={h.submitted_at}
+                                />
+                                <TimelineRow
+                                    icon={CheckCircle2}
+                                    tone="success"
+                                    label="Acknowledged"
+                                    who={
+                                        h.acknowledger?.name ??
+                                        'Awaiting acknowledgement'
+                                    }
+                                    iso={h.acknowledged_at}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {h.client ? (
+                                <OptionLink
+                                    href={`/operations/clients/${h.client.id}`}
+                                    icon={User}
+                                >
+                                    View client
+                                </OptionLink>
                             ) : null}
                             {h.outgoing_shift ? (
-                                <EntityLink
+                                <OptionLink
                                     href={`/operations/shifts/${h.outgoing_shift.id}`}
-                                    className="inline-flex items-center gap-1"
+                                    icon={Clock}
                                 >
-                                    <Clock className="h-3 w-3" />
-                                    {h.outgoing_shift.label} ·{' '}
-                                    {fmtShiftRange(h.outgoing_shift)}
-                                </EntityLink>
+                                    View shift
+                                </OptionLink>
                             ) : null}
-                            <span className="inline-flex items-center gap-1">
-                                <Activity className="h-3 w-3" />
-                                {handoverDate(h).toLocaleDateString('en-NZ', {
-                                    weekday: 'long',
-                                    day: 'numeric',
-                                    month: 'long',
-                                })}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Body */}
-                <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-                    {/* Flow */}
-                    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
-                        {out ? (
-                            <div className="flex items-center gap-2">
-                                <HueAvatar name={out.name} size={38} />
-                                <div className="leading-tight">
-                                    <EntityLink
-                                        href={`/staff/${out.id}`}
-                                        className="block text-[13px] font-bold"
-                                    >
-                                        {out.name}
-                                    </EntityLink>
-                                    <div className="text-[11px] text-muted-foreground">
-                                        Outgoing
-                                        {humanizeRole(out.role)
-                                            ? ` · ${humanizeRole(out.role)}`
-                                            : ''}
-                                    </div>
-                                </div>
-                            </div>
-                        ) : null}
-                        <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                        {inc ? (
-                            <div className="flex items-center gap-2">
-                                <HueAvatar name={inc.name} size={38} />
-                                <div className="leading-tight">
-                                    <EntityLink
-                                        href={`/staff/${inc.id}`}
-                                        className="block text-[13px] font-bold"
-                                    >
-                                        {inc.name}
-                                    </EntityLink>
-                                    <div className="text-[11px] text-muted-foreground">
-                                        Incoming
-                                        {humanizeRole(inc.role)
-                                            ? ` · ${humanizeRole(inc.role)}`
-                                            : ''}
-                                        {h.incoming_shift
-                                            ? ` · ${h.incoming_shift.label} ${fmtShiftRange(h.incoming_shift)}`
-                                            : ''}
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-status-warning/50 bg-status-warning-bg px-2.5 py-1 text-[11px] font-semibold text-status-warning">
-                                <ShieldAlert className="h-3.5 w-3.5" />
-                                Incoming shift open — needs cover
-                            </span>
-                        )}
-                        <span className="ml-auto">
-                            <MoodChip mood={h.client_mood} />
-                        </span>
-                    </div>
-
-                    {immutableRecipientEvidence ? (
-                        <div className="grid gap-2 rounded-xl border border-border bg-muted/20 px-4 py-3 text-[12px] sm:grid-cols-2">
-                            <div>
-                                <div className="font-semibold text-muted-foreground">
-                                    Submitted recipient
-                                </div>
-                                <div className="mt-0.5 font-medium">
-                                    {submittedRecipient?.name ?? 'Not recorded'}
-                                </div>
-                            </div>
-                            <div>
-                                <div className="font-semibold text-muted-foreground">
-                                    Current acknowledgement assignee
-                                </div>
-                                <div className="mt-0.5 font-medium">
-                                    {currentAcknowledgementAssignee?.name ??
-                                        'No worker currently assigned'}
-                                </div>
-                            </div>
-                        </div>
-                    ) : null}
-
-                    {emarLens ? (
-                        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-[11.5px] text-muted-foreground">
-                            <ArrowRight className="h-3.5 w-3.5 shrink-0" />
-                            Same shift-handover record as{' '}
-                            <Link
-                                href="/operations/handovers"
-                                className="font-semibold text-primary hover:underline"
-                            >
-                                Operations handovers
-                            </Link>{' '}
-                            — the eMAR view focuses on the medication slice;
-                            concurrent edits are version-locked.
-                        </div>
-                    ) : null}
-
-                    {h.edit_lock ? (
-                        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-status-warning/30 bg-status-warning-bg/60 px-3 py-2 text-[12px] font-medium text-status-warning">
-                            <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-                            Being edited by {h.edit_lock.held_by_name} — editing
-                            is disabled here to avoid a conflict.
-                        </div>
-                    ) : null}
-
-                    {/* Narrative */}
-                    <div>
-                        <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
-                            <FileText className="h-3.5 w-3.5" />
-                            Handover narrative
-                        </div>
-                        <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">
-                            {h.handover_notes || 'No narrative recorded.'}
-                        </p>
-                    </div>
-
-                    {medicationSnapshotUrl ? (
-                        <ShiftMedSummary
-                            snapshot={snapshot}
-                            loading={snapLoading}
-                            hasShift={!!h.outgoing_shift}
-                        />
-                    ) : null}
-
-                    {h.cd_verification ? (
-                        <div
-                            className={cn(
-                                'rounded-xl border p-3.5',
-                                h.cd_verification.result === 'discrepancy'
-                                    ? 'border-status-critical/30 bg-status-critical-bg/50'
-                                    : 'border-status-success/30 bg-status-success-bg/50',
-                            )}
-                        >
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span
-                                    className={cn(
-                                        'flex h-6 w-6 items-center justify-center rounded-md',
-                                        h.cd_verification.result ===
-                                            'discrepancy'
-                                            ? 'bg-status-critical-bg text-status-critical'
-                                            : 'bg-status-success-bg text-status-success',
-                                    )}
+                            {out ? (
+                                <OptionLink
+                                    href={`/staff/${out.id}`}
+                                    icon={UserCheck}
                                 >
-                                    {h.cd_verification.result ===
-                                    'discrepancy' ? (
-                                        <ShieldAlert className="h-3.5 w-3.5" />
-                                    ) : (
-                                        <CheckCircle2 className="h-3.5 w-3.5" />
-                                    )}
-                                </span>
-                                <span className="text-[13px] font-semibold">
-                                    Controlled-drug count{' '}
-                                    {h.cd_verification.result === 'discrepancy'
-                                        ? '— discrepancy found'
-                                        : 'verified'}
-                                </span>
-                                <Link
-                                    href="/emar/controlled"
-                                    className="ml-auto text-[12px] font-semibold text-primary hover:underline"
+                                    {out.name.split(' ')[0]} · outgoing
+                                </OptionLink>
+                            ) : null}
+                            {inc ? (
+                                <OptionLink
+                                    href={`/staff/${inc.id}`}
+                                    icon={Users}
                                 >
-                                    CD register
-                                </Link>
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">
-                                {h.cd_verification.witness_name ? (
-                                    <span>
-                                        Witness:{' '}
-                                        <b className="text-foreground">
-                                            {h.cd_verification.witness_name}
-                                        </b>
-                                    </span>
-                                ) : null}
-                                {h.cd_verification.verified_by_name ? (
-                                    <span>
-                                        Checked by{' '}
-                                        {h.cd_verification.verified_by_name}
-                                    </span>
-                                ) : null}
-                                {h.cd_verification.verified_at ? (
-                                    <span>
-                                        {formatDate(
-                                            h.cd_verification.verified_at,
-                                        )}{' '}
-                                        {fmtTime(h.cd_verification.verified_at)}
-                                    </span>
-                                ) : null}
-                            </div>
-                            {h.cd_verification.notes ? (
-                                <p className="mt-1.5 text-[12.5px] leading-snug">
-                                    {h.cd_verification.notes}
-                                </p>
+                                    {inc.name.split(' ')[0]} · incoming
+                                </OptionLink>
+                            ) : null}
+                            {h.client && medicationSnapshotUrl ? (
+                                <OptionLink
+                                    href={`/emar/mar?client_id=${h.client.id}`}
+                                    icon={Pill}
+                                >
+                                    Open on MAR chart
+                                </OptionLink>
                             ) : null}
                         </div>
-                    ) : null}
-
-                    <DetailList
-                        icon={Pill}
-                        tone="critical"
-                        title="Medications due"
-                        items={h.medications_due}
-                    />
-                    <DetailList
-                        icon={ShieldAlert}
-                        tone="critical"
-                        title="Incidents to note"
-                        items={h.incidents_to_note}
-                    />
-                    <DetailList
-                        icon={ListChecks}
-                        tone="primary"
-                        title="Follow-up items"
-                        items={h.follow_up_items}
-                    />
-                    <DetailList
-                        icon={ClipboardCheck}
-                        tone="warning"
-                        title="Tasks pending"
-                        items={h.tasks_pending}
-                    />
-
-                    {/* Audit trail */}
-                    <div>
-                        <div className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
-                            <Activity className="h-3.5 w-3.5" />
-                            Audit trail
-                        </div>
-                        <div className="divide-y divide-border">
-                            <TimelineRow
-                                icon={FileText}
-                                tone="muted"
-                                label="Created"
-                                who={out?.name ?? 'Unknown'}
-                                iso={h.created_at}
-                            />
-                            <TimelineRow
-                                icon={Send}
-                                tone="warning"
-                                label="Submitted"
-                                who={
-                                    h.submitted_at
-                                        ? (out?.name ?? 'Outgoing worker')
-                                        : 'Not yet submitted'
-                                }
-                                iso={h.submitted_at}
-                            />
-                            <TimelineRow
-                                icon={CheckCircle2}
-                                tone="success"
-                                label="Acknowledged"
-                                who={
-                                    h.acknowledger?.name ??
-                                    'Awaiting acknowledgement'
-                                }
-                                iso={h.acknowledged_at}
-                            />
-                        </div>
                     </div>
-                </div>
-
-                {/* Footer */}
-                <div className="flex flex-col gap-2.5 border-t border-border px-5 py-3.5">
-                    {/* Options bar — cross-entity jumps (client / shift / staff / MAR) */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                        {h.client ? (
-                            <OptionLink
-                                href={`/operations/clients/${h.client.id}`}
-                                icon={User}
-                            >
-                                View client
-                            </OptionLink>
-                        ) : null}
-                        {h.outgoing_shift ? (
-                            <OptionLink
-                                href={`/operations/shifts/${h.outgoing_shift.id}`}
-                                icon={Clock}
-                            >
-                                View shift
-                            </OptionLink>
-                        ) : null}
-                        {out ? (
-                            <OptionLink
-                                href={`/staff/${out.id}`}
-                                icon={UserCheck}
-                            >
-                                {out.name.split(' ')[0]} · outgoing
-                            </OptionLink>
-                        ) : null}
-                        {inc ? (
-                            <OptionLink href={`/staff/${inc.id}`} icon={Users}>
-                                {inc.name.split(' ')[0]} · incoming
-                            </OptionLink>
-                        ) : null}
-                        {h.client ? (
-                            <OptionLink
-                                href={`/emar/mar?client_id=${h.client.id}`}
-                                icon={Pill}
-                            >
-                                Open on MAR chart
-                            </OptionLink>
-                        ) : null}
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                            {note ? (
-                                <>
-                                    <note.icon
-                                        className={cn(
-                                            'h-3.5 w-3.5',
-                                            note.critical &&
-                                                'text-status-critical',
-                                        )}
-                                    />
-                                    {note.text}
-                                </>
-                            ) : null}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <GuardrailButton
-                                unstyled
-                                type="button"
-                                onClick={() => onOpenChange(false)}
-                                className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
-                            >
-                                Close
-                            </GuardrailButton>
-                            {h.status === 'draft' && h.can_submit ? (
-                                <GuardrailButton
-                                    unstyled
-                                    type="button"
-                                    onClick={() => onSubmit(h)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
-                                >
-                                    <Send className="h-3.5 w-3.5" />
-                                    Submit
-                                </GuardrailButton>
-                            ) : null}
-                            {h.status === 'submitted' && h.can_acknowledge ? (
-                                <GuardrailButton
-                                    unstyled
-                                    type="button"
-                                    onClick={() => onAcknowledge(h)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
-                                >
-                                    <Check className="h-4 w-4" />
-                                    Acknowledge
-                                </GuardrailButton>
-                            ) : null}
-                            {h.edit_lock ? (
-                                <button
-                                    type="button"
-                                    disabled
-                                    title={`Being edited by ${h.edit_lock.held_by_name}`}
-                                    className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground"
-                                >
-                                    <ShieldAlert className="h-3.5 w-3.5" />
-                                    Being edited
-                                </button>
-                            ) : h.can_edit ? (
-                                <GuardrailButton
-                                    unstyled
-                                    type="button"
-                                    onClick={() => onEdit(h)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                                >
-                                    <FileText className="h-3.5 w-3.5" />
-                                    Edit handover
-                                </GuardrailButton>
-                            ) : (
-                                <button
-                                    type="button"
-                                    disabled
-                                    title="Only managers can edit after the 7-day window"
-                                    className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground"
-                                >
-                                    <ShieldAlert className="h-3.5 w-3.5" />
-                                    Edit locked
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
+                )}
+            </WizardStepPane>
+        </WizardShell>
     );
 }

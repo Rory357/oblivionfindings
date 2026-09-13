@@ -3,20 +3,31 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Data\ItBulkActionResult;
+use App\Domain\It\Data\ItTicketCommentCancellationResult;
 use App\Domain\It\Data\ItTransitionInput;
 use App\Domain\It\Enums\ItWorkflowState;
+use App\Domain\It\Exceptions\ItSettlementBlocked;
+use App\Domain\It\Exceptions\ItTicketCommandConflict;
+use App\Domain\It\Exceptions\ItTicketDraftException;
 use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Presenters\ItTicketActivityPresenter;
+use App\Domain\It\Presenters\ItTicketApprovalPresenter;
+use App\Domain\It\Presenters\ItTicketCommentDeliveryPresenter;
 use App\Domain\It\Presenters\ItTicketContextPresenter;
+use App\Domain\It\Presenters\ItTicketConversationPresenter;
 use App\Domain\It\Presenters\ItTicketRoutingPresenter;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItLinkedContextOptions;
-use App\Domain\It\Services\ItTicketApprovalService;
+use App\Domain\It\Services\ItSlaReadService;
 use App\Domain\It\Services\ItTicketDeviceContextService;
+use App\Domain\It\Services\ItTicketDraftAttachmentService;
 use App\Domain\It\Services\ItTicketInteractionService;
 use App\Domain\It\Services\ItTicketMergeService;
+use App\Domain\It\Services\ItTicketRoutingService;
 use App\Domain\It\Services\ItTicketTriageService;
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\It\Services\ItWorkTaskReadinessService;
 use App\Domain\It\Services\ItWorkTransitionService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -24,25 +35,32 @@ use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\It\Concerns\BuildsItOptions;
 use App\Http\Requests\It\BulkTicketActionRequest;
+use App\Http\Requests\It\CancelItTicketCommentCommandRequest;
 use App\Http\Requests\It\CloseTicketRequest;
-use App\Http\Requests\It\DecideApprovalRequest;
+use App\Http\Requests\It\ConfirmTicketResolutionRequest;
 use App\Http\Requests\It\LinkTicketDeviceRequest;
 use App\Http\Requests\It\MergeTicketRequest;
+use App\Http\Requests\It\PreviewTicketMergeRequest;
+use App\Http\Requests\It\ReadTicketMergeCommandRequest;
+use App\Http\Requests\It\RecoverItTicketCommentCommandRequest;
 use App\Http\Requests\It\ReopenTicketRequest;
-use App\Http\Requests\It\RequestApprovalRequest;
 use App\Http\Requests\It\StoreTicketCommentRequest;
 use App\Http\Requests\It\SubmitCsatRequest;
 use App\Http\Requests\It\TransitionItWorkRequest;
+use App\Http\Requests\It\UpdateTicketWatcherRequest;
+use App\Http\Requests\It\ValidateItMergeCandidateRequest;
+use App\Jobs\DispatchItTicketNotifications;
 use App\Models\ItAttachment;
 use App\Models\ItTicket;
-use App\Models\ItTicketApproval;
+use App\Models\ItTicketCommandReceipt;
 use App\Models\ItTicketComment;
+use App\Models\ItTicketDraft;
 use App\Models\User;
-use App\Notifications\It\TicketApprovalNotification;
 use App\Notifications\It\TicketReopenedNotification;
 use App\Notifications\It\TicketRepliedNotification;
 use App\Services\UserSiteAccessService;
 use DomainException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
@@ -63,7 +81,6 @@ class ItTicketController extends Controller
         private readonly ItTicketContextPresenter $contextPresenter,
         private readonly ItTicketRoutingPresenter $routingPresenter,
         private readonly ItWorkTransitionService $transitionService,
-        private readonly ItTicketApprovalService $approvalService,
         private readonly ItTicketInteractionService $interactionService,
         private readonly ItTicketMergeService $mergeService,
         private readonly ItTicketTriageService $triageService,
@@ -71,9 +88,41 @@ class ItTicketController extends Controller
         private readonly ItEmailDeliveryService $emailDeliveries,
         private readonly ItWorkAccessService $workAccess,
         private readonly ItLinkedContextOptions $linkedContextOptions,
+        private readonly ItSlaReadService $slaRead,
     ) {}
 
     public function show(Request $request, ItTicket $ticket)
+    {
+        // Preserve the drawer's actor/record-bound JSON contract. Browser links
+        // follow the authorized survivor; historical commands never redirect.
+        if ($ticket->isMerged() && ($request->header('X-Inertia') || ! $request->wantsJson())) {
+            $destination = $this->mergeService->destinationForViewer($ticket, $request->user());
+            if ($destination) {
+                $tab = $request->query('tab');
+
+                return redirect()->route('it.tickets.show', [
+                    'ticket' => $destination->id,
+                    'merged_from' => $ticket->id,
+                    ...(in_array($tab, ['messages', 'files', 'tasks', 'approvals', 'properties', 'links', 'sla', 'history'], true)
+                        ? ['tab' => $tab] : []),
+                ])->header('Cache-Control', 'no-store, private');
+            }
+        }
+
+        return $this->renderWorkspace($request, $ticket);
+    }
+
+    public function original(Request $request, ItTicket $ticket)
+    {
+        abort_unless($this->workAccess->canView($request->user(), $ticket), 404);
+        if (! $ticket->isMerged()) {
+            return redirect()->route('it.tickets.show', $ticket)->header('Cache-Control', 'no-store, private');
+        }
+
+        return $this->renderWorkspace($request, $ticket);
+    }
+
+    private function renderWorkspace(Request $request, ItTicket $ticket)
     {
         $payload = $this->showPayload($request, $ticket);
 
@@ -81,10 +130,11 @@ class ItTicketController extends Controller
         // quick-peek drawer (axios). Policy + internal-note stripping run
         // identically for both — the payload IS the privacy boundary.
         if (! $request->header('X-Inertia') && $request->wantsJson()) {
-            return response()->json($payload);
+            return response()->json($payload)->header('Cache-Control', 'no-store, private');
         }
 
-        return Inertia::render('it/tickets/show', $payload);
+        return Inertia::render('it/tickets/show', $payload)->toResponse($request)
+            ->header('Cache-Control', 'no-store, private');
     }
 
     public function linkDevice(LinkTicketDeviceRequest $request, ItTicket $ticket)
@@ -129,16 +179,31 @@ class ItTicketController extends Controller
         abort_unless($this->workAccess->canView($user, $ticket), 404);
         $this->authorize('view', $ticket);
 
-        $isAgent = $user->canDo('it.view') || $user->canDo('it.manage');
         $canManage = $this->workAccess->canWork($user, $ticket);
-        $canLinkDevices = $canManage && $user->canDo('securityDevices.devices.view');
+        $taskStorageReady = $canManage && app(ItWorkTaskReadinessService::class)->storageReady();
+        $canChangeTasks = $taskStorageReady && ! $ticket->isMerged() && in_array($ticket->status, ItTicket::OPEN_STATUSES, true);
+        // Participation may grant a technician access to their own sensitive
+        // or otherwise out-of-scope request. Internal data and controls still
+        // require the same per-record work boundary as protected downloads.
+        $isAgent = $canManage;
+        $canLinkDevices = $canManage && ! $ticket->isMerged() && $user->canDo('securityDevices.devices.view');
         $isRequester = (int) $ticket->requester_user_id === (int) $user->id;
         $canComment = ! $ticket->isMerged() && in_array($ticket->status, ItTicket::OPEN_STATUSES, true);
+        $mergeDestination = $ticket->isMerged() ? $this->mergeService->destinationForViewer($ticket, $user) : null;
+        $mergeOrigin = null;
+        $originId = filter_var($request->query('merged_from'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($originId && ! $ticket->isMerged()) {
+            $origin = ItTicket::query()->find($originId);
+            if ($origin && (int) $this->mergeService->destinationForViewer($origin, $user)?->id === (int) $ticket->id) {
+                $mergeOrigin = ['id' => $origin->id, 'reference' => $origin->reference,
+                    'href' => route('it.tickets.original', $origin, false)];
+            }
+        }
         $replyUnavailableReason = match (true) {
             $canComment => null,
-            $ticket->isMerged() => $ticket->mergedInto?->reference
-                ? "Continue the conversation on {$ticket->mergedInto->reference}."
-                : 'Continue the conversation on the surviving ticket.',
+            $ticket->isMerged() => $mergeDestination
+                ? "Continue the conversation on {$mergeDestination->reference}."
+                : 'This ticket was merged. The surviving ticket is not available to your current account.',
             default => 'Reopen this ticket before adding another reply.',
         };
 
@@ -148,7 +213,9 @@ class ItTicketController extends Controller
             'owner:id,name',
             'team:id,name',
             'queue:id,name',
-            'watchers:id,name',
+            'watchers:id,name,role,approved_at',
+            'watchers.roles.permissions',
+            'watchers.permissionOverrides',
             'asset:id,name,asset_tag',
             'site:id,name,type,is_active,archived,archived_at',
             'service:id,name,is_active',
@@ -183,11 +250,18 @@ class ItTicketController extends Controller
             ->with(['author:id,name', 'attachments'])
             ->when(! $isAgent, fn ($q) => $q->publicOnly())
             ->orderBy('created_at')
-            ->get()
+            ->orderBy('id')
+            ->get();
+        $commentDeliveries = app(ItTicketCommentDeliveryPresenter::class)
+            ->presentMany($ticket, $user, $comments);
+        $comments = $comments
             ->map(fn (ItTicketComment $c) => [
                 'id' => $c->id,
                 'body' => $c->body,
                 'is_internal' => $c->is_internal,
+                'speaker_side' => $c->speaker_side,
+                'source_channel' => $c->source_channel,
+                'delivery' => $commentDeliveries[$c->id] ?? null,
                 'author' => [
                     'id' => $c->author?->id,
                     'name' => $c->author?->name ?? 'Unknown',
@@ -207,9 +281,12 @@ class ItTicketController extends Controller
         $pendingApproval = $latestApproval?->status === 'pending' ? $latestApproval : null;
 
         return [
+            'viewer_user_id' => (int) $user->id,
+            'conversation_ready' => ItTicket::hasConversationEvidence(),
             'ticket' => [
                 'id' => $ticket->id,
                 'reference' => $ticket->reference,
+                'lock_version' => (int) $ticket->lock_version,
                 'title' => $ticket->title,
                 'description' => $ticket->description,
                 'work_type' => $ticket->work_type,
@@ -219,14 +296,25 @@ class ItTicketController extends Controller
                 'category' => $ticket->category,
                 'subcategory' => $ticket->subcategory,
                 'priority' => $ticket->priority,
+                ...($canManage ? [
+                    'impact' => $ticket->impact,
+                    'urgency' => $ticket->urgency,
+                    'priority_decision' => $ticket->priority_decision,
+                ] : []),
                 'status' => $ticket->status,
                 'workflow_state' => $ticket->workflow_state,
                 'waiting' => $this->waitingPayload($ticket, $canManage),
                 'source' => $ticket->source,
-                'sla_state' => $ticket->sla_state,
+                ...$this->slaRead->present($ticket),
                 'first_response_due_at' => $ticket->first_response_due_at?->toIso8601String(),
                 'resolution_due_at' => $ticket->resolution_due_at?->toIso8601String(),
                 'first_responded_at' => $ticket->first_responded_at?->toIso8601String(),
+                'conversation' => app(ItTicketConversationPresenter::class)->present($ticket),
+                ...($canManage ? ['resolution' => $ticket->resolution_code !== null ? [
+                    'code' => $ticket->resolution_code,
+                    'summary' => $ticket->resolution_summary,
+                    'verification' => $ticket->resolution_verification,
+                ] : null] : []),
                 'requester' => [
                     'id' => $ticket->requester?->id,
                     'name' => $ticket->requester?->name ?? 'Unknown',
@@ -246,6 +334,7 @@ class ItTicketController extends Controller
                         'id' => $w->id,
                         'name' => $w->name,
                         'href' => $staffProfileHrefs[(int) $w->id] ?? null,
+                        ...($canManage ? ['receives_updates' => $this->workAccess->canReceiveTicketUpdates($w, $ticket)] : []),
                     ])
                     ->values()
                     ->all(),
@@ -284,29 +373,39 @@ class ItTicketController extends Controller
                 'monitoring_recovered_at' => $ticket->monitoring_recovered_at?->toIso8601String(),
                 'closed_at' => $ticket->closed_at?->toIso8601String(),
                 // §P-S2: the survivor this ticket was folded into, for the banner.
-                'merged_into' => $ticket->mergedInto
+                'is_merged' => $ticket->isMerged(),
+                'merge_origin' => $mergeOrigin,
+                'merged_originals' => $this->mergeService->originalRecords($ticket, $user,
+                    max(1, (int) $request->query('originals_page', 1))),
+                'merged_into' => $mergeDestination
                     ? [
-                        'id' => $ticket->mergedInto->id,
-                        'reference' => $ticket->mergedInto->reference,
-                        'title' => $ticket->mergedInto->title,
+                        'id' => $mergeDestination->id,
+                        'reference' => $mergeDestination->reference,
+                        'title' => $mergeDestination->title,
                     ]
                     : null,
                 // §P-S3 approval — flag + the latest request, for the rail.
                 'requires_approval' => (bool) $ticket->requires_approval,
                 'approval' => $latestApproval ? [
                     'id' => $latestApproval->id,
-                    'status' => $latestApproval->status,
+                    'status' => $latestApproval->effectiveStatus(),
                     'requested_by_name' => $latestApproval->requester?->name,
                     'approver_name' => $latestApproval->approver?->name,
-                    'reason' => $latestApproval->reason,
+                    'reason' => $canManage ? $latestApproval->reason : null,
                     'requested_at' => $latestApproval->created_at?->toIso8601String(),
                     'decided_at' => $latestApproval->decided_at?->toIso8601String(),
                 ] : null,
             ],
             'comments' => $comments,
+            'draftRecovery' => $this->draftRecoveryOptions(),
             'events' => $this->activityPresenter->present($ticket, $user),
             'linked_context' => $this->contextPresenter->present($ticket, $user),
             'assignees' => $canManage ? $this->staffUserOptions($user, $ticket) : [],
+            'approvals' => $canManage ? $ticket->approvals()->orderByDesc('id')->get(['id', 'status'])
+                ->map(fn ($approval): array => ['id' => (int) $approval->id, 'status' => $approval->status])->all() : [],
+            'task_work' => $canManage ? ['storage_ready' => $taskStorageReady,
+                'can_create' => $canChangeTasks, 'can_reorder' => $canChangeTasks] : null,
+            'approval_work' => app(ItTicketApprovalPresenter::class)->work($ticket, $user),
             // Rail picker over the canonical (fleet-)assets register — never
             // a parallel IT register. Agents only.
             'assetOptions' => $canManage ? $this->assetOptions($user, $ticket) : [],
@@ -327,43 +426,25 @@ class ItTicketController extends Controller
                 : [],
             'serviceOptions' => $canManage ? $this->linkedContextOptions->services() : [],
             'teamOptions' => $canManage ? $this->linkedContextOptions->teams() : [],
+            'queueOptions' => $canManage
+                ? app(ItTicketRoutingService::class)->queueOptions($ticket)
+                : [],
             // §I composer deflection: published articles an agent can reference
-            // as they type a reply. Agents (it.view) only — requesters already
-            // met the KB at raise time and their payload stays lean.
-            'kbSuggestions' => $isAgent ? $this->kbSuggestions() : [],
-            // §P-S2 merge picker: recent live tickets an agent can fold this one
-            // into. Agents only; excludes self and already-merged tickets.
+            // as they type a reply. Only technicians who can work this ticket
+            // receive the internal composer context.
+            'kbSuggestions' => $isAgent ? $this->kbSuggestions($user) : [],
+            // Suggestions remain scoped and explainable; they never authorize a merge.
             'mergeTargets' => $canManage
-                ? $this->workAccess->applyViewScope(ItTicket::query(), $user)
-                    ->whereIn('status', ItTicket::OPEN_STATUSES)
-                    ->whereNull('merged_into_ticket_id')
-                    ->where('id', '!=', $ticket->id)
-                    ->where('requester_user_id', $ticket->requester_user_id)
-                    ->latest('id')
-                    ->limit(100)
-                    ->get([
-                        'id',
-                        'reference',
-                        'title',
-                        'priority',
-                        'status',
-                        'requester_user_id',
-                        'requested_for_user_id',
-                    ])
-                    ->filter(fn (ItTicket $candidate) => $this->workAccess->canWork($user, $candidate)
-                        && $this->mergeService->sharesConversationAudience($ticket, $candidate))
-                    ->take(50)
-                    ->map(fn (ItTicket $t) => [
-                        'id' => $t->id,
-                        'reference' => $t->reference,
-                        'title' => $t->title,
-                        'priority' => $t->priority,
-                        'status' => $t->status,
-                    ])
-                    ->all()
+                ? $this->mergeService->candidates($ticket, $user)
+                : [],
+            'watcherOptions' => $canManage && ! $ticket->isMerged()
+                ? ItStaffDirectory::watchersForTicket($ticket)->map(fn (User $watcher): array => [
+                    'id' => (int) $watcher->id, 'name' => $watcher->name,
+                ])->all()
                 : [],
             'can' => [
-                'manage' => $canManage,
+                'manage' => $canManage && ! $ticket->isMerged(),
+                'manageWatchers' => $canManage && ! $ticket->isMerged(),
                 'linkDevices' => $canLinkDevices,
                 'assignApplicationWide' => $canManage
                     && $this->workAccess->canAssignScope($user, null, true),
@@ -371,14 +452,15 @@ class ItTicketController extends Controller
                 'internal' => $canManage,
                 'comment' => $canComment,
                 'reopen' => $user->can('reopen', $ticket),
+                'confirmResolution' => $user->can('confirmResolution', $ticket),
                 'watching' => $ticket->watchers->contains('id', $user->id),
                 // The requester may rate their own resolved ticket (§K).
-                'rate' => $isRequester && $ticket->status === 'resolved',
+                'rate' => $isRequester && ! $ticket->isMerged() && $ticket->status === 'resolved',
                 // Fold a duplicate into another live ticket (§P-S2). Agents only.
                 'merge' => $canManage && ! $ticket->isMerged() && $ticket->status !== 'closed',
                 // Approval affordances (§P-S3).
                 'requestApproval' => (bool) $user->can('requestApproval', $ticket),
-                'decideApproval' => $pendingApproval !== null && (bool) $user->can('decide', $pendingApproval),
+                'decideApproval' => ! $ticket->isMerged() && $pendingApproval !== null && (bool) $user->can('decide', $pendingApproval),
             ],
             'replyUnavailableReason' => $replyUnavailableReason,
         ];
@@ -451,6 +533,26 @@ class ItTicketController extends Controller
             abort_unless($this->workAccess->canWork($user, $ticket), 403);
         }
         $isInternal = $request->boolean('is_internal');
+        if ($request->has('request_uuid')) {
+            try {
+                $result = $this->interactionService->addCommentCommand($ticket, $user, $request->validated(), $request->file('attachments', []));
+            } catch (ItTicketCommandConflict $exception) {
+                return response()->json(['code' => 'idempotency_conflict', 'message' => $exception->getMessage()], 409);
+            } catch (DomainException $exception) {
+                return response()->json(['code' => 'comment_rejected', 'message' => $exception->getMessage(), 'errors' => ['body' => [$exception->getMessage()]]], 422);
+            }
+            if ($result instanceof ItTicketCommentCancellationResult) {
+                return response()->json(['status' => 'cancelled', 'data' => $result->toArray((int) $user->id)], 200, ['Cache-Control' => 'no-store, private']);
+            }
+            try {
+                DispatchItTicketNotifications::dispatchAfterResponse((int) $result->ticket->id);
+            } catch (\Throwable) {
+                // The committed outbox remains available to the scheduled
+                // drain. Scheduling failure cannot undo the saved reply ACK.
+            }
+
+            return response()->json(['status' => 'committed', 'data' => $result->toArray((int) $user->id)], $result->replayed ? 200 : 201, ['Cache-Control' => 'no-store, private']);
+        }
         try {
             $result = $this->interactionService->addComment(
                 $ticket,
@@ -460,7 +562,7 @@ class ItTicketController extends Controller
                 array_values(array_filter((array) $request->file('attachments'))),
             );
         } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            return redirect()->back()->withErrors(['body' => $exception->getMessage()]);
         }
         $ticket = $result['ticket'];
         $comment = $result['comment'];
@@ -486,7 +588,31 @@ class ItTicketController extends Controller
             }
         }
 
-        return redirect()->back()->with('success', $isInternal ? 'Internal note added.' : 'Reply sent.');
+        return redirect()->back()->with('success', $isInternal ? 'Internal note added.' : 'Reply added.');
+    }
+
+    public function recoverCommentCommand(RecoverItTicketCommentCommandRequest $request, ItTicket $ticket, string $requestUuid)
+    {
+        $result = $this->interactionService->recoverCommentCommand($ticket, $request->user(), $requestUuid);
+
+        return response()->json([
+            'status' => $result instanceof ItTicketCommentCancellationResult ? 'cancelled' : 'committed',
+            'data' => $result->toArray((int) $request->user()->id),
+        ], 200, ['Cache-Control' => 'no-store, private']);
+    }
+
+    public function cancelCommentCommand(CancelItTicketCommentCommandRequest $request, ItTicket $ticket, string $requestUuid)
+    {
+        try {
+            $result = $this->interactionService->cancelCommentCommand($ticket, $request->user(), $requestUuid, $request->boolean('is_internal'));
+        } catch (ItTicketCommandConflict $exception) {
+            return response()->json(['code' => 'idempotency_conflict', 'message' => $exception->getMessage()], 409);
+        }
+
+        return response()->json([
+            'status' => $result instanceof ItTicketCommentCancellationResult ? 'cancelled' : 'committed',
+            'data' => $result->toArray((int) $request->user()->id),
+        ], 200, ['Cache-Control' => 'no-store, private']);
     }
 
     /**
@@ -499,7 +625,13 @@ class ItTicketController extends Controller
         $user = $request->user();
         $parent = $attachment->attachable;
 
-        if ($parent instanceof ItTicketComment) {
+        if ($parent instanceof ItTicketDraft) {
+            try {
+                app(ItTicketDraftAttachmentService::class)->authorizeDownload($user, $attachment);
+            } catch (ItTicketDraftException) {
+                abort(404);
+            }
+        } elseif ($parent instanceof ItTicketComment) {
             abort_unless($this->workAccess->canView($user, $parent->ticket), 404);
             $this->authorize('view', $parent->ticket);
             if ($parent->is_internal) {
@@ -529,7 +661,7 @@ class ItTicketController extends Controller
         $validated = $request->validated();
 
         try {
-            $this->transitionService->transition(
+            $ticket = $this->transitionService->transition(
                 $ticket,
                 new ItTransitionInput(
                     actor: $user,
@@ -539,14 +671,49 @@ class ItTicketController extends Controller
                     nextAction: $validated['next_action'] ?? null,
                     resolutionCode: $validated['resolution_code'] ?? null,
                     resolutionSummary: $validated['resolution_summary'] ?? null,
+                    resolutionVerification: $validated['resolution_verification'] ?? null,
                     source: 'workspace',
+                    expectedVersion: (int) $validated['expected_version'],
                 ),
             );
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
 
+        if ($request->expectsJson()) {
+            return response()->json(['data' => [
+                'id' => (int) $ticket->id,
+                'lock_version' => (int) $ticket->lock_version,
+            ]]);
+        }
+
         return redirect()->back()->with('success', "Updated {$ticket->reference}.");
+    }
+
+    /** The requester confirms the reviewed resolution without private work access. */
+    public function confirmResolution(ConfirmTicketResolutionRequest $request, ItTicket $ticket)
+    {
+        try {
+            $saved = $this->transitionService->transition($ticket, new ItTransitionInput(
+                actor: $request->user(), to: ItWorkflowState::Closed,
+                reason: 'Requester confirmed the fix', source: 'requester_confirmation',
+                expectedVersion: (int) $request->validated('expected_version'),
+            ));
+        } catch (ItSettlementBlocked) {
+            // The requester must not receive private task titles or direct IDs.
+            return response()->json(['code' => 'confirmation_blocked',
+                'message' => 'IT still needs to complete required work before this ticket can close. Your confirmation was not recorded.'],
+                422, ['Cache-Control' => 'no-store, private']);
+        } catch (DomainException) {
+            return response()->json(['code' => 'confirmation_unavailable',
+                'message' => 'This ticket can no longer be confirmed in its current state. Review the current ticket.'],
+                422, ['Cache-Control' => 'no-store, private']);
+        }
+
+        return response()->json(['status' => 'committed', 'data' => [
+            'id' => (int) $saved->id, 'viewer_user_id' => (int) $request->user()->id,
+            'lock_version' => (int) $saved->lock_version, 'operation' => 'resolution.confirm', 'status' => $saved->status,
+        ]], 200, ['Cache-Control' => 'no-store, private']);
     }
 
     /** Close a settled (or abandoned) ticket — terminal until reopened. */
@@ -555,13 +722,30 @@ class ItTicketController extends Controller
         $user = $request->user();
 
         try {
-            $this->triageService->close(
+            $saved = $this->triageService->closeWithReason(
                 $ticket,
                 $user,
                 (string) $request->validated('reason'),
+                expectedVersion: (int) $request->validated('expected_version'),
             );
         } catch (DomainException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json(['code' => 'close_unavailable', 'message' => $exception->getMessage()],
+                    422, ['Cache-Control' => 'no-store, private']);
+            }
+
             return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['status' => 'committed', 'data' => [
+                'id' => (int) $saved->id,
+                'viewer_user_id' => (int) $user->id,
+                'operation' => 'ticket.close',
+                'status' => $saved->status,
+                'lock_version' => (int) $saved->lock_version,
+                'reason' => (string) $request->validated('reason'),
+            ]], 200, ['Cache-Control' => 'no-store, private']);
         }
 
         return redirect()->back()->with('success', "Closed {$ticket->reference}.");
@@ -580,8 +764,14 @@ class ItTicketController extends Controller
                 $ticket,
                 $user,
                 (string) $request->validated('reason'),
+                (int) $request->validated('expected_version'),
             );
         } catch (DomainException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json(['code' => 'reopen_unavailable', 'message' => $exception->getMessage()],
+                    422, ['Cache-Control' => 'no-store, private']);
+            }
+
             return redirect()->back()->with('error', $exception->getMessage());
         }
         $ticket = $result['ticket'];
@@ -592,7 +782,33 @@ class ItTicketController extends Controller
             ->reject(fn ($recipient) => (int) $recipient->id === (int) $user->id);
         $this->emailDeliveries->send($recipients, new TicketReopenedNotification($ticket));
 
+        if ($request->expectsJson()) {
+            return response()->json(['status' => 'committed', 'data' => [
+                'id' => (int) $ticket->id,
+                'viewer_user_id' => (int) $user->id,
+                'operation' => 'ticket.reopen',
+                'status' => $ticket->status,
+                'lock_version' => (int) $ticket->lock_version,
+                'reason' => $result['comment']->body,
+                'comment_id' => (int) $result['comment']->id,
+                'visibility' => $result['is_requester'] ? 'public' : 'internal',
+            ]], 200, ['Cache-Control' => 'no-store, private']);
+        }
+
         return redirect()->back()->with('success', "Reopened {$ticket->reference}.");
+    }
+
+    public function mergePreview(PreviewTicketMergeRequest $request, ItTicket $ticket)
+    {
+        $target = ItTicket::query()->findOrFail($request->integer('target_ticket_id'));
+        $preview = $this->mergeService->preview($ticket, $target, $request->user(),
+            $request->integer('source_version'), $request->integer('target_version'));
+
+        return response()->json(['status' => 'reviewed', 'data' => [
+            'viewer_user_id' => (int) $request->user()->id,
+            'review_nonce' => $request->validated('review_nonce'),
+            ...$preview,
+        ]], 200, ['Cache-Control' => 'no-store, private']);
     }
 
     /**
@@ -612,14 +828,29 @@ class ItTicketController extends Controller
             404,
         );
         try {
-            $target = $this->mergeService->merge(
+            $result = $this->mergeService->execute(
                 $ticket,
                 $target,
                 $user,
-                $request->validated('reason'),
+                $request->validated(),
             );
+        } catch (ItTicketCommandConflict $exception) {
+            return response()->json(['code' => 'command_conflict', 'message' => $exception->getMessage()],
+                409, ['Cache-Control' => 'no-store, private']);
         } catch (DomainException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json(['code' => 'merge_blocked', 'message' => $exception->getMessage(),
+                    'errors' => ['form' => [$exception->getMessage()]]], 422, ['Cache-Control' => 'no-store, private']);
+            }
+
             return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json($result, 200, ['Cache-Control' => 'no-store, private']);
+        }
+        if ($result['status'] !== 'committed') {
+            return redirect()->back()->with('error', 'This merge command was cancelled. Review the tickets before starting another merge.');
         }
 
         return redirect()
@@ -627,69 +858,30 @@ class ItTicketController extends Controller
             ->with('success', "Merged {$ticket->reference} into {$target->reference}.");
     }
 
-    /**
-     * Raise a sign-off request on a ticket whose category needs approval
-     * (§P-S3). Notifies the other agents (never the requester) and logs it.
-     * Canonical access is concealed before the locked lifecycle revalidates it.
-     */
-    public function requestApproval(RequestApprovalRequest $request, ItTicket $ticket)
+    public function mergeCommand(ReadTicketMergeCommandRequest $request, ItTicket $ticket, string $requestUuid)
     {
-        $user = $request->user();
-        abort_unless($this->workAccess->canWork($user, $ticket), 404);
+        $target = ItTicket::query()->findOrFail($request->integer('target_ticket_id'));
         try {
-            $approval = $this->approvalService->request(
-                $ticket,
-                $user,
-                $request->validated('reason'),
-            );
-        } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            $result = $this->mergeService->recover($ticket, $target, $request->user(), $requestUuid, $request->isMethod('post'));
+        } catch (ModelNotFoundException $exception) {
+            if ($exception->getModel() !== ItTicketCommandReceipt::class) {
+                throw $exception;
+            }
+
+            // Both parents and the actor were reauthorized inside recover(). A
+            // missing receipt is distinct from lost access and proves no outcome.
+            return response()->json(['code' => 'merge_receipt_unconfirmed', 'viewer_user_id' => (int) $request->user()->id,
+                'source_id' => (int) $ticket->id, 'target_id' => (int) $target->id, 'request_uuid' => $requestUuid],
+                404, ['Cache-Control' => 'no-store, private']);
         }
 
-        $ticket = $approval->ticket;
-
-        // Every agent who could sign off, except the one who asked.
-        $approvers = ItStaffDirectory::agentsForTicket($ticket)
-            ->reject(fn (User $u) => $u->id === $user->id);
-        if ($approvers->isNotEmpty()) {
-            $this->emailDeliveries->send($approvers, new TicketApprovalNotification($ticket, 'requested'));
-        }
-
-        return redirect()->back()->with('success', "Approval requested for {$ticket->reference}.");
+        return response()->json($result, 200, ['Cache-Control' => 'no-store, private']);
     }
 
-    /**
-     * Record a manager's verdict on a pending request (§P-S3) and tell the
-     * agent who asked. The locked lifecycle revalidates pending state and
-     * separation of duties before writing the decision.
-     */
-    public function decideApproval(DecideApprovalRequest $request, ItTicketApproval $approval)
+    public function validateMergeCandidate(ValidateItMergeCandidateRequest $request, ItTicket $ticket)
     {
-        $user = $request->user();
-        $ticket = $approval->ticket;
-        abort_unless($ticket && $this->workAccess->canWork($user, $ticket), 404);
-        abort_if((int) $approval->requested_by === (int) $user->id, 403);
-
-        try {
-            $approval = $this->approvalService->decide(
-                $approval,
-                $user,
-                $request->validated('decision'),
-                $request->validated('reason'),
-            );
-        } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
-        }
-
-        $ticket = $approval->ticket;
-        $status = $approval->status;
-
-        $requester = User::find($approval->requested_by);
-        if ($requester) {
-            $this->emailDeliveries->send($requester, new TicketApprovalNotification($ticket, $status));
-        }
-
-        return redirect()->back()->with('success', "Approval {$status} for {$ticket->reference}.");
+        return response()->json($this->mergeService->validateCandidate($ticket, $request->user(), $request->validated()),
+            200, ['Cache-Control' => 'no-store, private']);
     }
 
     /**
@@ -702,12 +894,25 @@ class ItTicketController extends Controller
         $user = $request->user();
         abort_unless($this->workAccess->canView($user, $ticket), 404);
         abort_unless($user->can('csat', $ticket), 403);
-        $this->interactionService->submitCsat(
+        $saved = $this->interactionService->submitCsat(
             $ticket,
             $user,
             (int) $request->validated('score'),
             $request->validated('comment') ?: null,
+            (int) $request->validated('expected_version'),
         );
+
+        if ($request->expectsJson()) {
+            return response()->json(['status' => 'committed', 'data' => [
+                'id' => (int) $saved->id,
+                'viewer_user_id' => (int) $user->id,
+                'operation' => 'csat.save',
+                'lock_version' => (int) $saved->lock_version,
+                'score' => (int) $saved->csat_score,
+                'comment' => $saved->csat_comment,
+                'submitted_at' => $saved->csat_submitted_at?->toIso8601String(),
+            ]], 200, ['Cache-Control' => 'no-store, private']);
+        }
 
         return redirect()->back()->with('success', 'Thanks — your feedback helps IT improve.');
     }
@@ -728,6 +933,15 @@ class ItTicketController extends Controller
         $this->interactionService->unwatch($ticket, $user);
 
         return redirect()->back()->with('success', "Stopped watching {$ticket->reference}.");
+    }
+
+    public function updateWatcher(UpdateTicketWatcherRequest $request, ItTicket $ticket, int $watcherUserId)
+    {
+        $result = $this->interactionService->setWatcher($ticket, $request->user(), $watcherUserId,
+            $request->boolean('watching'), (int) $request->validated('expected_version'));
+
+        return response()->json(['status' => 'committed', 'data' => $result->toArray((int) $request->user()->id)],
+            200, ['Cache-Control' => 'no-store, private']);
     }
 
     /* ================================================================== */
@@ -759,40 +973,50 @@ class ItTicketController extends Controller
         $tickets = $this->workAccess->applyViewScope(ItTicket::query(), $user)
             ->whereIn('id', $validated['ids'])
             ->get()
-            ->filter(fn (ItTicket $ticket) => $this->workAccess->canWork($user, $ticket));
+            ->filter(fn (ItTicket $ticket) => $this->workAccess->canWork($user, $ticket))
+            ->keyBy('id');
 
-        $updated = 0;
-        $skipped = count($validated['ids']) - $tickets->count();
+        $items = [];
 
-        foreach ($tickets as $ticket) {
-            $changed = match ($action) {
-                'assign' => $this->triageService->bulkUpdate($ticket, $user, [
+        foreach ($validated['ids'] as $selectedId) {
+            $ticket = $tickets->get((int) $selectedId);
+            $outcome = $ticket === null ? ItBulkActionResult::outcome('unavailable') : match ($action) {
+                'assign' => $this->triageService->bulkOutcome($ticket, $user, [
                     'assigned_to_user_id' => $assignee?->id,
+                    'routing_reason' => $validated['routing_reason'],
+                    'expected_version' => (int) $validated['expected_versions'][$ticket->id],
                 ], 'bulk'),
-                'priority' => $this->triageService->bulkUpdate($ticket, $user, [
+                'priority' => $this->triageService->bulkOutcome($ticket, $user, [
                     'priority' => (string) $validated['priority'],
+                    'priority_reason' => $validated['priority_reason'],
+                    'expected_version' => (int) $validated['expected_versions'][$ticket->id],
                 ], 'bulk'),
-                'status' => $this->triageService->bulkUpdate($ticket, $user, [
+                'status' => $this->triageService->bulkOutcome($ticket, $user, [
                     'status' => (string) $validated['status'],
+                    'expected_version' => (int) $validated['expected_versions'][$ticket->id],
                     ...Arr::only($validated, ['waiting_party', 'waiting_reason', 'next_action']),
                 ], 'bulk'),
-                'close' => $this->triageService->close(
+                'close' => ItBulkActionResult::capture(fn (): bool => $this->triageService->close(
                     $ticket,
                     $user,
                     (string) $validated['reason'],
                     source: 'bulk_close',
-                    staleIsUnchanged: true,
-                ),
-                default => false,
+                    expectedVersion: (int) $validated['expected_versions'][$ticket->id],
+                )),
             };
-            $changed ? $updated++ : $skipped++;
+            $items[] = ['id' => (int) $selectedId, ...$outcome];
         }
 
+        $result = ItBulkActionResult::payload('tickets', $action, $items);
         $label = ['assign' => 'assigned', 'priority' => 'reprioritised', 'status' => 'updated', 'close' => 'closed'][$action];
+        $unchanged = $result['selected'] - $result['updated'];
+        $message = "{$result['updated']} ticket(s) {$label}".($unchanged > 0 ? " · {$unchanged} unchanged" : '').'.';
+        if ($request->expectsJson()) {
+            return response()->json(['status' => 'completed', 'viewer_user_id' => (int) $user->id, 'message' => $message, 'result' => $result]);
+        }
 
-        return redirect()->back()->with(
-            'success',
-            "{$updated} ticket(s) {$label}".($skipped > 0 ? " · {$skipped} unchanged" : '').'.',
-        );
+        return redirect()->back()
+            ->with('it_bulk_result', ['actor_user_id' => (int) $user->id, ...$result])
+            ->with($result['rejected'] > 0 ? 'warning' : ($result['updated'] > 0 ? 'success' : 'info'), $message);
     }
 }

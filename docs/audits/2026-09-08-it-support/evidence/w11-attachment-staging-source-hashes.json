@@ -1,0 +1,132 @@
+{
+  "sources": [
+    {
+      "path": "app/Domain/It/Services/ItInboundAttachmentStaging.php",
+      "sha256": "4eac76c89db9348a7d4f2284f235b0cda1356533d6d872f24bd4b81622185d00"
+    },
+    {
+      "path": "app/Domain/It/Exceptions/ItInboundAttachmentUnavailable.php",
+      "sha256": "44c9b2c75330675a394388e82565ecfd66bccf97f8b9f30ea4660102127d4372"
+    },
+    {
+      "path": "app/Domain/It/Services/ItEmailAttachments.php",
+      "sha256": "f7ff7f17cc45f920ae90666ccd511f13e8bb528e4d686e81eef9ad08c1c933c1"
+    },
+    {
+      "path": "app/Models/ItAttachment.php",
+      "sha256": "85c4314b3b391bce66ddc8fcc63341021221dc38e2db9564772de13b9a7f79aa"
+    },
+    {
+      "path": "app/Models/ItInboundEmail.php",
+      "sha256": "0962fe5ace08b34d69a42e92f6a3bb74638da00e6e06abe54dffb97995915684"
+    },
+    {
+      "path": "app/Providers/AppServiceProvider.php",
+      "sha256": "bf889904ed27c36977086bcd31dd09b175cd7917f8f8811fc9aa008165d9ccae"
+    },
+    {
+      "path": "config/it.php",
+      "sha256": "afb104a586a910259a8937c052dfb826f5aeed21180478caf08036345cac8378"
+    },
+    {
+      "path": "database/migrations/2026_09_11_000019_add_it_inbound_attachment_staging.php",
+      "sha256": "e3c06967e2493d565ea8c9548eb53b500224f09b5abb12e4276f2475c09e0c74"
+    },
+    {
+      "path": "tests/Concurrency/It/ItInboundAttachmentStagingTest.php",
+      "sha256": "c8fd9f49348a44e5614c2568c902b0c58e4ff6b1ab8d05adcb2dc12388b43893"
+    },
+    {
+      "path": "tests/Feature/It/ItTicketDraftAttachmentTest.php",
+      "sha256": "9f3a4251b06525add34f3d9bdbee693a38eec58872343ebb600900c113166428"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "DESIGN.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/DESIGN_TOKENS.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LIST_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LOADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/oblivion-loader-01-demo.html",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "unchanged": true
+    }
+  ],
+  "tests": [
+    {
+      "token": "it_4ee5db76818f43ca",
+      "log": "w11-attachment-staging-tests.txt",
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 69,
+      "seconds": 181,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    },
+    {
+      "token": "it_65b77c8395cc483d",
+      "log": "w11-attachment-staging-tests-final.txt",
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 84,
+      "seconds": 180,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    },
+    {
+      "token": "it_7df9dfca9b2b490b",
+      "log": "w11-attachment-staging-regression.txt",
+      "passed": 58,
+      "failed": 2,
+      "errors": 0,
+      "assertions": 320,
+      "seconds": 193,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    },
+    {
+      "token": "it_0f639d2f476c4f90",
+      "log": "w11-attachment-staging-regression-retry.txt",
+      "passed": 60,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 332,
+      "seconds": 191,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    }
+  ]
+}

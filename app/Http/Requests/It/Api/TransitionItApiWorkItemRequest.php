@@ -13,6 +13,7 @@ class TransitionItApiWorkItemRequest extends FormRequest
 {
     private const FIELDS = [
         'to', 'reason', 'waiting_party', 'next_action', 'resolution_code', 'resolution_summary',
+        'resolution_verification', 'expected_version',
     ];
 
     public function authorize(): bool
@@ -39,12 +40,14 @@ class TransitionItApiWorkItemRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'expected_version' => ['required', 'integer', 'min:1'],
             'to' => ['required', Rule::enum(ItWorkflowState::class)],
             'reason' => ['nullable', 'string', 'max:1000'],
             'waiting_party' => ['nullable', Rule::in(['requester', 'vendor', 'approver', 'team', 'change', 'other'])],
             'next_action' => ['nullable', 'string', 'max:2000'],
             'resolution_code' => ['nullable', 'string', 'max:100'],
             'resolution_summary' => ['nullable', 'string', 'max:5000'],
+            'resolution_verification' => ['nullable', 'string', 'max:5000'],
         ];
     }
 

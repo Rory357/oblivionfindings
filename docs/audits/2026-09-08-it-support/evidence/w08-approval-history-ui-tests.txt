@@ -1,0 +1,392 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/pages/it/tickets/show.test.tsx (24 tests | 1 failed) 5391ms
+     × purges an open private approval decision when current decision permission is removed 272ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > purges an open private approval decision when current decision permission is removed
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name `/^Approve$/`
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  navigation:
+
+  Name "Breadcrumb":
+  <nav
+    aria-label="Breadcrumb"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "Home":
+  <a
+    href="/dashboard"
+  />
+
+  Name "IT & Support":
+  <a
+    href="/it"
+  />
+
+  Name "IT-000042":
+  <a
+    href="/it/tickets/42"
+  />
+
+  Name "Back":
+  <a
+    aria-label="Back"
+    class="mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 transition-colors outline-none hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    href="/it"
+  />
+
+  Name "View ticket conversation":
+  <a
+    aria-label="View ticket conversation"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    href="/it/tickets/42?tab=messages"
+  />
+
+  Name "View required ticket work":
+  <a
+    aria-label="View required ticket work"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    href="/it/tickets/42?tab=tasks"
+  />
+
+  Name "View response and resolution clocks":
+  <a
+    aria-label="View response and resolution clocks"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 eh-meter--warning"
+    href="/it/tickets/42?tab=sla"
+  />
+
+  Name "View permitted linked records":
+  <a
+    aria-label="View permitted linked records"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    href="/it/tickets/42?tab=links"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground overflow-clip!"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Investigate the shared printer":
+  <h1
+    class="text-[22px] leading-tight font-bold tracking-tight min-w-0 max-w-full break-words whitespace-normal"
+  />
+
+  Name "Approvals":
+  <h2
+    class="mb-4 text-base font-semibold"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  Name "":
+  <p
+    class="text-sm text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Find a ticket section…":
+  <button
+    class="relative inline-flex h-9 min-w-[200px] flex-1 items-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground/55 transition-colors outline-none hover:bg-primary-foreground/15 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 lg:w-[250px] lg:flex-none"
+    type="button"
+  />
+
+  Name "Write a reply":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "Ticket actions":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Ticket actions"
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 w-9 justify-center px-0 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_6v_"
+    type="button"
+  />
+
+  Name "Conversation":
+  <button
+    aria-pressed="false"
+    class="inline-flex shrink-0 items-center gap-[7px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-2 min-h-[42px] rounded-full px-[15px] font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    data-test="it-ticket-group-conversation"
+    type="button"
+  />
+
+  Name "Work":
+  <button
+    aria-pressed="true"
+    class="inline-flex shrink-0 items-center gap-[7px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 min-h-[46px] rounded-t-xl bg-background px-[18px] pb-3 font-semibold text-primary"
+    data-test="it-ticket-group-work"
+    type="button"
+  />
+
+  Name "Details & links":
+  <button
+    aria-pressed="false"
+    class="inline-flex shrink-0 items-center gap-[7px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-2 min-h-[42px] rounded-full px-[15px] font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    data-test="it-ticket-group-details"
+    type="button"
+  />
+
+  Name "Activity":
+  <button
+    aria-pressed="false"
+    class="inline-flex shrink-0 items-center gap-[7px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-2 min-h-[42px] rounded-full px-[15px] font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    data-test="it-ticket-group-activity"
+    type="button"
+  />
+
+  Name "Find a section":
+  <button
+    aria-label="Find a section"
+    class="mb-2 ml-auto inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80 focus-visible:outline-none"
+    data-test="it-ticket-search"
+    title="Find a section (/)"
+    type="button"
+  />
+
+  --------------------------------------------------
+  toolbar:
+
+  Name "Ticket workspace":
+  <div
+    aria-label="Ticket workspace"
+    class="scrollbar-none flex items-end gap-1.5 overflow-x-auto pt-2"
+    role="toolbar"
+  />
+
+  --------------------------------------------------
+  tablist:
+
+  Name "Work sections":
+  <div
+    aria-label="Work sections"
+    class="flex flex-wrap items-center gap-1"
+    role="tablist"
+  />
+
+  --------------------------------------------------
+  tab:
+
+  Name "Tasks & evidence":
+  <a
+    aria-controls="it-ticket-panel"
+    aria-selected="false"
+    class="relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none text-muted-foreground hover:bg-accent hover:text-foreground"
+    data-test="it-ticket-tab-tasks"
+    href="/it/tickets/42?tab=tasks"
+    id="it-ticket-tab-tasks"
+    role="tab"
+    tabindex="-1"
+  />
+
+  Name "Approvals":
+  <a
+    aria-controls="it-ticket-panel"
+    aria-selected="true"
+    class="relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none bg-tone-teal/12 text-tone-teal"
+    data-test="it-ticket-tab-approvals"
+    href="/it/tickets/42?tab=approvals"
+    id="it-ticket-tab-approvals"
+    role="tab"
+    tabindex="0"
+  />
+
+  --------------------------------------------------
+  tabpanel:
+
+  Name "Approvals":
+  <div
+    aria-labelledby="it-ticket-tab-approvals"
+    id="it-ticket-panel"
+    role="tabpanel"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <main>
+      <nav
+        aria-label="Breadcrumb"
+      >
+        <a
+          href="/dashboard"
+        >
+          Home
+        </a>
+        <a
+          href="/it"
+        >
+          IT & Support
+        </a>
+        <a
+          href="/it/tickets/42"
+        >
+          IT-000042
+        </a>
+      </nav>
+      <div>
+        <div
+          class="min-w-0"
+        >
+          <div
+            class="flex flex-col gap-5"
+          >
+            <header
+              class="eh-header text-primary-foreground overflow-clip!"
+            >
+              <div
+                class="relative z-[1] flex h-full flex-col"
+              >
+                <div
+                  class="flex flex-col px-[22px] pt-[18px]"
+                >
+                  <div
+                    class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6 lg:flex-wrap"
+                  >
+                    <div
+                      class="flex min-w-0 items-start gap-[13px] lg:flex-[1_0_28rem]"
+                    >
+                      <a
+                        aria-label="Back"
+                        class="mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 transition-colors outline-none hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+                        href="/it"
+                      >
+                        <svg
+                          class="lucide lucide-chevron-left size-4"
+                          fill="none"
+                          height="24"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                          width="24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="m15 18-6-6 6-6"
+                          />
+                        </svg>
+                      </a>
+                      <span
+                        class="eh-mark-ring"
+                      >
+                        <svg
+                          class="lucide lucide-ticket size-5"
+                          fill="none"
+                          height="24"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                          width="24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+                          />
+                          <path
+                            d="M13 5v2"
+                          />
+                          <path
+                            d="M13 17v2"
+                          />
+                          <path
+                            d="M13 11v2"
+                          />
+                        </svg>
+                      </span>
+                      <div
+                        class="flex min-w-0 flex-col"
+                      >
+                        <div
+                          class="flex flex-wrap items-center gap-2"
+                        >
+                          <h1
+                            class="text-[22px] leading-tight font-bold tracking-tight min-w-0 max-w-full break-words whitespace-normal"
+                          >
+                            Investigate the shared printer
+                          </h1>
+                          <span
+                            class="inline-flex items-center gap-1 border px-2.5 py-0.5 text-xs bg-status-warning-bg text-status-warning border-status-warning/30 rounded-[8px] font-semibold"
+                          >
+                            Open
+                          </span>
+                        </div>
+                        <p
+                          class="mt-[3px] text-[13px] text-primary-foreground/65"
+                        >
+                          IT-000042
+                           · 
+                          Raised by
+                           
+                          Alex Requester
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end lg:ml-auto"
+                    >
+                      <button
+                        class="relative inline-flex h-9 min-w-[200px] flex-1 items-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground/55 transition-colors outline-none hover:bg-primary-foreground/15 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 lg:w-[250px] lg:flex-none"
+     ...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/tickets/show.test.tsx:299:32
+    297|         const post = vi.spyOn(router, 'post').mockImplementation(() =>…
+    298|         const view = render(<ItTicketShow {...props} />);
+    299|         fireEvent.click(screen.getByRole('button', { name: /^Approve$/…
+       |                                ^
+    300|         fireEvent.change(
+    301|             screen.getByRole('textbox', { name: 'Decision note (option…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 37 passed (38)
+   Start at  08:58:32
+   Duration  10.16s (transform 1.26s, setup 391ms, import 5.68s, tests 8.23s, environment 2.99s)
+

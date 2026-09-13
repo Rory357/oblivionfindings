@@ -1,0 +1,13 @@
+{
+    "extends": "./w02-command-ui.tsconfig.json",
+    "files": [
+        "../../../../resources/js/hooks/use-it-ticket-command.ts",
+        "../../../../resources/js/hooks/use-it-ticket-command.test.tsx",
+        "../../../../resources/js/components/it/ticket-command-wizard.tsx",
+        "../../../../resources/js/components/it/ticket-intake-fields.tsx",
+        "../../../../resources/js/components/it/it-wizards.tsx",
+        "../../../../resources/js/components/it/__tests__/ticket-command-wizard.test.tsx",
+        "../../../../resources/js/components/it/__tests__/ticket-creation-access.test.tsx",
+        "../../../../resources/js/components/it/__tests__/ticket-intake-triage.test.tsx"
+    ]
+}

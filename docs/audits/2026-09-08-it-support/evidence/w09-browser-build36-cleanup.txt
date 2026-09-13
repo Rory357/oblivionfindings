@@ -1,0 +1,7 @@
+{"database_removed":"oblivion_it_draft_browser_107ee8b81e2c4322","token":"107ee8b81e2c4322","other_databases_affected":false}
+{
+  "token": "107ee8b81e2c4322",
+  "database_removed": true,
+  "owned_directory_removed": true,
+  "current_herd_environment_changed": false
+}

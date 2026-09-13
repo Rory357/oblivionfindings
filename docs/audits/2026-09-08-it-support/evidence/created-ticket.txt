@@ -1,0 +1,201 @@
+Browser tab: 1, Title: "IT-000007 — AUDIT 2026-09-08 — disposable printer workflow - Laravel", URL: "https://oblivionfindings.test/it/tickets/7".
+1 AXWebArea IT-000007 — AUDIT 2026-09-08 — disposable printer workflow - Laravel, URL: oblivionfindings.test/it/tickets/7
+	2 container app
+		3 link Description: Skip to main content, Value: oblivionfindings.test/it/tickets/7#main-content
+		4 container
+			5 container
+				6 text Tue 8 Sept
+			7 link Description: Oblivion Care — home, Value: oblivionfindings.test/dashboard
+			8 pop up button (collapsed) Description: Search or jump to a page, Secondary Actions: Expand
+				9 image
+				10 text Search or jump to…
+				11 text Ctrl
+				12 text K
+			13 link Description: Report incident, Value: oblivionfindings.test/incidents/create
+			14 link Description: Clock in/out, Value: oblivionfindings.test/attendance
+			15 pop up button (collapsed) Description: Ask about a client, Secondary Actions: Expand
+				16 image
+			17 link Description: Messages, Value: oblivionfindings.test/operations/messages
+			18 pop up button (collapsed) Description: Notifications, ID: radix-_r_b8_, Secondary Actions: Expand
+				19 image
+				20 text 1
+			21 pop up button (collapsed) Description: Announcements, ID: radix-_r_ba_, Secondary Actions: Expand
+				22 image
+			23 pop up button (collapsed) Description: Open user menu for Demo Admin, ID: radix-_r_8g_, Secondary Actions: Expand
+				24 image Demo Admin
+		25 container
+			26 container Description: Primary navigation, ID: app-sidebar-nav
+				27 container
+					28 link Description: My Day, Value: oblivionfindings.test/my-day
+					29 link Description: Overview, Value: oblivionfindings.test/dashboard
+					30 link Description: Today, Value: oblivionfindings.test/today
+					31 link Description: My Calendar, Value: oblivionfindings.test/my-calendar
+					32 link Description: All Tasks, Value: oblivionfindings.test/tasks
+					33 button (expanded) Description: Sites & Locations menu, Secondary Actions: Collapse
+						34 text Sites & Locations
+						35 image
+					36 container Sites & Locations navigation
+						37 text SITES & LOCATIONS
+						38 link Description: All Sites, Value: oblivionfindings.test/sites
+						39 link Description: Head Office, Value: oblivionfindings.test/sites?type=head_office
+						40 link Description: Houses, Value: oblivionfindings.test/sites?type=house
+						41 link Description: Facilities, Value: oblivionfindings.test/sites?type=facility
+						42 link Description: Site Calendar, Value: oblivionfindings.test/calendar
+						43 link Description: Checklists, Value: oblivionfindings.test/checklists
+						44 link Description: Inspections & Maintenance, Value: oblivionfindings.test/sites/inspections
+						45 link Description: Reports, Value: oblivionfindings.test/sites/reports
+						46 link Description: Vendors & Credentials, Value: oblivionfindings.test/vendors
+						47 link Description: Meal Planner, Value: oblivionfindings.test/catering
+						48 text RESPITE
+						49 link Description: Respite, Value: oblivionfindings.test/respite
+					50 button (collapsed) Description: Operations menu, Secondary Actions: Expand
+						51 text Operations
+						52 image
+					53 button (collapsed) Description: Workforce menu, Secondary Actions: Expand
+						54 text Workforce
+						55 image
+					56 button (collapsed) Description: eMAR menu, Secondary Actions: Expand
+						57 text eMAR
+						58 image
+					59 link Description: Health & Clinical, Value: oblivionfindings.test/health-clinical
+					60 button (collapsed) Description: Health & Safety menu, Secondary Actions: Expand
+						61 text Health & Safety
+						62 image
+					63 button (collapsed) Description: Fleet & Assets menu, Secondary Actions: Expand
+						64 text Fleet & Assets
+						65 image
+					66 button (expanded) Description: IT & Support menu, Secondary Actions: Collapse
+						67 text IT & Support
+						68 image
+					69 container IT & Support navigation
+						70 link Description: Service desk, Value: oblivionfindings.test/it
+						71 link Description: Problems, Value: oblivionfindings.test/it/problems
+						72 link Description: Changes, Value: oblivionfindings.test/it/changes
+						73 link Description: Major incidents, Value: oblivionfindings.test/it/major-incidents
+						74 link Description: Setup, Value: oblivionfindings.test/it/setup
+					75 button (collapsed) Description: HR menu, Secondary Actions: Expand
+						76 text HR
+						77 image
+					78 button (collapsed) Description: Governance menu, Secondary Actions: Expand
+						79 text Governance
+						80 image
+					81 button (collapsed) Description: Finance menu, Secondary Actions: Expand
+						82 text Finance
+						83 image
+					84 button (collapsed) Description: Reporting menu, Secondary Actions: Expand
+						85 text Reporting
+						86 image
+					87 button (collapsed) Description: Security & Devices menu, Secondary Actions: Expand
+						88 text Security & Devices
+						89 image
+					90 button (collapsed) Description: Control Room menu, Secondary Actions: Expand
+						91 text Control Room
+						92 image
+				93 link Description: Settings, Value: oblivionfindings.test/settings
+			94 button (expanded) Description: Collapse sidebar, Secondary Actions: Collapse
+				95 image
+		96 container main-content
+			97 container breadcrumb
+				98 content list
+					99 link Description: IT & Support, Value: oblivionfindings.test/it
+					100 link (disabled) IT-000007
+						101 text IT-000007
+			102 container
+				103 link Description: Back to IT & Support, Value: oblivionfindings.test/it
+				104 image
+				105 button Description: Copy reference IT-000007, Help: Copy reference
+					106 text IT-000007
+					107 image
+				108 text In progress Normal
+				109 image
+				110 text Response due in 23h 59m
+				111 heading AUDIT 2026-09-08 — disposable printer workflow, Value: 1
+					112 text AUDIT 2026-09-08 — disposable printer workflow
+				113 text Raised by
+				114 link Description: Demo Admin, Value: oblivionfindings.test/hr/people/20
+				115 text  · System Administrator  · 32s ago
+				116 button Resolve…
+					117 image
+					118 text Resolve…
+				119 button Merge…
+					120 image
+					121 text Merge…
+				122 button Watch
+					123 image
+					124 text Watch
+			125 checkbox Conversation, Value: 1
+				126 image
+				127 text Conversation
+			128 checkbox Activity 2, Value: 0
+				129 image
+				130 text Activity
+				131 text 2
+			132 container
+				133 text DEMO ADMIN  — ORIGINAL REPORT
+			134 text Disposable local audit record. Verify triage, work tasks, resolution and reopening. No operational action required.
+			135 container
+				136 checkbox Reply, Value: 1
+				137 checkbox Internal note, Value: 0
+			138 text entry area (settable)
+			139 button Attach
+				140 image
+				141 text Attach
+			142 text Ctrl+Enter to send
+			143 button (disabled) Send reply
+				144 image
+				145 text Send reply
+			146 text PROPERTIES
+			147 text STATUS
+			148 combo box (collapsed) Description: Status, Value: In progress, Secondary Actions: Expand
+				149 text In progress
+			150 text PRIORITY
+			151 combo box (collapsed) Description: Priority, Value: Normal, Secondary Actions: Expand
+				152 text Normal
+			153 text WORK TYPE
+			154 combo box (collapsed) Description: Work type, Value: Incident, Secondary Actions: Expand
+				155 text Incident
+			156 text AFFECTED SERVICE
+			157 combo box (collapsed) Description: Affected service, Value: No service selected, Secondary Actions: Expand
+				158 text No service selected
+			159 text TICKET SITE
+			160 combo box (collapsed) Description: Ticket Site, Value: QA Main Site, Secondary Actions: Expand
+				161 text QA Main Site
+			162 link Description: Open QA Main Site profile, Value: oblivionfindings.test/sites/1
+			163 text CATEGORY
+			164 combo box (collapsed) Description: Category, Value: Hardware, Secondary Actions: Expand
+				165 text Hardware
+			166 text SUBCATEGORY
+			167 text field (settable)
+			168 text ASSIGNEE
+			169 combo box (collapsed) Description: Assignee, Value: Demo Admin, Secondary Actions: Expand
+				170 text Demo Admin
+			171 link Description: Open Demo Admin's profile, Value: oblivionfindings.test/hr/people/20
+			172 text ROUTED OWNERSHIP
+			173 container Routed ownership
+				174 text QUEUE Queue not configured RESPONSIBLE TEAM Team not configured ACCOUNTABLE OWNER Owner not assigned
+			175 text LINKED ASSET
+			176 combo box (collapsed) Description: Linked asset, Value: No linked asset, Secondary Actions: Expand
+				177 text No linked asset
+			178 container WORK TASKS
+				179 heading WORK TASKS, Value: 2, ID: ticket-work-tasks
+					180 text WORK TASKS
+				181 button Add task
+				182 text No work tasks have been added.
+			183 container LINKED CONTEXT
+				184 heading LINKED CONTEXT, Value: 2, ID: ticket-linked-context
+					185 text LINKED CONTEXT
+				186 text Add affected Device
+				187 text Choose a visible Security & Devices record in this ticket's Site.
+				188 combo box (collapsed) Description: Add affected Device, Value: Choose a Device, ID: ticket-affected-device, Secondary Actions: Expand
+					189 text Choose a Device
+				190 text No linked operational records are visible.
+			191 text WATCHERS (0)
+			192 text Nobody watching yet.
+			193 text REQUESTER
+			194 link Description: Demo Admin · System Administrator, Value: oblivionfindings.test/hr/people/20
+			195 text SOURCE Agent RAISED Tue 8 Sept, 3:51 pm UPDATED Tue 8 Sept, 3:51 pm
+			196 image
+			197 button Copy link to this ticket
+		198 container Notifications alt+T
+
+The focused UI element is 4 container

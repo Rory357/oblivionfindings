@@ -1,0 +1,1 @@
+{"tool":"pint","result":"fixed","files":[{"path":"tests\\Feature\\It\\ItTicketMergeTest.php","fixers":["fully_qualified_strict_types","line_ending","ordered_imports"]}]}

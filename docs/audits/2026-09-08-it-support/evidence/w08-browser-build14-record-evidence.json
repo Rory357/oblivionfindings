@@ -1,0 +1,204 @@
+{
+    "observed_at": "2026-09-09T21:37:25+00:00",
+    "token": "0602c48a4735490d",
+    "database": "oblivion_it_draft_browser_0602c48a4735490d",
+    "time_context": {
+        "elapsed_ms": 0.09,
+        "rows": [
+            {
+                "session_time_zone": "SYSTEM",
+                "system_time_zone": "New Zealand Standard Time"
+            }
+        ]
+    },
+    "tickets": {
+        "elapsed_ms": 0.26,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 1,
+                "status": "open"
+            },
+            {
+                "id": 4,
+                "lock_version": 1,
+                "status": "open"
+            }
+        ]
+    },
+    "tasks": {
+        "elapsed_ms": 0.21,
+        "rows": []
+    },
+    "dependencies": {
+        "elapsed_ms": 0.27,
+        "rows": []
+    },
+    "receipts": {
+        "elapsed_ms": 0.26,
+        "rows": []
+    },
+    "events": {
+        "elapsed_ms": 0.18,
+        "rows": []
+    },
+    "audits": {
+        "elapsed_ms": 0.28,
+        "rows": []
+    },
+    "approvals": {
+        "ticket": {
+            "elapsed_ms": 0.13,
+            "rows": [
+                {
+                    "id": 5,
+                    "lock_version": 5,
+                    "status": "open"
+                }
+            ]
+        },
+        "requests": {
+            "elapsed_ms": 0.2,
+            "rows": [
+                {
+                    "id": 1,
+                    "it_ticket_id": 5,
+                    "status": "rejected",
+                    "requested_by": 3,
+                    "primary_approver_user_id": 4,
+                    "cover_approver_user_id": 5,
+                    "approver_id": 4,
+                    "expires_at": "2026-09-10 12:00:00",
+                    "remind_at": "2026-09-10 11:00:00",
+                    "decided_at": "2026-09-10 09:33:47",
+                    "expired_at": null,
+                    "cancelled_at": null,
+                    "cancelled_by_user_id": null,
+                    "request_reason_sha256": "1df06721b0a67c7e803d13b3f1acd508431e3da08e4064b7771b446c900ba3b2",
+                    "decision_reason_sha256": "ec0f0e021b73e8ed9d126ccaaf53caee23820c531bd7654e972f5801c9aca6da",
+                    "cancellation_reason_sha256": null
+                },
+                {
+                    "id": 2,
+                    "it_ticket_id": 5,
+                    "status": "approved",
+                    "requested_by": 4,
+                    "primary_approver_user_id": 3,
+                    "cover_approver_user_id": 5,
+                    "approver_id": 3,
+                    "expires_at": null,
+                    "remind_at": null,
+                    "decided_at": "2026-09-10 09:36:18",
+                    "expired_at": null,
+                    "cancelled_at": null,
+                    "cancelled_by_user_id": null,
+                    "request_reason_sha256": "d60ee1114b7b36fccca9b17b51db129ea0b1e687c9ae8113c6f7ad0b968aa2af",
+                    "decision_reason_sha256": "d0cc6e05e6933bb052556b3bdd6c4414c1aec98fa4e85e632d7208f5d73fa530",
+                    "cancellation_reason_sha256": null
+                }
+            ]
+        },
+        "receipts": {
+            "elapsed_ms": 0.15,
+            "rows": [
+                {
+                    "id": 1,
+                    "actor_user_id": 3,
+                    "operation": "approval.request",
+                    "request_uuid": "11e78e16-ec89-443e-8394-712f33e09969",
+                    "it_ticket_id": 5,
+                    "committed_ticket_version": 2,
+                    "committed_at": "2026-09-10 09:32:05"
+                },
+                {
+                    "id": 2,
+                    "actor_user_id": 4,
+                    "operation": "approval.decide",
+                    "request_uuid": "bb1994e9-e989-4156-8087-a49d95b42f20",
+                    "it_ticket_id": 5,
+                    "committed_ticket_version": 3,
+                    "committed_at": "2026-09-10 09:33:47"
+                },
+                {
+                    "id": 3,
+                    "actor_user_id": 4,
+                    "operation": "approval.request",
+                    "request_uuid": "030379f6-7e33-4a86-9be5-bbdb711298ac",
+                    "it_ticket_id": 5,
+                    "committed_ticket_version": 4,
+                    "committed_at": "2026-09-10 09:34:55"
+                },
+                {
+                    "id": 4,
+                    "actor_user_id": 3,
+                    "operation": "approval.decide",
+                    "request_uuid": "a54ced3b-52a3-4f0f-83ef-ea93ce0739c8",
+                    "it_ticket_id": 5,
+                    "committed_ticket_version": 5,
+                    "committed_at": "2026-09-10 09:36:18"
+                }
+            ]
+        },
+        "events": {
+            "elapsed_ms": 0.16,
+            "rows": [
+                {
+                    "id": 1,
+                    "actor_user_id": 3,
+                    "type": "approval_requested",
+                    "created_at": "2026-09-09 21:32:05"
+                },
+                {
+                    "id": 2,
+                    "actor_user_id": 4,
+                    "type": "approval_rejected",
+                    "created_at": "2026-09-09 21:33:47"
+                },
+                {
+                    "id": 3,
+                    "actor_user_id": 4,
+                    "type": "approval_requested",
+                    "created_at": "2026-09-09 21:34:55"
+                },
+                {
+                    "id": 4,
+                    "actor_user_id": 3,
+                    "type": "approval_approved",
+                    "created_at": "2026-09-09 21:36:18"
+                }
+            ]
+        },
+        "audits": {
+            "elapsed_ms": 0.19,
+            "rows": [
+                {
+                    "id": 18,
+                    "user_id": 3,
+                    "action": "it.ticket.approval.requested",
+                    "created_at": "2026-09-10 09:32:05"
+                },
+                {
+                    "id": 23,
+                    "user_id": 4,
+                    "action": "it.ticket.approval.rejected",
+                    "created_at": "2026-09-10 09:33:47"
+                },
+                {
+                    "id": 25,
+                    "user_id": 4,
+                    "action": "it.ticket.approval.requested",
+                    "created_at": "2026-09-10 09:34:55"
+                },
+                {
+                    "id": 30,
+                    "user_id": 3,
+                    "action": "it.ticket.approval.approved",
+                    "created_at": "2026-09-10 09:36:18"
+                }
+            ]
+        }
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false
+}

@@ -26,11 +26,13 @@ use App\Services\AuditLogger;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\MyDay\ShiftTaskHelpService;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class AttendanceService
@@ -49,6 +51,8 @@ class AttendanceService
         'shifts.update',
         'shifts.manageAny',
         'clients.update',
+        'clients.viewAssigned',
+        'clients.viewAny',
         'medications.controlled.view',
         'medications.controlled.record',
     ];
@@ -1494,6 +1498,7 @@ class AttendanceService
 
         $pendingTasks = $shift->tasks
             ->where('is_completed', false)
+            ->reject(fn ($task) => app(ShiftTaskHelpService::class)->accepted($task))
             ->count();
 
         if ($pendingTasks > 0) {
@@ -1798,6 +1803,7 @@ class AttendanceService
             ->map(fn (mixed $update) => is_array($update) ? [
                 'id' => (int) ($update['id'] ?? 0),
                 'is_completed' => (bool) ($update['is_completed'] ?? false),
+                'expected_version' => (int) ($update['expected_version'] ?? 0),
             ] : null)
             ->filter(fn (?array $update) => $update !== null && $update['id'] > 0)
             ->values();
@@ -1830,10 +1836,23 @@ class AttendanceService
             $task = $tasks->get($update['id']);
             $completed = (bool) $update['is_completed'];
 
+            if ((bool) $task->is_completed === $completed) {
+                continue;
+            }
+            if ((int) $task->version !== $update['expected_version']) {
+                throw ValidationException::withMessages([
+                    'task_updates' => 'A task changed while you were reviewing your shift. Refresh My Day and review its latest outcome.',
+                ]);
+            }
+            if ($task->task_scope === 'client') {
+                abort_unless(Gate::forUser($user)->allows('view', $task->client), 403);
+            }
+
             $task->forceFill([
                 'is_completed' => $completed,
                 'completed_at' => $completed ? ($task->completed_at ?? now()) : null,
                 'completed_by' => $completed ? ($task->completed_by ?? $user->id) : null,
+                'reminder_sent_at' => $completed ? $task->reminder_sent_at : null,
             ])->save();
         }
     }
@@ -1926,8 +1945,16 @@ class AttendanceService
             'submit' => false,
         ];
 
+        if (array_key_exists('worker_notes', $handover)) {
+            $payload['worker_notes'] = $handover['worker_notes'];
+            $payload['expected_version'] = $handover['expected_version'] ?? null;
+            // A named-person draft must not overwrite a concurrent reviewed edit.
+            $payload['replace_owned_draft'] = false;
+        }
+
         if (
-            $user->canDo('medications.controlled.view')
+            ! array_key_exists('worker_notes', $handover)
+            && $user->canDo('medications.controlled.view')
             && $user->canDo('medications.controlled.record')
         ) {
             $payload['medications_due'] = $medsCompleted

@@ -472,8 +472,8 @@ Auth pages (`auth/*`) never appear because they aren't rendered via
 ### operations (57)
 
 - [x] `operations/activity/Index` — PageHero
-- ~~`operations/calendar-sync/Create` — PageHero~~ — skipped 2026-09-08 at user request: do not migrate
-- [x] `operations/calendar-sync/Index` — PageHero
+- ~~`operations/calendar-sync/Create` — PageHero~~ — skipped 2026-09-08 at user request; page deleted 2026-09-13 in main (calendar sync centralized into `/settings/calendar-sync`, old URL 301-redirects)
+- ~~`operations/calendar-sync/Index` — PageHero~~ — migrated 2026-09-08, then page deleted 2026-09-13 in main (calendar sync centralized into `/settings/calendar-sync` + work-calendar settings; old URL 301-redirects)
 - ~~`operations/care-plans/Create` — PageHero~~ — skipped 2026-09-08: legacy full-page create form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
 - ~~`operations/care-plans/Edit` — PageHero~~ — skipped 2026-09-08: legacy full-page edit form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
 - [x] `operations/care-plans/Index` — PageHero

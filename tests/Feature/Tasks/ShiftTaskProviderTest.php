@@ -24,6 +24,7 @@ test('shift tasks expose the rostered staff assignee while enforcing canonical S
     $permission = Permission::query()->where('key', 'shifts.manageAny')->firstOrFail();
     $viewer->permissionOverrides()->syncWithoutDetaching([
         $permission->id => ['allowed' => true],
+        Permission::where('key', 'clients.viewAny')->firstOrFail()->id => ['allowed' => true],
     ]);
     HrEmployeeProfile::factory()->create([
         'user_id' => $viewer->id,
@@ -98,6 +99,7 @@ it('renders the rostered worker without loading an undefined shift relationship'
     $permission = Permission::query()->where('key', 'shifts.viewAny')->firstOrFail();
     $worker->permissionOverrides()->syncWithoutDetaching([
         $permission->id => ['allowed' => true],
+        Permission::where('key', 'clients.viewAssigned')->firstOrFail()->id => ['allowed' => true],
     ]);
     $site = Site::factory()->create();
     HrEmployeeProfile::factory()->create([
@@ -106,6 +108,7 @@ it('renders the rostered worker without loading an undefined shift relationship'
         'secondary_site_ids' => [],
     ]);
     $client = Client::factory()->create(['site_id' => $site->id]);
+    $client->supportWorkers()->attach($worker->id);
     $shift = Shift::factory()->create([
         'site_id' => $site->id,
         'client_id' => $client->id,
@@ -145,11 +148,12 @@ it('counts zero and populated rostered shift tasks for the navigation badge', fu
         'secondary_site_ids' => [],
     ]);
     $client = Client::factory()->create(['site_id' => $site->id]);
+    $client->supportWorkers()->attach($worker->id);
     $aggregator = new TaskAggregator([new ShiftTaskProvider]);
 
     expect($aggregator->badgeCountFor($worker))->toBe(0);
 
-    $shift = Shift::factory()->create([
+    $shift = Shift::factory()->published()->create([
         'site_id' => $site->id,
         'client_id' => $client->id,
         'user_id' => $worker->id,
@@ -162,6 +166,8 @@ it('counts zero and populated rostered shift tasks for the navigation badge', fu
         'is_completed' => false,
     ]);
 
+    // Providers are memoized within a request; the subsequent page uses a fresh aggregator.
+    $aggregator = new TaskAggregator([new ShiftTaskProvider]);
     $projection = $aggregator->navigationBadgeFor($worker);
 
     expect($aggregator->badgeCountFor($worker))->toBe(1)

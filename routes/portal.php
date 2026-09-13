@@ -35,6 +35,7 @@ use App\Http\Controllers\TimelineInteractionController;
 use App\Models\Announcement;
 use App\Models\Client;
 use App\Models\FamilyVisitRequest;
+use App\Services\SsoConfigurationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -47,7 +48,9 @@ use Inertia\Inertia;
  */
 
 // Portal SSO routes (outside auth middleware - these are for login)
-Route::get('portal/login', fn () => Inertia::render('portal/login'))->name('portal.login')->middleware('guest');
+Route::get('portal/login', fn () => Inertia::render('portal/login', [
+    'ssoProviders' => app(SsoConfigurationService::class)->availability('portal'),
+]))->name('portal.login')->middleware('guest');
 Route::get('portal/auth/microsoft/redirect', [PortalOAuthController::class, 'redirectMicrosoft'])->name('portal.auth.microsoft');
 Route::get('portal/auth/microsoft/callback', [PortalOAuthController::class, 'callbackMicrosoft']);
 Route::get('portal/auth/google/redirect', [PortalOAuthController::class, 'redirectGoogle'])->name('portal.auth.google');

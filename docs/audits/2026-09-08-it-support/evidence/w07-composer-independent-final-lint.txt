@@ -1,0 +1,6 @@
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\__tests__\ticket-reply-composer.test.tsx
+  30:13  warning  Consider <Button> from @/components/ui/button. If the raw <button> is intentional (custom layout / selector card), add an inline disable comment with reason  no-restricted-syntax
+
+✖ 1 problem (0 errors, 1 warning)
+

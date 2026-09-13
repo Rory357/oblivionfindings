@@ -1,0 +1,63 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_c37ae1d5e1ae4e36",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItNotificationAccessTest[39m
+  [32;1m✓[39;22m[90m [39m[90mIT dispatch refuses an already revoked recipient even with a stale loaded user[39m[90m                            [39m [90m164.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued IT channels recheck current record access at execution with ('approval')[39m[90m                             [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued IT channels recheck current record access at execution with ('site')[39m[90m                                 [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued IT channels recheck current record access at execution with ('permission')[39m[90m                           [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued IT channels recheck current record access at execution with ('team')[39m[90m                                 [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued IT channels recheck current record access at execution with ('sensitivity')[39m[90m                          [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpermitted participant and assigned technician still receive both IT channels with ('participant')[39m[90m           [39m [90m2.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpermitted participant and assigned technician still receive both IT channels with ('assignment')[39m[90m            [39m [90m0.16s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketCommandTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma browser retry returns the same committed ticket without duplicate activity or notifications[39m[90m               [39m [90m1.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mchanged command content conflicts without changing the saved ticket[39m[90m                                         [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery is actor owned and returns only a current authorized reference[39m[90m                                     [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery and conflicting replays conceal a ticket after the actor loses record access[39m[90m                       [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid input does not reserve the command identity and can be corrected safely[39m[90m                             [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy browser submissions remain compatible while newly served forms adopt command identities[39m[90m              [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnormalized identifiers and watcher ordering do not create false conflicts[39m[90m                                   [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mattachment fingerprints reject replacement content under the same request identity[39m[90m                          [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket audit attachments and command receipt roll back together if the binding cannot persist[39m[90m               [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnotification dispatch failure preserves a successful committed response and a recoverable intent[39m[90m            [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe database rejects a duplicate actor channel and operation command binding[39m[90m                                [39m [90m0.58s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketNotificationOutboxTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma committed intent survives a lost post-response dispatch and drains only once[39m[90m                              [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnotification intent persistence failure rolls back the entire ticket command[39m[90m                                [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpending intent checks revoked access before either channel executes[39m[90m                                         [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery does not repeat accepted uncertain or failed provider attempts with ('accepted')[39m[90m                   [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery does not repeat accepted uncertain or failed provider attempts with ('sending')[39m[90m                    [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery does not repeat accepted uncertain or failed provider attempts with ('failed')[39m[90m                     [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery skips a database channel already persisted before interruption[39m[90m                                     [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma contending dispatcher leaves an intent pending for the lock owner[39m[90m                                         [39m [90m0.18s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItServiceOperationsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mservice operations schema records knowledge evidence email delivery and canonical scheduler runs[39m[90m            [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery mail-capable IT notification exposes delivery tracking context[39m[90m                                        [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexisting IT schedules are named once and their runs are recorded from Laravel scheduler events[39m[90m              [39m [90m0.58s[39m  
+
+  [90mTests:[39m    [32;1m30 passed[39;22m[90m (177 assertions)[39m
+  [90mDuration:[39m [39m178.71s[39m
+

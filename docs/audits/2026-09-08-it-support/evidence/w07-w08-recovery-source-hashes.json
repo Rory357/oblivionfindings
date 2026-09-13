@@ -1,0 +1,8 @@
+{
+  "resources/js/hooks/use-it-ticket-draft-memory.ts": "7f5eec4cbfdd33405f9936f387980e0b3e609ffa2ee8966a9514f1064c60c149",
+  "resources/js/hooks/use-it-ticket-draft-memory.test.tsx": "1fa65e47731173b3f538fa09d32023972a9a9a359153b5f4be38ab3ef1286773",
+  "resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx": "fe2ae02f29999fdbd6402e2fa5d1bc4b542ee7f0757267cb240ca2df6ac5e783",
+  "resources/js/components/it/ticket-approval-history.tsx": "b307a254de966cebdd885f2926ee53ea1f8b04f4c5841d645a63eb82957a627c",
+  "resources/js/components/it/ticket-approval-record.tsx": "114b9c48213ca61a5cac7e73eec36203f7d0db9b98655383ade5226ad8b5827d",
+  "resources/js/components/it/__tests__/ticket-approval-history.test.tsx": "bbbd4539263b2f833692d23d4239bc50a36295c1ade9d2dd6aa66f720e322cd4"
+}

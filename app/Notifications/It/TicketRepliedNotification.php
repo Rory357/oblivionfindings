@@ -12,8 +12,8 @@ use Illuminate\Notifications\Notification;
 /**
  * A PUBLIC reply landed on the thread — requester hears about agent
  * replies; the assignee + watchers hear about requester replies. Internal
- * notes never notify. Reference + title only (frontline privacy): the reply
- * body may name the people we support and never leaves the app.
+ * notes never notify. The base message contains reference and title only;
+ * the canonical IT mail channel applies the configured public-reply policy.
  */
 class TicketRepliedNotification extends Notification implements ShouldQueue, TracksItEmailDelivery
 {
@@ -33,7 +33,7 @@ class TicketRepliedNotification extends Notification implements ShouldQueue, Tra
             'audience' => $this->audience,
             'type' => 'ticket_replied',
             'subject' => "New reply — {$this->ticket->reference} {$this->ticket->title}",
-            'retry_context' => ['audience' => $this->audience],
+            'retry_context' => ['audience' => $this->audience, 'requires_public_comment' => $this->commentId !== null],
         ];
     }
 
@@ -50,14 +50,14 @@ class TicketRepliedNotification extends Notification implements ShouldQueue, Tra
 
         if ($this->audience === 'requester') {
             return $mail
-                ->line('IT has replied on your ticket:')
+                ->line('There is a new reply on your ticket:')
                 ->line("**{$this->ticket->reference}** — {$this->ticket->title}")
                 ->action('Read the reply', url("/it/tickets/{$this->ticket->id}"))
                 ->line('You were notified because you raised this ticket.');
         }
 
         return $mail
-            ->line('The requester has replied on a ticket you are involved with:')
+            ->line('There is a new reply on a ticket you are involved with:')
             ->line("**{$this->ticket->reference}** — {$this->ticket->title}")
             ->action('Open the ticket', url("/it/tickets/{$this->ticket->id}"))
             ->line('You were notified as the assignee or a watcher.');

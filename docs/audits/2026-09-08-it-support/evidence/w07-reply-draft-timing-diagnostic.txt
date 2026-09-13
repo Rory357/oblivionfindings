@@ -1,0 +1,331 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+stdout | resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx > settles an acknowledged saved internal note and deliberately starts the next note without an uncertain RAM copy
+RAM release public_reply true undefined undefined
+RAM retain undefined undefined false 0 undefined
+RAM release internal_note true undefined undefined
+RAM release public_reply true undefined undefined
+RAM retain undefined undefined false 0 undefined
+RAM release internal_note true undefined undefined
+RAM release public_reply true undefined undefined
+RAM retain undefined undefined false 0 undefined
+RAM release internal_note true undefined undefined
+RAM release public_reply true undefined undefined
+RAM retain undefined undefined false 0 undefined
+RAM release internal_note true undefined undefined
+
+stdout | resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx > settles an acknowledged saved internal note and deliberately starts the next note without an uncertain RAM copy
+RAM release public_reply true undefined undefined
+RAM retain active undefined false 0 undefined
+RAM release internal_note true undefined undefined
+
+stdout | resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx > settles an acknowledged saved internal note and deliberately starts the next note without an uncertain RAM copy
+RAM release public_reply true undefined undefined
+RAM retain active undefined false 0 undefined
+RAM release public_reply true undefined undefined
+RAM retain active undefined false 0 0cd933b7-d55f-4a6e-8173-93f63842effd
+RAM retain active undefined true 0 0cd933b7-d55f-4a6e-8173-93f63842effd
+RAM release public_reply true undefined undefined
+RAM retain active undefined true 0 0cd933b7-d55f-4a6e-8173-93f63842effd
+
+stdout | resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx > settles an acknowledged saved internal note and deliberately starts the next note without an uncertain RAM copy
+RAM retain active bf392e76-f73b-45d4-a9a9-3be2c2f34c1f true 1 0cd933b7-d55f-4a6e-8173-93f63842effd
+RAM release internal_note false 0cd933b7-d55f-4a6e-8173-93f63842effd true
+RAM release public_reply true undefined undefined
+RAM retain active bf392e76-f73b-45d4-a9a9-3be2c2f34c1f true 1 da5d9618-be96-422d-9996-dc7bed1374ff
+
+stdout | resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx > settles an acknowledged saved internal note and deliberately starts the next note without an uncertain RAM copy
+RAM release internal_note true da5d9618-be96-422d-9996-dc7bed1374ff true
+RAM release public_reply true undefined undefined
+RAM retain undefined undefined false 3 undefined
+RAM release internal_note true undefined undefined
+
+stdout | resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx > settles an acknowledged saved internal note and deliberately starts the next note without an uncertain RAM copy
+RAM release public_reply true undefined undefined
+RAM retain undefined undefined false 3 undefined
+RAM release internal_note true undefined undefined
+
+stdout | resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx > settles an acknowledged saved internal note and deliberately starts the next note without an uncertain RAM copy
+RAM release public_reply true undefined undefined
+RAM release public_reply false undefined undefined
+RAM retain undefined undefined false 3 undefined
+RAM release internal_note true undefined undefined
+RAM release internal_note false undefined undefined
+
+ ❯ resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx (1 test | 1 failed) 1330ms
+   × settles an acknowledged saved internal note and deliberately starts the next note without an uncertain RAM copy 1328ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx > settles an acknowledged saved internal note and deliberately starts the next note without an uncertain RAM copy
+TestingLibraryElementError: Unable to find role="button" and name "Add another internal note"
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <section
+      aria-label="Write a ticket message"
+      class="space-y-4 border-t border-border p-5"
+    >
+      <div
+        aria-label="Message audience"
+        class="flex flex-wrap gap-2"
+      >
+        <button
+          aria-pressed="false"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+          data-slot="button"
+          type="button"
+        >
+          <svg
+            class="lucide lucide-message-square size-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+            />
+          </svg>
+           Reply
+        </button>
+        <button
+          aria-pressed="true"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-8 rounded-md px-3 has-[>svg]:px-2.5"
+          data-slot="button"
+          type="button"
+        >
+          <svg
+            class="lucide lucide-lock size-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <rect
+              height="11"
+              rx="2"
+              ry="2"
+              width="18"
+              x="3"
+              y="11"
+            />
+            <path
+              d="M7 11V7a5 5 0 0 1 10 0v4"
+            />
+          </svg>
+           Internal note
+        </button>
+      </div>
+      <div
+        hidden=""
+      >
+        <div
+          class="space-y-4"
+        >
+          <p
+            class="text-sm text-muted-foreground"
+          >
+            This reply is visible to the people who can access this ticket. Email delivery is tracked separately.
+          </p>
+          <fieldset />
+          <div
+            class="space-y-2"
+          >
+            <label
+              class="text-sm font-medium"
+              for="_r_0_"
+            >
+              Your reply
+            </label>
+            <textarea
+              aria-invalid="false"
+              class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              id="_r_0_"
+              placeholder="Write an update or ask a question…"
+              rows="5"
+            />
+          </div>
+          <div
+            class="space-y-3"
+          >
+            <div
+              aria-disabled="false"
+              class="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/40"
+              role="button"
+              tabindex="0"
+            >
+              <span
+                class="grid h-14 w-14 place-items-center rounded-2xl transition-colors bg-primary/10 text-primary"
+              >
+                <svg
+                  class="lucide lucide-cloud-upload h-7 w-7"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 13v8"
+                  />
+                  <path
+                    d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"
+                  [36...
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body>
+    <div>
+      <section
+        aria-label="Write a ticket message"
+        class="space-y-4 border-t border-border p-5"
+      >
+        <div
+          aria-label="Message audience"
+          class="flex flex-wrap gap-2"
+        >
+          <button
+            aria-pressed="false"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+            data-slot="button"
+            type="button"
+          >
+            <svg
+              class="lucide lucide-message-square size-4"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+              />
+            </svg>
+             Reply
+          </button>
+          <button
+            aria-pressed="true"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-8 rounded-md px-3 has-[>svg]:px-2.5"
+            data-slot="button"
+            type="button"
+          >
+            <svg
+              class="lucide lucide-lock size-4"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                height="11"
+                rx="2"
+                ry="2"
+                width="18"
+                x="3"
+                y="11"
+              />
+              <path
+                d="M7 11V7a5 5 0 0 1 10 0v4"
+              />
+            </svg>
+             Internal note
+          </button>
+        </div>
+        <div
+          hidden=""
+        >
+          <div
+            class="space-y-4"
+          >
+            <p
+              class="text-sm text-muted-foreground"
+            >
+              This reply is visible to the people who can access this ticket. Email delivery is tracked separately.
+            </p>
+            <fieldset />
+            <div
+              class="space-y-2"
+            >
+              <label
+                class="text-sm font-medium"
+                for="_r_0_"
+              >
+                Your reply
+              </label>
+              <textarea
+                aria-invalid="false"
+                class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                id="_r_0_"
+                placeholder="Write an update or ask a question…"
+                rows="5"
+              />
+            </div>
+            <div
+              class="space-y-3"
+            >
+              <div
+                aria-disabled="false"
+                class="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/40"
+                role="button"
+                tabindex="0"
+              >
+                <span
+                  class="grid h-14 w-14 place-items-center rounded-2xl transition-colors bg-primary/10 text-primary"
+                >
+                  <svg
+                    class="lucide lucide-cloud-upload h-7 w-7"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >[3...
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx:177:11
+    175|     fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
+    176|     await waitFor(() => expect(posts).toHaveBeenCalledTimes(1));
+    177|     await waitFor(() =>
+       |           ^
+    178|         expect(
+    179|             screen.getByRole('button', {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  16:51:47
+   Duration  4.51s (transform 295ms, setup 128ms, import 2.07s, tests 1.33s, environment 820ms)
+

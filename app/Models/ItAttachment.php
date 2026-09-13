@@ -26,6 +26,12 @@ class ItAttachment extends Model
     /** Per-file cap, in kilobytes (10 MB). */
     public const MAX_SIZE_KB = 10240;
 
+    /** Filename and detected content must both belong to the upload allowlist. */
+    public static function uploadRules(): array
+    {
+        return ['file', 'max:'.self::MAX_SIZE_KB, 'mimes:'.self::ALLOWED_MIMES, 'extensions:'.self::ALLOWED_MIMES];
+    }
+
     protected $fillable = [
         'attachable_type',
         'attachable_id',
@@ -34,10 +40,22 @@ class ItAttachment extends Model
         'mime',
         'size',
         'uploaded_by',
+        'draft_generation_uuid', 'draft_upload_uuid', 'draft_content_hash',
+        'draft_storage_state', 'draft_cleanup_attempts', 'draft_cleanup_error_code',
     ];
+
+    protected $hidden = ['draft_generation_uuid', 'draft_upload_uuid', 'draft_content_hash', 'draft_storage_state', 'draft_cleanup_attempts', 'draft_cleanup_error_code',
+        'inbound_position', 'source_inbound_attachment_id', 'inbound_content_hash', 'inbound_storage_state', 'inbound_error_code', 'inbound_cleanup_attempts',
+        'malware_scan_status', 'malware_scanner', 'malware_scan_attempted_at', 'malware_scanned_at'];
 
     protected $casts = [
         'size' => 'integer',
+        'draft_cleanup_attempts' => 'integer',
+        'inbound_position' => 'integer',
+        'source_inbound_attachment_id' => 'integer',
+        'inbound_cleanup_attempts' => 'integer',
+        'malware_scanned_at' => 'datetime',
+        'malware_scan_attempted_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */

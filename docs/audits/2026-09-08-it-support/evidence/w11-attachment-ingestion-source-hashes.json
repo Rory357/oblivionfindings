@@ -1,0 +1,164 @@
+{
+  "sources": [
+    {
+      "path": "app/Domain/It/Data/ItScannedEmailAttachment.php",
+      "sha256": "252e1a3a0d2fffe53866588f22e5e323b35d9119dd8010758de93fa4c1e582e2"
+    },
+    {
+      "path": "app/Domain/It/InboundEmailIngestor.php",
+      "sha256": "d0864234a89917bce7a0b1436c13c285b01236471a2d3e0e1b89ad2eb6b011a0"
+    },
+    {
+      "path": "app/Domain/It/Services/ItAttachmentStorageIntentService.php",
+      "sha256": "239c83cfd46b72aa698ec1cadaf3922dc4a7fc1e3c4858e8538fc3970e80f522"
+    },
+    {
+      "path": "app/Domain/It/Services/ItInboundAttachmentStaging.php",
+      "sha256": "4a3463b086eb0981bfa179fcb0612d91b4dc1ecd36a8687f205c0a2e804df526"
+    },
+    {
+      "path": "app/Domain/It/Services/ItMailboxInbox.php",
+      "sha256": "eb26c430fde5d9021b122e4b7cb77824b52830dfcdbc8bc45f06d11e52ea9f16"
+    },
+    {
+      "path": "app/Domain/It/Services/ItMailboxPollState.php",
+      "sha256": "4e88e0cf9685902583a6be182ed6f0f20bfa06afdbb082d0d11a4cb2c23ee7f2"
+    },
+    {
+      "path": "app/Domain/It/Exceptions/ItInboundAttachmentUnavailable.php",
+      "sha256": "5e3d99cef2a5600c015cfab4ab66ce6e56b64e913c43bb80fdff64e26e6bd156"
+    },
+    {
+      "path": "app/Models/ItAttachment.php",
+      "sha256": "b9a911ec7e5a0302ba5012664d04eae8671fd4dd0285da0a23145d94f0060b3f"
+    },
+    {
+      "path": "database/migrations/2026_09_11_000019_add_it_inbound_attachment_staging.php",
+      "sha256": "ffc513a590fadb457128d91bd98a17ea1bf6678cead3fcb3e6ca0b0c057e6990"
+    },
+    {
+      "path": "tests/Concurrency/It/ItMailboxAttachmentIngestionTest.php",
+      "sha256": "ef4a1860f7073ccfab6a05d2e530d9daed040ca3ffcb2947b8a243617dacb618"
+    },
+    {
+      "path": "tests/Feature/It/ItMailboxPollTest.php",
+      "sha256": "d21b0e0d4966af34c5b931d6bd10acd1d196972f030242f409fcf0d9fc22cd11"
+    },
+    {
+      "path": "tests/Feature/It/ItMailboxPagingTest.php",
+      "sha256": "4c00e28598784ba6e3e4f998d8ab7a6a6a0f1ef19db0c81223960ede300edc07"
+    },
+    {
+      "path": "tests/Feature/It/ItInboundProviderHeadersTest.php",
+      "sha256": "0133265f3dfcf77bd93c6bc15d26f3caba9a92d2659c43071f1ff125097499be"
+    },
+    {
+      "path": "app/Services/GoogleGmailService.php",
+      "sha256": "2e4a009c3eec80252896a65bd014d352ea401d4a87e23b6e53931f27199878cc"
+    },
+    {
+      "path": "app/Services/MicrosoftGraphService.php",
+      "sha256": "8bd03939b5dfb8ee855a414277f22dde9aeab261074773c72cb99569758e053b"
+    },
+    {
+      "path": "app/Domain/It/Services/ItAttachmentWriteContext.php",
+      "sha256": "5865f565b069f083c7cd8c7f3341a0790f4e531f2c32ee5d59944157c3014e8b"
+    },
+    {
+      "path": "app/Domain/It/Services/ItTicketIntakeService.php",
+      "sha256": "28c81f49996c5728701d401ca3fa984c5a958ef93b05eb2d82c9d90c92596457"
+    },
+    {
+      "path": "app/Domain/It/Services/ItTicketInteractionService.php",
+      "sha256": "a965eaa425d26b4bd1b7816c15a86f0a356eaf57dc1ff3571c25166a56eb4da5"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "DESIGN.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/DESIGN_TOKENS.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LIST_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LOADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/oblivion-loader-01-demo.html",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "unchanged": true
+    }
+  ],
+  "tests": [
+    {
+      "token": "it_0e748f4660e74b5b",
+      "log": "w11-attachment-ingestion-tests.txt",
+      "passed": 0,
+      "failed": 1,
+      "errors": 0,
+      "assertions": 62,
+      "seconds": 182,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    },
+    {
+      "token": "it_030cf422e6ad40d8",
+      "log": "w11-attachment-ingestion-tests-retry.txt",
+      "passed": 0,
+      "failed": 1,
+      "errors": 0,
+      "assertions": 98,
+      "seconds": 182,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    },
+    {
+      "token": "it_4f032392eae34814",
+      "log": "w11-attachment-ingestion-tests-final.txt",
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 198,
+      "seconds": 183,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    },
+    {
+      "token": "it_93fd532c22ed4e65",
+      "log": "w11-attachment-ingestion-regression.txt",
+      "passed": 110,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 988,
+      "seconds": 193,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    }
+  ]
+}

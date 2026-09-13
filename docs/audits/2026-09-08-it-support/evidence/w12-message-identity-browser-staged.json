@@ -1,0 +1,79 @@
+{
+    "token": "377860ef3cd84316",
+    "phase": "outbound_reply",
+    "database_mutations": false,
+    "synthetic_inbox_changed": true,
+    "tickets": [
+        {
+            "id": 1,
+            "reference": "IT-000001",
+            "merged_into_ticket_id": null,
+            "status": "open",
+            "lock_version": 1
+        },
+        {
+            "id": 7,
+            "reference": "IT-000007",
+            "merged_into_ticket_id": null,
+            "status": "open",
+            "lock_version": 1
+        }
+    ],
+    "receipts": [],
+    "connections": [
+        {
+            "id": 1,
+            "provider": "microsoft"
+        },
+        {
+            "id": 2,
+            "provider": "google"
+        }
+    ],
+    "ticket_count": 8,
+    "email_comment_commands": 0,
+    "comment_audits": 0,
+    "merge_events": [],
+    "synthetic_comments": [],
+    "outgoing_identities": [
+        {
+            "id": 1,
+            "it_ticket_id": 8,
+            "recipient_user_id": 1,
+            "status": "accepted",
+            "rfc_message_id_hash": "73a8b5f7bb734bcd18b8766782a0f3a768d3c8241f877bfc1f5dcede9f39b7c7",
+            "rfc_message_id_recorded_at": "2026-09-11 10:00:13"
+        }
+    ],
+    "provider_state": {
+        "token": "377860ef3cd84316",
+        "synthetic_only": true,
+        "unread": {
+            "microsoft": [
+                49,
+                50,
+                51,
+                52
+            ],
+            "google": [
+                49,
+                50,
+                51,
+                52
+            ]
+        },
+        "ack_attempts": {
+            "microsoft": [],
+            "google": []
+        },
+        "reads": {
+            "microsoft": [],
+            "google": []
+        },
+        "external_body_reads": 0,
+        "outbound_scenario": {
+            "delivery_id": 1,
+            "ticket_id": 8
+        }
+    }
+}

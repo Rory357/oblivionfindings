@@ -1,0 +1,421 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/it-api-operations.test.tsx (4 tests | 2 failed) 377ms
+     × shows recorded facts and original-client recovery with canonical identity and pagination links 302ms
+     × keeps legacy uncertainty, unrecorded attempts and read recovery distinct 62ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/it-api-operations.test.tsx > API operations diagnostics > shows recorded facts and original-client recovery with canonical identity and pagination links
+TestingLibraryElementError: Found multiple elements with the role "button" and name "Close"
+
+Here are the matching elements:
+
+Ignored nodes: comments, script, style
+<button
+  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+  data-slot="button"
+>
+  Close
+</button>
+
+Ignored nodes: comments, script, style
+<button
+  class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+  type="button"
+>
+  <svg
+    class="lucide lucide-x"
+    fill="none"
+    height="24"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="2"
+    viewBox="0 0 24 24"
+    width="24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M18 6 6 18"
+    />
+    <path
+      d="m6 6 12 12"
+    />
+  </svg>
+  <span
+    class="sr-only"
+  >
+    Close
+  </span>
+</button>
+
+(If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+Ignored nodes: comments, script, style
+<div
+  aria-describedby="radix-_r_4_"
+  aria-labelledby="radix-_r_3_"
+  class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg max-h-[90vh] overflow-y-auto"
+  data-slot="dialog-content"
+  data-state="open"
+  id="radix-_r_2_"
+  role="dialog"
+  style="max-width: min(92vw, 480px); pointer-events: auto;"
+  tabindex="-1"
+>
+  <div
+    class="flex flex-col gap-2 text-center sm:text-left"
+    data-slot="dialog-header"
+  >
+    <h2
+      class="text-lg leading-none font-semibold"
+      data-slot="dialog-title"
+      id="radix-_r_3_"
+    >
+      Request outcome · receipt 
+      28
+    </h2>
+    <p
+      class="text-muted-foreground text-sm"
+      data-slot="dialog-description"
+      id="radix-_r_4_"
+    >
+      Approved connector
+       ·
+       
+      Create ticket
+    </p>
+  </div>
+  <div
+    class="space-y-5"
+  >
+    <span
+      class="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium bg-status-critical-bg text-status-critical border-status-critical/30"
+    >
+      Not applied
+    </span>
+    <dl
+      class="grid grid-cols-2 gap-5"
+    >
+      <div>
+        <dt
+          class="text-caption"
+        >
+          Response / category
+        </dt>
+        <dd
+          class="text-subtle text-foreground"
+        >
+          500 · server failure
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-caption"
+        >
+          Execution attempts
+        </dt>
+        <dd
+          class="text-subtle text-foreground"
+        >
+          3
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-caption"
+        >
+          Last attempt
+        </dt>
+        <dd
+          class="text-subtle text-foreground"
+        >
+          Fri 11 Sept, 1:00 pm
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-caption"
+        >
+          Outcome recorded
+        </dt>
+        <dd
+          class="text-subtle text-foreground"
+        >
+          Fri 11 Sept, 1:00 pm
+        </dd>
+      </div>
+    </dl>
+    <p
+      class="text-subtle"
+    >
+      The command was rolled back. The original client can retry the unchanged request with the same Idempotency-Key after resolving the failure. Current credentials, permissions and record access are checked again.
+    </p>
+  </div>
+  <div
+    class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"
+    data-slot="dialog-footer"
+  >
+    <button
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+      data-slot="button"
+    >
+      Close
+    </button>
+  </div>
+  <button
+    class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+    type="button"
+  >
+    <svg
+      class="lucide lucide-x"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M18 6 6 18"
+      />
+      <path
+        d="m6 6 12 12"
+      />
+    </svg>
+    <span
+      class="sr-only"
+    >
+      Close
+    </span>
+  </button>
+</div>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ getElementError node_modules/@testing-library/dom/dist/query-helpers.js:20:35
+ ❯ getMultipleElementsFoundError node_modules/@testing-library/dom/dist/query-helpers.js:23:10
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:55:13
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/it/it-api-operations.test.tsx:81:28
+     79|         ).toHaveTextContent('same Idempotency-Key');
+     80|         fireEvent.click(
+     81|             within(dialog).getByRole('button', { name: 'Close', exact:…
+       |                            ^
+     82|         );
+     83|         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  resources/js/components/it/it-api-operations.test.tsx > API operations diagnostics > keeps legacy uncertainty, unrecorded attempts and read recovery distinct
+TestingLibraryElementError: Found multiple elements with the role "button" and name "Close"
+
+Here are the matching elements:
+
+Ignored nodes: comments, script, style
+<button
+  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+  data-slot="button"
+>
+  Close
+</button>
+
+Ignored nodes: comments, script, style
+<button
+  class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+  type="button"
+>
+  <svg
+    class="lucide lucide-x"
+    fill="none"
+    height="24"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="2"
+    viewBox="0 0 24 24"
+    width="24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M18 6 6 18"
+    />
+    <path
+      d="m6 6 12 12"
+    />
+  </svg>
+  <span
+    class="sr-only"
+  >
+    Close
+  </span>
+</button>
+
+(If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+Ignored nodes: comments, script, style
+<div
+  aria-describedby="radix-_r_b_"
+  aria-labelledby="radix-_r_a_"
+  class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg max-h-[90vh] overflow-y-auto"
+  data-slot="dialog-content"
+  data-state="open"
+  id="radix-_r_9_"
+  role="dialog"
+  style="max-width: min(92vw, 480px); pointer-events: auto;"
+  tabindex="-1"
+>
+  <div
+    class="flex flex-col gap-2 text-center sm:text-left"
+    data-slot="dialog-header"
+  >
+    <h2
+      class="text-lg leading-none font-semibold"
+      data-slot="dialog-title"
+      id="radix-_r_a_"
+    >
+      Request outcome · receipt 
+      28
+    </h2>
+    <p
+      class="text-muted-foreground text-sm"
+      data-slot="dialog-description"
+      id="radix-_r_b_"
+    >
+      Approved connector
+       ·
+       
+      Create ticket
+    </p>
+  </div>
+  <div
+    class="space-y-5"
+  >
+    <span
+      class="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium bg-status-warning-bg text-status-warning border-status-warning/30"
+    >
+      Outcome unverified
+    </span>
+    <dl
+      class="grid grid-cols-2 gap-5"
+    >
+      <div>
+        <dt
+          class="text-caption"
+        >
+          Response / category
+        </dt>
+        <dd
+          class="text-subtle text-foreground"
+        >
+          500 · server failure
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-caption"
+        >
+          Execution attempts
+        </dt>
+        <dd
+          class="text-subtle text-foreground"
+        >
+          Not recorded
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-caption"
+        >
+          Last attempt
+        </dt>
+        <dd
+          class="text-subtle text-foreground"
+        >
+          Fri 11 Sept, 1:00 pm
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-caption"
+        >
+          Outcome recorded
+        </dt>
+        <dd
+          class="text-subtle text-foreground"
+        >
+          Fri 11 Sept, 1:00 pm
+        </dd>
+      </div>
+    </dl>
+    <p
+      class="text-subtle"
+    >
+      The stored evidence does not prove whether work was applied. Reconcile the original client request and canonical work before retrying. Do not create a replacement intent to bypass this uncertainty.
+    </p>
+  </div>
+  <div
+    class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"
+    data-slot="dialog-footer"
+  >
+    <button
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+      data-slot="button"
+    >
+      Close
+    </button>
+  </div>
+  <button
+    class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+    type="button"
+  >
+    <svg
+      class="lucide lucide-x"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M18 6 6 18"
+      />
+      <path
+        d="m6 6 12 12"
+      />
+    </svg>
+    <span
+      class="sr-only"
+    >
+      Close
+    </span>
+  </button>
+</div>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ getElementError node_modules/@testing-library/dom/dist/query-helpers.js:20:35
+ ❯ getMultipleElementsFoundError node_modules/@testing-library/dom/dist/query-helpers.js:23:10
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:55:13
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/it/it-api-operations.test.tsx:122:48
+    120|         ).toBeInTheDocument();
+    121|         fireEvent.click(
+    122|             within(screen.getByRole('dialog')).getByRole('button', {
+       |                                                ^
+    123|                 name: 'Close',
+    124|                 exact: true,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 32 passed (34)
+   Start at  18:24:23
+   Duration  5.33s (transform 467ms, setup 524ms, import 6.81s, tests 1.98s, environment 3.99s)
+

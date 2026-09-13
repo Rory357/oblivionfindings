@@ -1,0 +1,46 @@
+{
+  "captured_at_utc": "2026-09-09T10:38:48.3312850Z",
+  "purpose": "Frozen final cleanup scheduler source; not a hash claim for prior in-flight catalogue assertion snapshot",
+  "sources": [
+    {
+      "path": "app/Console/Commands/RetryItAttachmentCleanup.php",
+      "sha256": "3690a1eca67a671ef4ea4bee0514c4a4f2d2aa6ce4327b21b6478fcce487cb41"
+    },
+    {
+      "path": "app/Domain/It/Services/ItAttachmentCleanupReadService.php",
+      "sha256": "ee8027750cd03bc6f1d5b1040877b3a4c8bf11732736ba75f4ab1778ea80a040"
+    },
+    {
+      "path": "app/Domain/It/Services/ItAutomationScheduleCatalog.php",
+      "sha256": "0fd2aff2011ed448669ec9c44b3037bd5ca3ab9343dee3f7bea9f4a135cb6cad"
+    },
+    {
+      "path": "app/Domain/It/Services/ItAutomationRunRecorder.php",
+      "sha256": "312e9edd12021d0365d9c9512d4652b16e598dafd6d9fb4fd03da658dec03ad2"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+      "sha256": "6cd4630d711d1d9f15fcc98168d01df896ace63f6694d66e3eb7e14dc645f106"
+    },
+    {
+      "path": "resources/js/components/it/it-service-operations.tsx",
+      "sha256": "3df5ecef0e4721ad95e0c5cacd7c5728f37473808e6c3c1ddf10fce15c46b023"
+    },
+    {
+      "path": "resources/js/components/it/__tests__/it-service-operations.test.tsx",
+      "sha256": "02f24794bd110f20ac9d2638b13c198f1acd2eeec1e0e9407a515fca2cf6cee1"
+    },
+    {
+      "path": "tests/Feature/It/ItAttachmentCleanupOperationsTest.php",
+      "sha256": "6b1bb4ba8c571ebbb4e02fb400c0ff697495fab65bb325847c59f80dab3e88dc"
+    },
+    {
+      "path": "tests/Feature/It/ItServiceOperationsTest.php",
+      "sha256": "6109c9f4693da21ae8e3b12b9bb042cf90cbb2242a72252bb3705dd7ce9d9c0e"
+    },
+    {
+      "path": "tests/Concurrency/It/ItAttachmentCleanupCommandTest.php",
+      "sha256": "269bc100cff2a47b7fc21d8f7e15298564be8a40f05f17c302cb5cfe563bbb80"
+    }
+  ]
+}

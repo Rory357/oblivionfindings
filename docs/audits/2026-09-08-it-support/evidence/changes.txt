@@ -1,0 +1,52 @@
+IT & Support
+Changes
+IT & SUPPORT
+Changes
+
+Plan, approve, schedule, execute, validate, and review infrastructure changes without losing the shared ticket record.
+
+New change
+Search changes
+All change types
+All change types
+Standard
+Normal
+Emergency
+All risk levels
+All risk levels
+Low
+Medium
+High
+Critical
+All workflow states
+All workflow states
+Draft
+Assessment
+Approval pending
+Approved
+Scheduled
+Implementing
+Validation
+Completed
+Failed
+Backed out
+Review
+Closed
+Apply filters
+Change register
+1 records
+IT-000003
+Draft
+E2E SD-WAN firmware change
+
+Short site failover while each gateway restarts.
+
+Type / risk
+
+Normal · Medium
+
+Maintenance
+
+Window overdue
+
+Aug 11, 2026, 12:11 AM

@@ -163,7 +163,8 @@ test('dependencies and evidence gate completion while optional tasks do not gate
         'is_required' => false,
     ]);
     $this->actingAs($this->agent)
-        ->post("/it/tickets/{$this->ticket->id}/resolve", [
+        ->post("/it/tickets/{$this->ticket->id}/resolve", ['resolution_code' => 'restored', 'resolution_verification' => 'Synthetic verification confirmed the expected result.',
+            'expected_version' => $this->ticket->fresh()->lock_version,
             'note' => 'Required work completed; optional follow-up remains.',
         ])
         ->assertRedirect()

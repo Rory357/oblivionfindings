@@ -1,0 +1,83 @@
+{
+    "captured_at": "2026-09-08T23:57:38+00:00",
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "environment": "local",
+    "app_host": "oblivionfindings.test",
+    "database_connection": "mysql",
+    "database_name": "oblivion_findings_codex_test",
+    "database_server_local": true,
+    "mail_default": "array",
+    "mail_driver": "array",
+    "queue_default": "sync",
+    "broadcast_default": null,
+    "session_driver": "file",
+    "configuration_cached": false,
+    "hot_file_exists": false,
+    "manifest_sha256": "852bb9d3528651a8218a631832670f17efac41499faf1fd3bfc6f1854eb9c11a",
+    "app_asset": "assets/app-B4I8JQ8g.js",
+    "app_css": [
+        "assets/app-pjifONb0.css"
+    ],
+    "it_asset": "assets/index-Cc4VZsgq.js",
+    "ticket_count": 8,
+    "requester_submission_fixture": [
+        {
+            "id": 8,
+            "reference": "IT-000008",
+            "status": "open",
+            "requester_user_id": 68,
+            "site_id": 1,
+            "source": "portal",
+            "created_at": "2026-09-08T23:51:29.000000Z"
+        }
+    ],
+    "requester_submission_delivery": [
+        {
+            "id": 4,
+            "it_ticket_id": 8,
+            "status": "accepted",
+            "attempt_count": 1,
+            "queued_at": "2026-09-08T23:51:29.000000Z",
+            "accepted_at": "2026-09-08T23:51:29.000000Z"
+        }
+    ],
+    "historical_audit_fixture": {
+        "id": 7,
+        "reference": "IT-000007",
+        "status": "closed",
+        "workflow_state": "closed",
+        "site_id": 1
+    },
+    "active_team_count": 0,
+    "active_queue_count": 0,
+    "mailboxes": [],
+    "provider_configured": {
+        "microsoft": false,
+        "google": false
+    },
+    "demo_users": [
+        {
+            "id": 62,
+            "fixture": "demo_admin",
+            "role": "admin",
+            "can_request": true,
+            "can_view": true,
+            "can_manage": true,
+            "approved_site_ids": [
+                1
+            ]
+        },
+        {
+            "id": 68,
+            "fixture": "support_worker_1",
+            "role": "support_worker",
+            "can_request": true,
+            "can_view": false,
+            "can_manage": false,
+            "approved_site_ids": [
+                1,
+                9008
+            ]
+        }
+    ]
+}

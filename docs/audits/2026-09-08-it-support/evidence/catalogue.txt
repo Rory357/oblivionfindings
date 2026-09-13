@@ -1,0 +1,57 @@
+Home
+IT & Support
+IT & Support
+SLA healthy
+
+Service desk · Tickets, requests and service delivery
+
+/
+Log ticket
+OPEN TICKETS
+7
+2 urgent
+UNASSIGNED
+2
+1 urgent · need an owner
+BREACHING SOON
+0
+SLA at risk
+BREACHED
+0
+SLA overdue
+AWAITING REPLY
+6
+conversation needs an agent
+WAITING
+0
+paused on requester or vendor
+SLA MET · 30D
+0
+nothing resolved yet
+PROVISIONING
+0
+queue healthy
+Category
+Overview
+Tickets
+7
+Provisioning
+0
+Knowledge
+1
+Reports
+Service catalogue
+1
+My tickets
+0
+Service catalogue
+
+Choose a supported request. The right form, approval, priority, and fulfilment workflow are applied automatically.
+
+Service request
+Network
+Request managed network access
+
+Request governed access to a managed site network.
+
+Request managed network access

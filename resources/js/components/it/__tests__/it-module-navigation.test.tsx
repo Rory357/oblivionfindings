@@ -1,37 +1,68 @@
 import ItSetupIndex from '@/pages/it/setup';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ItServiceCatalogue } from '../it-service-catalogue';
 import { ItSideNavigation } from '../it-side-navigation';
 
-vi.mock('@inertiajs/react', () => ({
-    Head: ({ title }: { title: string }) => <title>{title}</title>,
-    Link: ({
-        href,
-        children,
-        ...props
-    }: {
-        href: string;
-        children: ReactNode;
-    }) => (
-        <a href={href} {...props}>
-            {children}
-        </a>
-    ),
-    router: { post: vi.fn(), patch: vi.fn() },
-    useForm: (initial: Record<string, unknown>) => ({
-        data: initial,
-        setData: vi.fn(),
-        post: vi.fn(),
-        patch: vi.fn(),
-        reset: vi.fn(),
-        clearErrors: vi.fn(),
-        processing: false,
-        errors: {},
-    }),
-    usePage: () => ({ props: { itNavigation: navigation }, url: '/it/setup' }),
+const navigationState = vi.hoisted(() => ({
+    url: '/it/setup',
+    listeners: new Set<() => void>(),
 }));
+beforeEach(() => {
+    navigationState.url = '/it/setup';
+});
+vi.mock('@inertiajs/react', async () => {
+    const { useSyncExternalStore } = await import('react');
+    return {
+        Head: ({ title }: { title: string }) => <title>{title}</title>,
+        Link: ({
+            href,
+            children,
+            ...props
+        }: {
+            href: string;
+            children: ReactNode;
+        }) => (
+            <a href={href} {...props}>
+                {children}
+            </a>
+        ),
+        router: {
+            post: vi.fn(),
+            patch: vi.fn(),
+            get: vi.fn((path: string, params: Record<string, string>) => {
+                navigationState.url = `${path}?${new URLSearchParams(params)}`;
+                navigationState.listeners.forEach((listener) => listener());
+            }),
+        },
+        useForm: (initial: Record<string, unknown>) => ({
+            data: initial,
+            setData: vi.fn(),
+            post: vi.fn(),
+            patch: vi.fn(),
+            reset: vi.fn(),
+            clearErrors: vi.fn(),
+            processing: false,
+            errors: {},
+        }),
+        usePage: () => ({
+            props: {
+                itNavigation: navigation,
+                auth: { user: { id: 1, name: 'IT Admin' } },
+            },
+            url: useSyncExternalStore(
+                (listener) => {
+                    navigationState.listeners.add(listener);
+                    return () => {
+                        navigationState.listeners.delete(listener);
+                    };
+                },
+                () => navigationState.url,
+            ),
+        }),
+    };
+});
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
 }));
@@ -138,11 +169,20 @@ describe('IT & Support grouped navigation', () => {
                     {
                         id: 2,
                         key: 'network',
+                        configuration_version: 'a'.repeat(64),
                         name: 'Network queue',
                         description: null,
                         is_active: true,
                         team: { id: 1, name: 'Network operations' },
                         filter_rules: {},
+                        readiness: {
+                            ready: false,
+                            gaps: [
+                                'An accountable manager and cover are required.',
+                            ],
+                            accountable_owner: null,
+                            cover: null,
+                        },
                         workload: {
                             open_tickets: 4,
                             unassigned: 1,
@@ -171,11 +211,9 @@ describe('IT & Support grouped navigation', () => {
             />,
         );
 
-        expect(
-            screen.getByRole('heading', { name: 'Teams, queues & services' }),
-        ).toBeVisible();
+        expect(screen.getByRole('heading', { name: 'IT setup' })).toBeVisible();
         expect(screen.getByText('Network operations')).toBeVisible();
-        expect(screen.getAllByText('4 open')[0]).toBeVisible();
+        expect(screen.getAllByText('4 open tickets')[0]).toBeVisible();
         expect(screen.getByRole('button', { name: /New team/i })).toBeVisible();
         expect(
             screen.queryByRole('button', { name: /New queue/i }),
@@ -197,7 +235,14 @@ describe('IT & Support grouped navigation', () => {
                 teams={[]}
                 queues={[]}
                 services={[]}
-                agents={[{ id: 8, name: 'Integration agent' }]}
+                agents={[
+                    {
+                        id: 8,
+                        name: 'Integration agent',
+                        site_ids: [],
+                        organisation_wide: true,
+                    },
+                ]}
                 sites={[{ id: 3, name: 'Central House' }]}
                 apiIdentities={[
                     {
@@ -219,7 +264,9 @@ describe('IT & Support grouped navigation', () => {
                         expires_at: null,
                         revoked_at: null,
                         last_used_at: null,
+                        last_rotated_at: null,
                         created_at: '2026-07-19T12:00:00Z',
+                        configuration_version: 1,
                         is_active: true,
                     },
                 ]}
@@ -233,14 +280,16 @@ describe('IT & Support grouped navigation', () => {
         );
 
         expect(
-            screen.getByRole('tab', { name: 'API identities' }),
+            screen.getByRole('tab', { name: 'API', hidden: true }),
         ).toHaveAttribute('aria-selected', 'true');
 
         expect(
-            screen.getByRole('heading', { name: 'API identities', level: 2 }),
-        ).toBeVisible();
-        expect(screen.getByText('Native monitoring')).toBeVisible();
-        expect(screen.getByText('Signed')).toBeVisible();
+            screen.getByRole('heading', {
+                name: 'API identities',
+                level: 2,
+                hidden: true,
+            }),
+        ).toBeInTheDocument();
         expect(screen.getByLabelText('One-time API credential')).toHaveValue(
             'ofi_public_secret-shown-once',
         );
@@ -298,9 +347,7 @@ describe('IT & Support grouped navigation', () => {
             />,
         );
 
-        fireEvent.click(
-            screen.getByRole('tab', { name: 'Provisioning workflows' }),
-        );
+        fireEvent.click(screen.getByRole('tab', { name: 'Workflows' }));
 
         expect(
             screen.getByRole('heading', {
@@ -405,7 +452,7 @@ describe('IT & Support grouped navigation', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('tab', { name: 'Operations audit' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Operations' }));
 
         expect(
             screen.getByRole('heading', { name: 'Configuration audit' }),

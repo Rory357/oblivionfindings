@@ -1,0 +1,46 @@
+[
+  {
+    "path": "app/Domain/It/Enums/ItTicketCommandChannel.php",
+    "sha256": "7804B214A06B6AA4EFE55565553429E5966A65B7B760E742273D6F2DB539EBC4"
+  },
+  {
+    "path": "app/Domain/It/Data/ItTransitionInput.php",
+    "sha256": "526045CBB11B1FCF0D7E3285260C51B6368AD9A248105452234C4E5E77E52B84"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketIntakeService.php",
+    "sha256": "93758E61D3986A819C9B10800EB453E4050E62D02C2A5214419A178AF5B8B3CC"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketInteractionService.php",
+    "sha256": "C52C88FB25706D8F5A9BFC4305E9624E98AA2E76E52028C4D1E5C9BDDFD2FBD0"
+  },
+  {
+    "path": "app/Domain/It/Services/ItWorkTransitionService.php",
+    "sha256": "A1D774D233838F47D4DBB43BBB534DC40BC9CFFBD482F14F0D651D37AE5554C5"
+  },
+  {
+    "path": "app/Domain/It/InboundEmailIngestor.php",
+    "sha256": "0F25CD12BA80D7BEE8631471988571654AE0F324B6A696C20B5F9649CEC639A1"
+  },
+  {
+    "path": "database/migrations/2026_09_11_000018_expand_it_email_content_capacity.php",
+    "sha256": "CB8718F05E505116A098C62314640E9D88A985F8663CBCB9C18DDF86D2A3775A"
+  },
+  {
+    "path": "tests/Feature/It/ItInboundCommandLifecycleTest.php",
+    "sha256": "916C87682A06887137155CA1C70916A11331F3DE3DB6F1747DFC0266C558853B"
+  },
+  {
+    "path": "tests/Concurrency/It/ItInboundIdentityConcurrencyTest.php",
+    "sha256": "BEDDE0A94A7E58C3E0CCCD13D35A761AD5B7D850687B295DAC76D45BBCC51A4B"
+  },
+  {
+    "path": "tests/Support/It/inbound-identity-concurrency-worker.php",
+    "sha256": "BF9AB36EE88B4EA8E49FF276AA5005B54679C7C71CD2251376C745D94E6BF834"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w11-mailbox-browser-fixture.php",
+    "sha256": "5E6A0068B39C1E3B4E8B72BD8CFDCB59153291BBD3118DAC7207196B25BCFAFE"
+  }
+]

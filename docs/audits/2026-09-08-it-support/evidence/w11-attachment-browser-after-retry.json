@@ -1,0 +1,1203 @@
+{
+    "token": "724533b40323406b",
+    "database": "oblivion_it_draft_browser_724533b40323406b",
+    "read_only": true,
+    "synthetic_provider_only": true,
+    "captured_at": "2026-09-10T19:03:28+00:00",
+    "connections": [
+        {
+            "id": 1,
+            "provider": "microsoft",
+            "status": "connected",
+            "configuration_version": 1,
+            "last_polled_at": "2026-09-10 19:02:11",
+            "last_poll_attempt_at": "2026-09-11 07:02:11",
+            "next_poll_at": null
+        },
+        {
+            "id": 2,
+            "provider": "google",
+            "status": "connected",
+            "configuration_version": 1,
+            "last_polled_at": "2026-09-10 19:02:54",
+            "last_poll_attempt_at": "2026-09-11 07:02:54",
+            "next_poll_at": null
+        }
+    ],
+    "inbound": [
+        {
+            "it_mailbox_connection_id": 1,
+            "status": "duplicate",
+            "records": 2,
+            "distinct_tickets": 1,
+            "acknowledged": "2",
+            "processing_attempts": "2",
+            "acknowledgement_attempts": "2"
+        },
+        {
+            "it_mailbox_connection_id": 1,
+            "status": "processed",
+            "records": 31,
+            "distinct_tickets": 29,
+            "acknowledged": "31",
+            "processing_attempts": "32",
+            "acknowledgement_attempts": "32"
+        },
+        {
+            "it_mailbox_connection_id": 1,
+            "status": "quarantined",
+            "records": 10,
+            "distinct_tickets": 0,
+            "acknowledged": "10",
+            "processing_attempts": "10",
+            "acknowledgement_attempts": "10"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "status": "duplicate",
+            "records": 2,
+            "distinct_tickets": 1,
+            "acknowledged": "2",
+            "processing_attempts": "2",
+            "acknowledgement_attempts": "2"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "status": "processed",
+            "records": 31,
+            "distinct_tickets": 29,
+            "acknowledged": "31",
+            "processing_attempts": "32",
+            "acknowledgement_attempts": "31"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "status": "quarantined",
+            "records": 10,
+            "distinct_tickets": 0,
+            "acknowledged": "10",
+            "processing_attempts": "10",
+            "acknowledgement_attempts": "10"
+        }
+    ],
+    "synthetic_ticket_count": 58,
+    "canonical_commands": [
+        {
+            "operation": "ticket.create",
+            "records": 58,
+            "committed": "58"
+        },
+        {
+            "operation": "ticket.comment",
+            "records": 4,
+            "committed": "4"
+        }
+    ],
+    "ticket_conversation": [
+        {
+            "id": 8,
+            "reference": "IT-000008",
+            "title": "W11 synthetic microsoft request 1",
+            "source": "email",
+            "lock_version": 5,
+            "next_response_party": "it",
+            "comments": 2,
+            "email_comments": "2"
+        },
+        {
+            "id": 9,
+            "reference": "IT-000009",
+            "title": "W11 synthetic microsoft request 2",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 10,
+            "reference": "IT-000010",
+            "title": "W11 synthetic microsoft request 3",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 11,
+            "reference": "IT-000011",
+            "title": "W11 synthetic microsoft request 4",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 12,
+            "reference": "IT-000012",
+            "title": "W11 synthetic microsoft request 5",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 13,
+            "reference": "IT-000013",
+            "title": "W11 synthetic microsoft request 6",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 14,
+            "reference": "IT-000014",
+            "title": "W11 synthetic microsoft request 7",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 15,
+            "reference": "IT-000015",
+            "title": "W11 synthetic microsoft request 8",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 16,
+            "reference": "IT-000016",
+            "title": "W11 synthetic microsoft request 9",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 17,
+            "reference": "IT-000017",
+            "title": "W11 synthetic microsoft request 10",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 18,
+            "reference": "IT-000018",
+            "title": "W11 synthetic microsoft request 11",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 19,
+            "reference": "IT-000019",
+            "title": "W11 synthetic microsoft request 12",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 20,
+            "reference": "IT-000020",
+            "title": "W11 synthetic microsoft request 13",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 21,
+            "reference": "IT-000021",
+            "title": "W11 synthetic microsoft request 14",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 22,
+            "reference": "IT-000022",
+            "title": "W11 synthetic microsoft request 15",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 23,
+            "reference": "IT-000023",
+            "title": "W11 synthetic microsoft request 16",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 24,
+            "reference": "IT-000024",
+            "title": "W11 synthetic microsoft request 17",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 25,
+            "reference": "IT-000025",
+            "title": "W11 synthetic microsoft request 18",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 26,
+            "reference": "IT-000026",
+            "title": "W11 synthetic microsoft request 19",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 27,
+            "reference": "IT-000027",
+            "title": "W11 synthetic microsoft request 20",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 28,
+            "reference": "IT-000028",
+            "title": "W11 synthetic microsoft request 21",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 29,
+            "reference": "IT-000029",
+            "title": "W11 synthetic microsoft request 22",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 30,
+            "reference": "IT-000030",
+            "title": "W11 synthetic microsoft request 23",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 31,
+            "reference": "IT-000031",
+            "title": "W11 synthetic microsoft request 24",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 32,
+            "reference": "IT-000032",
+            "title": "W11 synthetic microsoft request 25",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 33,
+            "reference": "IT-000033",
+            "title": "W11 synthetic microsoft request 26",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 34,
+            "reference": "IT-000034",
+            "title": "W11 synthetic microsoft request 27",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 35,
+            "reference": "IT-000035",
+            "title": "W11 synthetic microsoft request 37",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 36,
+            "reference": "IT-000036",
+            "title": "W11 synthetic google request 1",
+            "source": "email",
+            "lock_version": 5,
+            "next_response_party": "it",
+            "comments": 2,
+            "email_comments": "2"
+        },
+        {
+            "id": 37,
+            "reference": "IT-000037",
+            "title": "W11 synthetic google request 2",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 38,
+            "reference": "IT-000038",
+            "title": "W11 synthetic google request 3",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 39,
+            "reference": "IT-000039",
+            "title": "W11 synthetic google request 4",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 40,
+            "reference": "IT-000040",
+            "title": "W11 synthetic google request 5",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 41,
+            "reference": "IT-000041",
+            "title": "W11 synthetic google request 6",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 42,
+            "reference": "IT-000042",
+            "title": "W11 synthetic google request 7",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 43,
+            "reference": "IT-000043",
+            "title": "W11 synthetic google request 8",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 44,
+            "reference": "IT-000044",
+            "title": "W11 synthetic google request 9",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 45,
+            "reference": "IT-000045",
+            "title": "W11 synthetic google request 10",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 46,
+            "reference": "IT-000046",
+            "title": "W11 synthetic google request 11",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 47,
+            "reference": "IT-000047",
+            "title": "W11 synthetic google request 12",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 48,
+            "reference": "IT-000048",
+            "title": "W11 synthetic google request 13",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 49,
+            "reference": "IT-000049",
+            "title": "W11 synthetic google request 14",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 50,
+            "reference": "IT-000050",
+            "title": "W11 synthetic google request 15",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 51,
+            "reference": "IT-000051",
+            "title": "W11 synthetic google request 16",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 52,
+            "reference": "IT-000052",
+            "title": "W11 synthetic google request 17",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 53,
+            "reference": "IT-000053",
+            "title": "W11 synthetic google request 18",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 54,
+            "reference": "IT-000054",
+            "title": "W11 synthetic google request 19",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 55,
+            "reference": "IT-000055",
+            "title": "W11 synthetic google request 20",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 56,
+            "reference": "IT-000056",
+            "title": "W11 synthetic google request 21",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 57,
+            "reference": "IT-000057",
+            "title": "W11 synthetic google request 22",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 58,
+            "reference": "IT-000058",
+            "title": "W11 synthetic google request 23",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 59,
+            "reference": "IT-000059",
+            "title": "W11 synthetic google request 24",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 60,
+            "reference": "IT-000060",
+            "title": "W11 synthetic google request 25",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 61,
+            "reference": "IT-000061",
+            "title": "W11 synthetic google request 26",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 62,
+            "reference": "IT-000062",
+            "title": "W11 synthetic google request 27",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 63,
+            "reference": "IT-000063",
+            "title": "W11 synthetic google request 37",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 64,
+            "reference": "IT-000064",
+            "title": "W11 synthetic microsoft request 39",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        },
+        {
+            "id": 65,
+            "reference": "IT-000065",
+            "title": "W11 synthetic google request 39",
+            "source": "email",
+            "lock_version": 3,
+            "next_response_party": "it",
+            "comments": 0,
+            "email_comments": null
+        }
+    ],
+    "quarantine_reasons": [
+        {
+            "it_mailbox_connection_id": 1,
+            "quarantine_reason": "message_id_collision",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 1,
+            "quarantine_reason": "sender_inactive",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 1,
+            "quarantine_reason": "duplicate_message_headers",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 1,
+            "quarantine_reason": "sender_ambiguous",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 1,
+            "quarantine_reason": "automatic_message",
+            "records": 2,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 1,
+            "quarantine_reason": "delivery_report",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 1,
+            "quarantine_reason": "invalid_message_content",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 1,
+            "quarantine_reason": "sender_unknown",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 1,
+            "quarantine_reason": "attachment_infected",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "quarantine_reason": "message_id_collision",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "quarantine_reason": "sender_inactive",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "quarantine_reason": "duplicate_message_headers",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "quarantine_reason": "sender_ambiguous",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "quarantine_reason": "automatic_message",
+            "records": 2,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "quarantine_reason": "delivery_report",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "quarantine_reason": "invalid_message_content",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "quarantine_reason": "sender_unknown",
+            "records": 1,
+            "retained_body_previews": "0"
+        },
+        {
+            "it_mailbox_connection_id": 2,
+            "quarantine_reason": "attachment_infected",
+            "records": 1,
+            "retained_body_previews": "0"
+        }
+    ],
+    "canonical_email_audit": [
+        {
+            "action": "it.ticket.created",
+            "records": 58
+        },
+        {
+            "action": "it.ticket.comment.added",
+            "records": 4
+        }
+    ],
+    "provider_state": {
+        "token": "724533b40323406b",
+        "synthetic_only": true,
+        "unread": {
+            "microsoft": [],
+            "google": []
+        },
+        "ack_attempts": {
+            "microsoft": {
+                "1": 2,
+                "2": 1,
+                "3": 1,
+                "4": 1,
+                "5": 1,
+                "6": 1,
+                "7": 1,
+                "8": 1,
+                "9": 1,
+                "10": 1,
+                "11": 1,
+                "12": 1,
+                "13": 1,
+                "14": 1,
+                "15": 1,
+                "16": 1,
+                "17": 1,
+                "18": 1,
+                "19": 1,
+                "20": 1,
+                "21": 1,
+                "22": 1,
+                "23": 1,
+                "24": 1,
+                "25": 1,
+                "26": 1,
+                "27": 1,
+                "28": 1,
+                "29": 1,
+                "30": 1,
+                "31": 1,
+                "32": 1,
+                "33": 1,
+                "34": 1,
+                "35": 1,
+                "36": 1,
+                "37": 1,
+                "38": 1,
+                "40": 1,
+                "41": 1,
+                "42": 1,
+                "43": 1,
+                "39": 1
+            },
+            "google": {
+                "1": 1,
+                "2": 1,
+                "3": 1,
+                "4": 1,
+                "5": 1,
+                "6": 1,
+                "7": 1,
+                "8": 1,
+                "9": 1,
+                "10": 1,
+                "11": 1,
+                "12": 1,
+                "13": 1,
+                "14": 1,
+                "15": 1,
+                "16": 1,
+                "17": 1,
+                "18": 1,
+                "19": 1,
+                "20": 1,
+                "21": 1,
+                "22": 1,
+                "23": 1,
+                "24": 1,
+                "25": 1,
+                "26": 1,
+                "27": 1,
+                "28": 1,
+                "29": 1,
+                "30": 1,
+                "31": 1,
+                "32": 1,
+                "33": 1,
+                "34": 1,
+                "35": 1,
+                "36": 1,
+                "37": 1,
+                "38": 1,
+                "40": 1,
+                "41": 1,
+                "42": 1,
+                "43": 1,
+                "39": 1
+            }
+        },
+        "reads": {
+            "microsoft": {
+                "1": 1,
+                "2": 1,
+                "3": 1,
+                "4": 1,
+                "5": 1,
+                "6": 1,
+                "7": 1,
+                "8": 1,
+                "9": 1,
+                "10": 1,
+                "11": 1,
+                "12": 1,
+                "13": 1,
+                "14": 1,
+                "15": 1,
+                "16": 1,
+                "17": 1,
+                "18": 1,
+                "19": 1,
+                "20": 1,
+                "21": 1,
+                "22": 1,
+                "23": 1,
+                "24": 1,
+                "25": 1,
+                "26": 1,
+                "27": 1,
+                "28": 1,
+                "29": 1,
+                "30": 1,
+                "31": 1,
+                "32": 1,
+                "33": 1,
+                "34": 1,
+                "35": 1,
+                "36": 1,
+                "37": 1,
+                "38": 1,
+                "39": 2,
+                "40": 1,
+                "41": 1,
+                "42": 1,
+                "43": 1
+            },
+            "google": {
+                "1": 1,
+                "2": 1,
+                "3": 1,
+                "4": 1,
+                "5": 1,
+                "6": 1,
+                "7": 1,
+                "8": 1,
+                "9": 1,
+                "10": 1,
+                "11": 1,
+                "12": 1,
+                "13": 1,
+                "14": 1,
+                "15": 1,
+                "16": 1,
+                "17": 1,
+                "18": 1,
+                "19": 1,
+                "20": 1,
+                "21": 1,
+                "22": 1,
+                "23": 1,
+                "24": 1,
+                "25": 1,
+                "26": 1,
+                "27": 1,
+                "28": 1,
+                "29": 1,
+                "30": 1,
+                "31": 1,
+                "32": 1,
+                "33": 1,
+                "34": 1,
+                "35": 1,
+                "36": 1,
+                "37": 1,
+                "38": 1,
+                "39": 2,
+                "40": 1,
+                "41": 1,
+                "42": 1,
+                "43": 1
+            }
+        },
+        "external_body_reads": 1
+    },
+    "attachment_records": [
+        {
+            "id": 1,
+            "attachable_type": "it_inbound_email",
+            "attachable_id": 39,
+            "size": 41,
+            "inbound_storage_state": "deleted",
+            "inbound_content_hash": "49c3b0573ea68c5cf77b7024c40454954bf1158620d59d8e0930916af7263c13",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": null,
+            "object_exists": false,
+            "object_hash_matches": null
+        },
+        {
+            "id": 2,
+            "attachable_type": "it_inbound_email",
+            "attachable_id": 40,
+            "size": 37,
+            "inbound_storage_state": "deleted",
+            "inbound_content_hash": "33aba6c9cb4d6208c70f50370449da5f58c9184afeb5ce91377cabca9cf94e27",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": null,
+            "object_exists": false,
+            "object_hash_matches": null
+        },
+        {
+            "id": 3,
+            "attachable_type": "it_ticket_comment",
+            "attachable_id": 2,
+            "size": 37,
+            "inbound_storage_state": null,
+            "inbound_content_hash": "33aba6c9cb4d6208c70f50370449da5f58c9184afeb5ce91377cabca9cf94e27",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": 2,
+            "object_exists": true,
+            "object_hash_matches": true
+        },
+        {
+            "id": 4,
+            "attachable_type": "it_inbound_email",
+            "attachable_id": 41,
+            "size": 37,
+            "inbound_storage_state": "deleted",
+            "inbound_content_hash": "33aba6c9cb4d6208c70f50370449da5f58c9184afeb5ce91377cabca9cf94e27",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": null,
+            "object_exists": false,
+            "object_hash_matches": null
+        },
+        {
+            "id": 5,
+            "attachable_type": "it_inbound_email",
+            "attachable_id": 42,
+            "size": 37,
+            "inbound_storage_state": "ready",
+            "inbound_content_hash": "df35c16433c8221a15f66e13689bc7f14ea477c6b30dc628868202f62be1eb7f",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": null,
+            "object_exists": true,
+            "object_hash_matches": true
+        },
+        {
+            "id": 6,
+            "attachable_type": "it_inbound_email",
+            "attachable_id": 43,
+            "size": 40,
+            "inbound_storage_state": "rejected",
+            "inbound_content_hash": "22713ca92ac184a7afe3893a93c1f3ec6cd2a8eb3223e5fd54ddf02ee9abb1ab",
+            "malware_scan_status": "infected",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": null,
+            "object_exists": true,
+            "object_hash_matches": true
+        },
+        {
+            "id": 7,
+            "attachable_type": "it_inbound_email",
+            "attachable_id": 82,
+            "size": 38,
+            "inbound_storage_state": "deleted",
+            "inbound_content_hash": "d2de648131a09de92b16f039603506861b5149a72efd632a4264d438e378fd02",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": null,
+            "object_exists": false,
+            "object_hash_matches": null
+        },
+        {
+            "id": 8,
+            "attachable_type": "it_inbound_email",
+            "attachable_id": 83,
+            "size": 34,
+            "inbound_storage_state": "deleted",
+            "inbound_content_hash": "db43d508200d9d27a2e96c7465b929f05a704448d6be486e206415fb0f4fd782",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": null,
+            "object_exists": false,
+            "object_hash_matches": null
+        },
+        {
+            "id": 9,
+            "attachable_type": "it_ticket_comment",
+            "attachable_id": 4,
+            "size": 34,
+            "inbound_storage_state": null,
+            "inbound_content_hash": "db43d508200d9d27a2e96c7465b929f05a704448d6be486e206415fb0f4fd782",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": 8,
+            "object_exists": true,
+            "object_hash_matches": true
+        },
+        {
+            "id": 10,
+            "attachable_type": "it_inbound_email",
+            "attachable_id": 84,
+            "size": 34,
+            "inbound_storage_state": "deleted",
+            "inbound_content_hash": "db43d508200d9d27a2e96c7465b929f05a704448d6be486e206415fb0f4fd782",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": null,
+            "object_exists": false,
+            "object_hash_matches": null
+        },
+        {
+            "id": 11,
+            "attachable_type": "it_inbound_email",
+            "attachable_id": 85,
+            "size": 34,
+            "inbound_storage_state": "ready",
+            "inbound_content_hash": "4cbc2d744ff90531db8af7fcde452ead68eee52cdbc9453403abf59945411ccd",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": null,
+            "object_exists": true,
+            "object_hash_matches": true
+        },
+        {
+            "id": 12,
+            "attachable_type": "it_inbound_email",
+            "attachable_id": 86,
+            "size": 37,
+            "inbound_storage_state": "rejected",
+            "inbound_content_hash": "f32f3da51f850b12212bda24925fafa4fe28471d49bca005cd4020768b645c69",
+            "malware_scan_status": "infected",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": null,
+            "object_exists": true,
+            "object_hash_matches": true
+        },
+        {
+            "id": 13,
+            "attachable_type": "it_ticket",
+            "attachable_id": 64,
+            "size": 41,
+            "inbound_storage_state": null,
+            "inbound_content_hash": "49c3b0573ea68c5cf77b7024c40454954bf1158620d59d8e0930916af7263c13",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": 1,
+            "object_exists": true,
+            "object_hash_matches": true
+        },
+        {
+            "id": 14,
+            "attachable_type": "it_ticket",
+            "attachable_id": 65,
+            "size": 38,
+            "inbound_storage_state": null,
+            "inbound_content_hash": "d2de648131a09de92b16f039603506861b5149a72efd632a4264d438e378fd02",
+            "malware_scan_status": "clean",
+            "malware_scanner": "synthetic-browser-scanner",
+            "inbound_cleanup_attempts": 0,
+            "source_inbound_attachment_id": 7,
+            "object_exists": true,
+            "object_hash_matches": true
+        }
+    ],
+    "scanner_fixture_state": {
+        "token": "724533b40323406b",
+        "synthetic_only": true,
+        "attempts": {
+            "49c3b0573ea68c5cf77b7024c40454954bf1158620d59d8e0930916af7263c13": 2,
+            "33aba6c9cb4d6208c70f50370449da5f58c9184afeb5ce91377cabca9cf94e27": 2,
+            "df35c16433c8221a15f66e13689bc7f14ea477c6b30dc628868202f62be1eb7f": 1,
+            "22713ca92ac184a7afe3893a93c1f3ec6cd2a8eb3223e5fd54ddf02ee9abb1ab": 1,
+            "d2de648131a09de92b16f039603506861b5149a72efd632a4264d438e378fd02": 2,
+            "db43d508200d9d27a2e96c7465b929f05a704448d6be486e206415fb0f4fd782": 2,
+            "4cbc2d744ff90531db8af7fcde452ead68eee52cdbc9453403abf59945411ccd": 1,
+            "f32f3da51f850b12212bda24925fafa4fe28471d49bca005cd4020768b645c69": 1
+        }
+    }
+}

@@ -153,12 +153,15 @@ test('ticket workspace options and bulk assignment follow exact Site access', fu
 
     $this->actingAs($agent)
         ->post(route('it.tickets.bulk'), [
+            'actor_user_id' => $agent->id,
             'ids' => [$ticket->id],
+            'expected_versions' => [$ticket->id => $ticket->lock_version],
             'action' => 'assign',
             'assigned_to_user_id' => $remoteTechnician->id,
+            'routing_reason' => 'Confirm that the assignee is approved for the ticket Site.',
         ])
         ->assertRedirect()
-        ->assertSessionHas('success', '0 ticket(s) assigned · 1 unchanged.');
+        ->assertSessionHas('warning', '0 ticket(s) assigned · 1 unchanged.');
 
     expect($ticket->fresh()->assigned_to_user_id)->toBeNull();
 });
@@ -172,12 +175,18 @@ test('bulk work silently excludes forged inaccessible ticket ids', function () {
 
     $this->actingAs($agent)
         ->post(route('it.tickets.bulk'), [
+            'actor_user_id' => $agent->id,
             'ids' => [$visible->id, $hidden->id],
+            'expected_versions' => [
+                $visible->id => $visible->lock_version,
+                $hidden->id => $hidden->lock_version,
+            ],
             'action' => 'priority',
             'priority' => 'high',
+            'priority_reason' => 'The approved-site incident needs faster attention.',
         ])
         ->assertRedirect()
-        ->assertSessionHas('success', '1 ticket(s) reprioritised · 1 unchanged.');
+        ->assertSessionHas('warning', '1 ticket(s) reprioritised · 1 unchanged.');
 
     expect($visible->fresh()->priority)->toBe('high')
         ->and($hidden->fresh()->priority)->toBe('normal');
@@ -390,12 +399,18 @@ test('ticket updates reject unapproved and conflicting scope changes', function 
     $ticket = ItTicket::factory()->create(['site_id' => $approvedSite->id]);
 
     $this->actingAs($agent)
-        ->patch(route('it.tickets.update', $ticket), ['site_id' => $otherSite->id])
+        ->patch(route('it.tickets.update', $ticket), [
+            'actor_user_id' => $agent->id,
+            'expected_version' => $ticket->lock_version,
+            'site_id' => $otherSite->id,
+        ])
         ->assertForbidden();
 
     $this->actingAs($agent)
         ->from(route('it.tickets.show', $ticket))
         ->patch(route('it.tickets.update', $ticket), [
+            'actor_user_id' => $agent->id,
+            'expected_version' => $ticket->lock_version,
             'site_id' => $approvedSite->id,
             'is_organisation_wide' => true,
         ])

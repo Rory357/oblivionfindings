@@ -1,0 +1,2 @@
+resources/js/components/settings/sso-configuration-form.tsx(182,84): error TS2322: Type '{ variant: string; text: string; }' is not assignable to type 'IntrinsicAttributes & LoadingStateProps'.
+  Property 'variant' does not exist on type 'IntrinsicAttributes & LoadingStateProps'.

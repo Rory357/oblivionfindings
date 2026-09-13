@@ -168,6 +168,13 @@ Actions, right (36px controls, radius 10):
 
 ## 5. The meter row — the page's instruments (full width)
 
+**Calendar date anchor (approved 2026-09-13):** calendars use the Site
+Calendar implementation and place a prominent date anchor in the first
+meter: large viewed day number, full month and four-digit year, with the
+weekday/full date or week range below. The period's entry count is the
+secondary value. This uses the existing meter surface and header rhythm;
+do not add a separate banner. See `CALENDAR_STYLE_GUIDE.md`.
+
 One row spanning the band, holding as many blocks as the page needs —
 **4–6 on desktop** (blocks `flex: 1 1 0` share the row; below desktop
 the row wraps). This row replaces the v1 stat pills entirely and is

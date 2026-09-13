@@ -9,11 +9,12 @@ use LogicException;
 
 class SsoGroupMappingLockService
 {
+    public const MUTEX_KEY = 'internal.sso.publication_mutex';
+
     /**
-     * Acquire the stable SSO mapping publication mutex. Locking the complete
-     * primary-key range (including its terminal insert gap under MySQL
-     * REPEATABLE READ) serializes mapping creation and edits with role-sync
-     * readers before either side acquires User or Role evidence.
+     * Acquire a stable transaction-scoped record lock before the mapping set
+     * and User/Role evidence. Empty-range gap locks can coexist in MySQL, so
+     * the mapping range alone cannot serialize an unconfigured application.
      *
      * @return Collection<int, SsoGroupMapping>
      */
@@ -22,6 +23,13 @@ class SsoGroupMappingLockService
         if (DB::transactionLevel() < 1) {
             throw new LogicException('SSO group mappings must be locked in the governing transaction.');
         }
+
+        // The unique key makes first-use insertion and later no-op updates
+        // acquire the same exclusive record lock. Existing value/timestamps
+        // remain untouched; this is internal coordination, never SSO config.
+        DB::table('app_settings')->upsert([
+            ['key' => self::MUTEX_KEY, 'value' => null, 'created_at' => now(), 'updated_at' => now()],
+        ], ['key'], ['key']);
 
         return SsoGroupMapping::query()
             ->orderBy('id')

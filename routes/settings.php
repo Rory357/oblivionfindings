@@ -9,6 +9,7 @@ use App\Http\Controllers\Settings\CalendarSyncOAuthController;
 use App\Http\Controllers\Settings\CalendarSyncSettingsController;
 use App\Http\Controllers\Settings\DataSettingsController;
 use App\Http\Controllers\Settings\EmailSettingsController;
+use App\Http\Controllers\Settings\ItInboundQuarantineController;
 use App\Http\Controllers\Settings\ItMailboxOAuthController;
 use App\Http\Controllers\Settings\ItMailboxSettingsController;
 use App\Http\Controllers\Settings\ModuleSettingsController;
@@ -188,7 +189,11 @@ Route::middleware('auth')->group(function () {
         ->name('settings.email.update');
     Route::post('settings/email/test', [EmailSettingsController::class, 'test'])
         ->middleware('permission:settings.access.manage')
+        ->middleware('throttle:10,1')
         ->name('settings.email.test');
+    Route::get('settings/email/test/{uuid}', [EmailSettingsController::class, 'showTest'])
+        ->whereUuid('uuid')->middleware('permission:settings.access.manage')
+        ->name('settings.email.test.show');
 
     // Security Settings
     Route::get('settings/security', [SecurityPolicyController::class, 'edit'])
@@ -285,6 +290,14 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/sso', [SsoConfigController::class, 'index'])
         ->middleware('permission:settings.access.manage')
         ->name('settings.sso');
+    Route::put('settings/sso/provisioning', [SsoConfigController::class, 'updateProvisioning'])
+        ->middleware('permission:settings.access.manage')->name('settings.sso.provisioning.update');
+    Route::get('settings/sso/configuration/{provider}', [SsoConfigController::class, 'showProvider'])
+        ->middleware('permission:settings.access.manage')->name('settings.sso.configuration.show');
+    Route::put('settings/sso/providers/{provider}', [SsoConfigController::class, 'updateProvider'])
+        ->middleware('permission:settings.access.manage')->name('settings.sso.providers.update');
+    Route::post('settings/sso/providers/{provider}/check', [SsoConfigController::class, 'check'])
+        ->middleware('permission:settings.access.manage')->name('settings.sso.providers.check');
     Route::get('settings/sso-groups', [SsoGroupController::class, 'index'])
         ->middleware('permission:settings.access.manage')
         ->name('settings.sso_groups.index');
@@ -314,6 +327,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:integrations.manage_secrets')->group(function () {
         Route::get('settings/calendar-sync', [CalendarSyncSettingsController::class, 'index'])
             ->name('settings.calendar-sync');
+        Route::put('settings/calendar-sync/work-calendar', [\App\Http\Controllers\Settings\WorkCalendarSettingsController::class, 'update'])->name('settings.work-calendar.update');
+        Route::post('settings/calendar-sync/work-calendar/check', [\App\Http\Controllers\Settings\WorkCalendarSettingsController::class, 'check'])->middleware('throttle:10,1')->name('settings.work-calendar.check');
+        Route::post('settings/calendar-sync/work-calendar/sync', [\App\Http\Controllers\Settings\WorkCalendarSettingsController::class, 'sync'])->middleware('throttle:5,1')->name('settings.work-calendar.sync');
         Route::put('settings/calendar-sync/mapping', [CalendarSyncSettingsController::class, 'updateMapping'])
             ->name('settings.calendar-sync.mapping');
         Route::put('settings/calendar-sync/settings', [CalendarSyncSettingsController::class, 'updateGlobal'])
@@ -341,6 +357,10 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:integrations.manage_secrets')->group(function () {
         Route::get('settings/it-mailbox', [ItMailboxSettingsController::class, 'index'])
             ->name('settings.it-mailbox');
+        Route::get('settings/it-mailbox/quarantine/{provider}', [ItInboundQuarantineController::class, 'index'])
+            ->name('settings.it-mailbox.quarantine');
+        Route::post('settings/it-mailbox/quarantine/{provider}/{receipt}/retry', [ItInboundQuarantineController::class, 'retry'])
+            ->whereNumber('receipt')->name('settings.it-mailbox.quarantine.retry');
         Route::put('settings/it-mailbox/mailbox/{provider}', [ItMailboxSettingsController::class, 'updateMailbox'])
             ->name('settings.it-mailbox.mailbox');
         Route::post('settings/it-mailbox/poll-now', [ItMailboxSettingsController::class, 'pollNow'])

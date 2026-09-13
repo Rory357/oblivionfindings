@@ -12,6 +12,8 @@ class ItAutomationRun extends Model
 
     public const STATUSES = ['running', 'succeeded', 'failed', 'skipped'];
 
+    protected $hidden = ['error_summary', 'result_summary'];
+
     protected $fillable = [
         'automation_key', 'schedule_expression', 'status', 'started_at',
         'finished_at', 'runtime_ms', 'error_summary', 'result_summary',

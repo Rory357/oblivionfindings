@@ -1,0 +1,309 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx (32 tests | 1 failed) 2404ms
+     × starts the next matching audience draft through one explicit action (internal true) 36ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > starts the next matching audience draft through one explicit action (internal true)
+TestingLibraryElementError: Unable to find an accessible element with the role "tab" and name "Internal note"
+
+Here are the accessible roles:
+
+  region:
+
+  Name "Write a ticket message":
+  <section
+    aria-label="Write a ticket message"
+    class="space-y-4 border-t border-border p-5"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Reply":
+  <button
+    aria-pressed="true"
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-8 rounded-md px-3 has-[>svg]:px-2.5"
+    data-slot="button"
+    type="button"
+  />
+
+  Name "Internal note":
+  <button
+    aria-pressed="false"
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+    data-slot="button"
+    type="button"
+  />
+
+  Name "Add reply":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+    disabled=""
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="text-sm text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  group:
+
+  Name "":
+  <fieldset />
+
+  --------------------------------------------------
+  textbox:
+
+  Name "Your reply":
+  <textarea
+    aria-invalid="false"
+    class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    id="_r_e_"
+    placeholder="Write an update or ask a question…"
+    rows="5"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <section
+      aria-label="Write a ticket message"
+      class="space-y-4 border-t border-border p-5"
+    >
+      <div
+        aria-label="Message audience"
+        class="flex flex-wrap gap-2"
+      >
+        <button
+          aria-pressed="true"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-8 rounded-md px-3 has-[>svg]:px-2.5"
+          data-slot="button"
+          type="button"
+        >
+          <svg
+            class="lucide lucide-message-square size-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+            />
+          </svg>
+           Reply
+        </button>
+        <button
+          aria-pressed="false"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+          data-slot="button"
+          type="button"
+        >
+          <svg
+            class="lucide lucide-lock size-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <rect
+              height="11"
+              rx="2"
+              ry="2"
+              width="18"
+              x="3"
+              y="11"
+            />
+            <path
+              d="M7 11V7a5 5 0 0 1 10 0v4"
+            />
+          </svg>
+           Internal note
+        </button>
+      </div>
+      <div>
+        <div
+          class="space-y-4"
+        >
+          <p
+            class="text-sm text-muted-foreground"
+          >
+            This reply is visible to the people who can access this ticket. Email delivery is tracked separately.
+          </p>
+          <fieldset />
+          <div
+            class="space-y-2"
+          >
+            <label
+              class="text-sm font-medium"
+              for="_r_e_"
+            >
+              Your reply
+            </label>
+            <textarea
+              aria-invalid="false"
+              class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              id="_r_e_"
+              placeholder="Write an update or ask a question…"
+              rows="5"
+            />
+          </div>
+          <div
+            class="flex flex-wrap items-center justify-between gap-3"
+          >
+            <div
+              class="flex flex-wrap items-center gap-2"
+            >
+              <span
+                class="text-xs text-muted-foreground"
+              >
+                Ctrl+Enter to
+                 
+                reply
+              </span>
+            </div>
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+              data-slot="button"
+              disabled=""
+            >
+              <svg
+                class="lucide lucide-send size-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"
+                />
+                <path
+                  d="m21.854 2.147-10.94 10.939"
+                />
+              </svg>
+              Add reply
+            </button>
+          </div>
+        </div>
+      </div>
+      <div
+        hidden=""
+      >
+        <div
+          class="space-y-4"
+        >
+          <p
+            class="text-sm text-muted-foreground"
+          >
+            Only people with permission to work on this ticket can read this note.
+          </p>
+          <fieldset />
+          <div
+            class="space-y-2"
+          >
+            <label
+              class="text-sm font-medium"
+              for="_r_l_"
+            >
+              Internal note
+            </label>
+            <textarea
+              aria-invalid="false"
+              class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              id="_r_l_"
+              placeholder="Record context or work for the IT team…"
+              rows="5"
+            />
+          </div>
+          <div
+            class="flex flex-wrap items-center justify-between gap-3"
+          >
+            <div
+              class="flex flex-wrap items-center gap-2"
+            >
+              <span
+                class="text-xs text-muted-foreground"
+              >
+                Ctrl+Enter to
+                 
+                add note
+              </span>
+            </div>
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+              data-slot="button"
+              disabled=""
+            >
+              <svg
+                class="lucide lucide-send size-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"
+                />
+                <path
+                  d="m21.854 2.147-10.94 10.939"
+                />
+              </svg>
+              Add note
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ finishSavedMessage resources/js/components/it/__tests__/ticket-reply-composer.test.tsx:395:32
+    393| const finishSavedMessage = async (internal = false) => {
+    394|     if (internal)
+    395|         fireEvent.click(screen.getByRole('tab', { name: 'Internal note…
+       |                                ^
+    396|     fireEvent.change(
+    397|         screen.getByRole('textbox', {
+ ❯ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx:439:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 43 passed (44)
+   Start at  20:10:10
+   Duration  5.50s (transform 386ms, setup 286ms, import 2.11s, tests 2.79s, environment 2.08s)
+

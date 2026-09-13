@@ -20,6 +20,7 @@ class ItApiWorkItemResource extends JsonResource
 
         return [
             'id' => $this->id,
+            'lock_version' => (int) $this->lock_version,
             'reference' => $this->reference,
             'title' => $this->title,
             'work_type' => $this->work_type,

@@ -1,0 +1,27 @@
+# W08 approval responsibility, timing and cancellation
+
+10 September 2026. Implementation in progress; no approval UI/browser acceptance yet.
+
+## Canonical changes
+
+- Additive migration000013 adds pending primary/cover, explicit assignment provenance, optional zoned deadline/reminder, reminder preparation/check timestamps, actual decision authority, and separate expiry/cancellation evidence. No historical backfill; guarded down refuses evidence loss. Working Herd database has not received this migration.
+- `ItTicketApprovalResponsibilityService` combines current canonical employment, approved Sites, sensitive capability and work access. New selected primary must differ from the raiser; optional cover must differ from both. An available primary owns the decision; cover activates only when primary is on approved HR leave or is no longer eligible. Actual decision records the precise authority basis. Legacy unassigned approvals remain explicitly unassigned and still require a currently eligible, available actor; no old assignment is invented.
+- The existing request service accepts explicit responsibility fields and limits its requested-notification audience to the current owner. Dates carry an offset, normalize before fingerprinting, and are checked against current time only for a new mutation. Original receipt recovery/retry remains possible after the deadline or an eligibility change. **Compatibility boundary still open:** already-served reason-only requests retain their old unassigned request path. Require new visible forms to provide explicit responsibility, then review tightening the legacy creation path; do not mislabel this as complete named ownership for every new request.
+- `withdraw` is a distinct business command, using canonical ticket lock/version/receipt/audit/outbox and actor/approval identity. Only the raiser or current responsible approver can cancel a pending, unexpired request with a reason. It does not erase a decision, and is separate from fencing an uncommitted command UUID. Its original result is recoverable.
+- The canonical scheduler catalogue includes `it:check-approval-deadlines --limit=100`, one bounded expiry queue and one bounded reminder queue. Each row is rechecked under ticket-first locks. Expiry preserves absent human decider/time; reminder prepares one durable outbox intention and never claims delivery. Failed audit/preparation rolls back. Missing owner defers and rotates checks by recorded last-check time; command records partial/failure instead of green success. The command records its own run exactly once, and scheduled execution does not double-record it.
+- Requested/reminder dispatch rechecks the exact approval generation, current active owner, deadline and ticket boundary. Terminal notifications remain addressed to the currently authorized raiser. Expired/cancelled work never becomes approved. Task graph/ticket approval state uses effective expiry even before the scheduler records it.
+- Client contract/hook now includes frozen allowlisted responsibility/timing, targeted withdrawal and separate committed-cancellation versus command-cancellation receipts. Session storage retains opaque identities only. No production AI/provider/notification policy changed.
+
+## Actual verification
+
+- Explicit Pint checks passed for implementation, migration, tests and the corrected files; exact logs use `w08-approval-responsibility-*pint.txt`.
+- Client contract/hook **57 tests,2files,3.53s passed**; strict four-file ESLint0; full TypeScript session41856 exit0. These are source checks, not browser proof. Current compiled assets remain Build12 and do not include this slice.
+- Initial guarded Feature session19658: **93 passed,0failed,1errored,930 assertions** across6files; Pestexit2/wrapperexit1. Exact token `it_f54fbb466825405a` independently absent in wrapper postflight. All11 new responsibility cases passed. The error came from old `ItServiceOperationsTest` mail retry fixture: it sent an internal approval notification to a requester without management entitlement. The fixture now uses the eligible manager for approval/SLA mail. Production authorization was not loosened.
+- Review additionally made timing audit attribution explicitly `systemActor:true`, and required canonical current availability even for legacy unassigned approval decisions. Added revoked-primary submission/cover and system-attribution assertions.
+- Corrected six-file Feature rerun **session13533 exit0**, token `it_a9229beb08ab4448`: **95passed/938assertions**, exact schema independently absent. Log `w08-approval-responsibility-feature-rerun.txt`.
+- Standalone real-worker approval concurrency **session94820 exit0**, token `it_0de5659610564f11`: **4passed/135assertions**, exact schema independently absent. Includes duplicate reminders, withdrawal versus approval, expiry versus approval under forced ticket-lock overlap, and existing original-command/reconciliation races. Log `w08-approval-responsibility-concurrency-tests.txt`.
+
+## Next
+
+1. Private projection/history, canonical personal approval provider, shared RAM candidate authorization and governed visible forms are now implemented with focused source checks; see `w08-approval-ui-results.md`. They still need current-asset browser acceptance.
+2. Finish template-generation bindings, named-ownership creation compatibility, actionable scheduler-lag expiry/replacement, restricted-role browser journeys and the rest of W08/E07. Full W00–W27/E01–E23/release gate remain open.

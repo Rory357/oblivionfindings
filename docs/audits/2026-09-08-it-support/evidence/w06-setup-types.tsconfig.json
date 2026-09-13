@@ -1,0 +1,9 @@
+{
+    "extends": "../../../../tsconfig.json",
+    "include": [
+        "../../../../resources/js/pages/it/setup/*.ts",
+        "../../../../resources/js/pages/it/setup/*.tsx",
+        "../../../../resources/js/**/*.d.ts",
+        "../../../../resources/js/test/setup.ts"
+    ]
+}

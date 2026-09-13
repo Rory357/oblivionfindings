@@ -1,0 +1,58 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItAutomationRunOutcome.php",
+    "sha256": "888f1a63c011d1c6189af82617a03eac02ce6d317b6db596a4c8aa2721fca792"
+  },
+  {
+    "path": "app/Domain/It/Services/ItAutomationOperationsPresenter.php",
+    "sha256": "f858b9994079666c0383c166be3448978f77496ea945daaafbb112e8e9720351"
+  },
+  {
+    "path": "app/Domain/It/Services/ItAutomationScheduleCatalog.php",
+    "sha256": "98c10e84d3892e3f5fa3f52f4534ac7973c84172c8eda7401e20a810499dc55d"
+  },
+  {
+    "path": "app/Domain/It/Services/ItAutomationFreshnessService.php",
+    "sha256": "9c6aa5ab76978f09f8aaa6b1c14f32944a670249f15c53ec6d2e78b942dfde3b"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+    "sha256": "9efe8c58b0cb6d66d7d3dffb2ca1f9169866137e28e7f8dfed5d47ceab37c471"
+  },
+  {
+    "path": "tests/Feature/It/ItServiceOperationsTest.php",
+    "sha256": "e8f084f75a5829054b199c658afd65f43b5b15d50fb687f31de44989df0980b1"
+  },
+  {
+    "path": "tests/Feature/It/ItMailboxPagingTest.php",
+    "sha256": "7f2dfe6dc1416849f7458a8df4de93d054b52d256ccf265fc0102e932aa8cf54"
+  },
+  {
+    "path": "resources/js/components/it/it-automation-history.tsx",
+    "sha256": "afab58449a26c73d08f19101c8492e06f15095d42f84cc5cd676de7d31d9bddd"
+  },
+  {
+    "path": "resources/js/components/it/it-automation-history.test.tsx",
+    "sha256": "c4da8a1ce9513fc7fc277b39c73c28e6054918047ede4ab22fa2537b8b205ea2"
+  },
+  {
+    "path": "resources/js/components/it/it-service-operations.tsx",
+    "sha256": "c75978d995ce9865313a0913178c7f095ab40f73b7d9b75fba6967bcd15a1b4a"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w13-api-browser-fixture.php",
+    "sha256": "0df6c57a2d5af62d3ac7ce1b6f333d674707240fe5e67eae4f9793211e6cead5"
+  },
+  {
+    "path": "resources/js/components/ui/laravel-pagination.tsx",
+    "sha256": "b138b7e99aa45f3774b9d729c1e52a6f9c5fae0fe8fdad0f716aec12edc82835"
+  },
+  {
+    "path": "resources/js/pages/it/setup/index.tsx",
+    "sha256": "baaac206bb188ba2b80b6eea752fd0da505d9fb01d032326585c59e0b434bb41"
+  },
+  {
+    "path": "resources/js/pages/it/setup/setup-workspace.test.tsx",
+    "sha256": "ff2f87018f744a9ca9001b967318c9b14844841e1df0b990eb8f639407f8692e"
+  }
+]

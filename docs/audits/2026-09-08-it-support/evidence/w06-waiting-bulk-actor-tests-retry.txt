@@ -1,0 +1,50 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_682606e193444ad3",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketBulkTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbulk waiting binds the originating browser actor before writing private operational evidence[39m[90m              [39m [90m228.45s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk waiting acknowledges the actual viewer and exact selected outcomes in JSON[39m[90m                             [39m [90m0.78s[39m  
+
+  [90mTests:[39m    [32;1m2 passed[39;22m[90m (11 assertions)[39m
+  [90mDuration:[39m [39m229.51s[39m
+
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_682606e193444ad3",
+    "database_mutations_performed": false
+}

@@ -1,0 +1,47 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/ticket-version-conflict.test.tsx (7 tests | 1 failed) 468ms
+     × permits a requester to review a reply version without granting ticket management 189ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-version-conflict.test.tsx > ticket version recovery > permits a requester to review a reply version without granting ticket management
+AssertionError: expected "vi.fn()" to be called with arguments: [ 8, { id: 42, …(6) } ]
+
+Received:
+
+  1st vi.fn() call:
+
+@@ -2,10 +2,11 @@
+    8,
+    {
+      "assignee": {
+        "name": "Current technician",
+      },
++     "can_reopen": false,
+      "id": 42,
+      "lock_version": 8,
+      "priority": "high",
+      "reference": "IT-000042",
+      "status": "resolved",
+
+
+Number of calls: 1
+
+ ❯ resources/js/components/it/__tests__/ticket-version-conflict.test.tsx:67:26
+     65|             }),
+     66|         );
+     67|         expect(reviewed).toHaveBeenCalledWith(8, current);
+       |                          ^
+     68|     });
+     69|     it('conceals an internal-note review if public comment access rema…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 49 passed (50)
+   Start at  14:23:36
+   Duration  28.30s (transform 1.56s, setup 5.40s, import 20.85s, tests 8.08s, environment 34.92s)
+

@@ -1,0 +1,86 @@
+[
+  {
+    "path": "app/Services/Integration/MailboxProviderHttp.php",
+    "sha256": "656AE0D16AA280AF7CADD6E4812ABECF1A977C880153871225FF1A6E2E78350F"
+  },
+  {
+    "path": "app/Services/Integration/Exceptions/MailboxProviderFailure.php",
+    "sha256": "E7DE88CA25CAB5C2710FF9B94B4607986653A9915CF038770D92C297F1D34423"
+  },
+  {
+    "path": "app/Services/GoogleGmailService.php",
+    "sha256": "FB746BBA917CE1559218C9E605AC94BA7AF71A12357492E56F11E1E1414B64C2"
+  },
+  {
+    "path": "app/Services/MicrosoftGraphService.php",
+    "sha256": "A3D4D8A78EC2588CFDA23C2B7040DD74510DFAC4629E2F113C5959366DF34818"
+  },
+  {
+    "path": "app/Domain/It/Services/ItMailboxPollState.php",
+    "sha256": "5E54F8A7CEA651B7C4338ACEC2F16470A92FCA8958444F06F850C8E23F529A5F"
+  },
+  {
+    "path": "app/Domain/It/Services/ItMailboxPollingToken.php",
+    "sha256": "D7D5FFC41C389DFAB2B07F6202E34B941980FAD84A70638ECE8EA4EAB9CD0B02"
+  },
+  {
+    "path": "app/Domain/It/Exceptions/ItMailboxPollSuperseded.php",
+    "sha256": "F2286600FAAB7F9F034347E4C18CB354E55A96CD33A54BCFDCE3990179F55804"
+  },
+  {
+    "path": "app/Jobs/PollItMailboxJob.php",
+    "sha256": "715C9587661D10B2AC318AED70E10E8DFF453EDF78AF5DFE44621774F7C49A96"
+  },
+  {
+    "path": "app/Models/ItMailboxConnection.php",
+    "sha256": "D16F504B711756A20251FA9541CD671ACD64AC954530696B0C8A6F669B248CCF"
+  },
+  {
+    "path": "app/Http/Controllers/Settings/ItMailboxOAuthController.php",
+    "sha256": "D480D2BD72BE43B13BFE5452A6A41AA3F0207718487469BCB2646531C360C6CA"
+  },
+  {
+    "path": "app/Http/Controllers/Settings/ItMailboxSettingsController.php",
+    "sha256": "7430F8CEE4AC1F50A02CC570B68B73E2B6EC782585AB08ACEDCAE15E6666A5EC"
+  },
+  {
+    "path": "database/migrations/2026_09_10_000015_add_it_mailbox_poll_recovery.php",
+    "sha256": "E0A515921221F1C1DA0B8A88DF1E89DD027316D11C469BFC6CA07F2E4AEA2E09"
+  },
+  {
+    "path": "tests/Feature/It/ItMailboxProviderFailureTest.php",
+    "sha256": "589F96F94FD4383DF7FDCD10C3B0A7B090B20BDD2C302762A1D71937F731CC17"
+  },
+  {
+    "path": "tests/Feature/It/ItMailboxPollStateTest.php",
+    "sha256": "5D9DAA8FD21533D5D831B773761001AC0C33A76A21703AF807CC2359C329F9B8"
+  },
+  {
+    "path": "tests/Feature/It/ItMailboxPollTest.php",
+    "sha256": "690861682620C354BD4710E657B09119BD9CCEEA113C0D7E42AEF8FF4D0C937C"
+  },
+  {
+    "path": "tests/Feature/It/ItMailboxSettingsTest.php",
+    "sha256": "1CBDD6C422B8415351E9402C135372871BBA36CCF7EAD2DE01FDEE2097A407AF"
+  },
+  {
+    "path": "tests/Feature/It/ItMailboxConnectionTest.php",
+    "sha256": "622DB2434AE5407475E7F974F0BA2C50C1DFF8D653719B07AE1C4BD772E0C1AC"
+  },
+  {
+    "path": "tests/Feature/It/ItGmailMailTest.php",
+    "sha256": "D408418C720EFF5EC9E95E92797878C543B79DE1E72A24B4079CA96F275FDE3D"
+  },
+  {
+    "path": "tests/Feature/It/ItGraphMailTest.php",
+    "sha256": "3DBF7A7EB404FC34183181C67550D73DEE2956D2C9E29BC89E00684513E46F36"
+  },
+  {
+    "path": "tests/Concurrency/It/ItMailboxPollConcurrencyTest.php",
+    "sha256": "62AD537D780F8CCC4426746CE6080F04D5BFE0FEEE0D2DCEF6D435B116E9B7CF"
+  },
+  {
+    "path": "tests/Support/It/mailbox-poll-concurrency-worker.php",
+    "sha256": "D6B9C09971C709EBA9184B2757A795FAF40A435FC7109DEA251821784A0DD273"
+  }
+]

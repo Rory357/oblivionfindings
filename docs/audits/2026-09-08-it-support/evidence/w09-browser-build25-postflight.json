@@ -1,0 +1,9 @@
+{
+    "token": "1a661b006d6f4a5e",
+    "database": "oblivion_it_draft_browser_1a661b006d6f4a5e",
+    "checks": {
+        "schema_absent": true,
+        "owned_directory_absent": true
+    },
+    "database_mutations_performed": false
+}

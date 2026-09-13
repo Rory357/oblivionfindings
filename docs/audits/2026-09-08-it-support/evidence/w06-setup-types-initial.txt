@@ -1,0 +1,216 @@
+resources/js/components/settings/__tests__/sso-configuration-form.test.tsx(102,109): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+resources/js/pages/it/setup/_dialogs.tsx(630,33): error TS2322: Type '{ children: Element; title: string; description: string; }' is not assignable to type 'IntrinsicAttributes & { children: ReactNode; }'.
+  Property 'title' does not exist on type 'IntrinsicAttributes & { children: ReactNode; }'.
+resources/js/pages/it/setup/_dialogs.tsx(683,33): error TS2322: Type '{ children: Element; title: string; description: string; }' is not assignable to type 'IntrinsicAttributes & { children: ReactNode; }'.
+  Property 'title' does not exist on type 'IntrinsicAttributes & { children: ReactNode; }'.
+resources/js/pages/it/setup/_dialogs.tsx(903,33): error TS2322: Type '{ children: (false | Element)[]; title: string; description: string; }' is not assignable to type 'IntrinsicAttributes & { children: ReactNode; }'.
+  Property 'title' does not exist on type 'IntrinsicAttributes & { children: ReactNode; }'.
+resources/js/pages/it/setup/_header.tsx(115,29): error TS2322: Type '{ value: number; total: number; }' is not assignable to type 'IntrinsicAttributes & { percent: number; caption?: ReactNode; }'.
+  Property 'value' does not exist on type 'IntrinsicAttributes & { percent: number; caption?: ReactNode; }'.
+resources/js/pages/it/setup/_header.tsx(127,29): error TS2322: Type '{ value: number; total: number; }' is not assignable to type 'IntrinsicAttributes & { percent: number; caption?: ReactNode; }'.
+  Property 'value' does not exist on type 'IntrinsicAttributes & { percent: number; caption?: ReactNode; }'.
+resources/js/pages/it/setup/_header.tsx(149,29): error TS2322: Type '{ value: number; total: number; }' is not assignable to type 'IntrinsicAttributes & { percent: number; caption?: ReactNode; }'.
+  Property 'value' does not exist on type 'IntrinsicAttributes & { percent: number; caption?: ReactNode; }'.
+resources/js/pages/it/setup/index.tsx(160,13): error TS2304: Cannot find name 'queueStep'.
+resources/js/pages/it/setup/index.tsx(161,42): error TS2304: Cannot find name 'setQueueStep'.
+resources/js/pages/it/setup/index.tsx(161,55): error TS2304: Cannot find name 'queueStep'.
+resources/js/pages/it/setup/index.tsx(165,13): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(166,13): error TS2304: Cannot find name 'queueOutcomeUnknown'.
+resources/js/pages/it/setup/index.tsx(167,13): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(171,9): error TS2304: Cannot find name 'setQueueError'.
+resources/js/pages/it/setup/index.tsx(172,9): error TS2304: Cannot find name 'queueSubmittedKey'.
+resources/js/pages/it/setup/index.tsx(172,37): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(176,21): error TS2304: Cannot find name 'setQueueStep'.
+resources/js/pages/it/setup/index.tsx(182,21): error TS2304: Cannot find name 'setQueueStep'.
+resources/js/pages/it/setup/index.tsx(183,22): error TS2304: Cannot find name 'setQueueStep'.
+resources/js/pages/it/setup/index.tsx(190,21): error TS2304: Cannot find name 'setQueueOutcomeUnknown'.
+resources/js/pages/it/setup/index.tsx(191,21): error TS2304: Cannot find name 'setQueueError'.
+resources/js/pages/it/setup/index.tsx(197,17): error TS2304: Cannot find name 'setQueueOpen'.
+resources/js/pages/it/setup/index.tsx(200,17): error TS2304: Cannot find name 'setQueueOutcomeUnknown'.
+resources/js/pages/it/setup/index.tsx(201,17): error TS2304: Cannot find name 'setQueueError'.
+resources/js/pages/it/setup/index.tsx(206,9): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(207,13): error TS2304: Cannot find name 'editingQueueId'.
+resources/js/pages/it/setup/index.tsx(207,31): error TS2304: Cannot find name 'queueOriginal'.
+resources/js/pages/it/setup/index.tsx(214,39): error TS2304: Cannot find name 'queueOriginal'.
+resources/js/pages/it/setup/index.tsx(222,13): error TS2304: Cannot find name 'editingQueueId'.
+resources/js/pages/it/setup/index.tsx(223,13): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(223,49): error TS2304: Cannot find name 'editingQueueId'.
+resources/js/pages/it/setup/index.tsx(225,13): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(229,13): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(230,13): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(231,13): error TS2304: Cannot find name 'setQueueOutcomeUnknown'.
+resources/js/pages/it/setup/index.tsx(232,13): error TS2304: Cannot find name 'setQueueError'.
+resources/js/pages/it/setup/index.tsx(238,13): error TS2304: Cannot find name 'queueOutcomeUnknown'.
+resources/js/pages/it/setup/index.tsx(239,28): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(244,29): error TS2304: Cannot find name 'queueOriginal'.
+resources/js/pages/it/setup/index.tsx(245,53): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(250,13): error TS2304: Cannot find name 'setQueueDiscardOpen'.
+resources/js/pages/it/setup/index.tsx(253,9): error TS2304: Cannot find name 'queueReviewAbort'.
+resources/js/pages/it/setup/index.tsx(254,9): error TS2304: Cannot find name 'setQueueOpen'.
+resources/js/pages/it/setup/index.tsx(257,9): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(258,14): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(258,45): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(259,18): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(260,17): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(261,18): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(262,17): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(263,13): error TS2304: Cannot find name 'setQueueStep'.
+resources/js/pages/it/setup/index.tsx(265,33): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(266,23): error TS2304: Cannot find name 'queueNameInput'.
+resources/js/pages/it/setup/index.tsx(267,23): error TS2304: Cannot find name 'queueKeyInput'.
+resources/js/pages/it/setup/index.tsx(276,15): error TS2304: Cannot find name 'editingQueueId'.
+resources/js/pages/it/setup/index.tsx(276,34): error TS2304: Cannot find name 'queueSubmittedKey'.
+resources/js/pages/it/setup/index.tsx(277,13): error TS2304: Cannot find name 'queueReviewLoading'.
+resources/js/pages/it/setup/index.tsx(280,9): error TS2304: Cannot find name 'queueReviewAbort'.
+resources/js/pages/it/setup/index.tsx(282,9): error TS2304: Cannot find name 'queueReviewAbort'.
+resources/js/pages/it/setup/index.tsx(283,9): error TS2304: Cannot find name 'setQueueReviewLoading'.
+resources/js/pages/it/setup/index.tsx(284,9): error TS2304: Cannot find name 'setQueueReviewError'.
+resources/js/pages/it/setup/index.tsx(285,9): error TS2304: Cannot find name 'setQueueReviewed'.
+resources/js/pages/it/setup/index.tsx(286,9): error TS2304: Cannot find name 'setQueueNotFound'.
+resources/js/pages/it/setup/index.tsx(314,23): error TS2304: Cannot find name 'editingQueueId'.
+resources/js/pages/it/setup/index.tsx(315,42): error TS2304: Cannot find name 'editingQueueId'.
+resources/js/pages/it/setup/index.tsx(316,43): error TS2304: Cannot find name 'queueSubmittedKey'.
+resources/js/pages/it/setup/index.tsx(320,18): error TS2304: Cannot find name 'editingQueueId'.
+resources/js/pages/it/setup/index.tsx(324,49): error TS2304: Cannot find name 'setQueueNotFound'.
+resources/js/pages/it/setup/index.tsx(331,45): error TS2304: Cannot find name 'setQueueReviewed'.
+resources/js/pages/it/setup/index.tsx(334,17): error TS2304: Cannot find name 'setQueueReviewError'.
+resources/js/pages/it/setup/index.tsx(340,45): error TS2304: Cannot find name 'setQueueReviewLoading'.
+resources/js/pages/it/setup/index.tsx(344,39): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(350,13): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(361,37): error TS2304: Cannot find name 'navigate'.
+resources/js/pages/it/setup/index.tsx(374,43): error TS2304: Cannot find name 'openQueue'.
+resources/js/pages/it/setup/index.tsx(376,45): error TS2304: Cannot find name 'openService'.
+resources/js/pages/it/setup/index.tsx(383,35): error TS2304: Cannot find name 'filterRows'.
+resources/js/pages/it/setup/index.tsx(386,29): error TS2322: Type '(record?: Team) => void' is not assignable to type '(row: SetupRow) => void'.
+  Types of parameters 'record' and 'row' are incompatible.
+    Type 'SetupRow' is not assignable to type 'Team | undefined'.
+      Type 'Queue' is missing the following properties from type 'Team': manager, members
+resources/js/pages/it/setup/index.tsx(392,35): error TS2304: Cannot find name 'filterRows'.
+resources/js/pages/it/setup/index.tsx(395,37): error TS2304: Cannot find name 'openQueue'.
+resources/js/pages/it/setup/index.tsx(401,35): error TS2304: Cannot find name 'filterRows'.
+resources/js/pages/it/setup/index.tsx(404,37): error TS2304: Cannot find name 'openService'.
+resources/js/pages/it/setup/index.tsx(410,33): error TS2304: Cannot find name 'match'.
+resources/js/pages/it/setup/index.tsx(425,33): error TS2304: Cannot find name 'match'.
+resources/js/pages/it/setup/index.tsx(442,33): error TS2304: Cannot find name 'match'.
+resources/js/pages/it/setup/index.tsx(460,33): error TS2304: Cannot find name 'match'.
+resources/js/pages/it/setup/index.tsx(472,37): error TS2304: Cannot find name 'match'.
+resources/js/pages/it/setup/index.tsx(481,33): error TS2304: Cannot find name 'match'.
+resources/js/pages/it/setup/index.tsx(505,23): error TS2304: Cannot find name 'queueOpen'.
+resources/js/pages/it/setup/index.tsx(507,24): error TS2304: Cannot find name 'editingQueueId'.
+resources/js/pages/it/setup/index.tsx(510,28): error TS2304: Cannot find name 'editingQueueId'.
+resources/js/pages/it/setup/index.tsx(532,28): error TS2304: Cannot find name 'queueStep'.
+resources/js/pages/it/setup/index.tsx(534,22): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(534,46): error TS2304: Cannot find name 'setQueueStep'.
+resources/js/pages/it/setup/index.tsx(547,26): error TS2304: Cannot find name 'queueStep'.
+resources/js/pages/it/setup/index.tsx(551,43): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(552,48): error TS2304: Cannot find name 'setQueueStep'.
+resources/js/pages/it/setup/index.tsx(552,61): error TS2304: Cannot find name 'queueStep'.
+resources/js/pages/it/setup/index.tsx(557,26): error TS2304: Cannot find name 'queueStep'.
+resources/js/pages/it/setup/index.tsx(561,43): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(565,41): error TS2304: Cannot find name 'queueStep'.
+resources/js/pages/it/setup/index.tsx(568,41): error TS2304: Cannot find name 'setQueueStep'.
+resources/js/pages/it/setup/index.tsx(568,54): error TS2304: Cannot find name 'queueStep'.
+resources/js/pages/it/setup/index.tsx(579,37): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(580,37): error TS2304: Cannot find name 'queueOutcomeUnknown'.
+resources/js/pages/it/setup/index.tsx(581,39): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(591,41): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(592,22): error TS2304: Cannot find name 'queueError'.
+resources/js/pages/it/setup/index.tsx(597,30): error TS2304: Cannot find name 'queueError'.
+resources/js/pages/it/setup/index.tsx(600,23): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(601,25): error TS2304: Cannot find name 'queueOutcomeUnknown'.
+resources/js/pages/it/setup/index.tsx(610,43): error TS2304: Cannot find name 'queueReviewLoading'.
+resources/js/pages/it/setup/index.tsx(613,34): error TS2304: Cannot find name 'queueReviewLoading'.
+resources/js/pages/it/setup/index.tsx(617,30): error TS2304: Cannot find name 'queueReviewError'.
+resources/js/pages/it/setup/index.tsx(622,38): error TS2304: Cannot find name 'queueReviewError'.
+resources/js/pages/it/setup/index.tsx(625,30): error TS2304: Cannot find name 'queueNotFound'.
+resources/js/pages/it/setup/index.tsx(635,45): error TS2304: Cannot find name 'setQueueOutcomeUnknown'.
+resources/js/pages/it/setup/index.tsx(636,45): error TS2304: Cannot find name 'setQueueNotFound'.
+resources/js/pages/it/setup/index.tsx(637,45): error TS2304: Cannot find name 'setQueueError'.
+resources/js/pages/it/setup/index.tsx(644,30): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(647,42): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(650,42): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(655,42): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(657,42): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(661,42): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(667,49): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(669,49): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(671,49): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(681,45): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(696,45): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(711,42): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(714,42): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(718,42): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(725,45): error TS2304: Cannot find name 'setEditingQueueId'.
+resources/js/pages/it/setup/index.tsx(725,63): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(726,45): error TS2304: Cannot find name 'setQueueOutcomeUnknown'.
+resources/js/pages/it/setup/index.tsx(727,45): error TS2304: Cannot find name 'setQueueError'.
+resources/js/pages/it/setup/index.tsx(728,45): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(730,49): error TS2304: Cannot find name 'queueReviewed'.
+resources/js/pages/it/setup/index.tsx(732,45): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(735,45): error TS2304: Cannot find name 'setQueueReviewed'.
+resources/js/pages/it/setup/index.tsx(745,35): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(745,59): error TS2304: Cannot find name 'queueOutcomeUnknown'.
+resources/js/pages/it/setup/index.tsx(748,26): error TS2304: Cannot find name 'queueStep'.
+resources/js/pages/it/setup/index.tsx(753,50): error TS2304: Cannot find name 'queueNameInput'.
+resources/js/pages/it/setup/index.tsx(755,51): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(757,52): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(759,49): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(769,50): error TS2304: Cannot find name 'queueKeyInput'.
+resources/js/pages/it/setup/index.tsx(771,51): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(773,52): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(775,49): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(789,52): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(791,49): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(802,26): error TS2304: Cannot find name 'queueStep'.
+resources/js/pages/it/setup/index.tsx(807,48): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(809,45): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(810,52): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(831,45): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(836,45): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(844,48): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(851,45): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(870,26): error TS2304: Cannot find name 'queueStep'.
+resources/js/pages/it/setup/index.tsx(879,49): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(882,49): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(891,54): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(893,49): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(903,53): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(906,53): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(918,51): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(920,45): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(929,51): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(931,45): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(940,51): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(942,45): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(963,62): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(967,57): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(971,74): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(976,67): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(1002,62): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(1006,57): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(1010,74): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(1015,67): error TS2304: Cannot find name 'queueForm'.
+resources/js/pages/it/setup/index.tsx(1033,23): error TS2304: Cannot find name 'queueDiscardOpen'.
+resources/js/pages/it/setup/index.tsx(1034,32): error TS2304: Cannot find name 'setQueueDiscardOpen'.
+resources/js/pages/it/setup/index.tsx(1037,21): error TS2304: Cannot find name 'queueOutcomeUnknown'.
+resources/js/pages/it/setup/index.tsx(1043,21): error TS2304: Cannot find name 'queueReviewAbort'.
+resources/js/pages/it/setup/index.tsx(1044,21): error TS2304: Cannot find name 'setQueueOpen'.
+resources/js/pages/it/tickets/show.tsx(286,17): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(iterable?: Iterable<readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }]> | null | undefined): Map<...>', gave the following error.
+    Argument of type '(readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }] | readonly [number, { readonly source: `${string} \u00B7 ${string}`; ... 4 more ...; readonly url: string; }])[]' is not assignable to parameter of type 'Iterable<readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }]>'.
+      The types returned by '[Symbol.iterator]().next(...)' are incompatible between these types.
+        Type 'IteratorResult<readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }] | readonly [number, { ...; }], undefined>' is not assignable to type 'IteratorResult<readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }], any>'.
+          Type 'IteratorYieldResult<readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }] | readonly [number, { ...; }]>' is not assignable to type 'IteratorResult<readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }], any>'.
+            Type 'IteratorYieldResult<readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }] | readonly [number, { ...; }]>' is not assignable to type 'IteratorYieldResult<readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }]>'.
+              Type 'readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }] | readonly [number, { readonly source: `${string} \u00B7 ${string}`; ... 4 more ...; readonly url: string; }]' is not assignable to type 'readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }]'.
+                Type 'readonly [number, { readonly source: `${string} \u00B7 ${string}`; readonly internal: boolean; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }]' is not assignable to type 'readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }]'.
+                  Type at position 1 in source is not compatible with type at position 1 in target.
+                    The types of 'source' are incompatible between these types.
+                      Type '`${string} \u00B7 ${string}`' is not assignable to type '"Original report"'.
+  Overload 2 of 4, '(entries?: readonly (readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }])[] | null | undefined): Map<...>', gave the following error.
+    Argument of type '(readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }] | readonly [number, { readonly source: `${string} \u00B7 ${string}`; ... 4 more ...; readonly url: string; }])[]' is not assignable to parameter of type 'readonly (readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }])[]'.
+      Type 'readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }] | readonly [number, { readonly source: `${string} \u00B7 ${string}`; ... 4 more ...; readonly url: string; }]' is not assignable to type 'readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }]'.
+        Type 'readonly [number, { readonly source: `${string} \u00B7 ${string}`; readonly internal: boolean; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }]' is not assignable to type 'readonly [number, { readonly source: "Original report"; readonly internal: false; readonly id: number; readonly name: string; readonly size: number; readonly url: string; }]'.
+          Type at position 1 in source is not compatible with type at position 1 in target.
+            The types of 'source' are incompatible between these types.
+              Type '`${string} \u00B7 ${string}`' is not assignable to type '"Original report"'.

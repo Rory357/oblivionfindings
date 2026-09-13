@@ -14,26 +14,7 @@ class ItSavedTicketFilterController extends Controller
         StoreItSavedTicketFilterRequest $request,
         ItSavedTicketFilterService $filters,
     ) {
-        $user = $request->user();
-
-        if (ItSavedTicketFilter::query()->where('user_id', $user->id)->count() >= 25) {
-            return redirect()->back()->withErrors([
-                'filters' => 'You can keep up to 25 personal ticket filters. Delete one before saving another.',
-            ]);
-        }
-
-        $safeFilters = $filters->sanitize($user, (array) $request->validated('filters'));
-        if ($safeFilters === []) {
-            return redirect()->back()->withErrors([
-                'filters' => 'Choose at least one ticket filter before saving this view.',
-            ]);
-        }
-
-        ItSavedTicketFilter::query()->create([
-            'user_id' => $user->id,
-            'name' => trim((string) $request->validated('name')),
-            'filters' => $safeFilters,
-        ]);
+        $filters->store($request->user(), (string) $request->validated('name'), (array) $request->validated('filters'));
 
         return redirect()->back()->with('success', 'Personal ticket filter saved.');
     }

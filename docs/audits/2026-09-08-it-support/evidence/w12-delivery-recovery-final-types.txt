@@ -1,0 +1,2 @@
+resources/js/components/it/it-service-operations.tsx(171,12): error TS2352: Conversion of type 'Record<string, unknown>' to type 'RetryReceipt' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'Record<string, unknown>' is missing the following properties from type 'RetryReceipt': original_delivery_id, retry_delivery_id, status, actor_id

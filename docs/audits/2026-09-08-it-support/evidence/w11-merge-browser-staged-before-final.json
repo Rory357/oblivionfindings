@@ -1,0 +1,65 @@
+{
+    "token": "ba36125e97ac40d8",
+    "phase": "before_merge",
+    "database_mutations": false,
+    "synthetic_inbox_changed": true,
+    "tickets": [
+        {
+            "id": 1,
+            "reference": "IT-000001",
+            "merged_into_ticket_id": null,
+            "status": "open",
+            "lock_version": 1
+        },
+        {
+            "id": 7,
+            "reference": "IT-000007",
+            "merged_into_ticket_id": null,
+            "status": "open",
+            "lock_version": 1
+        }
+    ],
+    "receipts": [],
+    "connections": [
+        {
+            "id": 1,
+            "provider": "microsoft"
+        },
+        {
+            "id": 2,
+            "provider": "google"
+        }
+    ],
+    "ticket_count": 7,
+    "email_comment_commands": 0,
+    "comment_audits": 0,
+    "merge_events": [],
+    "synthetic_comments": [],
+    "provider_state": {
+        "token": "ba36125e97ac40d8",
+        "synthetic_only": true,
+        "unread": {
+            "microsoft": [
+                44
+            ],
+            "google": [
+                44
+            ]
+        },
+        "ack_attempts": {
+            "microsoft": [],
+            "google": []
+        },
+        "reads": {
+            "microsoft": [],
+            "google": []
+        },
+        "external_body_reads": 0,
+        "merge_scenario": {
+            "phase": "before_merge",
+            "source_id": 7,
+            "target_id": 1,
+            "source_reference": "IT-000007"
+        }
+    }
+}

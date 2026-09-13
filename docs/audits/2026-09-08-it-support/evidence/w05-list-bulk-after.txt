@@ -1,0 +1,90 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_59761c9835794a12",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSavedTicketFilterTest[39m
+  [32;1m✓[39;22m[90m [39m[90man agent saves only allow-listed filters and currently accessible options[39m[90m                                 [39m [90m166.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma personal filter applies server-side and combines Site scope with queue filters[39m[90m                            [39m [90m2.40s[39m  
+  [32;1m✓[39;22m[90m [39m[90msaved filter payloads are private and stale Site access is pruned before display[39m[90m                            [39m [90m2.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforeign saved filter reads and direct-object deletion fail closed[39m[90m                                           [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequest-only staff cannot create personal agent queue filters[39m[90m                                               [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mone filter normalizer never reuses another actors permitted options[39m[90m                                         [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma reused filter normalizer drops revoked Site and retired service options before applying or listing saved[39m[90m… [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpersonal ticket totals match all own rows independently from the agent queue filter[39m[90m                         [39m [90m2.31s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketBulkTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbulk assign hands a selection to one agent and notifies them once per ticket[39m[90m                                [39m [90m0.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk assign to yourself never self-notifies[39m[90m                                                                 [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk priority restamps the SLA clock from the new target[39m[90m                                                    [39m [90m1.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk status moves working tickets and starts the waiting pause[39m[90m                                              [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk close requires and preserves one operational reason per ticket[39m[90m                                         [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk close settles everything still open and skips the already-closed[39m[90m                                       [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk is agent-only and constrained to canonical Site access[39m[90m                                                 [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk outcomes preserve selection order and conceal unavailable records while explaining stale and blocked r[39m[90m…[39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk unassign accepts an explicit null with its routing reason and rejects missing or duplicate selection i[39m[90m…[39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mone failed bulk transaction is reported without rolling back successful siblings or exposing exception cont[39m[90m…[39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk result receipts are projected only to the actor who performed the selection[39m[90m                            [39m [90m5.34s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketVersionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpersisted versions are monotonic even for same-second writes from older model instances[39m[90m                     [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma property update returns its version and a stale assignment cannot overwrite it[39m[90m                            [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90minertia receives field errors and an authorized reload reference without a success flash[39m[90m                    [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "properties"[39m[90m                       [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "workflow"[39m[90m                         [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "resolve"[39m[90m                          [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "close"[39m[90m                            [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "reopen"[39m[90m                           [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma versioned lifecycle command cannot be replayed into duplicate activity[39m[90m                                    [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresolve close and reopen reject stale browser commands without duplicate notes or transitions[39m[90m               [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocked commands recheck approval and role instead of trusting a cached actor with ('approval')[39m[90m              [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocked commands recheck approval and role instead of trusting a cached actor with ('role')[39m[90m                  [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma changed ticket site denies the old actor before returning a version conflict[39m[90m                              [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester can reopen with a current version but cannot change triage properties[39m[90m                           [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma failed atomic command rolls its version and activity back with its ticket changes[39m[90m                         [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk commands validate one version per selected ticket and skip stale rows independently[39m[90m                    [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon-browser canonical adapters remain compatible and still advance persisted versions[39m[90m                       [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthorized detail and queue payloads expose the persisted ticket version[39m[90m                                    [39m [90m5.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmigration rollback refuses to discard active concurrency versions[39m[90m                                           [39m [90m0.66s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItProvisioningBulkTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbulk assign moves pending requests to in progress and records an event[39m[90m                                      [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk fulfil marks requests done and completes the linked onboarding task[39m[90m                                    [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning bulk is agent-only and Site-scoped[39m[90m                                                             [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning bulk outcomes separate blockers from unavailable records without disclosing private context[39m[90m    [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning bulk rechecks lost actor access between locked item writes[39m[90m                                     [39m [90m0.69s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItProvisioningTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe /it hub is gated on it permissions[39m[90m                                                                      [39m [90m4.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe IT hub exposes workflow template management only to IT managers[39m[90m                                         [39m [90m5.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgenerating a checklist raises provisioning requests for non-equipment IT tasks[39m[90m                              [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfulfilling a request records the outcome and completes the linked onboarding task[39m[90m                           [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning lists and direct actions conceal inaccessible Sites[39m[90m                                            [39m [90m2.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtickets can be created and resolved from the helpdesk queue[39m[90m                                                 [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning assign, fulfil and cancel each write an activity event[39m[90m                                         [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90man agent raises a manual provisioning request; requesters cannot[39m[90m                                            [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning cancellation requires a reason before changing canonical work[39m[90m                                  [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90man agent raises a ticket linked to a provisioning request; requesters cannot link[39m[90m                           [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90man agent exports the provisioning queue as CSV; requesters cannot[39m[90m                                           [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe provisioning export respects the status filter[39m[90m                                                          [39m [90m0.65s[39m  
+
+  [90mTests:[39m    [32;1m55 passed[39;22m[90m (577 assertions)[39m
+  [90mDuration:[39m [39m230.39s[39m
+

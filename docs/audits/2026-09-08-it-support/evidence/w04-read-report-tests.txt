@@ -1,0 +1,62 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_68a31eb3a9e348b2",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItSlaReadTest[39m
+  [32;1m✓[39;22m[90m [39m[90mlive header queue detail reports and CSV reconcile without trusting stale SLA state[39m[90m                       [39m [90m209.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('ok', ['ok'])[39m[90m   [39m [90m2.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('at_risk', ['at[39m[90m…[39m [90m2.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('breached', ['b[39m[90m…[39m [90m2.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('met', ['met'])[39m[90m [39m [90m3.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('paused', ['pau[39m[90m…[39m [90m3.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('unmeasured', [[39m[90m…[39m [90m2.90s[39m  
+  [31;1m⨯[39;22m[90m [39m[90ma stopped SLA watchdog becomes stale in the hub and reports then recovers[39m[90m                                   [39m [90m3.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequesters receive their own clock evidence without operational aggregates[39m[90m                                  [39m [90m3.24s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItReportsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mreports are agent-only and an empty installation gets a zeroed well-formed report[39m[90m                           [39m [90m1.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe report aggregates tickets and provisioning across the range[39m[90m                                             [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreport source projections require their exact permissions and canonical Site visibility[39m[90m                     [39m [90m1.50s[39m  
+  [32;1m✓[39;22m[90m [39m[90mper-card CSV export is agent-only, correct and injection-guarded[39m[90m                                            [39m [90m0.91s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItSlaReadTest[22m [90m>[39m a stopped SLA watchdog becomes stale in the hub and reports then recover…   
+[39;1m  Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+@@ @@
+-'stale'
++'fresh'[39;22m
+
+  at [32mtests\Feature\It\ItSlaReadTest.php[39m:[32m98[39m
+     94▕     ]);
+     95▕     $this->actingAs($this->agent)->getJson('/it/reports/data')->assertOk()->assertJsonPath('kpis.sla_watchdog.state', 'fresh');
+     96▕     $this->travel(61)->minutes();
+     97▕     $this->get('/it')->assertInertia(fn (Assert $page) => $page->where('summary.tickets.sla_watchdog.state', 'stale'));
+  ➜  98▕     $this->getJson('/it/reports/data')->assertOk()->assertJsonPath('kpis.sla_watchdog.state', 'stale');
+     99▕     $run->update(['started_at' => now()->startOfHour(), 'finished_at' => now()]);
+    100▕     $this->getJson('/it/reports/data')->assertOk()->assertJsonPath('kpis.sla_watchdog.state', 'fresh');
+    101▕ });
+    102▕
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m12 passed[39;22m[90m (236 assertions)[39m
+  [90mDuration:[39m [39m239.11s[39m
+

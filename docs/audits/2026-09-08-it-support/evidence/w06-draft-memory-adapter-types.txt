@@ -1,0 +1,2 @@
+npm notice run npx
+npm notice run tsc --noEmit --skipLibCheck --moduleResolution bundler --module esnext --target es2022 --lib dom,es2022 --strict --jsx react-jsx resources/js/hooks/it-ticket-draft-memory.ts resources/js/hooks/it-ticket-draft-memory.test.ts resources/js/hooks/use-it-ticket-draft-memory.ts resources/js/hooks/use-it-ticket-draft-memory.test.tsx

@@ -1,0 +1,248 @@
+{
+    "observed_at": "2026-09-10T02:57:39+00:00",
+    "token": "1a661b006d6f4a5e",
+    "database": "oblivion_it_draft_browser_1a661b006d6f4a5e",
+    "time_context": {
+        "elapsed_ms": 0.44,
+        "rows": [
+            {
+                "session_time_zone": "SYSTEM",
+                "system_time_zone": "New Zealand Standard Time"
+            }
+        ]
+    },
+    "tickets": {
+        "elapsed_ms": 0.27,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 1,
+                "status": "open"
+            },
+            {
+                "id": 4,
+                "lock_version": 10,
+                "status": "open"
+            }
+        ]
+    },
+    "tasks": {
+        "elapsed_ms": 0.24,
+        "rows": []
+    },
+    "dependencies": {
+        "elapsed_ms": 1.23,
+        "rows": []
+    },
+    "receipts": {
+        "elapsed_ms": 0.17,
+        "rows": []
+    },
+    "events": {
+        "elapsed_ms": 0.27,
+        "rows": []
+    },
+    "audits": {
+        "elapsed_ms": 0.19,
+        "rows": []
+    },
+    "approvals": {
+        "ticket": {
+            "elapsed_ms": 0.13,
+            "rows": [
+                {
+                    "id": 5,
+                    "lock_version": 1,
+                    "status": "open"
+                }
+            ]
+        },
+        "requests": {
+            "elapsed_ms": 0.19,
+            "rows": []
+        },
+        "receipts": {
+            "elapsed_ms": 0.26,
+            "rows": []
+        },
+        "events": {
+            "elapsed_ms": 0.14,
+            "rows": []
+        },
+        "audits": {
+            "elapsed_ms": 0.15,
+            "rows": []
+        }
+    },
+    "resolution": {
+        "ticket": {
+            "elapsed_ms": 0.13,
+            "rows": [
+                {
+                    "id": 4,
+                    "lock_version": 10,
+                    "status": "open",
+                    "workflow_state": "submitted",
+                    "resolved_at": null,
+                    "closed_at": null,
+                    "reopened_count": 2,
+                    "resolution_code": null,
+                    "resolution_summary_sha256": null,
+                    "resolution_verification_sha256": null,
+                    "csat_score": null,
+                    "csat_submitted_at": null,
+                    "csat_comment_sha256": null
+                }
+            ]
+        },
+        "comments": {
+            "elapsed_ms": 0.15,
+            "rows": [
+                {
+                    "id": 1,
+                    "author_user_id": 4,
+                    "is_internal": 0,
+                    "speaker_side": "it",
+                    "source_channel": "browser",
+                    "created_at": "2026-09-10 14:48:38",
+                    "body_sha256": "ef749ea8abb95572e28bb5e97a0d498da5bb53dec7901d7b3715b93594983ad1"
+                },
+                {
+                    "id": 2,
+                    "author_user_id": 4,
+                    "is_internal": 1,
+                    "speaker_side": "it",
+                    "source_channel": "browser",
+                    "created_at": "2026-09-10 14:51:33",
+                    "body_sha256": "a8adb90a12f37a6f37a4c8525c4dcf4e8b56cca4818434c27a8f1b4b68633b06"
+                },
+                {
+                    "id": 3,
+                    "author_user_id": 4,
+                    "is_internal": 0,
+                    "speaker_side": "it",
+                    "source_channel": "browser",
+                    "created_at": "2026-09-10 14:53:39",
+                    "body_sha256": "d8f18264f2516c30e32bfacd2650f610957dced978729ffaa1b9cd1ef73dbf9a"
+                },
+                {
+                    "id": 4,
+                    "author_user_id": 1,
+                    "is_internal": 0,
+                    "speaker_side": "requester",
+                    "source_channel": "browser",
+                    "created_at": "2026-09-10 14:55:14",
+                    "body_sha256": "fb6304ede69acbd9aff94fb9aa9c8082446c5a898f729a4c585fc45980b509c2"
+                }
+            ]
+        },
+        "conversation": {
+            "elapsed_ms": 0.12,
+            "rows": [
+                {
+                    "id": 4,
+                    "last_public_comment_id": 4,
+                    "last_public_speaker_side": "requester",
+                    "next_response_party": "it"
+                }
+            ]
+        },
+        "events": {
+            "elapsed_ms": 0.22,
+            "rows": [
+                {
+                    "id": 1,
+                    "actor_user_id": 4,
+                    "type": "resolved",
+                    "created_at": "2026-09-10 02:48:38",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 4,
+                    "actor_user_id": 4,
+                    "type": "reopened",
+                    "created_at": "2026-09-10 02:51:33",
+                    "source": "legacy_reopen"
+                },
+                {
+                    "id": 5,
+                    "actor_user_id": 4,
+                    "type": "resolved",
+                    "created_at": "2026-09-10 02:53:39",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 6,
+                    "actor_user_id": 1,
+                    "type": "reopened",
+                    "created_at": "2026-09-10 02:55:14",
+                    "source": "legacy_reopen"
+                }
+            ]
+        },
+        "audits": {
+            "elapsed_ms": 0.29,
+            "rows": [
+                {
+                    "id": 24,
+                    "user_id": 4,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 14:48:38",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 27,
+                    "user_id": 4,
+                    "action": "it.ticket.resolved",
+                    "created_at": "2026-09-10 14:48:38",
+                    "source": null
+                },
+                {
+                    "id": 31,
+                    "user_id": 4,
+                    "action": "it.ticket.reopened",
+                    "created_at": "2026-09-10 14:51:33",
+                    "source": "legacy_reopen"
+                },
+                {
+                    "id": 32,
+                    "user_id": 4,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 14:51:33",
+                    "source": "legacy_reopen"
+                },
+                {
+                    "id": 37,
+                    "user_id": 4,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 14:53:39",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 39,
+                    "user_id": 4,
+                    "action": "it.ticket.resolved",
+                    "created_at": "2026-09-10 14:53:39",
+                    "source": null
+                },
+                {
+                    "id": 42,
+                    "user_id": 1,
+                    "action": "it.ticket.reopened",
+                    "created_at": "2026-09-10 14:55:14",
+                    "source": "legacy_reopen"
+                },
+                {
+                    "id": 43,
+                    "user_id": 1,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 14:55:14",
+                    "source": "legacy_reopen"
+                }
+            ]
+        }
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false
+}

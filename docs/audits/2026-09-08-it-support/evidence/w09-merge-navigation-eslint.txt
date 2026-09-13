@@ -1,0 +1,2 @@
+npm notice run npx
+npm notice run eslint resources/js/pages/it/tickets/show.tsx resources/js/pages/it/tickets/show.test.tsx --max-warnings=0

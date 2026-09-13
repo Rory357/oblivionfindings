@@ -11,6 +11,7 @@ use App\Models\ItTicketLink;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -22,9 +23,37 @@ use Illuminate\Support\Facades\Schema;
  */
 final class ItWorkAccessService
 {
-    /** @return list<int> */
-    public function approvedSiteIds(User $user): array
+    /**
+     * Prelock the union before a multi-account decision performs individual
+     * approvedSiteIds current reads. Caller already owns ordered User mutexes.
+     * Otherwise disjoint user pairs with crossed Site scopes can lock A/B and B/A.
+     *
+     * @param  iterable<User>  $users
+     */
+    public function lockApprovedSiteEvidenceForUsers(iterable $users): void
     {
+        $this->assertEvidenceTransaction(true);
+        $users = collect($users)->keyBy('id')->sortKeys();
+        $profiles = HrEmployeeProfile::withTrashed()->whereIn('user_id', $users->keys()->all())
+            ->orderBy('user_id')->lockForUpdate()->get();
+        $siteIds = $profiles->flatMap(fn (HrEmployeeProfile $profile): array => [
+            $profile->primary_site_id, ...($profile->secondary_site_ids ?? []),
+        ]);
+        if (Schema::hasColumn('users', 'site_id')) {
+            $siteIds = $siteIds->merge(User::query()->whereKey($users->keys()->all())
+                ->orderBy('id')->lockForUpdate()->pluck('site_id'));
+        }
+        $siteIds = $siteIds->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id): int => (int) $id)->unique()->sort()->values();
+        if ($siteIds->isNotEmpty()) {
+            Site::query()->whereKey($siteIds->all())->orderBy('id')->lockForUpdate()->get(['id']);
+        }
+    }
+
+    /** @return list<int> */
+    public function approvedSiteIds(User $user, bool $lockForUpdate = false): array
+    {
+        $this->assertEvidenceTransaction($lockForUpdate);
         $profile = HrEmployeeProfile::query()
             ->where('user_id', $user->getKey())
             ->where('is_active', true)
@@ -36,6 +65,7 @@ final class ItWorkAccessService
                 $query->whereNull('end_date')
                     ->orWhereDate('end_date', '>=', today());
             })
+            ->when($lockForUpdate, fn (Builder $query) => $query->lockForUpdate())
             ->first(['primary_site_id', 'secondary_site_ids']);
 
         $candidateIds = collect([
@@ -47,7 +77,8 @@ final class ItWorkAccessService
         // It is compatibility input only; Site remains the canonical scope.
         if (Schema::hasColumn('users', 'site_id')) {
             $candidateIds->push(
-                User::query()->whereKey($user->getKey())->value('site_id'),
+                User::query()->whereKey($user->getKey())
+                    ->when($lockForUpdate, fn (Builder $query) => $query->lockForUpdate())->value('site_id'),
             );
         }
 
@@ -66,6 +97,8 @@ final class ItWorkAccessService
             ->where('is_active', true)
             ->where('archived', false)
             ->whereNull('archived_at')
+            ->orderBy('id')
+            ->when($lockForUpdate, fn (Builder $query) => $query->lockForUpdate())
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
@@ -75,9 +108,9 @@ final class ItWorkAccessService
             ->all();
     }
 
-    public function canView(User $user, ItTicket $ticket): bool
+    public function canView(User $user, ItTicket $ticket, bool $lockForUpdate = false): bool
     {
-        $canonical = $this->canonicalTicket($ticket);
+        $canonical = $this->canonicalTicket($ticket, $lockForUpdate);
 
         if (! $canonical) {
             return false;
@@ -88,16 +121,26 @@ final class ItWorkAccessService
         }
 
         return $this->hasStaffCapability($user)
-            && $this->staffCanAccess($user, $canonical);
+            && $this->staffCanAccess($user, $canonical, $lockForUpdate);
     }
 
-    public function canWork(User $user, ItTicket $ticket): bool
+    public function canWork(User $user, ItTicket $ticket, bool $lockForUpdate = false): bool
     {
-        $canonical = $this->canonicalTicket($ticket);
+        $canonical = $this->canonicalTicket($ticket, $lockForUpdate);
 
         return $canonical !== null
             && $user->canDo('it.manage')
-            && $this->staffCanAccess($user, $canonical);
+            && $this->staffCanAccess($user, $canonical, $lockForUpdate);
+    }
+
+    /** Subscription never grants access; callers refresh users before a write/send. */
+    public function canReceiveTicketUpdates(User $user, ItTicket $ticket): bool
+    {
+        return $user->approved_at !== null
+            && ! in_array($user->role, ['client', 'next_of_kin'], true)
+            && ! $user->hasRole('client') && ! $user->hasRole('next_of_kin')
+            && ($user->canDo('it.request') || $user->canDo('it.view') || $user->canDo('it.manage'))
+            && $this->canView($user, $ticket);
     }
 
     /**
@@ -149,7 +192,9 @@ final class ItWorkAccessService
         User $user,
         ?int $siteId,
         bool $isOrganisationWide,
+        bool $lockForUpdate = false,
     ): bool {
+        $this->assertEvidenceTransaction($lockForUpdate);
         if ($isOrganisationWide) {
             return $siteId === null
                 && $user->canDo('it.manage')
@@ -157,7 +202,7 @@ final class ItWorkAccessService
         }
 
         return $siteId !== null
-            && in_array($siteId, $this->approvedSiteIds($user), true);
+            && in_array($siteId, $this->approvedSiteIds($user, $lockForUpdate), true);
     }
 
     public function defaultSiteId(User $user): ?int
@@ -196,6 +241,21 @@ final class ItWorkAccessService
      */
     public function applyViewScope(Builder $query, User $user): Builder
     {
+        return $this->applyRecordScope($query, $user, true);
+    }
+
+    /** Internal operational views require the same audience as canWork(). */
+    public function applyWorkScope(Builder $query, User $user): Builder
+    {
+        if (! $user->canDo('it.manage')) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $this->applyRecordScope($query, $user, false);
+    }
+
+    private function applyRecordScope(Builder $query, User $user, bool $includeParticipants): Builder
+    {
         $userId = (int) $user->getKey();
         $hasStaffCapability = $this->hasStaffCapability($user);
         $canViewSensitive = $user->canDo('it.viewSensitive');
@@ -208,11 +268,16 @@ final class ItWorkAccessService
             $canViewSensitive,
             $canViewOrganisationWide,
             $approvedSiteIds,
+            $includeParticipants,
         ): void {
-            $visible->where(function (Builder $participant) use ($userId): void {
-                $participant->where('requester_user_id', $userId)
-                    ->orWhere('requested_for_user_id', $userId);
-            });
+            if ($includeParticipants) {
+                $visible->where(function (Builder $participant) use ($userId): void {
+                    $participant->where('requester_user_id', $userId)
+                        ->orWhere('requested_for_user_id', $userId);
+                });
+            } else {
+                $visible->whereRaw('1 = 0');
+            }
 
             if (! $hasStaffCapability) {
                 return;
@@ -271,13 +336,15 @@ final class ItWorkAccessService
         });
     }
 
-    private function canonicalTicket(ItTicket $ticket): ?ItTicket
+    private function canonicalTicket(ItTicket $ticket, bool $lockForUpdate = false): ?ItTicket
     {
+        $this->assertEvidenceTransaction($lockForUpdate);
         if (! $ticket->exists || ! is_numeric($ticket->getKey())) {
             return null;
         }
 
-        return ItTicket::query()->find($ticket->getKey());
+        return ItTicket::query()->when($lockForUpdate, fn (Builder $query) => $query->lockForUpdate())
+            ->find($ticket->getKey());
     }
 
     private function isParticipant(User $user, ItTicket $ticket): bool
@@ -295,7 +362,7 @@ final class ItWorkAccessService
         return $user->canDo('it.view') || $user->canDo('it.manage');
     }
 
-    private function staffCanAccess(User $user, ItTicket $ticket): bool
+    private function staffCanAccess(User $user, ItTicket $ticket, bool $lockForUpdate = false): bool
     {
         if ($ticket->is_sensitive && ! $user->canDo('it.viewSensitive')) {
             return false;
@@ -306,18 +373,22 @@ final class ItWorkAccessService
                 && $user->canDo('it.organisationWide');
         }
 
+        // Acquire the approved Site set in ascending order before any separate
+        // responsibility Site. API callers require membership in this set.
+        $lockedSiteIds = $lockForUpdate ? $this->approvedSiteIds($user, true) : null;
         $siteIsOperational = Site::query()
             ->whereKey($ticket->site_id)
             ->where('is_active', true)
             ->where('archived', false)
             ->whereNull('archived_at')
+            ->when($lockForUpdate, fn (Builder $query) => $query->lockForUpdate())
             ->exists();
 
         if (! $siteIsOperational) {
             return false;
         }
 
-        if (in_array((int) $ticket->site_id, $this->approvedSiteIds($user), true)) {
+        if (in_array((int) $ticket->site_id, $lockedSiteIds ?? $this->approvedSiteIds($user), true)) {
             return true;
         }
 
@@ -360,5 +431,13 @@ final class ItWorkAccessService
             ->where('is_active', true)
             ->whereHas('team', fn (Builder $team): Builder => $this->applyActiveTeamScope($team, $userId))
             ->exists();
+    }
+
+    /** Callers take their ordered User/RBAC mutexes before requesting current scope evidence. */
+    private function assertEvidenceTransaction(bool $lockForUpdate): void
+    {
+        if ($lockForUpdate && DB::transactionLevel() < 1) {
+            throw new \LogicException('Current IT scope evidence requires a governing transaction.');
+        }
     }
 }

@@ -1,0 +1,33 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_b3402431c4084661",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketCsatTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma requester rates their own resolved ticket — score, comment and a single trail entry land[39m[90m                [39m [90m223.49s[39m  
+  [32;1m✓[39;22m[90m [39m[90mCSAT is editable while resolved, with one submission and an explicit update trail[39m[90m                           [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly the requester rates, and only while the ticket is resolved[39m[90m                                             [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpersonal list rating controls match canonical requester policy for requested-for participants[39m[90m               [39m [90m2.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe score must be a 1–5 star; the comment is optional[39m[90m                                                       [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe workspace rail and My-tickets row carry the CSAT prompt then the result[39m[90m                                [39m [90m11.00s[39m  
+
+  [90mTests:[39m    [32;1m6 passed[39;22m[90m (101 assertions)[39m
+  [90mDuration:[39m [39m240.07s[39m
+

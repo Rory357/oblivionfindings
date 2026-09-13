@@ -1,0 +1,50 @@
+[
+  {
+    "sha256": "26153F1DB7871C9CDF0706B7AA05EEFFFA717BE349818268454D280E7160C465",
+    "path": "app/Services/Integration/MailboxMessagePage.php"
+  },
+  {
+    "sha256": "79E91FFBBCA83D79B90FA4B32F78814F97A6564999876E2166FDC7C3D7B9F939",
+    "path": "app/Services/GoogleGmailService.php"
+  },
+  {
+    "sha256": "422B084C60A15DA4F41B4BAEF07E6855553DCC07E0FBF96F4C17493C78E9F003",
+    "path": "app/Services/MicrosoftGraphService.php"
+  },
+  {
+    "sha256": "CE36FBC5BF6259F8FAB7ECAB9290EA15E6381C15DB660CB0EB9912191935AA21",
+    "path": "app/Domain/It/Services/ItMailboxInbox.php"
+  },
+  {
+    "sha256": "1F12073B5DD3EF453F8A474DB6C7249FF060A3904C53602E62FC45C3202C7C1D",
+    "path": "app/Domain/It/Services/ItMailboxPollState.php"
+  },
+  {
+    "sha256": "A793289D864D7AC8928EC8F1B4021E41BB9F8780AD1B7CD40102E3A6666ED222",
+    "path": "app/Domain/It/InboundEmailIngestor.php"
+  },
+  {
+    "sha256": "5FBCB2FAD67F4E6386F7093CD3C22E3A7B6432E07E1A3B7CBCA27C6E783A5170",
+    "path": "app/Models/ItInboundEmail.php"
+  },
+  {
+    "sha256": "D12B1A4A849A6F74B2DEDA8320F54A5D9AF20F2BCC657C5FA54E38602DAAA782",
+    "path": "app/Models/ItMailboxConnection.php"
+  },
+  {
+    "sha256": "922010F5298DF7C7F87AFC024527C68BB498F7D75F92E37854810559B0CEE95A",
+    "path": "app/Jobs/PollItMailboxJob.php"
+  },
+  {
+    "sha256": "6981E69DCD4E5F6628FECF6B042D692ABA5FBD36CE6F00FF9A0B30655E033410",
+    "path": "database/migrations/2026_09_11_000016_add_it_mailbox_discovery_receipts.php"
+  },
+  {
+    "sha256": "4B8126F1764D337CAC9CCD883A97FCA928A874B3D7C93E11FC24BE097E258773",
+    "path": "tests/Feature/It/ItMailboxPollTest.php"
+  },
+  {
+    "sha256": "DF0F8F9C3B06645E02B4DC5AFFDC56BB620B22384DAB1393BE7AD8847647D05D",
+    "path": "tests/Feature/It/ItMailboxPagingTest.php"
+  }
+]

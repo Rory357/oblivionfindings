@@ -1,0 +1,46 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItTicketMergeService.php",
+    "sha256": "84b376ccce74bed4ad0dc57651ec3fd5a6b8c9fdd32cf0d8201750e429b71c80"
+  },
+  {
+    "path": "app/Http/Requests/It/ReadTicketDuplicateSuggestionsRequest.php",
+    "sha256": "a943b63ea8e6d78a55b73f38c5b1b3b5af389f672ddd2d2c1f7420fd84d4dc98"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItTicketDuplicateSuggestionController.php",
+    "sha256": "0e13687f2e956b8828b2f82cdff6a45337e7ff2279efac3b11e03fa88ee652d0"
+  },
+  {
+    "path": "routes/web.php",
+    "sha256": "a90d005f51f94dc0dc9679452a9d5f85ff0f45e490880329edc25005936ee44f"
+  },
+  {
+    "path": "tests/Feature/It/ItTicketDuplicateSuggestionTest.php",
+    "sha256": "f70408af6a87932f4f99293d60a18771f546920c4b2000fa0c628a892ac724b8"
+  },
+  {
+    "path": "resources/js/hooks/it-ticket-duplicate-contract.ts",
+    "sha256": "7f8940c1a450b37ee604e6ff9b442462ad59c6288ef68a1b3f52fc4a04ad178c"
+  },
+  {
+    "path": "resources/js/components/it/ticket-duplicate-suggestions.tsx",
+    "sha256": "9a1db2b6a2dc54126600c3d7993f30fd359854c33da64c6d565e77bd76dd679f"
+  },
+  {
+    "path": "resources/js/components/it/__tests__/ticket-duplicate-suggestions.test.tsx",
+    "sha256": "3f1f04f50c9c805e29bef8582447fea79ea2ce64a70effe54303913024a6f38d"
+  },
+  {
+    "path": "resources/js/components/it/merge-ticket-dialog.tsx",
+    "sha256": "05655b92e6452cfc6620ebe1bcc0043784e5a749f60f6d95b526c8d704ff33bc"
+  },
+  {
+    "path": "resources/js/components/it/it-wizards.tsx",
+    "sha256": "55d26497761357e7dbfc4f539fac219f36b18493e5fe4f14914a56f34803bf62"
+  },
+  {
+    "path": "resources/js/pages/it/tickets/show.tsx",
+    "sha256": "3ceb9304396595d4ad08c02950adc8e1822b2ea82b0cb366d089c29588650fbe"
+  }
+]

@@ -356,6 +356,7 @@ it('keeps ticket conversations feedback and watchers serialized and centrally au
     $ticketThread = file_get_contents($root.'/resources/js/components/it/ticket-thread.tsx');
     $reopenRequest = file_get_contents($root.'/app/Http/Requests/It/ReopenTicketRequest.php');
     $reopenDialog = file_get_contents($root.'/resources/js/components/it/ticket-reopen-dialog.tsx');
+    $transitions = file_get_contents($root.'/app/Domain/It/Services/ItWorkTransitionService.php');
     $queue = file_get_contents($root.'/resources/js/pages/it/index.tsx');
     $workspace = file_get_contents($root.'/resources/js/pages/it/tickets/show.tsx');
 
@@ -372,6 +373,7 @@ it('keeps ticket conversations feedback and watchers serialized and centrally au
         ->toContain('it.ticket.watcher.added')
         ->toContain('it.ticket.watcher.removed')
         ->toContain('reopenWithReason')
+        ->and($transitions)
         ->toContain("AuditLogger::logOrFail('it.ticket.reopened'")
         ->toContain("'is_internal' => ! \$isRequester")
         ->and($ticketThread)

@@ -1,0 +1,138 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_81527ec19a7e49d1",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItTicketDraftTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (false, 2, 3)[39m[90m             [39m [90m297.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, null, 3)[39m[90m             [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, 2, null)[39m[90m             [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, '1.5', 3)[39m[90m            [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft metadata never hydrates private fields and explicit resume decrypts only the owner content[39m[90m            [39m [90m0.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown foreign and inaccessible draft identities disclose the same safe response[39m[90m                           [39m [90m1.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic and internal drafts stay separate and participant status never grants internal recovery[39m[90m              [39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90mold Site bindings are checked before cleared fields or an accessible replacement can be saved[39m[90m               [39m [90m0.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcurrent role and account approval are rechecked despite a retained service actor[39m[90m                            [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90midentical lost acknowledgement retries return the saved revision but changed stale text conflicts[39m[90m           [39m [90m0.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdiscard is revision aware idempotent and a fresh generation cannot be changed by delayed old requests[39m[90m       [39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90msettled workflow and changed ticket version block submission without destroying authorized text[39m[90m             [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcommitted intake receipt suspends draft changes and points only to canonical recovery[39m[90m                       [39m [90m0.91s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mconsumption shares the canonical transaction and rollback restores the draft[39m[90m                                [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexpired private contents cannot resume or save and expiration never resets the generation silently[39m[90m          [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid partial payloads never flash into session and unexpected failures return no private debug data[39m[90m      [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90munauthenticated and missing-route draft responses remain uncached JSON[39m[90m                                      [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical ticket creation consumes exactly its submitted draft and receipt replay does not repeat consumpti[39m[90m…[39m [90m0.99s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mstale draft or rejected canonical intake leaves no new receipt ticket or scrubbed content[39m[90m                   [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical edit rejects stale draft revisions then consumes only the confirmed version in its transaction[39m[90m    [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfailed canonical resolution rolls back draft consumption and a valid retry resolves with its public note[39m[90m    [39m [90m0.95s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketCommandTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma browser retry returns the same committed ticket without duplicate activity or notifications[39m[90m               [39m [90m1.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mchanged command content conflicts without changing the saved ticket[39m[90m                                         [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery is actor owned and returns only a current authorized reference[39m[90m                                     [39m [90m1.30s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery and conflicting replays distinguish only an owned command whose record is unavailable with ('inacc[39m[90m…[39m [90m0.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery and conflicting replays distinguish only an owned command whose record is unavailable with ('unlin[39m[90m…[39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid input does not reserve the command identity and can be corrected safely[39m[90m                             [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy browser submissions remain compatible while newly served forms adopt command identities[39m[90m              [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnormalized identifiers and watcher ordering do not create false conflicts[39m[90m                                   [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mattachment fingerprints reject replacement content under the same request identity[39m[90m                          [39m [90m0.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket audit attachments and command receipt roll back together if the binding cannot persist[39m[90m               [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnotification dispatch failure preserves a successful committed response and a recoverable intent[39m[90m            [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe database rejects a duplicate actor channel and operation command binding[39m[90m                                [39m [90m0.81s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketVersionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpersisted versions are monotonic even for same-second writes from older model instances[39m[90m                     [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma property update returns its version and a stale assignment cannot overwrite it[39m[90m                            [39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90minertia receives field errors and an authorized reload reference without a success flash[39m[90m                    [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "properties"[39m[90m                       [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "workflow"[39m[90m                         [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "resolve"[39m[90m                          [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "close"[39m[90m                            [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "reopen"[39m[90m                           [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma versioned lifecycle command cannot be replayed into duplicate activity[39m[90m                                    [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresolve close and reopen reject stale browser commands without duplicate notes or transitions[39m[90m               [39m [90m1.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocked commands recheck approval and role instead of trusting a cached actor with ('approval')[39m[90m              [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocked commands recheck approval and role instead of trusting a cached actor with ('role')[39m[90m                  [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma changed ticket site denies the old actor before returning a version conflict[39m[90m                              [39m [90m0.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester can reopen with a current version but cannot change triage properties[39m[90m                           [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma failed atomic command rolls its version and activity back with its ticket changes[39m[90m                         [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk commands validate one version per selected ticket and skip stale rows independently[39m[90m                    [39m [90m1.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon-browser canonical adapters remain compatible and still advance persisted versions[39m[90m                       [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthorized detail and queue payloads expose the persisted ticket version[39m[90m                                    [39m [90m5.34s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmigration rollback refuses to discard active concurrency versions[39m[90m                                           [39m [90m0.87s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketLifecycleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mresolving requires a note and posts it as the final public reply[39m[90m                                            [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe notify toggle silences the requester but never the watchers[39m[90m                                             [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresolution met requires both clock measurements before the overall SLA is met with (true)[39m[90m                   [39m [90m1.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresolution met requires both clock measurements before the overall SLA is met with (false)[39m[90m                  [39m [90m0.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclose requires a reason records it once and reopen brings the ticket back with a bump[39m[90m                       [39m [90m1.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequesters can reopen within seven days, not after[39m[90m                                                          [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpersonal list reply and reopen controls respect settlement participant audience and the reopen window[39m[90m       [39m [90m5.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe auto-close command sweeps tickets past the reopen window[39m[90m                                                [39m [90m0.74s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTicketDraftTest[22m [90m>[39m consumption shares the canonical transaction… [41;1m ItTicketDraftException [49;22m  
+[39;1m  This draft generation is no longer editable.[39;22m
+
+  at [32mapp\Domain\It\Services\ItTicketDraftService.php[39m:[32m320[39m
+    316▕ 
+    317▕     private function requireActive(ItTicketDraft $draft, User $actor, ?ItTicket $ticket): void
+    318▕     {
+    319▕         if ($draft->state !== 'active' || $draft->expires_at->isPast()) {
+  ➜ 320▕             throw new DraftError('draft_terminal', 409, 'This draft generation is no longer editable.', ['current' => $this->metadata($draft, $actor, $ticket)]);
+    321▕         }
+    322▕     }
+    323▕ 
+    324▕     private function conflict(ItTicketDraft $draft, User $actor, ?ItTicket $ticket): never
+
+  [33m1   [39m[39;1mapp\Domain\It\Services\ItTicketDraftService.php[39;22m:[39;1m320[39;22m
+  [33m2   [39m[39;1mapp\Domain\It\Services\ItTicketDraftService.php[39;22m:[39;1m200[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTicketDraftTest[22m [90m>[39m stale draft or rejected canonical intake leaves no new receipt ticke…   
+[39;1m  Expected response status code [403] but received 422.
+Failed asserting that 422 is identical to 403.
+
+The following errors occurred during the last request:
+
+{
+    "message": "Choose an active approved Site for this ticket.",
+    "errors": {
+        "site_id": [
+            "Choose an active approved Site for this ticket."
+        ]
+    }
+}[39;22m
+
+  at [32mtests\Feature\It\ItTicketDraftTest.php[39m:[32m267[39m
+    263▕     $this->service->save($this->worker, $draft['draft_uuid'], 0, ['title' => 'Keep rejected input'], 0, null);
+    264▕     $input = ['request_uuid' => $this->requestUuid, 'title' => 'Keep rejected input', 'category' => 'hardware', 'priority' => 'normal',
+    265▕         'site_id' => $this->site->id, 'draft_uuid' => $draft['draft_uuid'], 'draft_revision' => 0, 'draft_actor_user_id' => $this->worker->id];
+    266▕     $this->postJson('/it/tickets', $input)->assertConflict()->assertJsonPath('code', 'draft_conflict');
+  ➜ 267▕     $hidden = Site::factory()->create();
+    268▕     $this->postJson('/it/tickets', [...$input, 'draft_revision' => 1, 'site_id' => $hidden->id])->assertForbidden();
+    269▕     expect(ItTicketCommandReceipt::query()->count())->toBe(0)->and(ItTicket::query()->count())->toBe(1)
+    270▕         ->and(ItTicketDraft::query()->sole()->revision)->toBe(1)->and(ItTicketDraft::query()->sole()->encrypted_payload['fields']['title'])->toBe('Keep rejected input')
+    271▕         ->and(AuditLog::query()->where('action', 'it.draft.consumed')->count())->toBe(0);
+
+
+  [90mTests:[39m    [31;1m2 failed[39;22m[90m,[39m[39m [39m[32;1m58 passed[39;22m[90m (622 assertions)[39m
+  [90mDuration:[39m [39m360.56s[39m
+

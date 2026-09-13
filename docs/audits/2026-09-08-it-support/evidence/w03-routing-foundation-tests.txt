@@ -1,0 +1,31 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_ba2b368356264655",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketRoutingDecisionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpriority decisions cover every impact and urgency with monotonic escalation[39m[90m                               [39m [90m165.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy priority adapters preserve their level while new dimensions govern assessment[39m[90m                        [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnew responsibility cannot inherit site access from an old assignment or inactive employment[39m[90m                 [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcover selection consumes approved HR absence without exposing or copying private leave details[39m[90m              [39m [90m0.69s[39m  
+
+  [90mTests:[39m    [32;1m4 passed[39;22m[90m (45 assertions)[39m
+  [90mDuration:[39m [39m168.35s[39m
+

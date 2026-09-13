@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { router } from '@inertiajs/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -30,6 +31,43 @@ vi.mock('@/hooks/use-mobile', () => ({
 }));
 
 describe('EndOfShiftChecklist', () => {
+    it('shows a failed save inside the site review and keeps the worker answers', () => {
+        render(
+            <EndOfShiftChecklist
+                session={{
+                    id: 10,
+                    shift_id: 20,
+                    client_name: 'Ari Kauri',
+                    site_name: 'Rimu House',
+                    tasks: [],
+                    end_of_shift_blockers: [],
+                }}
+                open
+                onOpenChange={vi.fn()}
+            />,
+        );
+        expect(
+            screen.getByRole('heading', { name: 'End shift at Rimu House' }),
+        ).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Optional notes'), {
+            target: { value: 'Keep these answers' },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'End shift' }),
+        );
+        const options = vi.mocked(router.post).mock.calls.at(-1)?.[2];
+        act(() => {
+            options?.onError?.({
+                task_updates:
+                    'A task changed. Refresh its state before retrying.',
+            });
+            options?.onFinish?.({} as never);
+        });
+        expect(screen.getByRole('alert')).toHaveTextContent('A task changed.');
+        expect(screen.getByLabelText('Optional notes')).toHaveValue(
+            'Keep these answers',
+        );
+    });
     it('resets transient fields when the checklist is reopened', () => {
         const session = {
             id: 10,

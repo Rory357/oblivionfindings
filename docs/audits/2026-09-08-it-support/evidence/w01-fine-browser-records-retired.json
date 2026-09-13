@@ -1,0 +1,48 @@
+{
+    "read_at": "2026-09-09T02:52:24+00:00",
+    "database_mutations_performed": false,
+    "teams": [
+        {
+            "id": 1,
+            "name": "IT Support W03 synthetic desk",
+            "manager_user_id": 230,
+            "is_active": 1
+        }
+    ],
+    "queues": [
+        {
+            "id": 1,
+            "key": "it-support-w03-synthetic-fallback",
+            "name": "IT Support W03 synthetic fallback",
+            "team_id": 1,
+            "is_active": 1,
+            "filter_rules": "{\"site_ids\": [9403, 9404], \"categories\": [], \"is_default\": true, \"priorities\": [], \"work_types\": [], \"service_ids\": [], \"cover_user_id\": 233, \"routing_priority\": 0, \"default_assignee_user_id\": null}"
+        }
+    ],
+    "articles": [
+        {
+            "id": 8,
+            "title": "W01 Fine Site A draft \u2014 browser reviewed",
+            "status": "retired",
+            "audience": "specific_sites",
+            "site_scope": "[9403]",
+            "author_user_id": 234,
+            "owner_user_id": 234,
+            "review_started_at": "2026-09-09 02:48:05",
+            "published_at": "2026-09-09 02:50:55",
+            "retired_at": "2026-09-09 02:51:47"
+        },
+        {
+            "id": 9,
+            "title": "W01 Fine Site C draft",
+            "status": "draft",
+            "audience": "specific_sites",
+            "site_scope": "[9405]",
+            "author_user_id": 234,
+            "owner_user_id": 234,
+            "review_started_at": null,
+            "published_at": null,
+            "retired_at": null
+        }
+    ]
+}

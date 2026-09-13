@@ -1,0 +1,94 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItApiWorkItemService.php",
+    "sha256": "e669d4d6b75c038d3cb786926ea4f62a06a3352a457d57a5b6883aab864c9bce"
+  },
+  {
+    "path": "app/Domain/It/Services/ItApiFieldPolicy.php",
+    "sha256": "db98a9d0c8a92fdc78bc959a15ce984a7933c02322844ebd9cca4a0d6e6a4fa2"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketTriageService.php",
+    "sha256": "5c5bc6f777d85d7eb2c6b03ebab549118485dac9c8a9229f36df6d02e05eace2"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketLinkService.php",
+    "sha256": "9df2275bc5e9917f84350caea013a8930d4ff1ed4498a1be3ceb68d7ea06d06b"
+  },
+  {
+    "path": "app/Http/Middleware/RecordItApiRequest.php",
+    "sha256": "baeef3f136fcbd782d926d1894858ffb67e9e9fe2cb38b26a3f87368fc69a998"
+  },
+  {
+    "path": "app/Http/Controllers/Api/ItApiWorkItemController.php",
+    "sha256": "10f470d9820bb8e5188dbaa869c9717c15101027d7e4eb6ebe333816c1fa31f5"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+    "sha256": "799379eb8afa00807b63c94ab6dd63613ef910e9120d0355bc6a326642068402"
+  },
+  {
+    "path": "app/Http/Requests/It/Api/TransitionItApiWorkItemRequest.php",
+    "sha256": "a04db96e9098be6d2887dfc61feb2379c0d703f30eae4bc8dbd29b9efbd0b6ab"
+  },
+  {
+    "path": "app/Http/Requests/It/Api/UpdateItApiWorkItemRequest.php",
+    "sha256": "493e4bb22a071d8844a273a45258e0b7d7fdf193268c1659a499e277163fead1"
+  },
+  {
+    "path": "app/Http/Requests/It/Api/LinkItApiWorkItemRequest.php",
+    "sha256": "71389be374554f4125caa918ac68a3dc31db7448a19600912bdab72b579044e1"
+  },
+  {
+    "path": "app/Http/Requests/It/StoreItServiceIdentityRequest.php",
+    "sha256": "b542e98c01cfa9a0def464b8a6668560e5a05d5bd94b9632b900b162a507098e"
+  },
+  {
+    "path": "app/Http/Resources/ItApiWorkItemResource.php",
+    "sha256": "cfa939276baa067af67d6046e05377a4b1d86d77893940dbfa49b8ddd23edfbd"
+  },
+  {
+    "path": "app/Models/ItServiceIdentity.php",
+    "sha256": "0371d6463fafe3632cb7833d926c39ae5ff3e963ebe95ee362bdf8300570afb4"
+  },
+  {
+    "path": "app/Models/ItTicketCommandReceipt.php",
+    "sha256": "323c953f1032700b67a88302d21561c5dd4d7a5f3b4d3d51d93706efe6a3d214"
+  },
+  {
+    "path": "routes/api-hr.php",
+    "sha256": "8d008c05f99bf5cb9c5233bf6c28d7f5b06035e4d7691fd6499a3fe34e46b4bf"
+  },
+  {
+    "path": "tests/Feature/It/ItApiRelatedCommandTest.php",
+    "sha256": "0f603489edd13fbc971946fac8a4913f2b9299ee5d2770ef6f1895192fb89643"
+  },
+  {
+    "path": "tests/Feature/It/ItApiMutationContractTest.php",
+    "sha256": "c0449491ac1d03c86b66f38a6233c6013a8961fb05c109da6f08afc90e5be2b1"
+  },
+  {
+    "path": "tests/Feature/It/ItSecureApiTest.php",
+    "sha256": "f49900a1746539f0729d059536e0a31999a41bddfc22d3ae13e53e43cecc8f9e"
+  },
+  {
+    "path": "tests/Concurrency/It/ItApiPublicationConcurrencyTest.php",
+    "sha256": "cfb8358ff3a574bf7d02a36f7ae12dafb3289fbefcd6f7361512469b35f686c7"
+  },
+  {
+    "path": "tests/Support/It/api-publication-concurrency-worker.php",
+    "sha256": "d49b175f70eb73793b89b2dc15a0538101ff133c31d9bb81903e0fc765349808"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w13-api-browser-fixture.php",
+    "sha256": "48604c0d776d94e6f32a8c47114d9f471c9465779070a607521301350ea2621a"
+  },
+  {
+    "path": "tests/Feature/It/ItTicketVersionTest.php",
+    "sha256": "56d1ce3e9d73ef58a52783d074b1557ec9fe2947ecc800b4a11deda290e4c2a8"
+  },
+  {
+    "path": "docs/it-support-service-api-v1.md",
+    "sha256": "e6ed295aecc7773e5bbf95309b69f1ac873cad324b133108268b76ebc8837be7"
+  }
+]

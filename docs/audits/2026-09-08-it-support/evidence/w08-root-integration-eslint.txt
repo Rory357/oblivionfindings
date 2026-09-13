@@ -1,0 +1,2 @@
+npm notice run npx
+npm notice run eslint resources/js/hooks/use-it-ticket-draft.ts resources/js/hooks/use-it-ticket-draft.test.tsx resources/js/components/it/ticket-workspace-header.tsx resources/js/pages/it/tickets/show.tsx resources/js/pages/it/tickets/show.test.tsx resources/js/components/it/ticket-draft-recovery.tsx resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx resources/js/components/it/__tests__/ticket-intake-draft.test.tsx --max-warnings=0

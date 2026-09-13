@@ -2,12 +2,18 @@
 
 namespace App\Domain\It\Services;
 
+use App\Domain\It\Data\ItBulkActionResult;
 use App\Domain\It\Data\ItTransitionInput;
+use App\Domain\It\Enums\ItTicketCommandChannel;
+use App\Domain\It\Enums\ItTicketDraftPurpose;
 use App\Domain\It\Enums\ItWorkflowState;
+use App\Domain\It\Exceptions\ItTicketCommandConflict;
+use App\Domain\It\Exceptions\ItTicketVersionConflict;
 use App\Domain\It\ItStaffDirectory;
 use App\Models\Asset;
 use App\Models\ItService;
 use App\Models\ItTicket;
+use App\Models\ItTicketCommandReceipt;
 use App\Models\ItTicketEvent;
 use App\Models\User;
 use App\Notifications\It\TicketAssignedNotification;
@@ -15,7 +21,9 @@ use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -29,6 +37,13 @@ final class ItTicketTriageService
     private const PROPERTY_FIELDS = [
         'status',
         'priority',
+        'impact',
+        'urgency',
+        'priority_decision',
+        'routing_override',
+        'queue_id',
+        'team_id',
+        'owner_user_id',
         'work_type',
         'it_service_id',
         'category',
@@ -45,12 +60,53 @@ final class ItTicketTriageService
         private readonly ItWorkTransitionService $transitionService,
         private readonly ItEmailDeliveryService $emailDeliveries,
         private readonly ItTicketRoutingService $routing,
+        private readonly ItTicketVersionService $versions,
+        private readonly ItTicketPriorityService $priority,
     ) {}
 
     /** @param array<string, mixed> $data */
     public function update(ItTicket $ticket, User $actor, array $data, string $source = 'workspace'): ItTicket
     {
         return $this->mutate($ticket, $actor, $data, $source)['ticket'];
+    }
+
+    /** Stable command identity for adapters; the existing mutation remains the property owner. */
+    public function updateCommand(ItTicket $ticket, User $actor, array $data, ItTicketCommandChannel $channel): ItTicket
+    {
+        return DB::transaction(function () use ($ticket, $actor, $data, $channel): ItTicket {
+            $currentEvidence = $channel === ItTicketCommandChannel::ServiceApi;
+            $actor = $this->versions->currentActor($actor, $currentEvidence);
+            $ticket = $this->lockTicket($ticket);
+            $this->guardActor($ticket, $actor, $currentEvidence);
+            Validator::make($data, ['request_uuid' => ['required', 'uuid'],
+                'expected_version' => ['required', 'integer', 'min:1']])->validate();
+            $payload = Arr::except($data, ['request_uuid']);
+            ksort($payload);
+            $hash = hash('sha256', json_encode([(int) $ticket->id, $payload], JSON_THROW_ON_ERROR));
+            $receipt = ItTicketCommandReceipt::query()->where('actor_user_id', $actor->id)
+                ->where('channel', $channel->value)->where('operation', ItTicketCommandReceipt::UPDATE_OPERATION)
+                ->where('request_uuid', $data['request_uuid'])->lockForUpdate()->first();
+            if ($receipt) {
+                if ((int) $receipt->it_ticket_id !== (int) $ticket->id
+                    || ! hash_equals((string) $receipt->request_hash, $hash)) {
+                    throw new ItTicketCommandConflict;
+                }
+                if ($receipt->committed_at === null || (int) $receipt->committed_ticket_version < 1) {
+                    throw new DomainException('This update has no confirmed outcome. Review its command history before retrying.');
+                }
+
+                return $ticket;
+            }
+            $saved = $this->update($ticket, $actor, Arr::except($data, ['request_uuid']), $channel->value);
+            ItTicketCommandReceipt::query()->create([
+                'actor_user_id' => $actor->id, 'channel' => $channel->value,
+                'operation' => ItTicketCommandReceipt::UPDATE_OPERATION, 'request_uuid' => $data['request_uuid'],
+                'request_hash' => $hash, 'it_ticket_id' => $saved->id, 'committed_at' => now(),
+                'committed_ticket_version' => $saved->lock_version,
+            ]);
+
+            return $saved;
+        });
     }
 
     /**
@@ -61,11 +117,13 @@ final class ItTicketTriageService
      */
     public function bulkUpdate(ItTicket $ticket, User $actor, array $data, string $source): bool
     {
-        try {
-            return $this->mutate($ticket, $actor, $data, $source)['changed'];
-        } catch (AuthorizationException|DomainException|ModelNotFoundException|ValidationException) {
-            return false;
-        }
+        return $this->bulkOutcome($ticket, $actor, $data, $source)['status'] === 'updated';
+    }
+
+    /** @param array<string, mixed> $data @return array{status: string, message: string} */
+    public function bulkOutcome(ItTicket $ticket, User $actor, array $data, string $source): array
+    {
+        return ItBulkActionResult::capture(fn (): bool => $this->mutate($ticket, $actor, $data, $source)['changed']);
     }
 
     public function close(
@@ -74,48 +132,65 @@ final class ItTicketTriageService
         string $reason,
         string $source = 'legacy_close',
         bool $staleIsUnchanged = false,
+        ?int $expectedVersion = null,
     ): bool {
         try {
-            return DB::transaction(function () use ($ticket, $actor, $reason, $source): bool {
-                $locked = $this->lockTicket($ticket);
-                $this->guardActor($locked, $actor);
+            $this->closeWithReason($ticket, $actor, $reason, $source, $expectedVersion);
 
-                if ($locked->status === 'closed') {
-                    throw new DomainException('This ticket is already closed.');
-                }
-                if ($locked->isMerged()) {
-                    throw new DomainException('This ticket was merged and cannot be closed again.');
-                }
-
-                $closed = $this->transitionService->transition(
-                    $locked,
-                    new ItTransitionInput(
-                        actor: $actor,
-                        to: ItWorkflowState::Closed,
-                        reason: $reason,
-                        source: $source,
-                    ),
-                );
-
-                AuditLogger::logOrFail('it.ticket.closed', $closed, [
-                    'actor_id' => $actor->id,
-                    'source' => $source,
-                    'reason_recorded' => true,
-                    'application_scope' => 'single_application',
-                ]);
-
-                return true;
-            });
+            return true;
         } catch (Throwable $exception) {
             if ($staleIsUnchanged && ($exception instanceof AuthorizationException
                 || $exception instanceof DomainException
                 || $exception instanceof ModelNotFoundException
-                || $exception instanceof ValidationException)) {
+                || $exception instanceof ValidationException
+                || $exception instanceof ItTicketVersionConflict)) {
                 return false;
             }
 
             throw $exception;
         }
+    }
+
+    /** Return the committed snapshot while retaining the legacy boolean adapter. */
+    public function closeWithReason(
+        ItTicket $ticket,
+        User $actor,
+        string $reason,
+        string $source = 'legacy_close',
+        ?int $expectedVersion = null,
+    ): ItTicket {
+        return DB::transaction(function () use ($ticket, $actor, $reason, $source, $expectedVersion): ItTicket {
+            $locked = $this->lockTicket($ticket);
+            $actor = $this->versions->currentActor($actor);
+            $this->guardActor($locked, $actor);
+            $this->versions->assertCurrent($locked, $expectedVersion);
+
+            if ($locked->status === 'closed') {
+                throw new DomainException('This ticket is already closed.');
+            }
+            if ($locked->isMerged()) {
+                throw new DomainException('This ticket was merged and cannot be closed again.');
+            }
+
+            $closed = $this->transitionService->transition(
+                $locked,
+                new ItTransitionInput(
+                    actor: $actor,
+                    to: ItWorkflowState::Closed,
+                    reason: $reason,
+                    source: $source,
+                ),
+            );
+
+            AuditLogger::logOrFail('it.ticket.closed', $closed, [
+                'actor_id' => $actor->id,
+                'source' => $source,
+                'reason_recorded' => true,
+                'application_scope' => 'single_application',
+            ]);
+
+            return $closed;
+        });
     }
 
     /**
@@ -125,8 +200,11 @@ final class ItTicketTriageService
     private function mutate(ItTicket $ticket, User $actor, array $data, string $source): array
     {
         return DB::transaction(function () use ($ticket, $actor, $data, $source): array {
+            $currentEvidence = $source === ItTicketCommandChannel::ServiceApi->value;
+            $actor = $this->versions->currentActor($actor, $currentEvidence);
             $locked = $this->lockTicket($ticket);
-            $this->guardActor($locked, $actor);
+            $this->guardActor($locked, $actor, $currentEvidence);
+            $this->versions->assertCurrent($locked, isset($data['expected_version']) ? (int) $data['expected_version'] : null);
 
             if ($locked->isMerged()) {
                 throw new DomainException('This ticket was merged and can no longer be changed.');
@@ -138,7 +216,23 @@ final class ItTicketTriageService
                 throw new DomainException('Settled tickets keep their existing triage history.');
             }
 
+            app(ItTicketDraftService::class)->consumeFromInput($actor, $data, ItTicketDraftPurpose::TicketEdit, (int) $locked->id);
+
             $before = $locked->only(self::PROPERTY_FIELDS);
+            if ($currentEvidence && array_key_exists('priority', $data)) {
+                // API priority changes use the current assessment, including for
+                // legacy tickets; they cannot borrow intake's compatibility path.
+                $data = ['impact' => $locked->impact ?? 'individual',
+                    'urgency' => $locked->urgency ?? 'normal', ...$data];
+            }
+            $manualOwnership = Arr::only($data, ['queue_id', 'owner_user_id', 'assigned_to_user_id']);
+            $releaseRouting = (bool) ($data['release_routing_override'] ?? false);
+            if ($releaseRouting && $manualOwnership !== []) {
+                throw ValidationException::withMessages(['routing_reason' => 'Release the override separately from choosing new ownership.']);
+            }
+            if ($manualOwnership !== [] || $releaseRouting) {
+                $this->routing->reason($data['routing_reason'] ?? null);
+            }
             $waitingBefore = $locked->only(['waiting_party', 'waiting_reason', 'next_action']);
             [$siteId, $isApplicationWide] = $this->prospectiveScope($locked, $data, $actor);
             $this->releaseIneligibleAssigneeAfterScopeChange(
@@ -174,7 +268,12 @@ final class ItTicketTriageService
                 );
             }
 
-            $properties = $data;
+            $properties = Arr::only($data, self::PROPERTY_FIELDS);
+            // Decisions are owned by the services, never accepted as JSON input.
+            unset($properties['priority_decision'], $properties['routing_override'], $properties['team_id']);
+            if (array_intersect(array_keys($data), ['impact', 'urgency', 'priority', 'release_priority_override']) !== []) {
+                $properties = [...$properties, ...$this->priority->decide($data, $actor, $locked)];
+            }
             unset(
                 $properties['status'],
                 $properties['waiting_reason'],
@@ -182,6 +281,7 @@ final class ItTicketTriageService
                 $properties['next_action'],
                 $properties['resolution_code'],
                 $properties['resolution_summary'],
+                $properties['expected_version'],
             );
 
             $locked->fill($properties);
@@ -198,8 +298,27 @@ final class ItTicketTriageService
                 $locked->save();
             }
 
-            if (collect(['work_type', 'it_service_id', 'category', 'site_id', 'is_organisation_wide'])
-                ->contains(fn (string $field): bool => array_key_exists($field, $properties))) {
+            if ($releaseRouting && $locked->routing_override !== null) {
+                $locked->routing_override = null;
+                $locked->save();
+                ItTicketEvent::record($locked, 'routing_override_released', $actor->id, [
+                    'reason' => trim($data['routing_reason']), 'via' => $source,
+                ]);
+            } elseif ($manualOwnership !== []) {
+                $locked->routing_override = $this->routing->manualOverride($locked, $actor, [
+                    ...$manualOwnership, 'routing_reason' => $data['routing_reason'] ?? null,
+                ]);
+                if ($locked->isDirty('routing_override')) {
+                    $locked->save();
+                    ItTicketEvent::record($locked, 'routing_override_applied', $actor->id, [
+                        'fields' => array_keys($manualOwnership), 'reason' => trim($data['routing_reason']), 'via' => $source,
+                    ]);
+                }
+            }
+
+            if ($releaseRouting || $manualOwnership !== []
+                || collect(['work_type', 'it_service_id', 'category', 'site_id', 'is_organisation_wide', 'priority'])
+                    ->contains(fn (string $field): bool => array_key_exists($field, $properties))) {
                 $locked = $this->routing->route($locked, $actor->id);
             }
             $locked->refresh();
@@ -243,12 +362,12 @@ final class ItTicketTriageService
         return ItTicket::query()->lockForUpdate()->findOrFail($ticket->getKey());
     }
 
-    private function guardActor(ItTicket $ticket, User $actor): void
+    private function guardActor(ItTicket $ticket, User $actor, bool $lockForUpdate = false): void
     {
         if (! $actor->canDo('it.manage')) {
             throw new AuthorizationException('You are not allowed to manage ticket triage.');
         }
-        if (! $this->workAccess->canWork($actor, $ticket)) {
+        if (! $this->workAccess->canWork($actor, $ticket, $lockForUpdate)) {
             throw (new ModelNotFoundException)->setModel(ItTicket::class, [$ticket->id]);
         }
     }
@@ -401,6 +520,13 @@ final class ItTicketTriageService
         array $changedFields,
         string $source,
     ): void {
+        if (in_array('priority_decision', $changedFields, true)) {
+            ItTicketEvent::record($ticket, 'priority_assessed', $actor->id, [
+                'impact' => $ticket->impact, 'urgency' => $ticket->urgency,
+                'priority' => $ticket->priority, 'decision' => $ticket->priority_decision,
+                'via' => $source,
+            ]);
+        }
         if (in_array('priority', $changedFields, true)) {
             ItTicketEvent::record($ticket, 'priority_changed', $actor->id, [
                 'from' => $before['priority'],

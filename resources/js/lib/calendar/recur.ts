@@ -66,6 +66,8 @@ export interface CalendarItem {
     site: CalendarSite | null;
     link: string | null;
     editable: boolean;
+    recordId?: number;
+    version?: number;
     eventType?: string | null;
     approvalStatus?: string | null;
     desc?: string | null;

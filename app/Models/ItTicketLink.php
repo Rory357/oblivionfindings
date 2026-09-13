@@ -11,6 +11,9 @@ class ItTicketLink extends Model
 {
     use WritesLegacyStorageContext;
 
+    /** Internal references only; these do not change specialized work membership or merge records. */
+    public const BROWSER_RELATIONSHIPS = ['related_ticket', 'duplicate_ticket'];
+
     public const RELATIONSHIPS = [
         'affected_device',
         'source_alert',
@@ -25,6 +28,7 @@ class ItTicketLink extends Model
         'related_change',
         'major_incident_member',
         'command_request',
+        ...self::BROWSER_RELATIONSHIPS,
     ];
 
     protected $fillable = [

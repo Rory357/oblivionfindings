@@ -3,6 +3,12 @@
  * (public replies + agent-only internal notes, already stripped from
  * requester payloads server-side), an Activity timeline lane fed by
  * it_ticket_events, and the composer (Reply ⇄ Internal note, Ctrl+Enter). */
+import {
+    TicketCommentDelivery,
+    type TicketCommentDeliveryData,
+} from '@/components/it/ticket-comment-delivery';
+import { TicketReplyComposer } from '@/components/it/ticket-reply-composer';
+import { ticketWatcherActivity } from '@/components/it/ticket-watcher-activity';
 import { Button } from '@/components/ui/button';
 import { formatFileSize, StagedFileCard } from '@/components/ui/file-dropzone';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -38,7 +44,7 @@ import {
     Webhook,
     Wrench,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 export interface ThreadAttachment {
@@ -52,6 +58,9 @@ export interface ThreadComment {
     id: number;
     body: string;
     is_internal: boolean;
+    speaker_side?: 'it' | 'requester' | 'observer' | null;
+    source_channel?: string | null;
+    delivery?: TicketCommentDeliveryData | null;
     author: { id: number | null; name: string; is_requester: boolean };
     attachments: ThreadAttachment[];
     at: string | null;
@@ -74,8 +83,61 @@ export interface ThreadKbHint {
     category: string;
 }
 
+/** The host can guard navigation without receiving private composer content. */
+export interface ThreadDraftState {
+    dirty: boolean;
+    busy: boolean;
+}
+
 const label = (raw: string) =>
     raw.replace(/[_-]/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+
+const privateTriageEvents = new Set([
+    'priority_assessed',
+    'routing_override_applied',
+    'routing_override_released',
+]);
+
+function priorityDecision(event: ThreadEvent): Record<string, unknown> {
+    const decision = event.payload?.decision;
+    return decision && typeof decision === 'object' && !Array.isArray(decision)
+        ? (decision as Record<string, unknown>)
+        : {};
+}
+
+/** Deliberately project known triage fields, never render an arbitrary payload. */
+function triageEventDetails(event: ThreadEvent): string[] {
+    const payload = event.payload ?? {};
+    const details: string[] = [];
+    if (event.type === 'priority_assessed') {
+        const assessment = [
+            [
+                'Impact',
+                payload.impact,
+                ['individual', 'team', 'site', 'organization'],
+            ],
+            ['Urgency', payload.urgency, ['low', 'normal', 'high', 'critical']],
+            ['Priority', payload.priority, ['low', 'normal', 'high', 'urgent']],
+        ] as const;
+        const summary = assessment.flatMap(([name, value, allowed]) =>
+            typeof value === 'string' &&
+            (allowed as readonly string[]).includes(value)
+                ? [
+                      `${name}: ${label(value === 'organization' ? 'organisation' : value)}`,
+                  ]
+                : [],
+        );
+        if (summary.length) details.push(summary.join(' · '));
+        const decision = priorityDecision(event);
+        const reason = decision.reason ?? decision.release_reason;
+        if (typeof reason === 'string' && reason.trim()) details.push(reason);
+    } else if (privateTriageEvents.has(event.type)) {
+        if (typeof payload.reason === 'string' && payload.reason.trim()) {
+            details.push(payload.reason);
+        }
+    }
+    return details;
+}
 
 /** Download chips for a message's evidence — served via the authorised route. */
 function AttachmentChips({ attachments }: { attachments: ThreadAttachment[] }) {
@@ -116,6 +178,16 @@ function eventLine(e: ThreadEvent): string {
             return `moved ${label(String(p.from_workflow_state ?? p.from ?? '?'))} → ${label(String(p.to_workflow_state ?? p.to ?? '?'))}`;
         case 'priority_changed':
             return `set priority ${label(String(p.from ?? '?'))} → ${label(String(p.to ?? '?'))}`;
+        case 'priority_assessed': {
+            const decision = priorityDecision(e);
+            if (decision.mode === 'legacy')
+                return 'recorded the existing priority assessment';
+            if (typeof decision.release_reason === 'string')
+                return 'released the priority override';
+            return decision.mode === 'override'
+                ? 'recorded a reasoned priority override'
+                : 'assessed impact and urgency';
+        }
         case 'properties_updated':
             return 'updated ticket properties';
         case 'waiting_updated':
@@ -127,13 +199,14 @@ function eventLine(e: ThreadEvent): string {
         case 'csat_updated':
             return 'updated the satisfaction rating';
         case 'watcher_added':
-            return 'started watching';
         case 'watcher_removed':
-            return 'stopped watching';
+            return ticketWatcherActivity(e.type, p);
         case 'reopened':
             return 'reopened the ticket';
         case 'resolved':
             return 'resolved the ticket';
+        case 'resolution_confirmed':
+            return 'confirmed the fix and closed the ticket';
         case 'closed':
             return 'closed the ticket';
         case 'problem_updated':
@@ -152,6 +225,10 @@ function eventLine(e: ThreadEvent): string {
             return 'rejected the request';
         case 'routing_applied':
             return 'updated queue routing';
+        case 'routing_override_applied':
+            return 'set a manual routing override';
+        case 'routing_override_released':
+            return 'released the manual routing override';
         case 'merged':
             return p.direction === 'from'
                 ? `merged ${String(p.source_reference ?? 'another ticket')} into this ticket`
@@ -161,10 +238,20 @@ function eventLine(e: ThreadEvent): string {
         case 'api_public_comment':
             return 'added a public update through an approved API';
         case 'context_linked':
+        case 'related_work_linked':
+            if (e.type === 'related_work_linked')
+                return p.target_reference
+                    ? `linked related ticket ${String(p.target_reference)}`
+                    : 'linked a related ticket';
             return p.device_name
                 ? `linked affected Device ${String(p.device_name)}`
                 : 'linked an affected Device';
         case 'context_unlinked':
+        case 'related_work_unlinked':
+            if (e.type === 'related_work_unlinked')
+                return p.target_reference
+                    ? `removed the relationship to ${String(p.target_reference)}`
+                    : 'removed a ticket relationship';
             return p.device_name
                 ? `removed affected Device ${String(p.device_name)}`
                 : 'removed an affected Device';
@@ -199,6 +286,7 @@ function eventIcon(type: string) {
         case 'workflow_transitioned':
             return RotateCcw;
         case 'priority_changed':
+        case 'priority_assessed':
             return Flag;
         case 'properties_updated':
             return Pencil;
@@ -228,6 +316,8 @@ function eventIcon(type: string) {
         case 'approval_rejected':
             return ShieldCheck;
         case 'routing_applied':
+        case 'routing_override_applied':
+        case 'routing_override_released':
             return Route;
         case 'merged':
             return GitMerge;
@@ -236,8 +326,10 @@ function eventIcon(type: string) {
         case 'api_public_comment':
             return Webhook;
         case 'context_linked':
+        case 'related_work_linked':
             return Link2;
         case 'context_unlinked':
+        case 'related_work_unlinked':
             return Unlink;
         case 'work_task_created':
             return ListChecks;
@@ -264,9 +356,22 @@ export function TicketThread({
     replyUnavailableReason,
     kbSuggestions = [],
     compact = false,
+    lane: controlledLane,
+    hideNavigation = false,
     onPosted,
+    refreshingDelivery = false,
+    accessState = null,
+    onDraftStateChange,
+    actorId,
+    expectedVersion,
+    conversationReady = false,
+    draftsEnabled = false,
 }: {
     ticketId: number;
+    actorId?: number;
+    expectedVersion?: number;
+    conversationReady?: boolean;
+    draftsEnabled?: boolean;
     requesterName: string;
     description: string | null;
     /** Files attached when the ticket was raised (thread replies carry their own). */
@@ -279,12 +384,27 @@ export function TicketThread({
     /** Published articles for the composer's "Suggest from Knowledge" (agents only). */
     kbSuggestions?: ThreadKbHint[];
     compact?: boolean;
+    /** A full profile owns navigation; drawers retain the local lane controls. */
+    lane?: 'conversation' | 'activity';
+    hideNavigation?: boolean;
     /** Drawer hosts pass a refetch — their snapshot doesn't refresh via Inertia props. */
     onPosted?: () => void;
+    refreshingDelivery?: boolean;
+    /** A host-confirmed access failure conceals content without discarding session recovery. */
+    accessState?: 'session' | 'access' | 'actor' | null;
+    onDraftStateChange?: (state: ThreadDraftState) => void;
 }) {
-    const [lane, setLane] = useState<'conversation' | 'activity'>(
+    const visibleComments = comments.filter(
+        (comment) => canInternal || !comment.is_internal,
+    );
+    const permittedSuggestions = canInternal ? kbSuggestions : [];
+    const visibleEvents = events.filter(
+        (event) => canInternal || !privateTriageEvents.has(event.type),
+    );
+    const [localLane, setLane] = useState<'conversation' | 'activity'>(
         'conversation',
     );
+    const lane = controlledLane ?? localLane;
     const fileInput = useRef<HTMLInputElement>(null);
     const form = useForm<{
         body: string;
@@ -295,6 +415,31 @@ export function TicketThread({
         is_internal: false,
         attachments: [],
     });
+    const resetLegacyForm = form.reset;
+    useEffect(() => {
+        if (accessState === 'access' || accessState === 'actor') {
+            resetLegacyForm('body', 'attachments');
+        }
+    }, [accessState, resetLegacyForm]);
+
+    useEffect(() => {
+        if (conversationReady) {
+            if (!canReply) onDraftStateChange?.({ dirty: false, busy: false });
+            return;
+        }
+        onDraftStateChange?.({
+            dirty:
+                form.data.body.length > 0 || form.data.attachments.length > 0,
+            busy: form.processing,
+        });
+    }, [
+        form.data.body,
+        form.data.attachments.length,
+        form.processing,
+        onDraftStateChange,
+        conversationReady,
+        canReply,
+    ]);
 
     // §I deflection: as the agent types, match published articles on the words
     // they're using (≥3-letter tokens) and surface the closest few for
@@ -302,7 +447,7 @@ export function TicketThread({
     const bodyTokens =
         form.data.body.toLowerCase().match(/[a-z0-9]{3,}/g) ?? [];
     const kbHints = bodyTokens.length
-        ? kbSuggestions
+        ? permittedSuggestions
               .map((a) => ({
                   a,
                   score: bodyTokens.filter((t) =>
@@ -333,7 +478,7 @@ export function TicketThread({
                 toast.success(
                     form.data.is_internal
                         ? 'Internal note added.'
-                        : 'Reply sent.',
+                        : 'Reply added.',
                 );
                 form.reset('body', 'attachments');
                 onPosted?.();
@@ -352,315 +497,391 @@ export function TicketThread({
 
     return (
         <div className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card">
-            {/* Lane toggle */}
-            <div className="flex items-center gap-1 border-b border-border bg-muted px-3 py-2">
-                {(
-                    [
-                        {
-                            id: 'conversation',
-                            l: 'Conversation',
-                            icon: MessageSquare,
-                        },
-                        { id: 'activity', l: 'Activity', icon: Activity },
-                    ] as const
-                ).map((o) => {
-                    const Icon = o.icon;
-                    const active = lane === o.id;
-                    return (
-                        // eslint-disable-next-line no-restricted-syntax -- segmented lane toggle, not button chrome
-                        <button
-                            key={o.id}
-                            type="button"
-                            aria-pressed={active}
-                            onClick={() => setLane(o.id)}
-                            className={
-                                active
-                                    ? 'inline-flex items-center gap-1.5 rounded-lg bg-card px-3 py-1.5 text-[12.5px] font-semibold shadow-sm'
-                                    : 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground'
-                            }
-                        >
-                            <Icon className="h-3.5 w-3.5" />
-                            {o.l}
-                            {o.id === 'activity' ? (
-                                <span className="rounded-full bg-muted px-1.5 text-[10.5px] font-bold">
-                                    {events.length}
-                                </span>
-                            ) : null}
-                        </button>
-                    );
-                })}
-            </div>
-
-            {lane === 'conversation' ? (
+            {!accessState && (
                 <>
-                    <div
-                        className={
-                            compact
-                                ? 'flex max-h-[46vh] flex-col gap-3 overflow-y-auto px-4 py-4'
-                                : 'flex flex-col gap-3 px-4.5 py-4'
-                        }
-                    >
-                        {description || ticketAttachments.length ? (
-                            <div className="rounded-xl border border-border/60 bg-muted/40 px-3.5 py-2.5">
-                                <div className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
-                                    {requesterName} — original report
-                                </div>
-                                {description ? (
-                                    <p className="mt-1 text-[13px] whitespace-pre-wrap">
-                                        {description}
-                                    </p>
-                                ) : null}
-                                <AttachmentChips
-                                    attachments={ticketAttachments}
-                                />
-                            </div>
-                        ) : null}
-
-                        {comments.map((c) => (
-                            <div
-                                key={c.id}
-                                className={
-                                    c.is_internal
-                                        ? 'rounded-xl border border-border/60 bg-accent/50 px-3.5 py-2.5'
-                                        : 'rounded-xl border border-border/60 bg-card px-3.5 py-2.5'
-                                }
-                            >
-                                <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
-                                    <span className="text-foreground">
-                                        {c.author.name}
-                                    </span>
-                                    <span>
-                                        ·{' '}
-                                        {c.author.is_requester
-                                            ? 'requester'
-                                            : 'IT'}
-                                    </span>
-                                    {c.is_internal ? (
-                                        <StatusBadge
-                                            variant="warning"
-                                            size="sm"
-                                        >
-                                            <Lock className="mr-1 h-3 w-3" />{' '}
-                                            Internal
-                                        </StatusBadge>
-                                    ) : null}
-                                    <span className="ml-auto">
-                                        {c.at_human}
-                                    </span>
-                                </div>
-                                <p className="mt-1 text-[13px] whitespace-pre-wrap">
-                                    {c.body}
-                                </p>
-                                <AttachmentChips attachments={c.attachments} />
-                            </div>
-                        ))}
-
-                        {comments.length === 0 && !description ? (
-                            <p className="py-6 text-center text-[12.5px] text-muted-foreground">
-                                {canReply
-                                    ? 'No messages yet — start the conversation below.'
-                                    : 'No replies have been added to this conversation.'}
-                            </p>
-                        ) : null}
-                    </div>
-
-                    {/* Composer */}
-                    {canReply ? (
-                        <div className="border-t border-border px-4.5 py-3.5">
-                            {canInternal ? (
-                                <div className="mb-2 inline-flex gap-1 rounded-lg bg-muted p-1">
-                                    {[
-                                        { v: false, l: 'Reply' },
-                                        { v: true, l: 'Internal note' },
-                                    ].map((o) => (
-                                        // eslint-disable-next-line no-restricted-syntax -- segmented-control option, not button chrome
-                                        <button
-                                            key={o.l}
-                                            type="button"
-                                            aria-pressed={
-                                                form.data.is_internal === o.v
-                                            }
-                                            onClick={() =>
-                                                form.setData('is_internal', o.v)
-                                            }
-                                            className={
-                                                form.data.is_internal === o.v
-                                                    ? 'rounded-md bg-card px-3 py-1 text-[12.5px] font-semibold shadow-sm'
-                                                    : 'rounded-md px-3 py-1 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground'
-                                            }
-                                        >
-                                            {o.l}
-                                        </button>
-                                    ))}
-                                </div>
-                            ) : null}
-                            <Textarea
-                                value={form.data.body}
-                                onChange={(e) =>
-                                    form.setData('body', e.target.value)
-                                }
-                                onKeyDown={(e) => {
-                                    if (
-                                        e.key === 'Enter' &&
-                                        (e.ctrlKey || e.metaKey)
-                                    )
-                                        send();
-                                }}
-                                placeholder={
-                                    form.data.is_internal
-                                        ? 'Add an internal note — the requester never sees these…'
-                                        : 'Write a reply — the requester is emailed a heads-up…'
-                                }
-                                rows={compact ? 2 : 3}
-                            />
-                            {kbHints.length ? (
-                                <div className="mt-2 rounded-xl border border-primary/20 bg-primary/5 px-2.5 py-2">
-                                    <div className="flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-primary uppercase">
-                                        <Lightbulb className="h-3 w-3" />{' '}
-                                        Suggest from Knowledge
-                                    </div>
-                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                        {kbHints.map((a) => (
-                                            // eslint-disable-next-line no-restricted-syntax -- KB suggestion chip, inserts a reference; not button chrome
-                                            <button
-                                                key={a.id}
-                                                type="button"
-                                                onClick={() =>
-                                                    insertArticle(a.title)
-                                                }
-                                                title={`Insert a reference to "${a.title}"`}
-                                                className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/30 bg-card px-2 py-0.5 text-[11.5px] font-semibold text-primary hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
-                                            >
-                                                <BookOpen className="h-3 w-3 flex-none" />
-                                                <span className="min-w-0 truncate">
-                                                    {a.title}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : null}
-                            {form.data.attachments.length ? (
-                                <div className="mt-2 flex flex-col gap-1.5">
-                                    {form.data.attachments.map((file, i) => (
-                                        <StagedFileCard
-                                            key={`${file.name}-${i}`}
-                                            file={file}
-                                            onRemove={() =>
-                                                form.setData(
-                                                    'attachments',
-                                                    form.data.attachments.filter(
-                                                        (_, j) => j !== i,
-                                                    ),
-                                                )
-                                            }
-                                        />
-                                    ))}
-                                </div>
-                            ) : null}
-                            <div className="mt-2 flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        ref={fileInput}
-                                        type="file"
-                                        multiple
-                                        className="hidden"
-                                        accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
-                                        onChange={(e) =>
-                                            stageFiles(e.target.files)
-                                        }
-                                    />
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() =>
-                                            fileInput.current?.click()
-                                        }
-                                        disabled={
-                                            form.data.attachments.length >= 5
+                    {/* Lane toggle */}
+                    {!hideNavigation && (
+                        <div className="flex items-center gap-1 border-b border-border bg-muted px-3 py-2">
+                            {(
+                                [
+                                    {
+                                        id: 'conversation',
+                                        l: 'Conversation',
+                                        icon: MessageSquare,
+                                    },
+                                    {
+                                        id: 'activity',
+                                        l: 'Activity',
+                                        icon: Activity,
+                                    },
+                                ] as const
+                            ).map((o) => {
+                                const Icon = o.icon;
+                                const active = lane === o.id;
+                                return (
+                                    // eslint-disable-next-line no-restricted-syntax -- segmented lane toggle, not button chrome
+                                    <button
+                                        key={o.id}
+                                        type="button"
+                                        aria-pressed={active}
+                                        onClick={() => setLane(o.id)}
+                                        className={
+                                            active
+                                                ? 'inline-flex items-center gap-1.5 rounded-lg bg-card px-3 py-1.5 text-[12.5px] font-semibold shadow-sm'
+                                                : 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground'
                                         }
                                     >
-                                        <Paperclip className="h-3.5 w-3.5" />{' '}
-                                        Attach
-                                    </Button>
-                                    <span className="text-[11.5px] text-muted-foreground">
-                                        Ctrl+Enter to send
-                                    </span>
-                                </div>
-                                <Button
-                                    size="sm"
-                                    onClick={send}
-                                    disabled={
-                                        form.processing ||
-                                        !form.data.body.trim()
-                                    }
-                                >
-                                    <Send className="h-3.5 w-3.5" />
-                                    {form.data.is_internal
-                                        ? 'Add note'
-                                        : 'Send reply'}
-                                </Button>
-                            </div>
+                                        <Icon className="h-3.5 w-3.5" />
+                                        {o.l}
+                                        {o.id === 'activity' ? (
+                                            <span className="rounded-full bg-muted px-1.5 text-[10.5px] font-bold">
+                                                {visibleEvents.length}
+                                            </span>
+                                        ) : null}
+                                    </button>
+                                );
+                            })}
                         </div>
-                    ) : (
-                        <div className="border-t border-border bg-muted/40 px-4.5 py-4">
-                            <div className="flex items-start gap-2.5">
-                                <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-muted text-muted-foreground">
-                                    <Lock className="h-4 w-4" />
-                                </span>
-                                <div className="min-w-0">
-                                    <p className="text-[13px] font-semibold">
-                                        This conversation is read-only
+                    )}
+
+                    {lane === 'conversation' ? (
+                        <>
+                            <div
+                                className={
+                                    compact
+                                        ? 'flex max-h-[46vh] flex-col gap-3 overflow-y-auto px-4 py-4'
+                                        : 'flex flex-col gap-3 px-4.5 py-4'
+                                }
+                            >
+                                {description || ticketAttachments.length ? (
+                                    <div className="rounded-xl border border-border/60 bg-muted/40 px-3.5 py-2.5">
+                                        <div className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
+                                            {requesterName} — original report
+                                        </div>
+                                        {description ? (
+                                            <p className="mt-1 text-[13px] whitespace-pre-wrap">
+                                                {description}
+                                            </p>
+                                        ) : null}
+                                        <AttachmentChips
+                                            attachments={ticketAttachments}
+                                        />
+                                    </div>
+                                ) : null}
+
+                                {visibleComments.map((c) => (
+                                    <div
+                                        key={c.id}
+                                        className={
+                                            c.is_internal
+                                                ? 'rounded-xl border border-border/60 bg-accent/50 px-3.5 py-2.5'
+                                                : 'rounded-xl border border-border/60 bg-card px-3.5 py-2.5'
+                                        }
+                                    >
+                                        <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                                            <span className="text-foreground">
+                                                {c.author.name}
+                                            </span>
+                                            <span>
+                                                ·{' '}
+                                                {c.speaker_side === 'it'
+                                                    ? 'IT'
+                                                    : c.speaker_side ===
+                                                        'requester'
+                                                      ? 'requester'
+                                                      : c.speaker_side ===
+                                                          'observer'
+                                                        ? 'participant'
+                                                        : 'role not recorded'}
+                                            </span>
+                                            {c.is_internal ? (
+                                                <StatusBadge
+                                                    variant="warning"
+                                                    size="sm"
+                                                >
+                                                    <Lock className="mr-1 h-3 w-3" />{' '}
+                                                    Internal
+                                                </StatusBadge>
+                                            ) : null}
+                                            <span className="ml-auto">
+                                                {c.at_human}
+                                            </span>
+                                        </div>
+                                        <p className="mt-1 text-[13px] whitespace-pre-wrap">
+                                            {c.body}
+                                        </p>
+                                        <AttachmentChips
+                                            attachments={c.attachments}
+                                        />
+                                        {!c.is_internal &&
+                                            c.delivery &&
+                                            (canInternal ||
+                                                c.author.id === actorId) && (
+                                                <TicketCommentDelivery
+                                                    delivery={c.delivery}
+                                                    onRefresh={onPosted}
+                                                    refreshing={
+                                                        refreshingDelivery
+                                                    }
+                                                />
+                                            )}
+                                    </div>
+                                ))}
+
+                                {visibleComments.length === 0 &&
+                                !description ? (
+                                    <p className="py-6 text-center text-[12.5px] text-muted-foreground">
+                                        {canReply
+                                            ? 'No messages yet — start the conversation below.'
+                                            : 'No replies have been added to this conversation.'}
                                     </p>
-                                    <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                        {replyUnavailableReason ??
-                                            'This ticket cannot accept another reply.'}
-                                    </p>
-                                </div>
+                                ) : null}
                             </div>
+
+                            {/* Composer */}
+                            {canReply && conversationReady ? null : canReply ? (
+                                <div className="border-t border-border px-4.5 py-3.5">
+                                    {canInternal ? (
+                                        <div className="mb-2 inline-flex gap-1 rounded-lg bg-muted p-1">
+                                            {[
+                                                { v: false, l: 'Reply' },
+                                                { v: true, l: 'Internal note' },
+                                            ].map((o) => (
+                                                // eslint-disable-next-line no-restricted-syntax -- segmented-control option, not button chrome
+                                                <button
+                                                    key={o.l}
+                                                    type="button"
+                                                    aria-pressed={
+                                                        form.data
+                                                            .is_internal === o.v
+                                                    }
+                                                    onClick={() =>
+                                                        form.setData(
+                                                            'is_internal',
+                                                            o.v,
+                                                        )
+                                                    }
+                                                    className={
+                                                        form.data
+                                                            .is_internal === o.v
+                                                            ? 'rounded-md bg-card px-3 py-1 text-[12.5px] font-semibold shadow-sm'
+                                                            : 'rounded-md px-3 py-1 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground'
+                                                    }
+                                                >
+                                                    {o.l}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                    <Textarea
+                                        aria-label={
+                                            form.data.is_internal
+                                                ? 'Internal note'
+                                                : 'Your reply'
+                                        }
+                                        value={form.data.body}
+                                        onChange={(e) =>
+                                            form.setData('body', e.target.value)
+                                        }
+                                        onKeyDown={(e) => {
+                                            if (
+                                                e.key === 'Enter' &&
+                                                (e.ctrlKey || e.metaKey)
+                                            )
+                                                send();
+                                        }}
+                                        placeholder={
+                                            form.data.is_internal
+                                                ? 'Add an internal note — the requester never sees these…'
+                                                : 'Write a reply for the people involved in this ticket…'
+                                        }
+                                        rows={compact ? 2 : 3}
+                                    />
+                                    {kbHints.length ? (
+                                        <div className="mt-2 rounded-xl border border-primary/20 bg-primary/5 px-2.5 py-2">
+                                            <div className="flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-primary uppercase">
+                                                <Lightbulb className="h-3 w-3" />{' '}
+                                                Suggest from Knowledge
+                                            </div>
+                                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                {kbHints.map((a) => (
+                                                    // eslint-disable-next-line no-restricted-syntax -- KB suggestion chip, inserts a reference; not button chrome
+                                                    <button
+                                                        key={a.id}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            insertArticle(
+                                                                a.title,
+                                                            )
+                                                        }
+                                                        title={`Insert a reference to "${a.title}"`}
+                                                        className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/30 bg-card px-2 py-0.5 text-[11.5px] font-semibold text-primary hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                                                    >
+                                                        <BookOpen className="h-3 w-3 flex-none" />
+                                                        <span className="min-w-0 truncate">
+                                                            {a.title}
+                                                        </span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                    {form.data.attachments.length ? (
+                                        <div className="mt-2 flex flex-col gap-1.5">
+                                            {form.data.attachments.map(
+                                                (file, i) => (
+                                                    <StagedFileCard
+                                                        key={`${file.name}-${i}`}
+                                                        file={file}
+                                                        onRemove={() =>
+                                                            form.setData(
+                                                                'attachments',
+                                                                form.data.attachments.filter(
+                                                                    (_, j) =>
+                                                                        j !== i,
+                                                                ),
+                                                            )
+                                                        }
+                                                    />
+                                                ),
+                                            )}
+                                        </div>
+                                    ) : null}
+                                    <div className="mt-2 flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                ref={fileInput}
+                                                type="file"
+                                                multiple
+                                                className="hidden"
+                                                accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
+                                                onChange={(e) =>
+                                                    stageFiles(e.target.files)
+                                                }
+                                            />
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    fileInput.current?.click()
+                                                }
+                                                disabled={
+                                                    form.data.attachments
+                                                        .length >= 5
+                                                }
+                                            >
+                                                <Paperclip className="h-3.5 w-3.5" />{' '}
+                                                Attach
+                                            </Button>
+                                            <span className="text-[11.5px] text-muted-foreground">
+                                                Ctrl+Enter to send
+                                            </span>
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            onClick={send}
+                                            disabled={
+                                                form.processing ||
+                                                !form.data.body.trim()
+                                            }
+                                        >
+                                            <Send className="h-3.5 w-3.5" />
+                                            {form.data.is_internal
+                                                ? 'Add note'
+                                                : 'Send reply'}
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="border-t border-border bg-muted/40 px-4.5 py-4">
+                                    <div className="flex items-start gap-2.5">
+                                        <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-muted text-muted-foreground">
+                                            <Lock className="h-4 w-4" />
+                                        </span>
+                                        <div className="min-w-0">
+                                            <p className="text-[13px] font-semibold">
+                                                This conversation is read-only
+                                            </p>
+                                            <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                                {replyUnavailableReason ??
+                                                    'This ticket cannot accept another reply.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div
+                            className={
+                                compact
+                                    ? 'flex max-h-[58vh] flex-col overflow-y-auto px-4 py-3'
+                                    : 'flex flex-col px-4.5 py-3'
+                            }
+                        >
+                            {visibleEvents.length === 0 ? (
+                                <p className="py-6 text-center text-[12.5px] text-muted-foreground">
+                                    Nothing on the trail yet.
+                                </p>
+                            ) : (
+                                visibleEvents.map((e) => {
+                                    const Icon = eventIcon(e.type);
+                                    return (
+                                        <div
+                                            key={e.id}
+                                            className="flex items-start gap-2.5 border-b border-border/40 py-2.5 last:border-0"
+                                        >
+                                            <span className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-lg bg-muted text-muted-foreground">
+                                                <Icon className="h-3.5 w-3.5" />
+                                            </span>
+                                            <div className="min-w-0 text-[12.5px]">
+                                                <span className="font-semibold">
+                                                    {e.actor ?? 'System'}
+                                                </span>{' '}
+                                                <span className="text-muted-foreground">
+                                                    {eventLine(e)}
+                                                </span>
+                                                <span className="ml-2 text-[11px] text-muted-foreground">
+                                                    {e.at_human}
+                                                </span>
+                                                {triageEventDetails(e).map(
+                                                    (detail, index) => (
+                                                        <p
+                                                            key={index}
+                                                            className="mt-1 break-words whitespace-pre-wrap text-muted-foreground"
+                                                        >
+                                                            {detail}
+                                                        </p>
+                                                    ),
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
                     )}
                 </>
-            ) : (
-                <div
-                    className={
-                        compact
-                            ? 'flex max-h-[58vh] flex-col overflow-y-auto px-4 py-3'
-                            : 'flex flex-col px-4.5 py-3'
-                    }
-                >
-                    {events.length === 0 ? (
-                        <p className="py-6 text-center text-[12.5px] text-muted-foreground">
-                            Nothing on the trail yet.
-                        </p>
-                    ) : (
-                        events.map((e) => {
-                            const Icon = eventIcon(e.type);
-                            return (
-                                <div
-                                    key={e.id}
-                                    className="flex items-start gap-2.5 border-b border-border/40 py-2.5 last:border-0"
-                                >
-                                    <span className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-lg bg-muted text-muted-foreground">
-                                        <Icon className="h-3.5 w-3.5" />
-                                    </span>
-                                    <div className="min-w-0 text-[12.5px]">
-                                        <span className="font-semibold">
-                                            {e.actor ?? 'System'}
-                                        </span>{' '}
-                                        <span className="text-muted-foreground">
-                                            {eventLine(e)}
-                                        </span>
-                                        <span className="ml-2 text-[11px] text-muted-foreground">
-                                            {e.at_human}
-                                        </span>
-                                    </div>
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
             )}
+            {canReply &&
+                conversationReady &&
+                actorId !== undefined &&
+                expectedVersion !== undefined && (
+                    <div hidden={lane !== 'conversation'}>
+                        <TicketReplyComposer
+                            actorId={actorId}
+                            ticketId={ticketId}
+                            expectedVersion={expectedVersion}
+                            draftsEnabled={draftsEnabled}
+                            canInternal={canInternal}
+                            accessState={accessState}
+                            compact={compact}
+                            kbSuggestions={permittedSuggestions}
+                            onPosted={onPosted}
+                            onDraftStateChange={onDraftStateChange}
+                        />
+                    </div>
+                )}
         </div>
     );
 }

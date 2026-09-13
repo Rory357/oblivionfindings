@@ -1,0 +1,81 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_bc19da1ca4204150",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketVersionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpersisted versions are monotonic even for same-second writes from older model instances[39m[90m                   [39m [90m229.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma property update returns its version and a stale assignment cannot overwrite it[39m[90m                            [39m [90m1.34s[39m  
+  [32;1m✓[39;22m[90m [39m[90minertia receives field errors and an authorized reload reference without a success flash[39m[90m                    [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "properties"[39m[90m                       [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "workflow"[39m[90m                         [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "resolve"[39m[90m                          [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "close"[39m[90m                            [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "reopen"[39m[90m                           [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma versioned lifecycle command cannot be replayed into duplicate activity[39m[90m                                    [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresolve close and reopen reject stale browser commands without duplicate notes or transitions[39m[90m               [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocked commands recheck approval and role instead of trusting a cached actor with ('approval')[39m[90m              [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocked commands recheck approval and role instead of trusting a cached actor with ('role')[39m[90m                  [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma changed ticket site denies the old actor before returning a version conflict[39m[90m                              [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester can reopen with a current version but cannot change triage properties[39m[90m                           [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma failed atomic command rolls its version and activity back with its ticket changes[39m[90m                         [39m [90m0.59s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk commands validate one version per selected ticket and skip stale rows independently[39m[90m                    [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon-browser canonical adapters remain compatible and still advance persisted versions[39m[90m                       [39m [90m0.61s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItWorkTransitionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "incident"[39m[90m                 [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "service request"[39m[90m          [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "security request"[39m[90m         [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "problem"[39m[90m                  [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "change"[39m[90m                   [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "task"[39m[90m                     [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "major incident"[39m[90m           [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects a lifecycle state that is not allowed for the work type[39m[90m                                          [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit requires a waiting party and reason before pausing work[39m[90m                                                  [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit blocks settlement until approvals required tasks and resolution evidence are complete[39m[90m                    [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit authorizes transitions through the canonical Site boundary[39m[90m                                               [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit allows an owning requester reply to resume waiting work without manage permission[39m[90m                        [39m [90m0.67s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mit exposes the governed transition through the existing ticket authorization boundary[39m[90m                       [39m [90m0.68s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItWorkTransitionTest[22m [90m>[39m it exposes the governed transition through the existing ticket au…   
+[39;1m  Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+@@ @@
+-'triaged'
++'submitted'[39;22m
+
+  at [32mtests\Feature\It\ItWorkTransitionTest.php[39m:[32m305[39m
+    301▕             'reason' => 'Impact and urgency confirmed',
+    302▕             'next_action' => 'Assign the infrastructure team',
+    303▕         ])
+    304▕         ->assertRedirect();
+  ➜ 305▕ 
+    306▕     expect($ticket->fresh()->workflow_state)->toBe('triaged')
+    307▕         ->and($ticket->fresh()->next_action)->toBe('Assign the infrastructure team')
+    308▕         ->and($ticket->events()->sole()->type)->toBe('workflow_transitioned');
+    309▕
+
+  [33m1   [39m[39;1mtests\Feature\It\ItWorkTransitionTest.php[39;22m:[39;1m305[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m29 passed[39;22m[90m (220 assertions)[39m
+  [90mDuration:[39m [39m250.59s[39m
+

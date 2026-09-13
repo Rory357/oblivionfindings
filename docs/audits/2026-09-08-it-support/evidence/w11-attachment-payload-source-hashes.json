@@ -1,0 +1,104 @@
+{
+  "sources": [
+    {
+      "path": "app/Domain/It/Data/ItEmailAttachment.php",
+      "sha256": "f7664a2a10c0858bf1e954f52ec0927a37d94dc746a76b6b2caf6c6d54bb199c"
+    },
+    {
+      "path": "app/Domain/It/Services/ItEmailAttachments.php",
+      "sha256": "5ee958f36c08fe070fd31009b2ea7279e38c25131055dabcef60e9bd7a372840"
+    },
+    {
+      "path": "app/Domain/It/Services/ItEmailBase64.php",
+      "sha256": "4690101ca411ebf4fcee2cc4d8c22378b8e7562fb23b63315906c3cc16f3ef8e"
+    },
+    {
+      "path": "app/Domain/It/Services/ItEmailContent.php",
+      "sha256": "3613a8af6271f6d9b76a284382edefd1d28723f3f8265b5cb3a70d452a97fd41"
+    },
+    {
+      "path": "app/Services/GoogleGmailService.php",
+      "sha256": "2e4a009c3eec80252896a65bd014d352ea401d4a87e23b6e53931f27199878cc"
+    },
+    {
+      "path": "app/Services/MicrosoftGraphService.php",
+      "sha256": "8bd03939b5dfb8ee855a414277f22dde9aeab261074773c72cb99569758e053b"
+    },
+    {
+      "path": "tests/Unit/It/ItEmailAttachmentsTest.php",
+      "sha256": "7de6cf25f50eecab9458a493f5ba45e7d515c7a774748fefc2fa3ca387287467"
+    },
+    {
+      "path": "tests/Feature/It/ItEmailAttachmentProviderTest.php",
+      "sha256": "afba8d64f20156365b382030fa0320cd65523a18939d253f05f9060357021083"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "DESIGN.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/DESIGN_TOKENS.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LIST_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LOADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/oblivion-loader-01-demo.html",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "unchanged": true
+    }
+  ],
+  "tests": [
+    {
+      "token": "it_36c0d4dd7ee1437f",
+      "passed": 26,
+      "failed": 0,
+      "errors": 1,
+      "assertions": 59,
+      "seconds": 1
+    },
+    {
+      "token": "it_71a45af357d54fe1",
+      "passed": 97,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 133,
+      "seconds": 0
+    },
+    {
+      "token": "it_4efa466856204f7e",
+      "passed": 88,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 239,
+      "seconds": 172
+    }
+  ]
+}

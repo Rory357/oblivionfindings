@@ -2,6 +2,7 @@
 
 namespace App\Services\Tasks\Providers;
 
+use App\Models\Client;
 use App\Models\ShiftTask;
 use App\Models\User;
 use App\Services\Tasks\Contracts\HasModelClass;
@@ -10,6 +11,7 @@ use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskProviderAuthorization;
 use App\Services\UserSiteAccessService;
+use Illuminate\Support\Facades\Gate;
 
 class ShiftTaskProvider implements HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
@@ -38,9 +40,19 @@ class ShiftTaskProvider implements HasModelClass, SiteScopedTaskProvider, TaskPr
 
     public function authorizedTasks(User $user, array $filters = []): array
     {
+        if (! $this->canView($user)) {
+            return [];
+        }
+        $clients = Client::query()->tap(fn ($query) => app(UserSiteAccessService::class)->applyClientScope($query, $user, ['clinical.accessAllSites', 'sites.viewAll']))
+            ->get()->filter(fn (Client $client) => Gate::forUser($user)->allows('view', $client))->modelKeys();
         $query = ShiftTask::query()
+            ->where(fn ($visible) => $visible
+                ->where('task_scope', 'site')
+                ->orWhere(fn ($explicit) => $explicit->where('task_scope', 'client')->whereIn('client_id', $clients))
+                ->orWhere(fn ($legacy) => $legacy->whereNull('task_scope')->whereHas('shift', fn ($shift) => $shift->whereNull('client_id')->orWhereIn('client_id', $clients))))
             ->with([
-                'shift:id,user_id,client_id,site_id,starts_at,status',
+                'client:id,site_id,first_name,last_name',
+                'shift:id,user_id,client_id,site_id,starts_at,ends_at,status',
                 'shift.staff:id,name',
                 'shift.client:id,first_name,last_name',
                 'shift.site:id,name',
@@ -72,13 +84,13 @@ class ShiftTaskProvider implements HasModelClass, SiteScopedTaskProvider, TaskPr
                 // Schedulers (shifts.manageAny) see every shift's tasks; other
                 // staff only the tasks on their OWN shifts.
                 if (! $actor->canDo('shifts.manageAny')) {
-                    $shifts->where('user_id', $actor->id);
+                    $shifts->visibleToFrontline()->where('user_id', $actor->id);
                 }
             }),
             function (ShiftTask $task) {
                 $shift = $task->shift;
                 $staff = $shift?->staff;
-                $client = $shift?->client;
+                $client = $task->task_scope === 'site' ? null : ($task->client ?? $shift?->client);
 
                 return new TaskItem(
                     id: 'shift_task-'.$task->id,
@@ -99,8 +111,8 @@ class ShiftTaskProvider implements HasModelClass, SiteScopedTaskProvider, TaskPr
                     site: $shift?->site
                         ? ['id' => $shift->site->id, 'name' => (string) $shift->site->name]
                         : null,
-                    // Shift date + scheduled_time when present, else the shift start.
-                    dueAt: optional($task->scheduledFor() ?? $shift?->starts_at)->toIso8601String(),
+                    // Untimed work has no due instant and must not appear overdue.
+                    dueAt: $task->scheduledFor()?->toIso8601String(),
                     createdAt: optional($task->created_at)->toIso8601String(),
                     link: "/shifts/{$task->shift_id}",
                     type: 'Shift task',

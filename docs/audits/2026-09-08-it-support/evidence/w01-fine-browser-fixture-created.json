@@ -1,0 +1,164 @@
+{
+    "prefix": "it-support-w01-fine-20260909",
+    "created": true,
+    "notifications_sent": false,
+    "existing_records_modified": false,
+    "immutable_before": {
+        "users": {
+            "count": 233,
+            "sha256": "fb66d439a84b72863f47fb944f4bf5bac912a9b75be59b42c4cf6d9248409e70"
+        },
+        "roles": {
+            "count": 29,
+            "sha256": "4292871d5f3733eca7b94fe7b67823e88d7d5e121e9200f50a95a65e22bb0b93"
+        },
+        "role_user": {
+            "count": 382,
+            "sha256": "e248aa56a5d400bff93ed5d30351e3d55820c550468e29d5f088cd11434acb09"
+        },
+        "role_permission": {
+            "count": 1596,
+            "sha256": "64d128fedbba87be217a46ef7eb39ffb3fa5e3daab18e6e46c0bd21d20a8a417"
+        },
+        "permission_user": {
+            "count": 47,
+            "sha256": "4f780fbed80926058d506934fb0ce14eb0ab59a9f9307866fea460ba59a043b0"
+        },
+        "hr_employee_profiles": {
+            "count": 102,
+            "sha256": "42a350586513585d68e17d52b4842b92b75b38556329010a4d02c6b1e9b3f70f"
+        },
+        "sites": {
+            "count": 26,
+            "sha256": "9a2a0c07c9f6d5c687b13a0fc3df345cfe9524c9143138649bde1bc70fff9a53"
+        },
+        "it_tickets": {
+            "count": 26,
+            "sha256": "9590681833557f69cd4f590b987c83d1444c78fa31063260762afaaea9a46893"
+        },
+        "it_kb_articles": {
+            "count": 7,
+            "sha256": "ac9248fdec27eff2f3fc5f17365852567b2341b9ca4a96f803a30cad0a99af56"
+        },
+        "it_email_deliveries": {
+            "count": 9,
+            "sha256": "987249a5947a4ceeafff501564812abc55b8a0a824b5e511e0677a4eb62adb81"
+        },
+        "site_credentials": {
+            "count": 0,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "site_credential_audit_logs": {
+            "count": 0,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+    },
+    "after": {
+        "users": {
+            "count": 236,
+            "sha256": "20d5adb50b9066a7c85a047e544edbcf2367b6aa20d594a588bfbd4b01fdc70a"
+        },
+        "roles": {
+            "count": 32,
+            "sha256": "789b226b3446cbca972117cfb5aec7bb70c99f7d975dede4fac5e1f9a4c9ba4a"
+        },
+        "role_user": {
+            "count": 385,
+            "sha256": "e7d9341c1f1ef612cf6d264ddc8b7936c10fd2b89e00fa9e011d745835da4722"
+        },
+        "role_permission": {
+            "count": 1601,
+            "sha256": "68ed52bb57946974a72fa6d275258d903caa2b429853688880355074d3e0bf03"
+        },
+        "permission_user": {
+            "count": 47,
+            "sha256": "4f780fbed80926058d506934fb0ce14eb0ab59a9f9307866fea460ba59a043b0"
+        },
+        "hr_employee_profiles": {
+            "count": 105,
+            "sha256": "332d90f5f92c728d72a869877a31de61410d52da3565a511fe493d94f12507bb"
+        },
+        "sites": {
+            "count": 26,
+            "sha256": "9a2a0c07c9f6d5c687b13a0fc3df345cfe9524c9143138649bde1bc70fff9a53"
+        },
+        "it_tickets": {
+            "count": 26,
+            "sha256": "9590681833557f69cd4f590b987c83d1444c78fa31063260762afaaea9a46893"
+        },
+        "it_kb_articles": {
+            "count": 9,
+            "sha256": "5aa42c07ef16d5e604c1310b2fbc39ee2ca239051c2de9dbce1afb58c4de2b6a"
+        },
+        "it_email_deliveries": {
+            "count": 9,
+            "sha256": "987249a5947a4ceeafff501564812abc55b8a0a824b5e511e0677a4eb62adb81"
+        },
+        "site_credentials": {
+            "count": 2,
+            "sha256": "431308d6b50710e9cf46406a43385f6b4444b2d960bdddd952270ff6e438aefe"
+        },
+        "site_credential_audit_logs": {
+            "count": 2,
+            "sha256": "6e96e4557cd1653e948344c216ea9f97342bc5ed747d26048cecfbefbbc75e9d"
+        }
+    },
+    "users": {
+        "author": {
+            "id": 234,
+            "name": "IT Support W01 Fine Author",
+            "permissions": [
+                "it.knowledge.author"
+            ],
+            "approved_site_ids": [
+                9403
+            ]
+        },
+        "reviewer": {
+            "id": 235,
+            "name": "IT Support W01 Fine Reviewer",
+            "permissions": [
+                "it.knowledge.review"
+            ],
+            "approved_site_ids": [
+                9403
+            ]
+        },
+        "auditor": {
+            "id": 236,
+            "name": "IT Support W01 Fine Auditor",
+            "permissions": [
+                "credentials.view",
+                "credentials.audit",
+                "sites.viewAny"
+            ],
+            "approved_site_ids": [
+                9403
+            ]
+        }
+    },
+    "articles": {
+        "a": {
+            "id": 8,
+            "title": "W01 Fine Site A draft",
+            "site_id": 9403
+        },
+        "c": {
+            "id": 9,
+            "title": "W01 Fine Site C draft",
+            "site_id": 9405
+        }
+    },
+    "credentials": {
+        "a": {
+            "id": 1,
+            "label": "it-support-w01-fine-20260909-credential-a",
+            "site_id": 9403
+        },
+        "c": {
+            "id": 2,
+            "label": "it-support-w01-fine-20260909-credential-c",
+            "site_id": 9405
+        }
+    }
+}

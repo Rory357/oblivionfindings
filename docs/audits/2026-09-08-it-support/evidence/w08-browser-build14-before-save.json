@@ -1,0 +1,80 @@
+{
+    "observed_at": "2026-09-09T21:31:59+00:00",
+    "token": "0602c48a4735490d",
+    "database": "oblivion_it_draft_browser_0602c48a4735490d",
+    "time_context": {
+        "elapsed_ms": 0.09,
+        "rows": [
+            {
+                "session_time_zone": "SYSTEM",
+                "system_time_zone": "New Zealand Standard Time"
+            }
+        ]
+    },
+    "tickets": {
+        "elapsed_ms": 0.37,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 1,
+                "status": "open"
+            },
+            {
+                "id": 4,
+                "lock_version": 1,
+                "status": "open"
+            }
+        ]
+    },
+    "tasks": {
+        "elapsed_ms": 0.27,
+        "rows": []
+    },
+    "dependencies": {
+        "elapsed_ms": 1.08,
+        "rows": []
+    },
+    "receipts": {
+        "elapsed_ms": 0.24,
+        "rows": []
+    },
+    "events": {
+        "elapsed_ms": 0.35,
+        "rows": []
+    },
+    "audits": {
+        "elapsed_ms": 0.27,
+        "rows": []
+    },
+    "approvals": {
+        "ticket": {
+            "elapsed_ms": 0.13,
+            "rows": [
+                {
+                    "id": 5,
+                    "lock_version": 1,
+                    "status": "open"
+                }
+            ]
+        },
+        "requests": {
+            "elapsed_ms": 0.22,
+            "rows": []
+        },
+        "receipts": {
+            "elapsed_ms": 0.15,
+            "rows": []
+        },
+        "events": {
+            "elapsed_ms": 0.17,
+            "rows": []
+        },
+        "audits": {
+            "elapsed_ms": 0.22,
+            "rows": []
+        }
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false
+}

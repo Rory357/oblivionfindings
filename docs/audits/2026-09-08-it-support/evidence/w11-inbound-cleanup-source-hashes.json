@@ -1,0 +1,115 @@
+{
+  "sources": [
+    {
+      "path": "app/Domain/It/Services/ItAttachmentStorageIntentService.php",
+      "sha256": "146267400ae7484b2539c73466ffff8d65db8275f80f8ec82431f30de34ed70a"
+    },
+    {
+      "path": "app/Domain/It/Services/ItAttachmentStorageService.php",
+      "sha256": "9822d44b1d0dd4840b71a80418b0140d1d124dff4e534485c56441b69c3c98cd"
+    },
+    {
+      "path": "app/Domain/It/Services/ItInboundAttachmentStaging.php",
+      "sha256": "901fb745fb080042bc29bc0f9d68b2d35c99598d1ad2b546056ff230db863637"
+    },
+    {
+      "path": "app/Domain/It/Services/ItAttachmentCleanupReadService.php",
+      "sha256": "3e6736f09d91f8f34226b7fac1d642902af802aff8736de5252427bea1829707"
+    },
+    {
+      "path": "app/Console/Commands/RetryItAttachmentCleanup.php",
+      "sha256": "d3c33b17de447cc342d15fb2d2399f6ee14460ed08c7b1e6f4bf9ba0ce2dbd55"
+    },
+    {
+      "path": "tests/Unit/It/RetryItAttachmentCleanupTest.php",
+      "sha256": "2696c0546e4f9ff28f8af8ad2182a923e228a36cfe29f30974ffad1f4d2adff6"
+    },
+    {
+      "path": "tests/Feature/It/ItAttachmentCleanupOperationsTest.php",
+      "sha256": "f4bdac9ec13ffb900ed94f9ff8ceb6bfdcedc611359498e8ca8ff73d5b680bfa"
+    },
+    {
+      "path": "tests/Concurrency/It/ItAttachmentCleanupCommandTest.php",
+      "sha256": "482aa1ef7b8cbe75d3d49bafb840f47b87b4a9222c50a001e4e2c6e654c48267"
+    },
+    {
+      "path": "resources/js/components/it/it-service-operations.tsx",
+      "sha256": "741a9c8b72e6b90cb92a7215bc4f3d8b048cace5de5c6af16c139586cde8890f"
+    },
+    {
+      "path": "resources/js/components/it/__tests__/it-service-operations.test.tsx",
+      "sha256": "08223ca36ad4c57be3ea0f19e9e6340cda238c8ceccd4a39b35ab79e61bf21d7"
+    },
+    {
+      "path": "docs/runbooks/it-attachment-storage-recovery.md",
+      "sha256": "e52732e9193908242ef77a2d801d173970fb2741d4a1db9f5f960323a9e71a44"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "DESIGN.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/DESIGN_TOKENS.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LIST_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LOADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/oblivion-loader-01-demo.html",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "unchanged": true
+    }
+  ],
+  "tests": [
+    {
+      "token": "it_6df6172b13b54fbd",
+      "log": "w11-inbound-cleanup-command-tests.txt",
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 53,
+      "seconds": 171,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    },
+    {
+      "token": "it_74c89cfc00db45b8",
+      "log": "w11-inbound-cleanup-regression-tests.txt",
+      "passed": 29,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 358,
+      "seconds": 202,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    }
+  ],
+  "assetManifestSha256": "36a47bd0d34f8b80b0442bfd43cee08039557dd89a1ed0e168bd4cacdd7ab000"
+}

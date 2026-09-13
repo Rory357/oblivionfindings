@@ -1,0 +1,26 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItTicketMergeService.php",
+    "sha256": "98741b6d62fe00013c06504d79de4eb3b1658287c5c5ceb833ea5d97090a89df"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItTicketController.php",
+    "sha256": "bd63d97d09c043c39f4939b636b60748fffc6aeef1dc4439be75a0e185edc125"
+  },
+  {
+    "path": "tests/Feature/It/ItTicketMergeTest.php",
+    "sha256": "740b479a9a9dc8824335321e738da440e8a4be4708757d9de4491630803c4c91"
+  },
+  {
+    "path": "resources/js/components/it/ticket-merged-originals.tsx",
+    "sha256": "c3b71d4d587c68cb5766b7e9f31cc8bc75e6ed6dc196e5cec838351edda36cf0"
+  },
+  {
+    "path": "resources/js/components/it/__tests__/ticket-merged-originals.test.tsx",
+    "sha256": "0c521294d3f19e9a1b3bb3b6d7dbaa4338886e2386202bd098b203ed86e5f0ad"
+  },
+  {
+    "path": "resources/js/pages/it/tickets/show.tsx",
+    "sha256": "58cefd68316cff9cd99b48c7f82a698ef0078ddd67bc97c58093f080b720d8f2"
+  }
+]

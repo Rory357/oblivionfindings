@@ -6,13 +6,12 @@ use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Socialite\Facades\Socialite;
-use Laravel\Socialite\Two\User as SocialiteUser;
-use Mockery;
+use Tests\Support\FakesSsoProvider;
 use Tests\TestCase;
 
 class MicrosoftCallbackTest extends TestCase
 {
+    use FakesSsoProvider;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -20,17 +19,19 @@ class MicrosoftCallbackTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+        $this->configureSsoFixture();
     }
 
     public function test_microsoft_callback_gracefully_handles_missing_org_domain(): void
     {
-        $this->setEnvironmentValue('ORG_DOMAIN', '');
+        config(['sso.staff_domain' => 'example.test']);
         $this->fakeSocialiteUser([
             'id' => 'ms-123',
             'name' => 'Microsoft User',
             'email' => 'user@example.test',
         ]);
 
+        config(['sso.staff_domain' => '']);
         $this->get('/auth/microsoft/callback')
             ->assertRedirect(route('login', absolute: false))
             ->assertSessionHasErrors(['microsoft']);
@@ -41,7 +42,7 @@ class MicrosoftCallbackTest extends TestCase
 
     public function test_microsoft_callback_rejects_non_org_email(): void
     {
-        $this->setEnvironmentValue('ORG_DOMAIN', 'example.test');
+        config(['sso.staff_domain' => 'example.test']);
         $this->fakeSocialiteUser([
             'id' => 'ms-123',
             'name' => 'External User',
@@ -54,7 +55,7 @@ class MicrosoftCallbackTest extends TestCase
 
     public function test_microsoft_callback_creates_pending_user_and_identity_without_logging_in(): void
     {
-        $this->setEnvironmentValue('ORG_DOMAIN', 'example.test');
+        config(['sso.staff_domain' => 'example.test']);
         $this->fakeSocialiteUser([
             'id' => 'ms-123',
             'name' => 'Microsoft User',
@@ -80,11 +81,12 @@ class MicrosoftCallbackTest extends TestCase
 
     public function test_microsoft_callback_logs_in_existing_approved_user(): void
     {
-        $this->setEnvironmentValue('ORG_DOMAIN', 'example.test');
-        $user = User::factory()->create([
+        config(['sso.staff_domain' => 'example.test']);
+        $user = User::factory()->withoutTwoFactor()->create([
             'email' => 'approved@example.test',
             'approved_at' => now(),
         ]);
+        $user->identities()->create(['provider' => 'microsoft', 'provider_user_id' => 'ms-approved', 'email' => $user->email]);
         $this->fakeSocialiteUser([
             'id' => 'ms-approved',
             'name' => 'Approved User',
@@ -105,8 +107,9 @@ class MicrosoftCallbackTest extends TestCase
 
     public function test_microsoft_callback_links_identity_to_authenticated_user(): void
     {
-        $this->setEnvironmentValue('ORG_DOMAIN', 'example.test');
-        $user = User::factory()->create(['approved_at' => now()]);
+        config(['sso.staff_domain' => 'example.test']);
+        $user = User::factory()->withoutTwoFactor()->create(['approved_at' => now()]);
+        $this->actingAs($user);
         $this->fakeSocialiteUser([
             'id' => 'ms-linked',
             'name' => 'Linked User',
@@ -128,26 +131,11 @@ class MicrosoftCallbackTest extends TestCase
     }
 
     /**
-     * @param array{id: string, name: string, email: string|null} $attributes
+     * @param  array{id: string, name: string, email: string|null}  $attributes
      */
     private function fakeSocialiteUser(array $attributes): void
     {
-        $user = (new SocialiteUser())->map($attributes);
-        $user->setRaw([
-            ...$attributes,
-            'mail' => $attributes['email'],
-            'userPrincipalName' => $attributes['email'],
-        ]);
-        $user->setToken('microsoft-access-token');
-        $user->setRefreshToken('microsoft-refresh-token');
-        $user->setExpiresIn(3600);
-
-        $driver = Mockery::mock();
-        $driver->shouldReceive('stateless')->andReturnSelf();
-        $driver->shouldReceive('user')->andReturn($user);
-
-        Socialite::shouldReceive('driver')
-            ->with('microsoft')
-            ->andReturn($driver);
+        $this->fakeSsoProvider('microsoft', $attributes);
+        $this->beginSsoFixture('microsoft', 'staff', auth()->check());
     }
 }

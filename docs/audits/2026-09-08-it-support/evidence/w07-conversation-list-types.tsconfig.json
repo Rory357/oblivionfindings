@@ -1,0 +1,12 @@
+{
+    "extends": "../../../../tsconfig.json",
+    "include": [
+        "../../../../resources/js/pages/it/index.tsx",
+        "../../../../resources/js/components/it/__tests__/ticket-conversation-list.test.tsx",
+        "../../../../resources/js/components/it/my-tickets-list.test.tsx",
+        "../../../../resources/js/components/it/__tests__/sla-evidence.test.tsx",
+        "../../../../resources/js/components/lists/entity-interactions.test.tsx",
+        "../../../../resources/js/**/*.d.ts",
+        "../../../../resources/js/test/setup.ts"
+    ]
+}

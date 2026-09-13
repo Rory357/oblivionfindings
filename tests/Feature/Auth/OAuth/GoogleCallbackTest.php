@@ -3,15 +3,22 @@
 namespace Tests\Feature\Auth\OAuth;
 
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Socialite\Facades\Socialite;
-use Laravel\Socialite\Two\User as SocialiteUser;
-use Mockery;
+use Tests\Support\FakesSsoProvider;
 use Tests\TestCase;
 
 class GoogleCallbackTest extends TestCase
 {
+    use FakesSsoProvider;
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RbacSeeder::class);
+        $this->configureSsoFixture();
+    }
 
     public function test_google_callback_creates_pending_user_and_identity_without_logging_in(): void
     {
@@ -38,7 +45,8 @@ class GoogleCallbackTest extends TestCase
 
     public function test_google_callback_links_identity_to_authenticated_user(): void
     {
-        $user = User::factory()->create(['approved_at' => now()]);
+        $user = User::factory()->withoutTwoFactor()->create(['approved_at' => now()]);
+        $this->actingAs($user);
 
         $this->fakeSocialiteUser('google', [
             'id' => 'google-linked',
@@ -73,22 +81,11 @@ class GoogleCallbackTest extends TestCase
     }
 
     /**
-     * @param array{id: string, name: string, email: string|null} $attributes
+     * @param  array{id: string, name: string, email: string|null}  $attributes
      */
     private function fakeSocialiteUser(string $provider, array $attributes): void
     {
-        $user = (new SocialiteUser())->map($attributes);
-        $user->setRaw($attributes);
-        $user->setToken($provider.'-access-token');
-        $user->setRefreshToken($provider.'-refresh-token');
-        $user->setExpiresIn(3600);
-
-        $driver = Mockery::mock();
-        $driver->shouldReceive('stateless')->andReturnSelf();
-        $driver->shouldReceive('user')->andReturn($user);
-
-        Socialite::shouldReceive('driver')
-            ->with($provider)
-            ->andReturn($driver);
+        $this->fakeSsoProvider($provider, $attributes);
+        $this->beginSsoFixture($provider, 'staff', auth()->check());
     }
 }

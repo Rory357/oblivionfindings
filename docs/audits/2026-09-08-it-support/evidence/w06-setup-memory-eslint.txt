@@ -1,0 +1,6 @@
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\pages\it\setup\use-setup-memory.ts
+  233:8  warning  React Hook useEffect has a missing dependency: 'options.work'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 1 problem (0 errors, 1 warning)
+

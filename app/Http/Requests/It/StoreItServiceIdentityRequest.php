@@ -20,7 +20,13 @@ class StoreItServiceIdentityRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return [
+        return self::configurationRules();
+    }
+
+    /** Shared with the versioned management command after current authorization. */
+    public static function configurationRules(bool $includeActor = true): array
+    {
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'actor_user_id' => ['required', 'integer', Rule::exists('users', 'id')],
@@ -37,10 +43,17 @@ class StoreItServiceIdentityRequest extends FormRequest
             'create_fields.*' => ['string', Rule::in(ItServiceIdentity::CREATE_FIELDS)],
             'read_fields' => ['present', 'array'],
             'read_fields.*' => ['string', Rule::in(ItServiceIdentity::READ_FIELDS)],
+            'update_fields' => ['sometimes', 'array'],
+            'update_fields.*' => ['string', Rule::in(ItServiceIdentity::UPDATE_FIELDS)],
             'require_signature' => ['required', 'boolean'],
             'rate_limit_per_minute' => ['required', 'integer', 'min:1', 'max:300'],
             'expires_at' => ['nullable', 'date', 'after:now'],
         ];
+        if (! $includeActor) {
+            unset($rules['actor_user_id']);
+        }
+
+        return $rules;
     }
 
     /** @return array<int, callable> */

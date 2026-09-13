@@ -1,0 +1,7 @@
+npm notice run npx
+npm notice run prettier --write resources/js/hooks/it-ticket-approval-contract.ts resources/js/hooks/it-ticket-draft-contract.ts resources/js/hooks/it-ticket-draft-memory.ts resources/js/hooks/use-it-ticket-draft-memory.ts resources/js/hooks/it-approval-memory.test.tsx
+resources/js/hooks/it-ticket-approval-contract.ts 410ms
+resources/js/hooks/it-ticket-draft-contract.ts 90ms
+resources/js/hooks/it-ticket-draft-memory.ts 110ms
+resources/js/hooks/use-it-ticket-draft-memory.ts 95ms
+resources/js/hooks/it-approval-memory.test.tsx 38ms

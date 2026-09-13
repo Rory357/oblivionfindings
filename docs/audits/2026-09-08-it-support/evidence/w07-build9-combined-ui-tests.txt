@@ -1,0 +1,13 @@
+
+> test
+> vitest run resources/js/components/it/__tests__/ticket-thread.test.tsx resources/js/components/it/__tests__/ticket-reply-composer.test.tsx resources/js/components/it/__tests__/ticket-watchers.test.tsx resources/js/components/it/__tests__/ticket-comment-delivery.test.tsx resources/js/components/it/__tests__/ticket-drawer.test.tsx resources/js/hooks/use-ticket-page-refresh.test.tsx resources/js/hooks/use-it-ticket-peek.test.tsx resources/js/pages/it/tickets/show.test.tsx resources/js/pages/it/setup/setup-workspace.test.tsx
+
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+
+ Test Files  9 passed (9)
+      Tests  148 passed (148)
+   Start at  22:07:15
+   Duration  9.21s (transform 2.44s, setup 1.35s, import 15.60s, tests 12.32s, environment 11.10s)
+

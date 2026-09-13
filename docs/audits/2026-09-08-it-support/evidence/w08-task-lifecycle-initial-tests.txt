@@ -1,0 +1,1447 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+····································x·············xxxxx····x·x··xx···xxxxx·xx·xx
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 19 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-work-task-focus.test.tsx > Task action dialog focus return > returns blank-reason validation followed by Escape to the exact Reopen opener
+Error: expect(element).toHaveAttribute("aria-invalid", "true") // element.getAttribute("aria-invalid") === "true"
+
+Expected the element to have attribute:
+  aria-invalid="true"
+Received:
+  aria-invalid="false"
+ ❯ resources/js/components/it/__tests__/ticket-work-task-focus.test.tsx:132:23
+    130|         );
+    131|         await waitFor(() => expect(input).toHaveFocus());
+    132|         expect(input).toHaveAttribute('aria-invalid', 'true');
+       |                       ^
+    133|         expect(input).toHaveAccessibleDescription(
+    134|             'Explain why this task needs to be reopened.',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/19]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > focuses and associates the server status rejection with its editable control
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > focuses and associates the server dependency_ids.0 rejection with its editable control
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > focuses and associates the server is_required rejection with its editable control
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > focuses and associates the server evidence_required rejection with its editable control
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > focuses indexed completion evidence errors and preserves the proposed references
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > shows owned progress, dependencies and completion evidence
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > records required evidence through the canonical completion route
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > uses explicit current review and applies only the changed edit fields
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > omits redacted work rather than claiming zero, including an open private dialog
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > requires meaningful evidence and trims each reference before completing
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > keeps the current ineligible assignee visible and permits removal of a cancelled prerequisite
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > reorders the full register with labelled controls and a separate explicit save
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > requires explicit reconciliation when a stale order review contains a new task
+ReferenceError: prerequisites is not defined
+ ❯ resources/js/components/it/ticket-work-tasks.tsx:587:58
+    585|                                                     <p className="text…
+    586|                                                         Complete{' '}
+    587|                                                         {prerequisites…
+       |                                                          ^
+    588|                                                         prerequisite
+    589|                                                         {prerequisites…
+ ❯ TicketWorkTasks resources/js/components/it/ticket-work-tasks.tsx:318:28
+ ❯ Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:20
+ ❯ renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:22
+ ❯ updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:19
+ ❯ beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:18
+ ❯ runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ ❯ performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:22
+ ❯ workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:41
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/19]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > does not consume an unrelated resumed proposal when an older receipt is confirmed
+TestingLibraryElementError: Unable to find an element with the text: /Your different unsent proposal remains/. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  >
+    <section
+      aria-labelledby="ticket-work-tasks"
+      class="space-y-4"
+    >
+      <div
+        class="flex flex-wrap items-center justify-between gap-3"
+      >
+        <div
+          class="flex items-center gap-2"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-list-checks size-4 text-muted-foreground"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="m3 17 2 2 4-4"
+            />
+            <path
+              d="m3 7 2 2 4-4"
+            />
+            <path
+              d="M13 6h8"
+            />
+            <path
+              d="M13 12h8"
+            />
+            <path
+              d="M13 18h8"
+            />
+          </svg>
+          <h2
+            class="text-section-title"
+            id="ticket-work-tasks"
+          >
+            Work tasks
+          </h2>
+        </div>
+        <div
+          class="flex gap-2"
+        >
+          <button
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+            data-slot="button"
+            type="button"
+          >
+            <svg
+              class="lucide lucide-plus size-4"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5 12h14"
+              />
+              <path
+                d="M12 5v14"
+              />
+            </svg>
+            Add task
+          </button>
+        </div>
+      </div>
+      <div
+        class="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 text-center"
+      >
+        <h3
+          class="mt-3 text-sm font-medium"
+        >
+          No work tasks yet
+        </h3>
+        <p
+          class="mt-1 text-xs text-muted-foreground"
+        >
+          Add concrete work and evidence requirements when they are needed for this ticket.
+        </p>
+      </div>
+    </section>
+  </div>
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_1b_"
+    aria-labelledby="radix-_r_1a_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_19_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_1a_"
+    >
+      Add work task
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_1b_"
+    >
+      Define the task, responsibility and prerequisites, then review the changes before saving.
+    </p>
+    <div
+      class="flex min-h-0 w-full flex-col items-center justify-center px-10 py-12 text-center"
+      style="min-height: min(60vh, 460px);"
+    >
+      <div
+        class="relative mb-5"
+      >
+        <span
+          class="grid h-[76px] w-[76px] place-items-center rounded-full bg-status-success-bg text-status-success"
+        >
+          <svg
+            class="lucide lucide-check h-10 w-10"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2.5"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M20 6 9 17l-5-5"
+            />
+          </svg>
+        </span>
+        <svg
+          class="lucide lucide-sparkles absolute -top-1.5 -right-3.5 h-5 w-5 text-primary"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"
+          />
+          <path
+            d="M20 3v4"
+          />
+          <path
+            d="M22 5h-4"
+          />
+          <path
+            d="M4 17v2"
+          />
+          <path
+            d="M5 18H3"
+          />
+        </svg>
+      </div>
+      <h2
+        class="text-2xl font-bold"
+      >
+        Task added
+      </h2>
+      <p
+        class="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground"
+      >
+        The earlier save is confirmed. Your newer unsaved work is available in Task work to recover.
+      </p>
+      <div
+        class="mt-6 flex gap-3"
+      >
+        <button
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+          data-slot="button"
+          type="button"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+    <button
+      class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+      type="button"
+    >
+      <svg
+        class="lucide lucide-x"
+        fill="none"
+        height="24"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M18 6 6 18"
+        />
+        <path
+          d="m6 6 12 12"
+        />
+      </svg>
+      <span
+        class="sr-only"
+      >
+        Close
+      </span>
+    </button>
+  </div>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+</body>
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  >
+    <section
+      aria-labelledby="ticket-work-tasks"
+      class="space-y-4"
+    >
+      <div
+        class="flex flex-wrap items-center justify-between gap-3"
+      >
+        <div
+          class="flex items-center gap-2"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-list-checks size-4 text-muted-foreground"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="m3 17 2 2 4-4"
+            />
+            <path
+              d="m3 7 2 2 4-4"
+            />
+            <path
+              d="M13 6h8"
+            />
+            <path
+              d="M13 12h8"
+            />
+            <path
+              d="M13 18h8"
+            />
+          </svg>
+          <h2
+            class="text-section-title"
+            id="ticket-work-tasks"
+          >
+            Work tasks
+          </h2>
+        </div>
+        <div
+          class="flex gap-2"
+        >
+          <button
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+            data-slot="button"
+            type="button"
+          >
+            <svg
+              class="lucide lucide-plus size-4"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5 12h14"
+              />
+              <path
+                d="M12 5v14"
+              />
+            </svg>
+            Add task
+          </button>
+        </div>
+      </div>
+      <div
+        class="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 text-center"
+      >
+        <h3
+          class="mt-3 text-sm font-medium"
+        >
+          No work tasks yet
+        </h3>
+        <p
+          class="mt-1 text-xs text-muted-foreground"
+        >
+          Add concrete work and evidence requirements when they are needed for this ticket.
+        </p>
+      </div>
+    </section>
+  </div>
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_1b_"
+    aria-labelledby="radix-_r_1a_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_19_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_1a_"
+    >
+      Add work task
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_1b_"
+    >
+      Define the task, responsibility and prerequisites, then review the changes before saving.
+    </p>
+    <div
+      class="flex min-h-0 w-full flex-col items-center justify-center px-10 py-12 text-center"
+      style="min-height: min(60vh, 460px);"
+    >
+      <div
+        class="relative mb-5"
+      >
+        <span
+          class="grid h-[76px] w-[76px] place-items-center rounded-full bg-status-success-bg text-status-success"
+        >
+          <svg
+            class="lucide lucide-check h-10 w-10"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2.5"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M20 6 9 17l-5-5"
+            />
+          </svg>
+        </span>
+        <svg
+          class="lucide lucide-sparkles absolute -top-1.5 -right-3.5 h-5 w-5 text-primary"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"
+          />
+          <path
+            d="M20 3v4"
+          />
+          <path
+            d="M22 5h-4"
+          />
+          <path
+            d="M4 17v2"
+          />
+          <path
+            d="M5 18H3"
+          />
+        </svg>
+      </div>
+      <h2
+        class="text-2xl font-bold"
+      >
+        Task added
+      </h2>
+      <p
+        class="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground"
+      >
+        The earlier save is confirmed. Your newer unsaved work is available in Task work to recover.
+      </p>
+      <div
+        class="mt-6 flex gap-3"
+      >
+        <button
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+          data-slot="button"
+          type="button"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+    <button
+      class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+      type="button"
+    >
+      <svg
+        class="lucide lucide-x"
+        fill="none"
+        height="24"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M18 6 6 18"
+        />
+        <path
+          d="m6 6 12 12"
+        />
+      </svg>
+      <span
+        class="sr-only"
+      >
+        Close
+      </span>
+    </button>
+  </div>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+</body>
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx:371:22
+    369|         });
+    370|         fireEvent.click(screen.getByRole('button', { name: 'Check resu…
+    371|         await screen.findByText(/Your different unsent proposal remain…
+       |                      ^
+    372|         fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    373|         fireEvent.click(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/19]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > reopens completed work only through the reasoned lifecycle
+AssertionError: expected "wrap" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body
+    data-scroll-locked="1"
+    style="pointer-events: none;"
+  >
+    <span
+      aria-hidden="true"
+      data-aria-hidden="true"
+      data-radix-focus-guard=""
+      style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+      tabindex="0"
+    />
+    <div
+      aria-hidden="true"
+      data-aria-hidden="true"
+    >
+      <section
+        aria-labelledby="ticket-work-tasks"
+        class="space-y-4"
+      >
+        <div
+          class="flex flex-wrap items-center justify-between gap-3"
+        >
+          <div
+            class="flex items-center gap-2"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-list-checks size-4 text-muted-foreground"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="m3 17 2 2 4-4"
+              />
+              <path
+                d="m3 7 2 2 4-4"
+              />
+              <path
+                d="M13 6h8"
+              />
+              <path
+                d="M13 12h8"
+              />
+              <path
+                d="M13 18h8"
+              />
+            </svg>
+            <h2
+              class="text-section-title"
+              id="ticket-work-tasks"
+            >
+              Work tasks
+            </h2>
+          </div>
+          <div
+            class="flex gap-2"
+          >
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+              data-slot="button"
+              type="button"
+            >
+              <svg
+                class="lucide lucide-plus size-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12h14"
+                />
+                <path
+                  d="M12 5v14"
+                />
+              </svg>
+              Add task
+            </button>
+          </div>
+        </div>
+        <div
+          class="flex flex-wrap gap-2"
+        >
+          <span
+            class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+          >
+            <svg
+              class="lucide lucide-clipboard-check size-3"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                height="4"
+                rx="1"
+                ry="1"
+                width="8"
+                x="8"
+                y="2"
+              />
+              <path
+                d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+              />
+              <path
+                d="m9 14 2 2 4-4"
+              />
+            </svg>
+            1
+             of 
+            1
+             complete
+          </span>
+        </div>
+        <ul
+          class="space-y-3"
+        >
+          <li
+            id="task-9"
+          >
+            <div
+              class="bg-card text-card-foreground flex flex-col rounded-xl border shadow-sm gap-3 p-4"
+              data-slot="card"
+            >
+              <div
+                class="flex flex-wrap items-start justify-between gap-2"
+              >
+                <h3
+                  class="min-w-0 flex-1 text-sm font-semibold break-words"
+                >
+                  Approve maintenance window
+                </h3>
+                <div
+                  class="flex flex-wrap g...
+ ❯ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx:512:35
+    510|
+    511|         await waitFor(() =>
+    512|             expect(axios.request).toHaveBeenCalledWith(
+       |                                   ^
+    513|                 expect.objectContaining({
+    514|                     url: '/it/tickets/42/tasks/9/reopen',
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/19]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > conceals session-expired fields and keeps the hard-reload warning
+TestingLibraryElementError: Unable to find an element with the text: /Sign in with the same account/. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  >
+    <section
+      aria-labelledby="ticket-work-tasks"
+      class="space-y-4"
+    >
+      <div
+        class="flex flex-wrap items-center justify-between gap-3"
+      >
+        <div
+          class="flex items-center gap-2"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-list-checks size-4 text-muted-foreground"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="m3 17 2 2 4-4"
+            />
+            <path
+              d="m3 7 2 2 4-4"
+            />
+            <path
+              d="M13 6h8"
+            />
+            <path
+              d="M13 12h8"
+            />
+            <path
+              d="M13 18h8"
+            />
+          </svg>
+          <h2
+            class="text-section-title"
+            id="ticket-work-tasks"
+          >
+            Work tasks
+          </h2>
+        </div>
+        <div
+          class="flex gap-2"
+        >
+          <button
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+            data-slot="button"
+            type="button"
+          >
+            <svg
+              class="lucide lucide-plus size-4"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5 12h14"
+              />
+              <path
+                d="M12 5v14"
+              />
+            </svg>
+            Add task
+          </button>
+        </div>
+      </div>
+      <div
+        class="flex flex-wrap gap-2"
+      >
+        <span
+          class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+        >
+          <svg
+            class="lucide lucide-clipboard-check size-3"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <rect
+              height="4"
+              rx="1"
+              ry="1"
+              width="8"
+              x="8"
+              y="2"
+            />
+            <path
+              d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+            />
+            <path
+              d="m9 14 2 2 4-4"
+            />
+          </svg>
+          1
+           of 
+          1
+           complete
+        </span>
+      </div>
+      <ul
+        class="space-y-3"
+      >
+        <li
+          id="task-9"
+        >
+          <div
+            class="bg-card text-card-foreground flex flex-col rounded-xl border shadow-sm gap-3 p-4"
+            data-slot="card"
+          >
+            <div
+              class="flex flex-wrap items-start justify-between gap-2"
+            >
+              <h3
+                class="min-w-0 flex-1 text-sm font-semibold break-words"
+              >
+                Approve maintenance window
+              </h3>
+              <div
+                class="flex flex-wrap gap-1.5"
+              >
+                <span
+                  class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+                >
+                  <svg
+     ...
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  >
+    <section
+      aria-labelledby="ticket-work-tasks"
+      class="space-y-4"
+    >
+      <div
+        class="flex flex-wrap items-center justify-between gap-3"
+      >
+        <div
+          class="flex items-center gap-2"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-list-checks size-4 text-muted-foreground"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="m3 17 2 2 4-4"
+            />
+            <path
+              d="m3 7 2 2 4-4"
+            />
+            <path
+              d="M13 6h8"
+            />
+            <path
+              d="M13 12h8"
+            />
+            <path
+              d="M13 18h8"
+            />
+          </svg>
+          <h2
+            class="text-section-title"
+            id="ticket-work-tasks"
+          >
+            Work tasks
+          </h2>
+        </div>
+        <div
+          class="flex gap-2"
+        >
+          <button
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+            data-slot="button"
+            type="button"
+          >
+            <svg
+              class="lucide lucide-plus size-4"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5 12h14"
+              />
+              <path
+                d="M12 5v14"
+              />
+            </svg>
+            Add task
+          </button>
+        </div>
+      </div>
+      <div
+        class="flex flex-wrap gap-2"
+      >
+        <span
+          class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+        >
+          <svg
+            class="lucide lucide-clipboard-check size-3"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <rect
+              height="4"
+              rx="1"
+              ry="1"
+              width="8"
+              x="8"
+              y="2"
+            />
+            <path
+              d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+            />
+            <path
+              d="m9 14 2 2 4-4"
+            />
+          </svg>
+          1
+           of 
+          1
+           complete
+        </span>
+      </div>
+      <ul
+        class="space-y-3"
+      >
+        <li
+          id="task-9"
+        >
+          <div
+            class="bg-card text-card-foreground flex flex-col rounded-xl border shadow-sm gap-3 p-4"
+            data-slot="card"
+          >
+            <div
+              class="flex flex-wrap items-start justify-between gap-2"
+            >
+              <h3
+                class="min-w-0 flex-1 text-sm font-semibold break-words"
+              >
+                Approve maintenance window
+              </h3>
+              <div
+                class="flex flex-wrap gap-1.5"
+              >
+                <span
+                  class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+                >
+                  <svg
+     ...
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx:703:22
+    701|             }),
+    702|         );
+    703|         await screen.findByText(/Sign in with the same account/);
+       |                      ^
+    704|         expect(
+    705|             screen.queryByDisplayValue('Private recovery reason'),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/19]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > purges the private register and open proposal after confirmed access loss
+AssertionError: expected "vi.fn()" to be called once, but got 0 times
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body
+    data-scroll-locked="1"
+    style="pointer-events: none;"
+  >
+    <span
+      aria-hidden="true"
+      data-aria-hidden="true"
+      data-radix-focus-guard=""
+      style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+      tabindex="0"
+    />
+    <div
+      aria-hidden="true"
+      data-aria-hidden="true"
+    >
+      <section
+        aria-labelledby="ticket-work-tasks"
+        class="space-y-4"
+      >
+        <div
+          class="flex flex-wrap items-center justify-between gap-3"
+        >
+          <div
+            class="flex items-center gap-2"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-list-checks size-4 text-muted-foreground"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="m3 17 2 2 4-4"
+              />
+              <path
+                d="m3 7 2 2 4-4"
+              />
+              <path
+                d="M13 6h8"
+              />
+              <path
+                d="M13 12h8"
+              />
+              <path
+                d="M13 18h8"
+              />
+            </svg>
+            <h2
+              class="text-section-title"
+              id="ticket-work-tasks"
+            >
+              Work tasks
+            </h2>
+          </div>
+          <div
+            class="flex gap-2"
+          >
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+              data-slot="button"
+              type="button"
+            >
+              <svg
+                class="lucide lucide-plus size-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12h14"
+                />
+                <path
+                  d="M12 5v14"
+                />
+              </svg>
+              Add task
+            </button>
+          </div>
+        </div>
+        <div
+          class="flex flex-wrap gap-2"
+        >
+          <span
+            class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+          >
+            <svg
+              class="lucide lucide-clipboard-check size-3"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                height="4"
+                rx="1"
+                ry="1"
+                width="8"
+                x="8"
+                y="2"
+              />
+              <path
+                d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+              />
+              <path
+                d="m9 14 2 2 4-4"
+              />
+            </svg>
+            1
+             of 
+            1
+             complete
+          </span>
+        </div>
+        <ul
+          class="space-y-3"
+        >
+          <li
+            id="task-9"
+          >
+            <div
+              class="bg-card text-card-foreground flex flex-col rounded-xl border shadow-sm gap-3 p-4"
+              data-slot="card"
+            >
+              <div
+                class="flex flex-wrap items-start justify-between gap-2"
+              >
+                <h3
+                  class="min-w-0 flex-1 text-sm font-semibold break-words"
+                >
+                  Approve maintenance window
+                </h3>
+                <div
+                  class="flex flex-wrap g...
+ ❯ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx:733:50
+    731|             }),
+    732|         );
+    733|         await waitFor(() => expect(onAccessLost).toHaveBeenCalledOnce(…
+       |                                                  ^
+    734|         expect(screen.queryByText(completedTask.title)).not.toBeInTheD…
+    735|         expect(
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/19]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-work-tasks.test.tsx > TicketWorkTasks > reports completion only after the exact committed actor, command and version acknowledgement
+AssertionError: expected "vi.fn()" to be called once, but got 0 times
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body
+    data-scroll-locked="1"
+    style="pointer-events: none;"
+  >
+    <span
+      aria-hidden="true"
+      data-aria-hidden="true"
+      data-radix-focus-guard=""
+      style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+      tabindex="0"
+    />
+    <div
+      aria-hidden="true"
+      data-aria-hidden="true"
+    >
+      <section
+        aria-labelledby="ticket-work-tasks"
+        class="space-y-4"
+      >
+        <div
+          class="flex flex-wrap items-center justify-between gap-3"
+        >
+          <div
+            class="flex items-center gap-2"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-list-checks size-4 text-muted-foreground"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="m3 17 2 2 4-4"
+              />
+              <path
+                d="m3 7 2 2 4-4"
+              />
+              <path
+                d="M13 6h8"
+              />
+              <path
+                d="M13 12h8"
+              />
+              <path
+                d="M13 18h8"
+              />
+            </svg>
+            <h2
+              class="text-section-title"
+              id="ticket-work-tasks"
+            >
+              Work tasks
+            </h2>
+          </div>
+          <div
+            class="flex gap-2"
+          >
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+              data-slot="button"
+              type="button"
+            >
+              <svg
+                class="lucide lucide-plus size-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12h14"
+                />
+                <path
+                  d="M12 5v14"
+                />
+              </svg>
+              Add task
+            </button>
+          </div>
+        </div>
+        <div
+          class="flex flex-wrap gap-2"
+        >
+          <span
+            class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+          >
+            <svg
+              class="lucide lucide-clipboard-check size-3"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                height="4"
+                rx="1"
+                ry="1"
+                width="8"
+                x="8"
+                y="2"
+              />
+              <path
+                d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+              />
+              <path
+                d="m9 14 2 2 4-4"
+              />
+            </svg>
+            1
+             of 
+            1
+             complete
+          </span>
+        </div>
+        <ul
+          class="space-y-3"
+        >
+          <li
+            id="task-9"
+          >
+            <div
+              class="bg-card text-card-foreground flex flex-col rounded-xl border shadow-sm gap-3 p-4"
+              data-slot="card"
+            >
+              <div
+                class="flex flex-wrap items-start justify-between gap-2"
+              >
+                <h3
+                  class="min-w-0 flex-1 text-sm font-semibold break-words"
+                >
+                  Approve maintenance window
+                </h3>
+                <div
+                  class="flex flex-wrap g...
+ ❯ resources/js/components/it/__tests__/ticket-work-tasks.test.tsx:1057:55
+    1055|             }),
+    1056|         );
+    1057|         await waitFor(() => expect(props.onCommitted).toHaveBeenCalled…
+       |                                                       ^
+    1058|         expect(props.onCommitted).toHaveBeenCalledWith(
+    1059|             expect.objectContaining({
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/19]⎯
+
+
+ Test Files  2 failed | 4 passed (6)
+      Tests  19 failed | 61 passed (80)
+   Start at  01:13:47
+   Duration  12.33s (transform 1.08s, setup 768ms, import 9.21s, tests 13.81s, environment 6.06s)
+

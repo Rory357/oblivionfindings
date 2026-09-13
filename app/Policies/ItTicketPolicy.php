@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Domain\It\Services\ItTicketApprovalService;
 use App\Domain\It\Services\ItTicketMergeService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Models\ItTicket;
@@ -44,11 +45,16 @@ class ItTicketPolicy
     /** Agents reopen anytime; requesters within 7 days of resolution. */
     public function reopen(User $user, ItTicket $ticket): bool
     {
-        if ($user->canDo('it.manage')) {
-            return $this->access->canWork($user, $ticket);
+        if ($ticket->isMerged()) {
+            return false;
+        }
+
+        if ($user->canDo('it.manage') && $this->access->canWork($user, $ticket)) {
+            return true;
         }
 
         return $this->owns($user, $ticket)
+            && $this->access->canView($user, $ticket)
             && $ticket->resolved_at !== null
             && $ticket->resolved_at->gt(now()->subDays(7));
     }
@@ -69,6 +75,15 @@ class ItTicketPolicy
         return $this->access->canWork($user, $ticket);
     }
 
+    /** Confirmation is the requester's statement, including when they also work for IT. */
+    public function confirmResolution(User $user, ItTicket $ticket): bool
+    {
+        return $this->owns($user, $ticket)
+            && $this->access->canView($user, $ticket)
+            && ! $ticket->isMerged()
+            && $ticket->status === 'resolved';
+    }
+
     /**
      * Merge a duplicate SOURCE ticket into a TARGET survivor. Agent work; a
      * ticket can't merge into itself, an already-merged source can't be merged
@@ -84,7 +99,8 @@ class ItTicketPolicy
             && $target->merged_into_ticket_id === null
             && $ticket->status !== 'closed'
             && $target->status !== 'closed'
-            && $this->mergeService->sharesConversationAudience($ticket, $target);
+            && $this->mergeService->sharesConversationAudience($ticket, $target)
+            && $this->mergeService->sharesStaffAccessScope($ticket, $target);
     }
 
     /**
@@ -94,8 +110,14 @@ class ItTicketPolicy
     public function requestApproval(User $user, ItTicket $ticket): bool
     {
         return $this->access->canWork($user, $ticket)
+            && $user->canDo('it.manage')
+            && ! $ticket->isMerged()
+            && in_array($ticket->status, ItTicket::OPEN_STATUSES, true)
             && $ticket->requires_approval
-            && ! $ticket->approvals()->whereIn('status', ['pending', 'approved'])->exists();
+            && app(ItTicketApprovalService::class)->storageReady()
+            && ! $ticket->approvals()->where(fn ($query) => $query->where('status', 'approved')
+                ->orWhere(fn ($pending) => $pending->where('status', 'pending')
+                    ->where(fn ($deadline) => $deadline->whereNull('expires_at')->orWhere('expires_at', '>', now()))))->exists();
     }
 
     /**
@@ -105,7 +127,8 @@ class ItTicketPolicy
      */
     public function csat(User $user, ItTicket $ticket): bool
     {
-        return $this->owns($user, $ticket) && $ticket->status === 'resolved';
+        return $this->owns($user, $ticket) && $ticket->status === 'resolved'
+            && ! $ticket->isMerged() && $this->access->canView($user, $ticket);
     }
 
     /** Destructive — admins only. */

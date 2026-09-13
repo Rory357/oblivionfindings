@@ -116,6 +116,7 @@ use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
 use App\Models\HouseLedgerEntry;
 use App\Models\ItChange;
+use App\Models\ItInboundEmail;
 use App\Models\ItMajorIncident;
 use App\Models\ItMajorIncidentUpdate;
 use App\Models\ItProblem;
@@ -139,6 +140,7 @@ use App\Models\SubstanceExposureRecord;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
+use App\Notifications\Channels\ItMailChannel;
 use App\Observers\AssetMaintenanceLogObserver;
 use App\Observers\AssetValueObserver;
 use App\Observers\ClientConsentObserver;
@@ -200,6 +202,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Database\Events\SchemaLoaded;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Channels\MailChannel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
@@ -216,6 +219,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(MailChannel::class, ItMailChannel::class);
         $this->app->bind(ApprovedProbeScopeProvider::class, DiscoveryApprovedProbeScopeProvider::class);
         $this->app->bind(CommandDispatchPort::class, GovernedCommandDispatchService::class);
         $this->app->singleton(
@@ -466,6 +470,7 @@ class AppServiceProvider extends ServiceProvider
             'it_major_incident_update' => ItMajorIncidentUpdate::class,
             'it_problem' => ItProblem::class,
             'it_ticket_comment' => ItTicketComment::class,
+            'it_inbound_email' => ItInboundEmail::class,
             'it_team' => ItTeam::class,
             'it_queue' => ItQueue::class,
             'it_service' => ItService::class,

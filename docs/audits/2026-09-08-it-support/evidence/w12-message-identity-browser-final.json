@@ -1,0 +1,179 @@
+{
+    "token": "377860ef3cd84316",
+    "phase": "observe",
+    "database_mutations": false,
+    "synthetic_inbox_changed": false,
+    "tickets": [
+        {
+            "id": 1,
+            "reference": "IT-000001",
+            "merged_into_ticket_id": null,
+            "status": "open",
+            "lock_version": 1
+        },
+        {
+            "id": 7,
+            "reference": "IT-000007",
+            "merged_into_ticket_id": null,
+            "status": "open",
+            "lock_version": 1
+        }
+    ],
+    "receipts": [
+        {
+            "id": 1,
+            "it_mailbox_connection_id": 1,
+            "it_ticket_id": 8,
+            "status": "processed",
+            "quarantine_reason": null,
+            "acknowledged_at": "2026-09-11 10:04:02",
+            "acknowledgement_attempts": 2
+        },
+        {
+            "id": 2,
+            "it_mailbox_connection_id": 1,
+            "it_ticket_id": null,
+            "status": "quarantined",
+            "quarantine_reason": "automatic_message",
+            "acknowledged_at": "2026-09-11 10:01:31",
+            "acknowledgement_attempts": 1
+        },
+        {
+            "id": 3,
+            "it_mailbox_connection_id": 1,
+            "it_ticket_id": null,
+            "status": "quarantined",
+            "quarantine_reason": "sender_unauthorized",
+            "acknowledged_at": "2026-09-11 10:01:31",
+            "acknowledgement_attempts": 1
+        },
+        {
+            "id": 4,
+            "it_mailbox_connection_id": 1,
+            "it_ticket_id": 8,
+            "status": "duplicate",
+            "quarantine_reason": null,
+            "acknowledged_at": "2026-09-11 10:01:31",
+            "acknowledgement_attempts": 1
+        },
+        {
+            "id": 5,
+            "it_mailbox_connection_id": 2,
+            "it_ticket_id": 8,
+            "status": "processed",
+            "quarantine_reason": null,
+            "acknowledged_at": "2026-09-11 10:03:35",
+            "acknowledgement_attempts": 2
+        },
+        {
+            "id": 6,
+            "it_mailbox_connection_id": 2,
+            "it_ticket_id": null,
+            "status": "quarantined",
+            "quarantine_reason": "automatic_message",
+            "acknowledged_at": "2026-09-11 10:01:46",
+            "acknowledgement_attempts": 1
+        },
+        {
+            "id": 7,
+            "it_mailbox_connection_id": 2,
+            "it_ticket_id": null,
+            "status": "quarantined",
+            "quarantine_reason": "sender_unauthorized",
+            "acknowledged_at": "2026-09-11 10:01:46",
+            "acknowledgement_attempts": 1
+        },
+        {
+            "id": 8,
+            "it_mailbox_connection_id": 2,
+            "it_ticket_id": 8,
+            "status": "duplicate",
+            "quarantine_reason": null,
+            "acknowledged_at": "2026-09-11 10:01:46",
+            "acknowledgement_attempts": 1
+        }
+    ],
+    "connections": [
+        {
+            "id": 1,
+            "provider": "microsoft"
+        },
+        {
+            "id": 2,
+            "provider": "google"
+        }
+    ],
+    "ticket_count": 8,
+    "email_comment_commands": 2,
+    "comment_audits": 2,
+    "merge_events": [],
+    "synthetic_comments": [
+        {
+            "id": 1,
+            "ticket_id": 8,
+            "author_user_id": 1,
+            "source_channel": "email",
+            "is_internal": 0,
+            "body": "W12 microsoft changed subject reply."
+        },
+        {
+            "id": 2,
+            "ticket_id": 8,
+            "author_user_id": 1,
+            "source_channel": "email",
+            "is_internal": 0,
+            "body": "W12 google changed subject reply."
+        }
+    ],
+    "outgoing_identities": [
+        {
+            "id": 1,
+            "it_ticket_id": 8,
+            "recipient_user_id": 1,
+            "status": "accepted",
+            "rfc_message_id_hash": "73a8b5f7bb734bcd18b8766782a0f3a768d3c8241f877bfc1f5dcede9f39b7c7",
+            "rfc_message_id_recorded_at": "2026-09-11 10:00:13"
+        }
+    ],
+    "provider_state": {
+        "token": "377860ef3cd84316",
+        "synthetic_only": true,
+        "unread": {
+            "microsoft": [],
+            "google": []
+        },
+        "ack_attempts": {
+            "microsoft": {
+                "49": 2,
+                "50": 1,
+                "51": 1,
+                "52": 1
+            },
+            "google": {
+                "49": 2,
+                "50": 1,
+                "51": 1,
+                "52": 1
+            }
+        },
+        "reads": {
+            "microsoft": {
+                "49": 1,
+                "50": 1,
+                "51": 1,
+                "52": 1
+            },
+            "google": {
+                "49": 1,
+                "50": 1,
+                "51": 1,
+                "52": 1
+            }
+        },
+        "external_body_reads": 0,
+        "outbound_scenario": {
+            "delivery_id": 1,
+            "ticket_id": 8
+        }
+    }
+}

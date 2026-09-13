@@ -203,7 +203,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('permission:credentials.manage');
         Route::get('/credentials/{credential}/audit', [SiteCredentialController::class, 'auditLog'])
             ->name('sites.credentials.audit')
-            ->middleware('permission:credentials.reveal');
+            ->middleware('permission:credentials.audit');
 
         // TOTP / Authenticator endpoints.
         // Oblivion *is* the authenticator app: the operator pastes an
@@ -554,10 +554,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:vendors.view|credentials.view');
 
     // Cross-site reveal & audit feed (JSON) for the Vendors & Credentials page.
-    // Security activity contains actor/IP evidence and requires reveal access.
+    // Audit access is independent from disclosure of credential values.
     Route::get('/vendors/audit', [SiteVendorController::class, 'globalAudit'])
         ->name('sites.vendors.audit')
-        ->middleware('permission:credentials.reveal');
+        ->middleware('permission:credentials.audit');
 
     // Application credential-type registry (powers the type tile picker).
     // Application-wide config, gated on credentials.manage.

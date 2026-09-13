@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItSavedTicketFilterService;
 use App\Models\ItSavedTicketFilter;
 use App\Models\ItService;
 use App\Models\ItTicket;
@@ -8,6 +9,8 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Validation\ValidationException;
 
 function savedTicketFilterActor(array $permissionKeys, Site $site): User
 {
@@ -184,4 +187,114 @@ test('request-only staff cannot create personal agent queue filters', function (
     ])->assertForbidden();
 
     expect(ItSavedTicketFilter::query()->count())->toBe(0);
+});
+
+test('one filter normalizer never reuses another actors permitted options', function () {
+    $site = Site::factory()->create();
+    $otherSite = Site::factory()->create();
+    $first = savedTicketFilterActor(['it.view', 'it.manage'], $site);
+    $second = savedTicketFilterActor(['it.view', 'it.manage'], $otherSite);
+    $normalizer = app(ItSavedTicketFilterService::class);
+
+    expect($normalizer->sanitize($first, ['site_id' => $site->id, 'assignee' => $first->id]))
+        ->toBe(['site_id' => $site->id, 'assignee' => $first->id]);
+    expect($normalizer->sanitize($second, ['site_id' => $site->id, 'assignee' => $first->id]))
+        ->toBe([]);
+    expect($normalizer->sanitize($second, ['site_id' => $otherSite->id, 'assignee' => $second->id]))
+        ->toBe(['site_id' => $otherSite->id, 'assignee' => $second->id]);
+});
+
+test('a reused filter normalizer drops revoked Site and retired service options before applying or listing saved views', function () {
+    $oldSite = Site::factory()->create();
+    $currentSite = Site::factory()->create();
+    $owner = savedTicketFilterActor(['it.view', 'it.manage'], $oldSite);
+    $service = ItService::factory()->create(['is_active' => true]);
+    $saved = ItSavedTicketFilter::query()->create([
+        'user_id' => $owner->id, 'name' => 'Previous scope',
+        'filters' => ['ticket_status' => 'open', 'site_id' => $oldSite->id, 'service' => $service->id],
+    ]);
+    $normalizer = app(ItSavedTicketFilterService::class);
+    expect($normalizer->sanitize($owner, $saved->filters))->toBe($saved->filters);
+
+    HrEmployeeProfile::query()->where('user_id', $owner->id)->update(['primary_site_id' => $currentSite->id]);
+    $service->update(['is_active' => false]);
+
+    expect($normalizer->sanitize($owner, $saved->filters))->toBe(['ticket_status' => 'open']);
+    expect($normalizer->ownedRows($owner))->toBe([['id' => $saved->id, 'name' => 'Previous scope']]);
+    expect($saved->fresh()->filters)->toBe(['ticket_status' => 'open']);
+});
+
+test('personal ticket totals match all own rows independently from the agent queue filter', function () {
+    $site = Site::factory()->create();
+    $outside = Site::factory()->create();
+    $actor = savedTicketFilterActor(['it.request', 'it.view', 'it.manage'], $site);
+    ItTicket::factory()->create(['site_id' => $site->id, 'requester_user_id' => $actor->id, 'status' => 'open']);
+    ItTicket::factory()->create(['site_id' => $outside->id, 'requested_for_user_id' => $actor->id, 'status' => 'waiting']);
+    ItTicket::factory()->create([
+        'site_id' => $site->id, 'requester_user_id' => $actor->id, 'requested_for_user_id' => $actor->id,
+        'status' => 'closed', 'resolved_at' => now()->subDays(60),
+    ]);
+    ItTicket::factory()->create(['site_id' => $site->id, 'status' => 'open']);
+
+    $this->actingAs($actor)->get('/it?tab=tickets&q=No%20matching%20ticket')
+        ->assertOk()->assertInertia(fn ($page) => $page
+        ->where('summary.my.total', 3)->where('summary.my.open', 2)
+        ->where('summary.my.waiting', 1)->where('summary.my.resolved_30d', 0)
+        ->has('myTickets', 3)->where('tickets.total', 0));
+});
+
+test('operational view counts and rows agree without exposing participant-only waiting or ownership', function (string $view, array $attributes) {
+    $site = Site::factory()->create();
+    $actor = savedTicketFilterActor(['it.request', 'it.view', 'it.manage'], $site);
+    $allowed = ItTicket::factory()->create(['site_id' => $site->id, ...$attributes]);
+    ItTicket::factory()->create(['site_id' => $site->id, 'requester_user_id' => $actor->id, 'is_sensitive' => true, ...$attributes]);
+    ItTicket::factory()->create(['site_id' => Site::factory()->create()->id, 'requested_for_user_id' => $actor->id, ...$attributes]);
+    ItTicket::factory()->create(['site_id' => Site::factory()->create()->id, ...$attributes]);
+
+    $this->actingAs($actor)->get('/it?tab=tickets&view='.$view)->assertOk()
+        ->assertInertia(fn ($page) => $page->where('filters.view', $view)
+            ->where('summary.tickets.views.'.$view, 1)->where('tickets.total', 1)->where('tickets.data.0.id', $allowed->id));
+    $reader = savedTicketFilterActor(['it.view'], $site);
+    $this->actingAs($reader)->get('/it?tab=tickets&view='.$view)->assertOk()
+        ->assertInertia(fn ($page) => $page->where('summary.tickets.views.'.$view, 0)->where('tickets.total', 0));
+})->with([
+    ['unowned', ['status' => 'open', 'owner_user_id' => null]],
+    ['waiting_requester', ['status' => 'waiting', 'waiting_party' => 'requester']],
+    ['waiting_vendor', ['status' => 'waiting', 'waiting_party' => 'vendor']],
+    ['waiting_approver', ['status' => 'waiting', 'waiting_party' => 'approver']],
+]);
+
+test('canonical saved view creation enforces the current count and database name comparison after request validation', function () {
+    $actor = savedTicketFilterActor(['it.view'], Site::factory()->create());
+    $store = app(ItSavedTicketFilterService::class);
+    foreach (range(1, 24) as $number) {
+        ItSavedTicketFilter::query()->create(['user_id' => $actor->id, 'name' => 'View '.$number, 'filters' => ['ticket_status' => 'open']]);
+    }
+    $last = $store->store($actor, '  Final view  ', ['ticket_status' => 'waiting']);
+    expect($last->name)->toBe('Final view');
+    expect(fn () => $store->store($actor, 'final VIEW', ['ticket_status' => 'open']))
+        ->toThrow(ValidationException::class, 'You already have a ticket view with this name.');
+    expect(fn () => $store->store($actor, 'View twenty six', ['ticket_status' => 'open']))
+        ->toThrow(ValidationException::class, 'You can keep up to 25 personal ticket filters.');
+    expect(ItSavedTicketFilter::query()->where('user_id', $actor->id)->count())->toBe(25);
+
+    $other = savedTicketFilterActor(['it.view'], Site::factory()->create());
+    expect($store->store($other, 'Final view', ['ticket_status' => 'open'])->user_id)->toBe($other->id);
+});
+
+test('canonical saved view creation reauthorizes a previously loaded actor and rejects an empty normalized view', function () {
+    $site = Site::factory()->create();
+    $actor = savedTicketFilterActor(['it.view'], $site);
+    $actor->load('roles.permissions', 'permissionOverrides');
+    expect($actor->canDo('it.view'))->toBeTrue();
+    $store = app(ItSavedTicketFilterService::class);
+    $hiddenSite = Site::factory()->create();
+    expect(fn () => $store->store($actor, 'Unavailable Site', ['site_id' => $hiddenSite->id]))
+        ->toThrow(ValidationException::class, 'Choose at least one ticket filter');
+
+    $permission = Permission::query()->where('key', 'it.view')->firstOrFail();
+    $actor->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
+    expect(fn () => $store->store($actor, 'Old session', ['ticket_status' => 'open']))
+        ->toThrow(AuthorizationException::class);
+    expect(ItSavedTicketFilter::query()->where('user_id', $actor->id)->count())->toBe(0);
 });

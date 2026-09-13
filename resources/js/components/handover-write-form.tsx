@@ -1,5 +1,9 @@
 import DictateButton from '@/components/dictate-button';
+import type { HandoverWorkerNotes } from '@/components/handover-person-notes';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import type { HandoverPerson } from '@/hooks/use-handover-editor';
 import { cn } from '@/lib/utils';
 
 /* -------------------------------------------------------------------------- */
@@ -27,6 +31,8 @@ export type HandoverWriteValue = {
     shift_rating: 'calm' | 'mixed' | 'challenging' | null;
     handover_notes: string;
     follow_up_needed: boolean;
+    worker_notes?: HandoverWorkerNotes;
+    expected_version?: number | null;
 };
 
 export type HandoverWriteFormProps = {
@@ -34,6 +40,8 @@ export type HandoverWriteFormProps = {
     onChange: (next: HandoverWriteValue) => void;
     disabled?: boolean;
     alreadySubmitted?: boolean;
+    people?: HandoverPerson[];
+    showSharedNotes?: boolean;
 };
 
 export const emptyHandoverWriteValue: HandoverWriteValue = {
@@ -100,6 +108,8 @@ export default function HandoverWriteForm({
     onChange,
     disabled,
     alreadySubmitted,
+    people = [],
+    showSharedNotes = true,
 }: HandoverWriteFormProps) {
     if (alreadySubmitted) {
         return (
@@ -113,6 +123,147 @@ export default function HandoverWriteForm({
         key: K,
         next: HandoverWriteValue[K],
     ) => onChange({ ...value, [key]: next });
+
+    if (value.worker_notes) {
+        const notes = value.worker_notes;
+        const updatePerson = (
+            id: number,
+            change: Partial<HandoverWorkerNotes['people'][number]>,
+        ) => {
+            set('worker_notes', {
+                ...notes,
+                people: notes.people.map((person) =>
+                    person.client_id === id ? { ...person, ...change } : person,
+                ),
+            });
+        };
+        return (
+            <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                    Write about each person in their own section, or select “Did
+                    not support this person” when appropriate.
+                </p>
+                {people.map((person) => {
+                    const note = notes.people.find(
+                        (entry) => entry.client_id === person.id,
+                    );
+                    if (!note) return null;
+                    return (
+                        <Card key={person.id} className="gap-3 p-5">
+                            <h3 className="text-base font-semibold">
+                                {person.name}
+                            </h3>
+                            <label
+                                htmlFor={`handover-person-${person.id}`}
+                                className="text-sm font-medium"
+                            >
+                                What should the next worker know about{' '}
+                                {person.name}?
+                            </label>
+                            <textarea
+                                id={`handover-person-${person.id}`}
+                                rows={3}
+                                maxLength={2000}
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-ring"
+                                placeholder="What happened, what helped, and what needs to happen next."
+                                value={note.notes}
+                                disabled={disabled || note.not_supported}
+                                onChange={(event) =>
+                                    updatePerson(person.id, {
+                                        notes: event.target.value,
+                                        no_updates: false,
+                                    })
+                                }
+                            />
+                            <div className="flex flex-wrap gap-x-6 gap-y-2">
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                                    <Checkbox
+                                        checked={note.no_updates}
+                                        disabled={
+                                            disabled ||
+                                            !!note.notes.trim() ||
+                                            note.not_supported
+                                        }
+                                        onCheckedChange={(checked) =>
+                                            updatePerson(person.id, {
+                                                no_updates: checked === true,
+                                            })
+                                        }
+                                    />
+                                    Supported — no updates to pass on
+                                </label>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                                    <Checkbox
+                                        checked={note.follow_up_needed}
+                                        disabled={
+                                            disabled || note.not_supported
+                                        }
+                                        onCheckedChange={(checked) =>
+                                            updatePerson(person.id, {
+                                                follow_up_needed:
+                                                    checked === true,
+                                            })
+                                        }
+                                    />
+                                    Needs follow-up
+                                </label>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                                    <Checkbox
+                                        checked={note.not_supported ?? false}
+                                        disabled={
+                                            disabled ||
+                                            !!note.notes.trim() ||
+                                            note.no_updates ||
+                                            note.follow_up_needed
+                                        }
+                                        onCheckedChange={(checked) =>
+                                            updatePerson(person.id, {
+                                                not_supported: checked === true,
+                                            })
+                                        }
+                                    />
+                                    Did not support this person
+                                </label>
+                            </div>
+                        </Card>
+                    );
+                })}
+                {showSharedNotes && (
+                    <Card className="gap-2 p-5">
+                        <label
+                            htmlFor="handover-shared-notes"
+                            className="text-base font-semibold"
+                        >
+                            Whole site{' '}
+                            <span className="text-sm font-normal text-muted-foreground">
+                                (optional)
+                            </span>
+                        </label>
+                        <p className="text-sm text-muted-foreground">
+                            Shared practical matters, such as supplies or
+                            transport. Keep personal care details in the named
+                            sections above.
+                        </p>
+                        <textarea
+                            id="handover-shared-notes"
+                            rows={2}
+                            maxLength={2000}
+                            value={notes.shared_notes}
+                            disabled={disabled}
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-ring"
+                            placeholder="e.g. Fresh towels are in the hallway cupboard."
+                            onChange={(event) =>
+                                set('worker_notes', {
+                                    ...notes,
+                                    shared_notes: event.target.value,
+                                })
+                            }
+                        />
+                    </Card>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-4">

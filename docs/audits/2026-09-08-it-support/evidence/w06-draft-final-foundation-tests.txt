@@ -1,0 +1,48 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_b63953d3dd4346e5",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketDraftTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (false, 2, 3)[39m[90m             [39m [90m304.33s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, null, 3)[39m[90m             [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, 2, null)[39m[90m             [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, '1.5', 3)[39m[90m            [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft metadata never hydrates private fields and explicit resume decrypts only the owner content[39m[90m            [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown foreign and inaccessible draft identities disclose the same safe response[39m[90m                           [39m [90m0.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic and internal drafts stay separate and participant status never grants internal recovery[39m[90m              [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mold Site bindings are checked before cleared fields or an accessible replacement can be saved[39m[90m               [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcurrent role and account approval are rechecked despite a retained service actor[39m[90m                            [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90midentical lost acknowledgement retries return the saved revision but changed stale text conflicts[39m[90m           [39m [90m0.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdiscard is revision aware idempotent and a fresh generation cannot be changed by delayed old requests[39m[90m       [39m [90m1.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90msettled workflow and changed ticket version block submission without destroying authorized text[39m[90m             [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcommitted intake receipt suspends draft changes and points only to canonical recovery[39m[90m                       [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconsumption shares the canonical transaction and rollback restores the draft[39m[90m                                [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexpired private contents cannot resume or save and expiration never resets the generation silently[39m[90m          [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid partial payloads never flash into session and unexpected failures return no private debug data[39m[90m      [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90munauthenticated and missing-route draft responses remain uncached JSON[39m[90m                                      [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical ticket creation consumes exactly its submitted draft and receipt replay does not repeat consumpti[39m[90m…[39m [90m0.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstale draft or rejected canonical intake leaves no new receipt ticket or scrubbed content[39m[90m                   [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical edit rejects stale draft revisions then consumes only the confirmed version in its transaction[39m[90m    [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfailed canonical resolution rolls back draft consumption and a valid retry resolves with its public note[39m[90m    [39m [90m0.96s[39m  
+
+  [90mTests:[39m    [32;1m21 passed[39;22m[90m (255 assertions)[39m
+  [90mDuration:[39m [39m322.64s[39m
+

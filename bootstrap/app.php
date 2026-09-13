@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\It\Services\ItTicketRequestTrace;
 use App\Exceptions\RecoverableTaskAuthorizationException;
 use App\Http\Middleware\AddContentSecurityPolicy;
 use App\Http\Middleware\AuthenticateItServiceIdentity;
@@ -13,8 +14,10 @@ use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventSearchIndexing;
+use App\Http\Middleware\ProtectItDraftResponses;
 use App\Http\Middleware\RecordItApiRequest;
 use App\Http\Middleware\RoleScope;
+use App\Http\Middleware\TraceItTicketCreation;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,6 +25,7 @@ use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
@@ -45,6 +49,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ['middleware' => ['web', 'auth']],
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prepend(TraceItTicketCreation::class);
+        $middleware->prepend(ProtectItDraftResponses::class);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->web(append: [
@@ -73,6 +79,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(fn (Throwable $exception, Request $request) => ProtectItDraftResponses::render($exception, $request));
+        $exceptions->report(fn (Throwable $exception) => ProtectItDraftResponses::report($exception));
+        $exceptions->respond(function (Response $response, Throwable $exception, Request $request): Response {
+            return ItTicketRequestTrace::from($request)?->finish($response, $exception) ?? $response;
+        });
+
         $exceptions->dontFlash([
             'secret_manager_reference',
             'credential_material',

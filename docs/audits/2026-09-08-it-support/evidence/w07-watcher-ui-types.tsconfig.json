@@ -1,0 +1,13 @@
+{
+    "extends": "../../../../tsconfig.json",
+    "include": [
+        "../../../../resources/js/pages/it/tickets/show.tsx",
+        "../../../../resources/js/pages/it/tickets/show.test.tsx",
+        "../../../../resources/js/components/it/ticket-drawer.tsx",
+        "../../../../resources/js/components/it/__tests__/ticket-watchers.test.tsx",
+        "../../../../resources/js/components/it/__tests__/ticket-drawer.test.tsx",
+        "../../../../resources/js/hooks/use-ticket-page-refresh.test.tsx",
+        "../../../../resources/js/**/*.d.ts",
+        "../../../../resources/js/test/setup.ts"
+    ]
+}

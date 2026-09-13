@@ -1,0 +1,14 @@
+[
+  {
+    "path": "resources/js/components/settings/sso-configuration-form.tsx",
+    "sha256": "d97410c7fdd709b3262ce4676986db595fad6aad791bf53c0d8e4add43b17665"
+  },
+  {
+    "path": "resources/js/components/settings/sso-group-mappings.tsx",
+    "sha256": "96d220fd041515a8fe72802ea3a0249eb51940dee48b54095ba06ae0df7c5570"
+  },
+  {
+    "path": "resources/js/pages/settings/sso-config.tsx",
+    "sha256": "b2bf29604196c0b504f7298529ab218af70d9bd7727f3cdbdaf5b906f9fb1128"
+  }
+]

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItKnowledge;
 use App\Models\ItKbArticle;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -13,11 +14,11 @@ use Illuminate\Validation\Rule;
  */
 class UpdateKbArticleRequest extends FormRequest
 {
+    use ConcealsInaccessibleItKnowledge;
+
     public function authorize(): bool
     {
-        $user = $this->user();
-
-        return (bool) ($user && $user->canDo('it.manage'));
+        return $this->canManageKnowledge();
     }
 
     /**

@@ -1,0 +1,200 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_54dd222c1dce40e4",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketVersionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpersisted versions are monotonic even for same-second writes from older model instances[39m[90m                   [39m [90m287.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma property update returns its version and a stale assignment cannot overwrite it[39m[90m                            [39m [90m1.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90minertia receives field errors and an authorized reload reference without a success flash[39m[90m                    [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "properties"[39m[90m                       [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "workflow"[39m[90m                         [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "resolve"[39m[90m                          [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "close"[39m[90m                            [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser mutation routes require a positive expected version with dataset "reopen"[39m[90m                           [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma versioned lifecycle command cannot be replayed into duplicate activity[39m[90m                                    [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresolve close and reopen reject stale browser commands without duplicate notes or transitions[39m[90m               [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocked commands recheck approval and role instead of trusting a cached actor with ('approval')[39m[90m              [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocked commands recheck approval and role instead of trusting a cached actor with ('role')[39m[90m                  [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma changed ticket site denies the old actor before returning a version conflict[39m[90m                              [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester can reopen with a current version but cannot change triage properties[39m[90m                           [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma failed atomic command rolls its version and activity back with its ticket changes[39m[90m                         [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk commands validate one version per selected ticket and skip stale rows independently[39m[90m                    [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon-browser canonical adapters remain compatible and still advance persisted versions[39m[90m                       [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthorized detail and queue payloads expose the persisted ticket version[39m[90m                                    [39m [90m5.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmigration rollback refuses to discard active concurrency versions[39m[90m                                           [39m [90m0.63s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketLifecycleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mresolving requires a note and posts it as the final public reply[39m[90m                                            [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe notify toggle silences the requester but never the watchers[39m[90m                                             [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresolving inside the resolution target marks the SLA met[39m[90m                                                    [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclose requires a reason records it once and reopen brings the ticket back with a bump[39m[90m                       [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequesters can reopen within seven days, not after[39m[90m                                                          [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe auto-close command sweeps tickets past the reopen window[39m[90m                                                [39m [90m0.61s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketWorkspaceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcanonical routed ownership is technician visible and requester private[39m[90m                                      [39m [90m1.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket associations expose only canonical destinations the viewer can open[39m[90m                                  [39m [90m1.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket associations withhold HR and asset links outside the viewers Sites despite module permissions[39m[90m        [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlinked context follows canonical device and alert permissions without leaking raw payloads[39m[90m                  [39m [90m1.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents govern affected Device links while monitoring evidence remains immutable[39m[90m                             [39m [90m3.31s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe workspace strips internal notes from requester payloads server-side[39m[90m                                     [39m [90m4.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "sen[39m[90m…[39m [90m7.48s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "sen[39m[90m…[39m [90m7.42s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "una[39m[90m…[39m [90m7.48s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "una[39m[90m…[39m [90m7.56s[39m  
+  [32;1m✓[39;22m[90m [39m[90mread-only IT access does not widen the internal work boundary[39m[90m                                               [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcomments respect the internal gate and stamp the first agent response[39m[90m                                       [39m [90m1.00s[39m  
+  [32;1m✓[39;22m[90m [39m[90msettled ticket conversations are read only until the ticket is reopened[39m[90m                                     [39m [90m2.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester reply resumes a waiting ticket and banks the paused minutes[39m[90m                                     [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic replies notify the other side of the conversation only[39m[90m                                               [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe quick-peek JSON branch mirrors the page payload and its stripping[39m[90m                                       [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe rail can classify reroute and retag a ticket[39m[90m                                                            [39m [90m5.01s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly an explicitly application-wide manager can move a ticket to all Sites[39m[90m                                  [39m [90m5.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe composer carries published KB to agents for suggestion, never to requesters[39m[90m                             [39m [90m4.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwatch and unwatch are agent actions recorded on the trail[39m[90m                                                   [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtriage updates write the activity trail and notify the new assignee[39m[90m                                         [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwaiting ownership is explicit revisable and requester safe[39m[90m                                                  [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtriage cannot bypass configured approval by changing the ticket category[39m[90m                                    [39m [90m0.87s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketBulkTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbulk assign hands a selection to one agent and notifies them once per ticket[39m[90m                                [39m [90m0.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk assign to yourself never self-notifies[39m[90m                                                                 [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk priority restamps the SLA clock from the new target[39m[90m                                                    [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk status moves working tickets and starts the waiting pause[39m[90m                                              [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk close requires and preserves one operational reason per ticket[39m[90m                                         [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk close settles everything still open and skips the already-closed[39m[90m                                       [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk is agent-only and constrained to canonical Site access[39m[90m                                                 [39m [90m0.84s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItWorkTransitionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "incident"[39m[90m                 [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "service request"[39m[90m          [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "security request"[39m[90m         [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "problem"[39m[90m                  [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "change"[39m[90m                   [39m [90m0.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "task"[39m[90m                     [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit applies an allowed lifecycle state for every canonical work type with dataset "major incident"[39m[90m           [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects a lifecycle state that is not allowed for the work type[39m[90m                                          [39m [90m0.57s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit requires a waiting party and reason before pausing work[39m[90m                                                  [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit blocks settlement until approvals required tasks and resolution evidence are complete[39m[90m                    [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit authorizes transitions through the canonical Site boundary[39m[90m                                               [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit allows an owning requester reply to resume waiting work without manage permission[39m[90m                        [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit exposes the governed transition through the existing ticket authorization boundary[39m[90m                       [39m [90m0.66s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketAuthzTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma support worker can raise a ticket but the triage fields are ignored[39m[90m                                       [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents can still log-and-triage with an assignee in one step[39m[90m                                                [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester sees only their own tickets in the payload[39m[90m                                                      [39m [90m4.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequesters cannot work the queue or the provisioning routes[39m[90m                                                 [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe ticket policy scopes view, reopen and delete correctly[39m[90m                                                  [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexternal portal personas hold no it.request grant[39m[90m                                                           [39m [90m0.58s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSlaCommandTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe command flags a ticket at risk and tells the assignee exactly once[39m[90m                                      [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma breach notifies the assignee and every it.manage agent exactly once[39m[90m                                       [39m [90m0.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpaused waiting minutes hold the resolution clock back[39m[90m                                                       [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90man unassigned urgent ticket escalates to admins once after 30 minutes[39m[90m                                       [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90munstamped, resolved and met tickets are left alone[39m[90m                                                          [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma growing waiting pause relaxes a breached ticket without re-paging anyone[39m[90m                                  [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma business-hours SLA neither risks nor breaches over a weekend, then fires on the next working day[39m[90m          [39m [90m0.75s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketingSchemaTest[39m
+  [32;1m✓[39;22m[90m [39m[90mtickets carry the full ticketing schema and tolerate null references[39m[90m                                        [39m [90m0.59s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents can move a ticket to waiting through the update route[39m[90m                                                [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe conversation, watcher and link relationships round-trip[39m[90m                                                 [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe polymorphic event trail serves tickets and provisioning requests[39m[90m                                        [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning requests gain priority and due date with safe defaults[39m[90m                                         [39m [90m0.58s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItWorkTaskTest[39m
+  [32;1m✓[39;22m[90m [39m[90magents create ordered required and optional tasks with dependencies and assignments[39m[90m                         [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdependencies and evidence gate completion while optional tasks do not gate resolution[39m[90m                       [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask updates and reopening are governed and recorded on the ticket timeline[39m[90m                                 [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask cancellation is reasoned and settled tickets are immutable[39m[90m                                             [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask routes reject requesters other Site technicians and cross-ticket dependencies[39m[90m                          [39m [90m0.96s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSlaTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcreating a ticket stamps SLA due dates from the default policy[39m[90m                                              [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90murgent tickets get the tight default targets[39m[90m                                                                [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90man application policy row overrides the code defaults[39m[90m                                                       [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma priority change re-targets the clock without restarting it[39m[90m                                                [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe seeder materialises editable default rows and factories stay unstamped[39m[90m                                  [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90man admin can retune the grid and new tickets stamp from it[39m[90m                                                  [39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe SLA editor is admin-only — it.manage alone is not enough[39m[90m                                                [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe grid refuses a resolution target tighter than first response[39m[90m                                            [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma business-hours policy rolls SLA targets onto working time[39m[90m                                                 [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mSLA targets skip a public holiday[39m[90m                                                                           [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe SLA editor writes a business-hours calendar across the whole grid[39m[90m                                       [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe SLA editor clears the calendar back to 24/7 when disabled[39m[90m                                               [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe SLA editor rejects a close time at or before the open time[39m[90m                                              [39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90menabling business hours requires at least one working day[39m[90m                                                   [39m [90m0.85s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItProvisioningTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe /it hub is gated on it permissions[39m[90m                                                                      [39m [90m4.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe IT hub exposes workflow template management only to IT managers[39m[90m                                         [39m [90m4.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgenerating a checklist raises provisioning requests for non-equipment IT tasks[39m[90m                              [39m [90m0.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfulfilling a request records the outcome and completes the linked onboarding task[39m[90m                           [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning lists and direct actions conceal inaccessible Sites[39m[90m                                            [39m [90m2.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtickets can be created and resolved from the helpdesk queue[39m[90m                                                 [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning assign, fulfil and cancel each write an activity event[39m[90m                                         [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90man agent raises a manual provisioning request; requesters cannot[39m[90m                                            [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning cancellation requires a reason before changing canonical work[39m[90m                                  [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90man agent raises a ticket linked to a provisioning request; requesters cannot link[39m[90m                           [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90man agent exports the provisioning queue as CSV; requesters cannot[39m[90m                                           [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe provisioning export respects the status filter[39m[90m                                                          [39m [90m0.64s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketApprovalTest[39m
+  [32;1m✓[39;22m[90m [39m[90man agent can request approval on a ticket that needs it[39m[90m                                                     [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproval cannot be requested twice while one is live[39m[90m                                                        [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma ticket that does not require approval cannot request one[39m[90m                                                  [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester cannot request approval[39m[90m                                                                         [39m [90m0.58s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma different agent can decide a pending approval[39m[90m                                                             [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90man agent cannot approve their own request (separation of duties)[39m[90m                                            [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma decided approval cannot be decided again[39m[90m                                                                  [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe config drives which categories need approval[39m[90m                                                            [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma ticket in an approval category is flagged requires_approval at creation[39m[90m                                   [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90man agent requests approval, notifying the other agents but not themselves[39m[90m                                   [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrepeating an approval request is explained without creating duplicate work[39m[90m                                  [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma manager approves a pending request and the requester is told[39m[90m                                              [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma decided approval cannot be decided again or emit a contradictory event[39m[90m                                    [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrejecting records the verdict and notifies the requester[39m[90m                                                    [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma rejection requires a reason that the requester can act on[39m[90m                                                 [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90man agent cannot approve their own request through the route[39m[90m                                                 [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma ticket needing approval cannot be resolved until it is approved[39m[90m                                           [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma rejected approval still blocks resolution[39m[90m                                                                 [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe update route also refuses to resolve an unapproved ticket[39m[90m                                               [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90man approved ticket still resolves only through the governed resolution journey[39m[90m                              [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma ticket that does not require approval resolves normally[39m[90m                                                   [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe workspace exposes approval state and affordances[39m[90m                                                        [39m [90m7.15s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketMergeTest[39m
+  [32;1m✓[39;22m[90m [39m[90man agent may merge two distinct live tickets[39m[90m                                                                [39m [90m0.59s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester cannot merge tickets[39m[90m                                                                            [39m [90m0.59s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtickets with different requester audiences cannot be merged[39m[90m                                                 [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma ticket cannot be merged into itself[39m[90m                                                                       [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90man already-merged source cannot be merged again[39m[90m                                                             [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma closed target cannot receive a merge[39m[90m                                                                      [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmerging folds the conversation and watchers onto the survivor and closes the source[39m[90m                         [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmerge requires a reason and a repeated merge cannot write duplicate history[39m[90m                                 [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma merged source cannot be reopened[39m[90m                                                                          [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe workspace offers live merge targets to agents but not requesters[39m[90m                                        [39m [90m4.96s[39m  
+
+  [90mTests:[39m    [32;1m149 passed[39;22m[90m (1712 assertions)[39m
+  [90mDuration:[39m [39m476.12s[39m
+

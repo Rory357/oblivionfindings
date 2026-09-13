@@ -23,6 +23,7 @@ final class ItLinkedContextOptions
         private readonly SecurityDevicesAccessService $deviceAccess,
         private readonly UserSiteAccessService $siteAccess,
         private readonly CanonicalDeviceSiteResolver $deviceSites,
+        private readonly ItTicketRoutingEligibility $routingEligibility,
     ) {}
 
     /** @return array<int, array{id: int, name: string}> */
@@ -35,6 +36,35 @@ final class ItLinkedContextOptions
             ->map(fn (User $agent): array => ['id' => $agent->id, 'name' => $agent->name])
             ->values()
             ->all();
+    }
+
+    /** Current assignment choices; historical filters and mentions keep agents(). */
+    public function assignableAgents(User $viewer, ?ItTicket $ticket = null): array
+    {
+        if (! $viewer->canDo('it.manage')) {
+            return [];
+        }
+        $siteIds = $this->workAccess->approvedSiteIds($viewer);
+
+        return ItStaffDirectory::agents()->filter(function (User $candidate) use ($viewer, $ticket, $siteIds): bool {
+            if ($ticket) {
+                return $this->routingEligibility->agent($candidate->id, $ticket) !== null;
+            }
+            foreach ($siteIds as $siteId) {
+                if ($this->routingEligibility->agent($candidate->id, new ItTicket([
+                    'site_id' => $siteId, 'is_organisation_wide' => false,
+                ]))) {
+                    return true;
+                }
+            }
+
+            return $viewer->canDo('it.organisationWide') && $this->routingEligibility->agent($candidate->id,
+                new ItTicket(['site_id' => null, 'is_organisation_wide' => true])) !== null;
+        })->sortBy('name')->map(fn (User $candidate): array => [
+            'id' => $candidate->id, 'name' => $candidate->name,
+            'site_ids' => $this->workAccess->approvedSiteIds($candidate),
+            'organisation_wide' => $candidate->canDo('it.organisationWide'),
+        ])->values()->all();
     }
 
     /** @return array<int, array{id: int, name: string}> */

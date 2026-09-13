@@ -4,6 +4,11 @@
  * provisioning panels. A range picker drives the from/to params; skeletons
  * while loading; a taught empty state for a young service. Colours are design
  * tokens only (no raw hex). */
+import {
+    SlaWatchdogNote,
+    type SlaSummary,
+    type SlaWatchdog,
+} from '@/components/it/sla-evidence';
 import { Button } from '@/components/ui/button';
 import axios from 'axios';
 import {
@@ -64,6 +69,9 @@ interface ReportData {
         sla_compliance: number | null;
         sla_met: number;
         sla_measured: number;
+        sla_open?: SlaSummary;
+        sla_resolved?: SlaSummary;
+        sla_watchdog?: SlaWatchdog | null;
         csat_avg: number | null;
         csat_response_rate: number | null;
     };
@@ -173,10 +181,42 @@ const TOOLTIP_STYLE = {
     fontSize: 12,
 } as const;
 
+interface ReportRequestError {
+    kind: 'session' | 'access' | 'request';
+    message: string;
+}
+
+function reportRequestError(cause: unknown): ReportRequestError {
+    const status = axios.isAxiosError(cause)
+        ? cause.response?.status
+        : undefined;
+    if (status === 401 || status === 419) {
+        return {
+            kind: 'session',
+            message:
+                'Your session has expired. Sign in again in a new tab, then return here and try again.',
+        };
+    }
+    if (status === 403) {
+        return {
+            kind: 'access',
+            message:
+                'Your access to reports has changed. Results have been cleared. Check your access with an administrator, then try again.',
+        };
+    }
+    return {
+        kind: 'request',
+        message:
+            status !== undefined
+                ? 'Reports could not be loaded. Try again shortly.'
+                : 'Reports could not be loaded. Check your connection and try again.',
+    };
+}
+
 export function ItReports({ days = 30 }: { days?: number }) {
     const [data, setData] = useState<ReportData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<ReportRequestError | null>(null);
     const [reloadVersion, setReloadVersion] = useState(0);
     const requestId = useRef(0);
 
@@ -207,7 +247,7 @@ export function ItReports({ days = 30 }: { days?: number }) {
 
                 setData(response.data);
             })
-            .catch(() => {
+            .catch((cause: unknown) => {
                 if (
                     controller.signal.aborted ||
                     activeRequest !== requestId.current
@@ -215,9 +255,7 @@ export function ItReports({ days = 30 }: { days?: number }) {
                     return;
                 }
 
-                setError(
-                    'Reports could not be loaded. Check your connection and try again.',
-                );
+                setError(reportRequestError(cause));
             })
             .finally(() => {
                 if (
@@ -281,9 +319,11 @@ export function ItReports({ days = 30 }: { days?: number }) {
                 <BarChart3 className="h-4 w-4 text-muted-foreground" />
                 <p className="text-[12.5px] text-muted-foreground">
                     Helpdesk analytics —{' '}
-                    {data
-                        ? `${shortDate(data.range.from)} → ${shortDate(data.range.to)}`
-                        : 'loading…'}
+                    {loading
+                        ? 'loading…'
+                        : error || !data
+                          ? 'unavailable'
+                          : `${shortDate(data.range.from)} → ${shortDate(data.range.to)}`}
                 </p>
                 {/* The range lives in the header filter row (PAGE_HEADER_STYLE_GUIDE.md §6). */}
                 <div className="ml-auto flex items-center gap-2">
@@ -302,6 +342,9 @@ export function ItReports({ days = 30 }: { days?: number }) {
                 </div>
             </div>
 
+            {!loading && !error && k ? (
+                <SlaWatchdogNote watchdog={k.sla_watchdog} />
+            ) : null}
             {loading ? (
                 <div className="flex flex-col gap-4">
                     <p
@@ -340,19 +383,34 @@ export function ItReports({ days = 30 }: { days?: number }) {
                                 Reports are unavailable
                             </h3>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                {error}
+                                {error.message}
                             </p>
                         </div>
                     </div>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                            setReloadVersion((version) => version + 1)
-                        }
-                    >
-                        Try again
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        {error.kind === 'session' && (
+                            <Button asChild size="sm" variant="outline">
+                                <a
+                                    href="/login"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    Sign in again
+                                </a>
+                            </Button>
+                        )}
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                                setReloadVersion((version) => version + 1)
+                            }
+                        >
+                            {error.kind === 'access'
+                                ? 'Check access again'
+                                : 'Try again'}
+                        </Button>
+                    </div>
                 </div>
             ) : !hasAnything ? (
                 <div className="flex flex-col items-center rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
@@ -370,6 +428,16 @@ export function ItReports({ days = 30 }: { days?: number }) {
                 data &&
                 k && (
                     <>
+                        <p className="text-xs text-muted-foreground">
+                            Open tickets: {k.sla_open?.by_coverage.full ?? '—'}{' '}
+                            fully measured ·{' '}
+                            {k.sla_open?.by_coverage.partial ?? '—'} partly
+                            measured · {k.sla_open?.by_coverage.none ?? '—'}{' '}
+                            with no measured clocks. SLA compliance includes
+                            only resolved tickets with both clocks measured;{' '}
+                            {k.resolved - k.sla_measured} excluded in this
+                            period.
+                        </p>
                         {/* KPI row */}
                         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                             <Stat
@@ -406,8 +474,8 @@ export function ItReports({ days = 30 }: { days?: number }) {
                                 value={pct(k.sla_compliance)}
                                 sub={
                                     k.sla_measured > 0
-                                        ? `${k.sla_met} of ${k.sla_measured} within SLA`
-                                        : `${k.resolved} resolved`
+                                        ? `${k.sla_met} of ${k.sla_measured} fully measured within SLA`
+                                        : `${k.resolved} resolved · none fully measured`
                                 }
                                 tone={
                                     k.sla_compliance === null

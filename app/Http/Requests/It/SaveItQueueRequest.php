@@ -2,15 +2,18 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\BindsItBrowserActor;
 use App\Models\ItTicket;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class SaveItQueueRequest extends FormRequest
 {
+    use BindsItBrowserActor;
+
     public function authorize(): bool
     {
-        return (bool) $this->user()?->canDo('it.manage');
+        return (bool) $this->user()?->canDo('it.manage') && $this->hasCurrentBrowserActor();
     }
 
     public function rules(): array
@@ -19,9 +22,13 @@ class SaveItQueueRequest extends FormRequest
         $required = $queue ? ['sometimes', 'required'] : ['required'];
 
         return [
+            ...$this->browserActorRules(),
+            'actor_user_id' => ['required_with:request_uuid', 'integer', 'min:1'],
+            'request_uuid' => ['sometimes', 'required', 'uuid', ...($queue ? ['prohibited'] : [])],
+            'configuration_version' => [...($queue ? ['required'] : ['sometimes', 'nullable']), 'string', 'regex:/^[a-f0-9]{64}$/'],
             'key' => [
                 ...$required, 'string', 'max:100', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
-                Rule::unique('it_queues', 'key')->ignore($queue?->id),
+                ...($this->filled('request_uuid') ? [] : [Rule::unique('it_queues', 'key')->ignore($queue?->id)]),
             ],
             'name' => [...$required, 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
@@ -42,6 +49,7 @@ class SaveItQueueRequest extends FormRequest
                 'nullable', 'integer',
                 Rule::exists('users', 'id'),
             ],
+            'cover_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'is_active' => [...($queue ? ['sometimes'] : ['required']), 'boolean'],
         ];
     }

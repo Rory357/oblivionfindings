@@ -1,0 +1,67 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_3419801843dd4cbb",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItNotificationAccessTest[39m
+  [32;1m✓[39;22m[90m [39m[90mIT dispatch refuses an already revoked recipient even with a stale loaded user[39m[90m                            [39m [90m229.30s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued IT channels recheck current record access at execution with ('approval')[39m[90m                             [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued IT channels recheck current record access at execution with ('site')[39m[90m                                 [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued IT channels recheck current record access at execution with ('permission')[39m[90m                           [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued IT channels recheck current record access at execution with ('team')[39m[90m                                 [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued IT channels recheck current record access at execution with ('sensitivity')[39m[90m                          [39m [90m0.13s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mpermitted participant and assigned technician still receive both IT channels with ('participant')[39m[90m           [39m [90m0.12s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mpermitted participant and assigned technician still receive both IT channels with ('assignment')[39m[90m            [39m [90m0.13s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItNotificationAccessTest[22m [90m>[39m permitted participant and assigned technician still receive b…   
+[39;1m  Failed asserting that actual size 0 matches expected size 1.[39;22m
+
+  at [32mtests\Feature\It\ItNotificationAccessTest.php[39m:[32m105[39m
+    101▕         $job->handle(app(ChannelManager::class));
+    102▕     }
+    103▕ 
+    104▕     expect($recipient->notifications()->count())->toBe(1)
+  ➜ 105▕         ->and(Mail::mailer('array')->getSymfonyTransport()->messages())->toHaveCount(1)
+    106▕         ->and(ItEmailDelivery::query()->sole()->status)->toBe('accepted');
+    107▕ })->with(['participant', 'assignment']);
+    108▕
+
+  [33m1   [39m[39;1mtests\Feature\It\ItNotificationAccessTest.php[39;22m:[39;1m105[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItNotificationAccessTest[22m [90m>[39m permitted participant and assigned technician still receive b…   
+[39;1m  Failed asserting that actual size 0 matches expected size 1.[39;22m
+
+  at [32mtests\Feature\It\ItNotificationAccessTest.php[39m:[32m105[39m
+    101▕         $job->handle(app(ChannelManager::class));
+    102▕     }
+    103▕ 
+    104▕     expect($recipient->notifications()->count())->toBe(1)
+  ➜ 105▕         ->and(Mail::mailer('array')->getSymfonyTransport()->messages())->toHaveCount(1)
+    106▕         ->and(ItEmailDelivery::query()->sole()->status)->toBe('accepted');
+    107▕ })->with(['participant', 'assignment']);
+    108▕
+
+  [33m1   [39m[39;1mtests\Feature\It\ItNotificationAccessTest.php[39;22m:[39;1m105[39;22m
+
+
+  [90mTests:[39m    [31;1m2 failed[39;22m[90m,[39m[39m [39m[32;1m6 passed[39;22m[90m (32 assertions)[39m
+  [90mDuration:[39m [39m230.54s[39m
+

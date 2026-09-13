@@ -1,0 +1,118 @@
+{
+  "recorded_at": "2026-09-10T23:37:37.6832317Z",
+  "backend_run": "it_3bcfaec61dec4434",
+  "backend_tests": 135,
+  "backend_assertions": 905,
+  "ui_tests": 19,
+  "browser_verified": false,
+  "sources": [
+    {
+      "path": "app/Services/EmailConfiguration.php",
+      "sha256": "7ff4e65ee11a07be68bf517a60a25895d49f81d85e5c19de9393220336a29b4c"
+    },
+    {
+      "path": "app/Domain/It/Services/ItOutboundMailer.php",
+      "sha256": "28534ea8ca5b405c7e20da5667ad9baa158a01940be83e73b1ad8dd170cfedb5"
+    },
+    {
+      "path": "app/Domain/It/Services/ItEmailDeliveryService.php",
+      "sha256": "c28ac2f894b5291587a6bad4c60479100cb4ae107f82aa106aea69c2731df0cc"
+    },
+    {
+      "path": "app/Notifications/Channels/ItMailChannel.php",
+      "sha256": "84c65a7ea4bfc8f806b1b1835c21c62f584a8e0c1eba9407fb12db5314ecfefe"
+    },
+    {
+      "path": "app/Notifications/It/EmailConfigurationTestNotification.php",
+      "sha256": "ee374efbe7b8bd0f22f3ee2d9599ba8fce5c5415d95f6f9d2c10b249d8ebdd7e"
+    },
+    {
+      "path": "app/Notifications/It/TicketRepliedNotification.php",
+      "sha256": "edd7af728f4033bbae94149c408e87512b74ca7ff471e8a06a946af654a5c875"
+    },
+    {
+      "path": "app/Listeners/It/RecordItEmailDelivery.php",
+      "sha256": "43143d87d200178869e2882a440b62d598b2e0d562eee482bf6103349db71263"
+    },
+    {
+      "path": "app/Mail/MailNotSubmitted.php",
+      "sha256": "978842eff8accc007aa956ec7b75203b54a6bc3b708428811aaa2cd799561f12"
+    },
+    {
+      "path": "app/Mail/MailSubmissionRejected.php",
+      "sha256": "175b09844d79604020183f8a13b23786797cc85bdfe6689a9ffd2e27575b6342"
+    },
+    {
+      "path": "app/Mail/SupportMailboxSender.php",
+      "sha256": "60b406b5ad2b9d5c6fdb92d892ecef561b6f809b7550ea4cafdd064230f8052a"
+    },
+    {
+      "path": "app/Mail/ApiMailMessage.php",
+      "sha256": "abb951db793a89285985ead6c851e78af8c229625ebf4c258b6bea5ce3e436a7"
+    },
+    {
+      "path": "app/Mail/GoogleGmailTransport.php",
+      "sha256": "b5308ebae15543f149dc0ac71e8415599962a638c71e4837337f1e3ea97eb243"
+    },
+    {
+      "path": "app/Mail/MicrosoftGraphTransport.php",
+      "sha256": "50addf498277df64c7bb060b0ba1612d6cfa3dbb90427f52cb1d6c48b6460307"
+    },
+    {
+      "path": "app/Http/Controllers/Settings/EmailSettingsController.php",
+      "sha256": "ffee585e9088a39c13a39064df8f785d71f0c784edb3df2b08bcf989c368647b"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+      "sha256": "bd8d7d346d42cd83289d5ed6197a46b540133593b97a3541585cb5d01a60ae52"
+    },
+    {
+      "path": "app/Jobs/DispatchItTicketNotifications.php",
+      "sha256": "c6fcc5058629a1453c3096be269bc648e1aed77b4226c8955e7fe8e17b225f4c"
+    },
+    {
+      "path": "app/Providers/AppServiceProvider.php",
+      "sha256": "8ead4f6774d2962a81de26846fe15d2b9c3b928edb1d7a7fedab53e1bf2027a8"
+    },
+    {
+      "path": "routes/settings.php",
+      "sha256": "748f771b9c38db8948267d8412e56b377361fd53c728f8a04a046fe09a86087d"
+    },
+    {
+      "path": "resources/js/pages/settings/email-settings.tsx",
+      "sha256": "2b6f6d72d77b3f8a4516493aae41a53ad4088742a88be024c31fdf012b911567"
+    },
+    {
+      "path": "resources/js/components/settings/email-configuration-dialog.tsx",
+      "sha256": "8e12560fb666af4188a04a3f22bcb77c51951d54a8d88185bdf60202e1695768"
+    },
+    {
+      "path": "resources/js/components/settings/email-configuration-contract.ts",
+      "sha256": "b5c335420faf0cd696b35a7da92bc34ba5658adfdffd937512637b1fe69bf250"
+    },
+    {
+      "path": "resources/js/pages/settings/email-settings.test.tsx",
+      "sha256": "5006302645d99a1ff9892837c03a0c89b07fd14bbb9db0e616090ee4e89e7836"
+    },
+    {
+      "path": "resources/js/components/settings/email-configuration-dialog.test.tsx",
+      "sha256": "5279872c05741f7db5970a02279468ef9bdb0f5f85446e263df4da662637afe4"
+    },
+    {
+      "path": "resources/js/components/settings/email-configuration-contract.test.ts",
+      "sha256": "4d11fec397cca7d2c44d2bdbb8e6efea5a93b20622525661abf49c1cbde24216"
+    },
+    {
+      "path": "resources/js/components/page/page-header-rail.test.tsx",
+      "sha256": "037e2e0a799d4e64c47920d7c0a69ddbaceb35c8d5eb64d29aaba8a8e3b9711a"
+    },
+    {
+      "path": "tests/Feature/It/ItEmailConfigurationTest.php",
+      "sha256": "590af4026ab1785bb741b92691c7f0cb1fc1fd7732b685382ee1f5d8ea58a4d7"
+    },
+    {
+      "path": "tests/Feature/It/ItTicketNotificationOutboxTest.php",
+      "sha256": "34b433d2fd6429d0c9bbad3dbf2d2c825aaeb1ab0b77efd8fe4de028e66ed3c2"
+    }
+  ]
+}

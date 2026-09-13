@@ -31,14 +31,10 @@ class SiteVendorController extends Controller
         $canSiteWrite = (bool) ($user?->canDo('sites.viewAny') ?? false);
 
         $allowedSiteTypes = $this->allowedSiteTypes($request);
-        // Per-user site-assignment scoping — mirrors the per-site endpoints'
-        // SitePolicy::view (canAccessAssignedSite) and SiteCalendarController::global.
-        // [] means unrestricted (admins / no assignment), matching the service.
-        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
-        $scopeBySite = fn ($q, string $column = 'site_id') => $q->when(
-            $accessibleSiteIds !== [],
-            fn ($q) => $q->whereIn($column, $accessibleSiteIds),
-        );
+        // Match SitePolicy's explicit exception. No current approved Sites
+        // means no records; an empty assignment never grants global access.
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user, ['sites.viewAll']);
+        $scopeBySite = fn ($q, string $column = 'site_id') => $q->whereIn($column, $accessibleSiteIds);
 
         // Vendor data — only loaded and serialised when the user can see it.
         $vendors = $canVendors
@@ -143,6 +139,7 @@ class SiteVendorController extends Controller
                 'vendorsManage' => $canSiteWrite && (bool) ($user?->canDo('vendors.manage') ?? false),
                 'credentialsManage' => $canSiteWrite && (bool) ($user?->canDo('credentials.manage') ?? false),
                 'credentialsReveal' => $canSiteWrite && (bool) ($user?->canDo('credentials.reveal') ?? false),
+                'credentialsAudit' => (bool) ($user?->canDo('credentials.audit') ?? false),
                 // Type catalogue is application-wide configuration.
                 'manageCredentialTypes' => (bool) ($user?->canDo('credentials.manage') ?? false),
             ],
@@ -178,21 +175,21 @@ class SiteVendorController extends Controller
     /**
      * Cross-site reveal & audit log feed for the Vendors & Credentials page.
      * Scoped to the credentials the viewer is allowed to see; gated on
-     * credentials.reveal so metadata-only viewers never reach the trail.
+     * credentials.audit so audit access never implies secret disclosure.
      */
     public function globalAudit(Request $request, UserSiteAccessService $siteAccess)
     {
         $user = $request->user();
-        abort_unless((bool) ($user?->canDo('credentials.reveal') ?? false), 403);
+        abort_unless((bool) ($user?->canDo('credentials.audit') ?? false), 403);
 
         $allowedSiteTypes = $this->allowedSiteTypes($request);
-        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user, ['sites.viewAll']);
 
         $logs = SiteCredentialAuditLog::query()
             ->with(['user:id,name', 'site:id,name,type', 'credential:id,label,credential_type,site_id'])
             ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
             // Per-user assignment scoping, matching globalIndex / the per-site flow.
-            ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('site_id', $accessibleSiteIds))
+            ->whereIn('site_id', $accessibleSiteIds)
             ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
             // Routine page-load views are not a "reveal/copy/rotation/change" —
             // excluding them keeps high-signal security events from being

@@ -1,0 +1,105 @@
+{
+    "token": "ba36125e97ac40d8",
+    "phase": "observe",
+    "database_mutations": false,
+    "synthetic_inbox_changed": false,
+    "tickets": [
+        {
+            "id": 1,
+            "reference": "IT-000001",
+            "merged_into_ticket_id": null,
+            "status": "open",
+            "lock_version": 1
+        },
+        {
+            "id": 7,
+            "reference": "IT-000007",
+            "merged_into_ticket_id": null,
+            "status": "open",
+            "lock_version": 3
+        }
+    ],
+    "receipts": [
+        {
+            "id": 1,
+            "it_mailbox_connection_id": 1,
+            "it_ticket_id": 7,
+            "status": "processed",
+            "quarantine_reason": null,
+            "acknowledged_at": "2026-09-11 09:15:02",
+            "acknowledgement_attempts": 1
+        },
+        {
+            "id": 2,
+            "it_mailbox_connection_id": 2,
+            "it_ticket_id": 7,
+            "status": "processed",
+            "quarantine_reason": null,
+            "acknowledged_at": "2026-09-11 09:15:16",
+            "acknowledgement_attempts": 1
+        }
+    ],
+    "connections": [
+        {
+            "id": 1,
+            "provider": "microsoft"
+        },
+        {
+            "id": 2,
+            "provider": "google"
+        }
+    ],
+    "ticket_count": 7,
+    "email_comment_commands": 2,
+    "comment_audits": 2,
+    "merge_events": [],
+    "synthetic_comments": [
+        {
+            "id": 1,
+            "ticket_id": 7,
+            "author_user_id": 1,
+            "source_channel": "email",
+            "is_internal": 0,
+            "body": "W11 microsoft before merge reply."
+        },
+        {
+            "id": 2,
+            "ticket_id": 7,
+            "author_user_id": 1,
+            "source_channel": "email",
+            "is_internal": 0,
+            "body": "W11 google before merge reply."
+        }
+    ],
+    "provider_state": {
+        "token": "ba36125e97ac40d8",
+        "synthetic_only": true,
+        "unread": {
+            "microsoft": [],
+            "google": []
+        },
+        "ack_attempts": {
+            "microsoft": {
+                "44": 1
+            },
+            "google": {
+                "44": 1
+            }
+        },
+        "reads": {
+            "microsoft": {
+                "44": 1
+            },
+            "google": {
+                "44": 1
+            }
+        },
+        "external_body_reads": 0,
+        "merge_scenario": {
+            "phase": "before_merge",
+            "source_id": 7,
+            "target_id": 1,
+            "source_reference": "IT-000007"
+        }
+    }
+}

@@ -1,0 +1,256 @@
+{
+    "ready": true,
+    "created_at": "2026-09-11T06:40:26+00:00",
+    "database": "oblivion_it_draft_browser_cfd6ea2642044b1a",
+    "registry_count": 1016,
+    "fixtures": {
+        "sites": {
+            "a": 1,
+            "b": 2,
+            "c": 3
+        },
+        "actors": {
+            "requester": {
+                "id": 1,
+                "login": "w06-requester@demo.test"
+            },
+            "other": {
+                "id": 2,
+                "login": "w06-other@demo.test"
+            },
+            "tech": {
+                "id": 3,
+                "login": "w06-tech@demo.test"
+            },
+            "restricted": {
+                "id": 4,
+                "login": "w06-restricted@demo.test"
+            },
+            "cover": {
+                "id": 5,
+                "login": "w06-cover@demo.test"
+            },
+            "absent": {
+                "id": 6,
+                "login": "w06-absent@demo.test"
+            },
+            "settings": {
+                "id": 7,
+                "login": "w06-settings@demo.test"
+            },
+            "settings_viewer": {
+                "id": 8,
+                "login": "w06-settings_viewer@demo.test"
+            },
+            "audit": {
+                "id": 9,
+                "login": "w06-audit@demo.test"
+            }
+        },
+        "permissions": {
+            "requester": [
+                "it.request"
+            ],
+            "other": [
+                "it.request"
+            ],
+            "tech": [
+                "it.request",
+                "it.view",
+                "it.manage",
+                "it.viewSensitive"
+            ],
+            "restricted": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ],
+            "cover": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ],
+            "absent": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ],
+            "settings": [
+                "it.request",
+                "settings.access.manage"
+            ],
+            "settings_viewer": [
+                "it.request",
+                "settings.access.manage"
+            ],
+            "audit": [
+                "it.request",
+                "it.view",
+                "it.manage",
+                "audit.viewAny"
+            ]
+        },
+        "tickets": {
+            "public_workspace": {
+                "id": 1,
+                "reference": "IT-000001"
+            },
+            "sensitive_participant": {
+                "id": 2,
+                "reference": "IT-000002"
+            },
+            "unapproved_site": {
+                "id": 3,
+                "reference": "IT-000003"
+            },
+            "resolve_workspace": {
+                "id": 4,
+                "reference": "IT-000004"
+            },
+            "approval_workspace": {
+                "id": 5,
+                "reference": "IT-000005"
+            },
+            "approval_history": {
+                "id": 6,
+                "reference": "IT-000006"
+            },
+            "duplicate_workspace": {
+                "id": 7,
+                "reference": "IT-000007"
+            }
+        },
+        "approval_history_ids": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+        ],
+        "synthetic_approved_leave_id": 1,
+        "retention_is_synthetic_only": true
+    },
+    "drafts_enabled": true,
+    "synthetic_retention_days": [
+        2,
+        3
+    ],
+    "provider_configuration_checks": {
+        "mailboxes_absent": true,
+        "app_settings_absent": true,
+        "service_providers_cleared": true
+    },
+    "api_fixtures": {
+        "ticket_id": 8,
+        "comment_id": 1,
+        "requester_actor": "cover",
+        "technician_actor": "tech",
+        "create": {
+            "status": 201,
+            "id": 8,
+            "lock_version": 3,
+            "replay": false
+        },
+        "create_replay": {
+            "status": 201,
+            "id": 8,
+            "lock_version": 3,
+            "replay": true
+        },
+        "comment": {
+            "status": 201,
+            "id": 1,
+            "lock_version": null,
+            "replay": false
+        },
+        "comment_replay": {
+            "status": 201,
+            "id": 1,
+            "lock_version": null,
+            "replay": true
+        },
+        "foundation_counts": {
+            "tickets": 1,
+            "comments": 1,
+            "api_receipts": 2,
+            "canonical_receipts": 2,
+            "deliveries": 2
+        },
+        "mutation_counts": {
+            "api_receipts": 7,
+            "canonical_receipts": 5
+        },
+        "diagnostics": {
+            "recorded_validation_failures": 26,
+            "retained_rollback_failures": 1,
+            "recovered_attempts": 2,
+            "recovery_replayed": true,
+            "synthetic_legacy_pending": 1,
+            "synthetic_legacy_delivery": 1
+        },
+        "mutations": {
+            "target_ticket_id": 9,
+            "read": {
+                "status": 200,
+                "id": 8,
+                "lock_version": 5,
+                "replay": false
+            },
+            "update": {
+                "status": 200,
+                "id": 8,
+                "lock_version": 7,
+                "replay": false
+            },
+            "update_replay": {
+                "status": 200,
+                "id": 8,
+                "lock_version": 7,
+                "replay": true
+            },
+            "link": {
+                "status": 200,
+                "id": 8,
+                "lock_version": 8,
+                "replay": false
+            },
+            "link_replay": {
+                "status": 200,
+                "id": 8,
+                "lock_version": 8,
+                "replay": true
+            },
+            "transition": {
+                "status": 200,
+                "id": 8,
+                "lock_version": 9,
+                "replay": false
+            },
+            "transition_replay": {
+                "status": 200,
+                "id": 8,
+                "lock_version": 9,
+                "replay": true
+            }
+        },
+        "source": "system",
+        "next_response_party": "requester",
+        "first_response_recorded": true
+    }
+}
+{
+  "started": true,
+  "token": "cfd6ea2642044b1a",
+  "database": "oblivion_it_draft_browser_cfd6ea2642044b1a",
+  "pid": 41224,
+  "url": "http://127.0.0.1:8766",
+  "root": "C:\\Users\\steph\\Herd\\oblivionfindings\\storage\\framework\\testing\\it-draft-browser-cfd6ea2642044b1a",
+  "browser_verified": false
+}

@@ -1,0 +1,86 @@
+{
+    "mode": "apply",
+    "fingerprint": "93ef2c9d235a3b48665cda74d717c523edc04e43090ef923f292b9b71c0e84fc",
+    "before": [
+        {
+            "schema": "oblivion_it_support_test_it_1c92ebd123104476",
+            "exists": true,
+            "table_count": 837,
+            "active_connections": 0
+        },
+        {
+            "schema": "oblivion_it_support_test_it_6c31f2135fad49cc",
+            "exists": true,
+            "table_count": 837,
+            "active_connections": 0
+        },
+        {
+            "schema": "oblivion_it_support_test_it_1e0980617e1440c7",
+            "exists": true,
+            "table_count": 837,
+            "active_connections": 0
+        },
+        {
+            "schema": "oblivion_it_support_test_it_f545a50617604042",
+            "exists": true,
+            "table_count": 837,
+            "active_connections": 0
+        },
+        {
+            "schema": "oblivion_it_support_test_it_1cce77999e634ab3",
+            "exists": true,
+            "table_count": 837,
+            "active_connections": 0
+        },
+        {
+            "schema": "oblivion_it_support_test_it_0a4c4293ec6f47f3",
+            "exists": false,
+            "table_count": 0,
+            "active_connections": 0
+        }
+    ],
+    "database_mutations_performed": false
+}
+{
+    "mode": "postflight",
+    "after": [
+        {
+            "schema": "oblivion_it_support_test_it_1c92ebd123104476",
+            "exists": false,
+            "table_count": 0,
+            "active_connections": 0
+        },
+        {
+            "schema": "oblivion_it_support_test_it_6c31f2135fad49cc",
+            "exists": false,
+            "table_count": 0,
+            "active_connections": 0
+        },
+        {
+            "schema": "oblivion_it_support_test_it_1e0980617e1440c7",
+            "exists": false,
+            "table_count": 0,
+            "active_connections": 0
+        },
+        {
+            "schema": "oblivion_it_support_test_it_f545a50617604042",
+            "exists": false,
+            "table_count": 0,
+            "active_connections": 0
+        },
+        {
+            "schema": "oblivion_it_support_test_it_1cce77999e634ab3",
+            "exists": false,
+            "table_count": 0,
+            "active_connections": 0
+        },
+        {
+            "schema": "oblivion_it_support_test_it_0a4c4293ec6f47f3",
+            "exists": false,
+            "table_count": 0,
+            "active_connections": 0
+        }
+    ],
+    "database_mutations_performed": true,
+    "all_exact_schemas_absent": true
+}

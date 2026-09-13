@@ -517,7 +517,7 @@ test('identity setup rejects Sites and exceptional abilities unavailable to the 
     apiBoundaryAssignSite($this->actor, $allowedSite);
 
     $this->actingAs($this->actor)
-        ->post('/it/setup/api-identities', [
+        ->postJson('/it/setup/api-identities', [
             'name' => 'Over-broad connector',
             'actor_user_id' => $this->actor->id,
             'abilities' => ['work:create', 'work:read', 'work:sensitive', 'work:organisation-wide'],
@@ -527,8 +527,11 @@ test('identity setup rejects Sites and exceptional abilities unavailable to the 
             'read_fields' => [],
             'require_signature' => true,
             'rate_limit_per_minute' => 30,
+            'request_uuid' => (string) str()->uuid(),
+            'viewer_user_id' => $this->actor->id,
         ])
-        ->assertSessionHasErrors(['allowed_site_ids.0', 'abilities']);
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['allowed_site_ids.0', 'abilities']);
 
     expect(ItServiceIdentity::query()->count())->toBe(0);
 });
@@ -550,11 +553,14 @@ test('identity setup cannot borrow another execution accounts wider Sites or exc
         'read_fields' => [],
         'require_signature' => true,
         'rate_limit_per_minute' => 30,
+        'request_uuid' => (string) str()->uuid(),
+        'viewer_user_id' => $this->actor->id,
     ];
 
     $this->actingAs($this->actor)
-        ->post('/it/setup/api-identities', $payload)
-        ->assertSessionHasErrors(['allowed_site_ids.0', 'abilities']);
+        ->postJson('/it/setup/api-identities', $payload)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['allowed_site_ids.0', 'abilities']);
 
     expect(fn () => app(ItServiceIdentityCredentialService::class)->create($this->actor, [
         ...$payload,
@@ -568,12 +574,16 @@ test('identity setup cannot borrow another execution accounts wider Sites or exc
         'allowed_site_ids' => [$executionSite->id],
     ]);
     $this->actingAs($this->actor)
-        ->post(route('it.setup.api-identities.revoke', $otherCredential['identity']))
+        ->postJson(route('it.setup.api-identities.revoke', $otherCredential['identity']), [
+            'request_uuid' => (string) str()->uuid(),
+            'viewer_user_id' => $this->actor->id,
+            'expected_version' => $otherCredential['identity']->configuration_version,
+        ])
         ->assertNotFound();
     expect($otherCredential['identity']->fresh()->revoked_at)->toBeNull();
 });
 
-test('create recording retains its authorization subject when authority changes before response recording', function () {
+test('create recording rolls back its subject when authority changes before response recording', function () {
     $site = Site::factory()->create();
     $otherSite = Site::factory()->create();
     apiBoundaryAssignSite($this->actor, $site);
@@ -598,8 +608,11 @@ test('create recording retains its authorization subject when authority changes 
         ->assertJsonMissingPath('data.id');
 
     $record = ItApiRequest::query()->where('idempotency_key', $key)->sole();
-    expect($record->ticket_id)->toBeInt()
-        ->and($record->response_body)->not->toHaveKey('data');
+    expect($record->ticket_id)->toBeNull()
+        ->and($record->execution_state)->toBe('rolled_back')
+        ->and($record->response_body)->not->toHaveKey('data')
+        ->and(ItTicket::query()->where('title', $payload['title'])->exists())->toBeFalse()
+        ->and($actor->hrEmployeeProfile()->first()->primary_site_id)->toBe($site->id);
 
     $this->withHeaders(apiBoundaryHeaders($credential['token'], $key))
         ->postJson('/api/v1/it/work-items', $payload)

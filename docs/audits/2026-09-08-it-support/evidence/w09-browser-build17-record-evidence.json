@@ -1,0 +1,308 @@
+{
+    "observed_at": "2026-09-09T23:10:24+00:00",
+    "token": "26a0705b30b848af",
+    "database": "oblivion_it_draft_browser_26a0705b30b848af",
+    "time_context": {
+        "elapsed_ms": 0.12,
+        "rows": [
+            {
+                "session_time_zone": "SYSTEM",
+                "system_time_zone": "New Zealand Standard Time"
+            }
+        ]
+    },
+    "tickets": {
+        "elapsed_ms": 0.29,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 1,
+                "status": "open"
+            },
+            {
+                "id": 4,
+                "lock_version": 9,
+                "status": "closed"
+            }
+        ]
+    },
+    "tasks": {
+        "elapsed_ms": 0.31,
+        "rows": [
+            {
+                "id": 1,
+                "ticket_id": 4,
+                "team_id": null,
+                "assigned_to_user_id": 3,
+                "status": "completed",
+                "is_required": 1,
+                "evidence_required": 1,
+                "due_at": null,
+                "due_at_epoch": null,
+                "sort_order": 10,
+                "completed_by_user_id": 3,
+                "completed_at": "2026-09-10 11:05:27",
+                "completed_at_epoch": 1788995127,
+                "title_sha256": "5fe857c400aebec83bcc0f9e50ad66fe56065978c99addf182b05415136a3015",
+                "description_sha256": "87cdda1f5473bddc5cfb5f82e68dccaccfada4081bf381bacc94bcd170bbd0da",
+                "completion_note_sha256": "8c6151dcd1595b85341d849aa868eaede3fe604f2b31a7fe50306e8cd5d9ffff",
+                "evidence_sha256": "3425a46ff2bc6e928a2dc1c7cf51025cdea71c57d7662da15c257d78381f5caa",
+                "evidence_count": 1
+            }
+        ]
+    },
+    "dependencies": {
+        "elapsed_ms": 0.19,
+        "rows": []
+    },
+    "receipts": {
+        "elapsed_ms": 0.37,
+        "rows": [
+            {
+                "id": 1,
+                "actor_user_id": 3,
+                "operation": "task.create",
+                "request_uuid": "7edbaaab-3ccc-404e-8de0-f015a216c32a",
+                "it_ticket_id": 4,
+                "committed_ticket_version": 2,
+                "committed_at": "2026-09-10 10:58:54",
+                "result_state": "committed",
+                "task_id": "1"
+            },
+            {
+                "id": 2,
+                "actor_user_id": 3,
+                "operation": "task.complete",
+                "request_uuid": "82638f42-d107-4021-a1d4-ecefbfcf0767",
+                "it_ticket_id": 4,
+                "committed_ticket_version": 3,
+                "committed_at": "2026-09-10 11:05:27",
+                "result_state": "committed",
+                "task_id": "1"
+            }
+        ]
+    },
+    "events": {
+        "elapsed_ms": 0.29,
+        "rows": [
+            {
+                "id": 1,
+                "subject_id": 4,
+                "actor_user_id": 3,
+                "type": "work_task_created",
+                "created_at": "2026-09-09 22:58:54",
+                "task_id": "1",
+                "payload_sha256": "0e4c82081ce0e4c5565473b62c065767f12e1f90dd6a7604c66eee6ac73ebc5b"
+            },
+            {
+                "id": 2,
+                "subject_id": 4,
+                "actor_user_id": 3,
+                "type": "work_task_completed",
+                "created_at": "2026-09-09 23:05:27",
+                "task_id": "1",
+                "payload_sha256": "b4e689c85db30826c116e303392237140ca48cf6df5973e2491848526368f879"
+            }
+        ]
+    },
+    "audits": {
+        "elapsed_ms": 0.48,
+        "rows": [
+            {
+                "id": 21,
+                "user_id": 3,
+                "auditable_id": 4,
+                "action": "it.ticket.task.created",
+                "created_at": "2026-09-10 10:58:54",
+                "meta_sha256": "15c49473759247154f8dd4f0f091a338e0ba2a189d4477ee3dfa3b28e69e64d4"
+            },
+            {
+                "id": 26,
+                "user_id": 3,
+                "auditable_id": 4,
+                "action": "it.ticket.task.completed",
+                "created_at": "2026-09-10 11:05:27",
+                "meta_sha256": "c1bc519b01caca75e3a61d016797380cd3331fc6b9daebaed1e33803e88ac1c4"
+            }
+        ]
+    },
+    "approvals": {
+        "ticket": {
+            "elapsed_ms": 0.14,
+            "rows": [
+                {
+                    "id": 5,
+                    "lock_version": 1,
+                    "status": "open"
+                }
+            ]
+        },
+        "requests": {
+            "elapsed_ms": 0.17,
+            "rows": []
+        },
+        "receipts": {
+            "elapsed_ms": 0.19,
+            "rows": []
+        },
+        "events": {
+            "elapsed_ms": 0.19,
+            "rows": []
+        },
+        "audits": {
+            "elapsed_ms": 0.21,
+            "rows": []
+        }
+    },
+    "resolution": {
+        "ticket": {
+            "elapsed_ms": 0.18,
+            "rows": [
+                {
+                    "id": 4,
+                    "lock_version": 9,
+                    "status": "closed",
+                    "workflow_state": "closed",
+                    "resolved_at": "2026-09-09 23:08:40",
+                    "closed_at": "2026-09-09 23:10:11",
+                    "reopened_count": 1,
+                    "resolution_code": "restored",
+                    "resolution_summary_sha256": "c0bb08854b9f61c5a5bec80475a35440ab844085aff5ba3b7ddc7fbca02ce516",
+                    "csat_score": 4,
+                    "csat_submitted_at": "2026-09-09 23:09:31",
+                    "csat_comment_sha256": "a345731d4ffd0db888f7c3b34c3a335ce0d32c7916abc7ec165c73ca9e9f483f"
+                }
+            ]
+        },
+        "comments": {
+            "elapsed_ms": 0.19,
+            "rows": [
+                {
+                    "id": 1,
+                    "author_user_id": 3,
+                    "is_internal": 0,
+                    "created_at": "2026-09-10 11:06:39",
+                    "body_sha256": "d375e1e5e57c24525f76bf1316132370621a9b7f18e541a768b75fe804cdcc0b"
+                },
+                {
+                    "id": 2,
+                    "author_user_id": 1,
+                    "is_internal": 0,
+                    "created_at": "2026-09-10 11:07:31",
+                    "body_sha256": "b7b441a3b5782dc866a18a040ba20c9a8999776ee582bc4271b5f3b6921b1cca"
+                },
+                {
+                    "id": 3,
+                    "author_user_id": 3,
+                    "is_internal": 0,
+                    "created_at": "2026-09-10 11:08:40",
+                    "body_sha256": "c0bb08854b9f61c5a5bec80475a35440ab844085aff5ba3b7ddc7fbca02ce516"
+                }
+            ]
+        },
+        "events": {
+            "elapsed_ms": 0.18,
+            "rows": [
+                {
+                    "id": 3,
+                    "actor_user_id": 3,
+                    "type": "resolved",
+                    "created_at": "2026-09-09 23:06:39",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 5,
+                    "actor_user_id": 1,
+                    "type": "reopened",
+                    "created_at": "2026-09-09 23:07:31",
+                    "source": "legacy_reopen"
+                },
+                {
+                    "id": 6,
+                    "actor_user_id": 3,
+                    "type": "resolved",
+                    "created_at": "2026-09-09 23:08:40",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 7,
+                    "actor_user_id": 1,
+                    "type": "csat_submitted",
+                    "created_at": "2026-09-09 23:09:31",
+                    "source": null
+                },
+                {
+                    "id": 8,
+                    "actor_user_id": 1,
+                    "type": "resolution_confirmed",
+                    "created_at": "2026-09-09 23:10:11",
+                    "source": "requester_confirmation"
+                }
+            ]
+        },
+        "audits": {
+            "elapsed_ms": 0.23,
+            "rows": [
+                {
+                    "id": 31,
+                    "user_id": 3,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 11:06:39",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 33,
+                    "user_id": 3,
+                    "action": "it.ticket.resolved",
+                    "created_at": "2026-09-10 11:06:39",
+                    "source": null
+                },
+                {
+                    "id": 35,
+                    "user_id": 1,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 11:07:31",
+                    "source": "legacy_reopen"
+                },
+                {
+                    "id": 36,
+                    "user_id": 1,
+                    "action": "it.ticket.reopened",
+                    "created_at": "2026-09-10 11:07:31",
+                    "source": null
+                },
+                {
+                    "id": 42,
+                    "user_id": 3,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 11:08:40",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 43,
+                    "user_id": 3,
+                    "action": "it.ticket.resolved",
+                    "created_at": "2026-09-10 11:08:40",
+                    "source": null
+                },
+                {
+                    "id": 45,
+                    "user_id": 1,
+                    "action": "it.ticket.csat.submitted",
+                    "created_at": "2026-09-10 11:09:31",
+                    "source": null
+                },
+                {
+                    "id": 47,
+                    "user_id": 1,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 11:10:11",
+                    "source": "requester_confirmation"
+                }
+            ]
+        }
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false
+}

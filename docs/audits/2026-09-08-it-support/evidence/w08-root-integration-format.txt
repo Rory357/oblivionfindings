@@ -1,0 +1,10 @@
+npm notice run npx
+npm notice run prettier --write resources/js/hooks/use-it-ticket-draft.ts resources/js/hooks/use-it-ticket-draft.test.tsx resources/js/components/it/ticket-workspace-header.tsx resources/js/pages/it/tickets/show.tsx resources/js/pages/it/tickets/show.test.tsx resources/js/components/it/ticket-draft-recovery.tsx resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx resources/js/components/it/__tests__/ticket-intake-draft.test.tsx
+resources/js/hooks/use-it-ticket-draft.ts 511ms (unchanged)
+resources/js/hooks/use-it-ticket-draft.test.tsx 131ms (unchanged)
+resources/js/components/it/ticket-workspace-header.tsx 57ms (unchanged)
+resources/js/pages/it/tickets/show.tsx 164ms (unchanged)
+resources/js/pages/it/tickets/show.test.tsx 90ms (unchanged)
+resources/js/components/it/ticket-draft-recovery.tsx 38ms (unchanged)
+resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx 66ms (unchanged)
+resources/js/components/it/__tests__/ticket-intake-draft.test.tsx 64ms (unchanged)

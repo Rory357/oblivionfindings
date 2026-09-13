@@ -3,21 +3,33 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItApiOperationsPresenter;
+use App\Domain\It\Services\ItAttachmentCleanupReadService;
+use App\Domain\It\Services\ItAutomationOperationsPresenter;
+use App\Domain\It\Services\ItAutomationRunDiagnostics;
 use App\Domain\It\Services\ItAutomationScheduleCatalog;
 use App\Domain\It\Services\ItCatalogManagementService;
+use App\Domain\It\Services\ItEmailDeliveryFailure;
 use App\Domain\It\Services\ItEmailDeliveryService;
+use App\Domain\It\Services\ItMailboxConnectionPresenter;
 use App\Domain\It\Services\ItProvisioningTemplateService;
 use App\Domain\It\Services\ItServiceIdentityCredentialService;
 use App\Domain\It\Services\ItServiceManagementSetupService;
+use App\Domain\It\Services\ItSetupCommandService;
+use App\Domain\It\Services\ItSlaReadService;
+use App\Domain\It\Services\ItTicketRoutingEligibility;
+use App\Domain\It\Services\ItTicketRoutingService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\It\RecoverItSetupCommandRequest;
 use App\Http\Requests\It\SaveItCatalogItemRequest;
 use App\Http\Requests\It\SaveItQueueRequest;
 use App\Http\Requests\It\SaveItServiceRequest;
 use App\Http\Requests\It\SaveItTeamRequest;
 use App\Http\Requests\It\StoreItProvisioningTemplateRequest;
-use App\Http\Requests\It\StoreItServiceIdentityRequest;
 use App\Http\Requests\It\UnpublishItCatalogItemRequest;
+use App\Http\Requests\It\ValidateItSetupCandidateRequest;
+use App\Jobs\DispatchItTicketNotifications;
 use App\Models\ItApiRequest;
 use App\Models\ItAutomationRun;
 use App\Models\ItCatalogItem;
@@ -30,9 +42,11 @@ use App\Models\ItServiceIdentity;
 use App\Models\ItSlaPolicy;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
+use App\Models\ItTicketComment;
 use App\Models\Site;
 use App\Models\User;
 use DomainException;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -47,6 +61,11 @@ class ItServiceManagementSetupController extends Controller
         private readonly ItEmailDeliveryService $emailDeliveries,
         private readonly ItWorkAccessService $workAccess,
         private readonly ItCatalogManagementService $catalogueManagement,
+        private readonly ItTicketRoutingService $ticketRouting,
+        private readonly ItTicketRoutingEligibility $routingEligibility,
+        private readonly ItSlaReadService $slaRead,
+        private readonly ItSetupCommandService $setupCommands,
+        private readonly ItAttachmentCleanupReadService $attachmentCleanup,
     ) {}
 
     public function index(Request $request)
@@ -55,9 +74,34 @@ class ItServiceManagementSetupController extends Controller
         $user = $request->user();
         $approvedSiteIds = $this->workAccess->approvedSiteIds($user);
         $automationPeriod = $request->validate([
+            'q' => ['sometimes', 'nullable', 'string'],
             'automation_from' => ['nullable', 'date_format:Y-m-d'],
             'automation_to' => ['nullable', 'date_format:Y-m-d'],
+            'automation_page' => ['sometimes', 'required', 'integer', 'min:1'],
+            'api_request_page' => ['sometimes', 'required', 'integer', 'min:1'],
+            'review_resource' => ['sometimes', 'required', 'in:teams,queues,services'],
+            'actor_user_id' => ['sometimes', 'required', 'integer', 'min:1'],
+            'delivery_comment_id' => ['sometimes', 'required', 'integer', 'min:1'],
+            'delivery_page' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
+        $deliveryComment = null;
+        if (isset($automationPeriod['delivery_comment_id'])) {
+            abort_unless(Schema::hasColumn('it_email_deliveries', 'it_ticket_comment_id'), 503, 'Reply delivery tracking is not available yet.');
+            $deliveryComment = ItTicketComment::query()->with('ticket')->publicOnly()
+                ->findOrFail((int) $automationPeriod['delivery_comment_id']);
+            abort_unless($deliveryComment->ticket && $this->workAccess->canWork($user, $deliveryComment->ticket), 404);
+        }
+        if ($request->query->has('review_resource')) {
+            $user = $this->setupService->reviewActor($user, isset($automationPeriod['actor_user_id']) ? (int) $automationPeriod['actor_user_id'] : null);
+        }
+        $riskTickets = $this->slaRead->whereState(
+            $this->workAccess->applyViewScope(ItTicket::query(), $user)->whereIn('status', ItTicket::OPEN_STATUSES),
+            ['at_risk', 'breached'],
+        );
+        $queueRisk = (clone $riskTickets)->select('queue_id')->selectRaw('COUNT(*) AS risk_count')
+            ->groupBy('queue_id')->pluck('risk_count', 'queue_id');
+        $serviceRisk = (clone $riskTickets)->select('it_service_id')->selectRaw('COUNT(*) AS risk_count')
+            ->groupBy('it_service_id')->pluck('risk_count', 'it_service_id');
 
         $teams = ItTeam::query()
             ->with(['manager:id,name', 'members:id,name'])
@@ -74,6 +118,7 @@ class ItServiceManagementSetupController extends Controller
             ->get()
             ->map(fn (ItTeam $team) => [
                 'id' => $team->id,
+                'configuration_version' => $this->setupService->teamVersion($team),
                 'name' => $team->name,
                 'description' => $team->description,
                 'is_active' => $team->is_active,
@@ -96,7 +141,6 @@ class ItServiceManagementSetupController extends Controller
             ->withCount([
                 'tickets as open_tickets_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES),
                 'tickets as unassigned_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES)->whereNull('assigned_to_user_id'),
-                'tickets as sla_risk_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES)->whereIn('sla_state', ['at_risk', 'breached']),
             ])
             ->orderBy('name')
             ->get()
@@ -108,10 +152,12 @@ class ItServiceManagementSetupController extends Controller
                 'is_active' => $queue->is_active,
                 'team' => $queue->team ? ['id' => $queue->team->id, 'name' => $queue->team->name] : null,
                 'filter_rules' => $queue->filter_rules ?? [],
+                'readiness' => $this->ticketRouting->queueReadiness($queue),
+                'configuration_version' => $this->setupService->queueVersion($queue),
                 'workload' => [
                     'open_tickets' => $queue->open_tickets_count,
                     'unassigned' => $queue->unassigned_count,
-                    'sla_risk' => $queue->sla_risk_count,
+                    'sla_risk' => (int) $queueRisk->get($queue->id, 0),
                 ],
             ])->values();
 
@@ -119,12 +165,12 @@ class ItServiceManagementSetupController extends Controller
             ->with('owner:id,name')
             ->withCount([
                 'tickets as open_tickets_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES),
-                'tickets as sla_risk_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES)->whereIn('sla_state', ['at_risk', 'breached']),
             ])
             ->orderBy('name')
             ->get()
             ->map(fn (ItService $service) => [
                 'id' => $service->id,
+                'configuration_version' => $this->setupService->serviceVersion($service),
                 'key' => $service->key,
                 'name' => $service->name,
                 'description' => $service->description,
@@ -134,35 +180,41 @@ class ItServiceManagementSetupController extends Controller
                 'owner' => $this->userOption($service->owner),
                 'workload' => [
                     'open_tickets' => $service->open_tickets_count,
-                    'sla_risk' => $service->sla_risk_count,
+                    'sla_risk' => (int) $serviceRisk->get($service->id, 0),
                 ],
             ])->values();
 
-        $apiIdentities = ItServiceIdentity::query()
+        // A frozen editor can inspect the current configuration without an
+        // Inertia asset-version redirect, or unrelated provider/operations data.
+        if ($request->query->has('review_resource')) {
+            abort_unless($request->wantsJson() && ! $request->header('X-Inertia'), 400);
+            $resource = $automationPeriod['review_resource'];
+            $records = match ($resource) {
+                'teams' => $teams,
+                'queues' => $queues,
+                'services' => $services,
+            };
+
+            return response()->json(['resource' => $resource, 'viewer_user_id' => $user->id, 'records' => $records])
+                ->header('Cache-Control', 'no-store, private');
+        }
+
+        // Old flash credentials must never enter an Inertia/history response.
+        $request->session()->forget('it_api_credential');
+        try {
+            $this->identityCredentials->guardManager($user);
+            $canManageApiIdentities = true;
+        } catch (DomainException) {
+            $canManageApiIdentities = false;
+        }
+        $manageableApiIdentities = ItServiceIdentity::query()
             ->with(['actor:id,name', 'creator:id,name'])
             ->latest('id')
             ->get()
             ->filter(fn (ItServiceIdentity $identity): bool => $this->identityCredentials
-                ->canManage($user, $identity))
-            ->map(fn (ItServiceIdentity $identity) => [
-                'id' => $identity->id,
-                'public_id' => $identity->public_id,
-                'name' => $identity->name,
-                'description' => $identity->description,
-                'actor' => $this->userOption($identity->actor),
-                'creator' => $this->userOption($identity->creator),
-                'abilities' => $identity->abilities ?? [],
-                'allowed_work_types' => $identity->allowed_work_types ?? [],
-                'allowed_site_ids' => $identity->allowed_site_ids ?? [],
-                'allowed_fields' => $identity->allowed_fields ?? ['create' => [], 'read' => []],
-                'require_signature' => $identity->require_signature,
-                'rate_limit_per_minute' => $identity->rate_limit_per_minute,
-                'expires_at' => $identity->expires_at?->toIso8601String(),
-                'revoked_at' => $identity->revoked_at?->toIso8601String(),
-                'last_used_at' => $identity->last_used_at?->toIso8601String(),
-                'created_at' => $identity->created_at?->toIso8601String(),
-                'is_active' => $identity->isActive(),
-            ])->values();
+                ->canManage($user, $identity));
+        $apiIdentities = $manageableApiIdentities
+            ->map(fn (ItServiceIdentity $identity): array => $this->identityCredentials->present($identity))->values();
 
         $provisioningTemplates = ItProvisioningTemplate::query()
             ->when(! $user->canDo('it.organisationWide'), function ($templates) use ($approvedSiteIds): void {
@@ -212,7 +264,7 @@ class ItServiceManagementSetupController extends Controller
                 ])->values(),
             ])->values();
 
-        $deliveryRows = Schema::hasTable('it_email_deliveries')
+        $deliveryQuery = Schema::hasTable('it_email_deliveries')
             ? $this->emailDeliveries->visibleQuery($request->user())
                 ->with([
                     'ticket:id,reference,title',
@@ -220,10 +272,15 @@ class ItServiceManagementSetupController extends Controller
                     'recipient:id,name',
                     'retryAttempt:id,retry_of_delivery_id',
                 ])
-                ->latest('id')
-                ->limit(100)
-                ->get()
-            : collect();
+                ->latest('id') : null;
+        $deliveryPage = null;
+        if ($deliveryComment && $deliveryQuery) {
+            $deliveryPage = $deliveryQuery->where('it_ticket_comment_id', $deliveryComment->id)
+                ->paginate(50, ['*'], 'delivery_page');
+            $deliveryRows = $deliveryPage->getCollection();
+        } else {
+            $deliveryRows = $deliveryQuery?->limit(100)->get() ?? collect();
+        }
         $failedDeliveryCount = Schema::hasTable('it_email_deliveries')
             ? $this->emailDeliveries->visibleQuery($request->user())
                 ->whereIn('status', ['failed', 'bounced'])
@@ -248,14 +305,22 @@ class ItServiceManagementSetupController extends Controller
                 ->orderBy('name')
                 ->get()
             : collect();
-        $mailboxes = Schema::hasTable('it_mailbox_connections')
-            ? ItMailboxConnection::query()->get()
-            : collect();
+        $mailboxHealth = app(ItMailboxConnectionPresenter::class)->operations($user);
+        $mailboxes = collect($mailboxHealth['connections']);
         $apiErrors = Schema::hasTable('it_api_requests')
-            ? ItApiRequest::query()->where('response_status', '>=', 400)->count()
+            ? ItApiRequest::query()
+                ->whereIn('service_identity_id', $apiIdentities->pluck('id'))
+                ->where('response_status', '>=', 400)->count()
             : 0;
 
         $operationsAudit = [
+            'automation_history' => app(ItAutomationOperationsPresenter::class)->operations($user, $automationPeriod, $request->integer('automation_page', 1)),
+            'api_health' => app(ItApiOperationsPresenter::class)->operations(
+                $user, $manageableApiIdentities, $request->integer('api_request_page', 1), $automationPeriod,
+            ),
+            'attachment_cleanup' => $this->attachmentCleanup->health($user),
+            'mailbox_health' => $mailboxHealth,
+            'delivery_health' => $this->emailDeliveries->operationsHealth($user),
             'teams' => [
                 'total' => $teams->count(),
                 'active' => $teams->where('is_active', true)->count(),
@@ -278,9 +343,9 @@ class ItServiceManagementSetupController extends Controller
                 'empty' => $catalogItems->filter(fn (ItCatalogItem $item) => count($item->form_schema['fields'] ?? []) === 0)->count(),
             ],
             'email' => [
-                'connections' => $mailboxes->count(),
-                'connected' => $mailboxes->where('status', ItMailboxConnection::STATUS_CONNECTED)->count(),
-                'connection_errors' => $mailboxes->where('status', ItMailboxConnection::STATUS_ERROR)->count(),
+                'connections' => $mailboxHealth['available'] ? $mailboxes->count() : null,
+                'connected' => $mailboxHealth['available'] ? $mailboxes->where('status', ItMailboxConnection::STATUS_CONNECTED)->count() : null,
+                'connection_errors' => $mailboxHealth['available'] ? $mailboxes->where('status', ItMailboxConnection::STATUS_ERROR)->count() : null,
                 'failed_or_bounced' => $failedDeliveryCount,
             ],
             'api' => [
@@ -326,9 +391,18 @@ class ItServiceManagementSetupController extends Controller
                 'submission_count' => $item->submissions_count,
             ])->values(),
             'apiIdentities' => $apiIdentities,
-            'oneTimeApiCredential' => $request->session()->get('it_api_credential'),
+            'apiIdentityViewerUserId' => $user->id,
+            'canManageApiIdentities' => $canManageApiIdentities,
             'provisioningTemplates' => $provisioningTemplates,
             'operationsAudit' => $operationsAudit,
+            'emailDeliveryFilter' => $deliveryComment ? [
+                'comment_id' => $deliveryComment->id,
+                'ticket_reference' => $deliveryComment->ticket->reference,
+                'total' => $deliveryPage?->total() ?? 0,
+                'page' => $deliveryPage?->currentPage() ?? 1,
+                'last_page' => $deliveryPage?->lastPage() ?? 1,
+                'shown' => $deliveryRows->count(),
+            ] : null,
             'emailDeliveries' => $deliveryRows->map(fn (ItEmailDelivery $delivery) => [
                 'id' => $delivery->id,
                 'notification_uuid' => $delivery->notification_uuid,
@@ -347,13 +421,13 @@ class ItServiceManagementSetupController extends Controller
                 'status' => $delivery->status,
                 'attempt_count' => $delivery->attempt_count,
                 'retry_count' => $delivery->retry_count,
-                'last_error' => $delivery->last_error,
+                'last_error' => ItEmailDeliveryFailure::message($delivery),
+                'failure_category' => ItEmailDeliveryFailure::category($delivery),
                 'queued_at' => $delivery->queued_at?->toIso8601String(),
                 'accepted_at' => $delivery->accepted_at?->toIso8601String(),
                 'provider_status_at' => $delivery->provider_status_at?->toIso8601String(),
                 'delivered_at' => $delivery->delivered_at?->toIso8601String(),
-                'can_retry' => in_array($delivery->status, ['failed', 'bounced'], true)
-                    && $delivery->retryAttempt === null,
+                'can_retry' => $this->emailDeliveries->canOfferRetry($delivery, $user),
             ])->values(),
             'automationDefinitions' => $automationDefinitions,
             'automationRuns' => $automationRuns->map(fn (ItAutomationRun $run) => [
@@ -363,11 +437,18 @@ class ItServiceManagementSetupController extends Controller
                 'started_at' => $run->started_at?->toIso8601String(),
                 'finished_at' => $run->finished_at?->toIso8601String(),
                 'runtime_ms' => $run->runtime_ms,
-                'error_summary' => $run->error_summary,
+                'error_summary' => ItAutomationRunDiagnostics::safeError($run),
+                'cleanup' => $this->attachmentCleanup->runSummary($user, $run),
             ])->values(),
             'agents' => $this->identityCredentials->delegableExecutionAccounts($user)
+                ->filter(fn (User $agent) => $this->routingEligibility->currentlyEmployed($agent->id))
                 ->sortBy('name')
-                ->map(fn (User $user) => $this->userOption($user))
+                ->map(fn (User $agent) => [
+                    'id' => $agent->id,
+                    'name' => $agent->name,
+                    'site_ids' => $this->workAccess->approvedSiteIds($agent),
+                    'organisation_wide' => $agent->canDo('it.organisationWide'),
+                ])
                 ->values(),
             'sites' => Site::query()
                 ->whereKey($approvedSiteIds)
@@ -397,9 +478,18 @@ class ItServiceManagementSetupController extends Controller
         ]);
     }
 
+    public function validateCandidate(ValidateItSetupCandidateRequest $request)
+    {
+        return response()->json(['candidate' => $this->setupService->authorizeCandidate($request->user(), $request->validated())])
+            ->header('Cache-Control', 'no-store, private');
+    }
+
     public function storeTeam(SaveItTeamRequest $request)
     {
         $this->authorize('create', ItTeam::class);
+        if ($request->filled('request_uuid')) {
+            return $this->createCommand($request, 'teams');
+        }
 
         return $this->run(fn () => $this->setupService
             ->createTeam($request->user(), $request->validated()), 'Team created.');
@@ -416,6 +506,9 @@ class ItServiceManagementSetupController extends Controller
     public function storeQueue(SaveItQueueRequest $request)
     {
         $this->authorize('create', ItQueue::class);
+        if ($request->filled('request_uuid')) {
+            return $this->createCommand($request, 'queues');
+        }
 
         return $this->run(fn () => $this->setupService
             ->createQueue($request->user(), $request->validated()), 'Queue created.');
@@ -432,6 +525,9 @@ class ItServiceManagementSetupController extends Controller
     public function storeService(SaveItServiceRequest $request)
     {
         $this->authorize('create', ItService::class);
+        if ($request->filled('request_uuid')) {
+            return $this->createCommand($request, 'services');
+        }
 
         return $this->run(fn () => $this->setupService
             ->createService($request->user(), $request->validated()), 'Service created.');
@@ -443,6 +539,32 @@ class ItServiceManagementSetupController extends Controller
 
         return $this->run(fn () => $this->setupService
             ->updateService($service, $request->user(), $request->validated()), 'Service updated.');
+    }
+
+    private function createCommand(FormRequest $request, string $resource)
+    {
+        abort_unless($request->wantsJson() && ! $request->header('X-Inertia'), 400);
+        try {
+            return response()->json($this->setupCommands->create($request->user(), $resource, $request->validated()))
+                ->header('Cache-Control', 'no-store, private');
+        } catch (DomainException $error) {
+            return response()->json(['message' => $error->getMessage(), 'errors' => ['setup' => [$error->getMessage()]]], 422)
+                ->header('Cache-Control', 'no-store, private');
+        }
+    }
+
+    public function recoverCommand(RecoverItSetupCommandRequest $request, string $requestUuid)
+    {
+        return response()->json($this->setupCommands->recover(
+            $request->user(), $request->validated('resource'), $requestUuid, (int) $request->validated('actor_user_id'),
+        ))->header('Cache-Control', 'no-store, private');
+    }
+
+    public function cancelCommand(RecoverItSetupCommandRequest $request, string $requestUuid)
+    {
+        return response()->json($this->setupCommands->cancel(
+            $request->user(), $request->validated('resource'), $requestUuid, (int) $request->validated('actor_user_id'),
+        ))->header('Cache-Control', 'no-store, private');
     }
 
     public function storeCatalogItem(SaveItCatalogItemRequest $request)
@@ -481,41 +603,6 @@ class ItServiceManagementSetupController extends Controller
         );
     }
 
-    public function storeIdentity(StoreItServiceIdentityRequest $request)
-    {
-        try {
-            $data = $request->validated();
-            $credential = $this->identityCredentials->create($request->user(), [
-                ...$data,
-                'allowed_fields' => [
-                    'create' => array_values($data['create_fields']),
-                    'read' => array_values($data['read_fields']),
-                ],
-            ]);
-        } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
-        }
-
-        return redirect()->route('it.setup.index')
-            ->with('success', 'API identity created. Copy its credential now; it will not be shown again.')
-            ->with('it_api_credential', [
-                'identity_id' => $credential['identity']->id,
-                'name' => $credential['identity']->name,
-                'token' => $credential['token'],
-            ]);
-    }
-
-    public function revokeIdentity(Request $request, ItServiceIdentity $identity)
-    {
-        try {
-            $this->identityCredentials->revoke($identity, $request->user());
-        } catch (DomainException) {
-            abort(404);
-        }
-
-        return redirect()->route('it.setup.index')->with('success', 'API identity revoked.');
-    }
-
     public function storeProvisioningTemplate(StoreItProvisioningTemplateRequest $request)
     {
         try {
@@ -552,10 +639,33 @@ class ItServiceManagementSetupController extends Controller
             $this->emailDeliveries->canRetryDelivery($delivery, $request->user()),
             404,
         );
+        if ($request->expectsJson()) {
+            $validated = $request->validate(['expected_actor_id' => ['required', 'integer', 'min:1']]);
+            abort_unless(
+                (int) $validated['expected_actor_id'] === (int) $request->user()->id,
+                409,
+                'Your signed-in account changed. Refresh the delivery history before retrying.',
+            );
+        }
         try {
-            $this->emailDeliveries->retry($delivery, $request->user());
+            $retry = $this->emailDeliveries->retry($delivery, $request->user());
         } catch (DomainException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $exception->getMessage()], 409);
+            }
+
             return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        DispatchItTicketNotifications::dispatchAfterResponse(null, (int) $retry->id);
+
+        if ($request->expectsJson()) {
+            return response()->json(['data' => [
+                'original_delivery_id' => (int) $delivery->id,
+                'retry_delivery_id' => (int) $retry->id,
+                'status' => 'queued',
+                'actor_id' => (int) $request->user()->id,
+            ]]);
         }
 
         return redirect()->back()->with('success', 'Email queued for another delivery attempt.');

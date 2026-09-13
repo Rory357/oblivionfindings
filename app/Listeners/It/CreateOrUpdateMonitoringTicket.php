@@ -3,6 +3,7 @@
 namespace App\Listeners\It;
 
 use App\Domain\It\Services\ItTicketLinkService;
+use App\Domain\It\Services\ItTicketRoutingService;
 use App\Domain\Monitoring\Services\MonitoringIncidentEvidenceService;
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
 use App\Domain\SecurityDevices\Models\Device;
@@ -26,6 +27,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
     public function __construct(
         private readonly ItTicketLinkService $links,
         private readonly MonitoringIncidentEvidenceService $incidentEvidence,
+        private readonly ItTicketRoutingService $routing,
     ) {}
 
     public function handle(DeviceSignalPublished $event): void
@@ -121,6 +123,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             );
 
             ItTicketEvent::record($ticket, 'created_from_monitoring', null, $this->eventEvidence($event, $lockedAlert));
+            $this->routing->route($ticket);
         });
     }
 

@@ -1,0 +1,213 @@
+{
+    "observed_at": "2026-09-09T23:45:44+00:00",
+    "token": "0dd5f10504da4d5d",
+    "database": "oblivion_it_draft_browser_0dd5f10504da4d5d",
+    "time_context": {
+        "elapsed_ms": 0.11,
+        "rows": [
+            {
+                "session_time_zone": "SYSTEM",
+                "system_time_zone": "New Zealand Standard Time"
+            }
+        ]
+    },
+    "tickets": {
+        "elapsed_ms": 0.27,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 1,
+                "status": "open"
+            },
+            {
+                "id": 4,
+                "lock_version": 8,
+                "status": "closed"
+            }
+        ]
+    },
+    "tasks": {
+        "elapsed_ms": 0.26,
+        "rows": []
+    },
+    "dependencies": {
+        "elapsed_ms": 1.42,
+        "rows": []
+    },
+    "receipts": {
+        "elapsed_ms": 0.26,
+        "rows": []
+    },
+    "events": {
+        "elapsed_ms": 0.21,
+        "rows": []
+    },
+    "audits": {
+        "elapsed_ms": 0.28,
+        "rows": []
+    },
+    "approvals": {
+        "ticket": {
+            "elapsed_ms": 0.19,
+            "rows": [
+                {
+                    "id": 5,
+                    "lock_version": 1,
+                    "status": "open"
+                }
+            ]
+        },
+        "requests": {
+            "elapsed_ms": 0.21,
+            "rows": []
+        },
+        "receipts": {
+            "elapsed_ms": 0.17,
+            "rows": []
+        },
+        "events": {
+            "elapsed_ms": 0.2,
+            "rows": []
+        },
+        "audits": {
+            "elapsed_ms": 0.2,
+            "rows": []
+        }
+    },
+    "resolution": {
+        "ticket": {
+            "elapsed_ms": 0.25,
+            "rows": [
+                {
+                    "id": 4,
+                    "lock_version": 8,
+                    "status": "closed",
+                    "workflow_state": "closed",
+                    "resolved_at": "2026-09-09 23:40:48",
+                    "closed_at": "2026-09-09 23:45:29",
+                    "reopened_count": 0,
+                    "resolution_code": "restored",
+                    "resolution_summary_sha256": "0716deb969af21f55b682db3870f08d9c9610fb5f60e84595ddcfbf3815a3647",
+                    "csat_score": 4,
+                    "csat_submitted_at": "2026-09-09 23:42:26",
+                    "csat_comment_sha256": "309d79f4ae50122d7386bbfebb256ec59b0d3a9472e1de1cfeb5fce2e7957563"
+                }
+            ]
+        },
+        "comments": {
+            "elapsed_ms": 0.23,
+            "rows": [
+                {
+                    "id": 1,
+                    "author_user_id": 3,
+                    "is_internal": 0,
+                    "speaker_side": "it",
+                    "source_channel": "browser",
+                    "created_at": "2026-09-10 11:40:48",
+                    "body_sha256": "0716deb969af21f55b682db3870f08d9c9610fb5f60e84595ddcfbf3815a3647"
+                }
+            ]
+        },
+        "conversation": {
+            "elapsed_ms": 0.17,
+            "rows": [
+                {
+                    "id": 4,
+                    "last_public_comment_id": 1,
+                    "last_public_speaker_side": "it",
+                    "next_response_party": "requester"
+                }
+            ]
+        },
+        "events": {
+            "elapsed_ms": 0.27,
+            "rows": [
+                {
+                    "id": 1,
+                    "actor_user_id": 3,
+                    "type": "resolved",
+                    "created_at": "2026-09-09 23:40:48",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 3,
+                    "actor_user_id": 1,
+                    "type": "csat_submitted",
+                    "created_at": "2026-09-09 23:42:26",
+                    "source": null
+                },
+                {
+                    "id": 4,
+                    "actor_user_id": 1,
+                    "type": "csat_updated",
+                    "created_at": "2026-09-09 23:43:40",
+                    "source": null
+                },
+                {
+                    "id": 5,
+                    "actor_user_id": 1,
+                    "type": "csat_updated",
+                    "created_at": "2026-09-09 23:45:18",
+                    "source": null
+                },
+                {
+                    "id": 6,
+                    "actor_user_id": 1,
+                    "type": "resolution_confirmed",
+                    "created_at": "2026-09-09 23:45:29",
+                    "source": "requester_confirmation"
+                }
+            ]
+        },
+        "audits": {
+            "elapsed_ms": 0.32,
+            "rows": [
+                {
+                    "id": 24,
+                    "user_id": 3,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 11:40:48",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 27,
+                    "user_id": 3,
+                    "action": "it.ticket.resolved",
+                    "created_at": "2026-09-10 11:40:48",
+                    "source": null
+                },
+                {
+                    "id": 29,
+                    "user_id": 1,
+                    "action": "it.ticket.csat.submitted",
+                    "created_at": "2026-09-10 11:42:26",
+                    "source": null
+                },
+                {
+                    "id": 31,
+                    "user_id": 1,
+                    "action": "it.ticket.csat.updated",
+                    "created_at": "2026-09-10 11:43:40",
+                    "source": null
+                },
+                {
+                    "id": 33,
+                    "user_id": 1,
+                    "action": "it.ticket.csat.updated",
+                    "created_at": "2026-09-10 11:45:18",
+                    "source": null
+                },
+                {
+                    "id": 35,
+                    "user_id": 1,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 11:45:29",
+                    "source": "requester_confirmation"
+                }
+            ]
+        }
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false
+}

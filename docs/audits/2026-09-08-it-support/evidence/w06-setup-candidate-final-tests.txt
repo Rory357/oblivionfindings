@@ -1,0 +1,73 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_5b8af3351d5c4f44",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSetupCandidateRecoveryTest[39m
+  [32;1m✓[39;22m[90m [39m[90msetup recovery authorizes incomplete whole-entity candidates without a record write or private echo with[39m[90m… [39m [90m247.54s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup recovery authorizes incomplete whole-entity candidates without a record write or private echo with ('[39m[90m…[39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup recovery authorizes incomplete whole-entity candidates without a record write or private echo with ('[39m[90m…[39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup recovery preserves the original stale configuration and requires explicit current review with ('teams[39m[90m…[39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup recovery preserves the original stale configuration and requires explicit current review with ('servi[39m[90m…[39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup recovery preserves the original stale configuration and requires explicit current review with ('queue[39m[90m…[39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup recovery checks cleared historical bindings and current Site access[39m[90m                                   [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup recovery rechecks former member employment even after the proposed selection is cleared[39m[90m               [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup recovery permits repeated bindings across historical scopes but rejects duplicates within one selecti[39m[90m…[39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup candidate and current review refuse a changed account and freshly revoked authorization[39m[90m               [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup candidate rejects unknown fields malformed identities and missing canonical records[39m[90m                   [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup save endpoints bind the original actor for both create and edits[39m[90m                                      [39m [90m0.71s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSetupVersionTest[39m
+  [32;1m✓[39;22m[90m [39m[90msetup review returns only the requested current canonical register without an Inertia version with ('teams'[39m[90m…[39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup review returns only the requested current canonical register without an Inertia version with ('queues[39m[90m…[39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup review returns only the requested current canonical register without an Inertia version with ('servic[39m[90m…[39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup review rejects unsupported resources and current restricted access[39m[90m                                    [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam editors cannot overwrite a newer member role and must explicitly review a new version[39m[90m                  [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mservice editor rejects an obsolete version and preserves the newer status on an explicit retry[39m[90m              [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam and service update endpoints require the displayed version[39m[90m                                             [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical setup mutation rechecks a cached actor permission and approval before writing[39m[90m                     [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical setup service cannot bypass the version check by omitting transport validation[39m[90m                    [39m [90m0.59s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma failed required audit leaves the service configuration and version unchanged[39m[90m                              [39m [90m0.59s[39m  
+
+  [90mTests:[39m    [32;1m22 passed[39;22m[90m (177 assertions)[39m
+  [90mDuration:[39m [39m263.36s[39m
+
+{"exit_code":0,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_5b8af3351d5c4f44",
+    "database_mutations_performed": false
+}

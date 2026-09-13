@@ -15,6 +15,7 @@ interface LaravelPaginationProps {
     lastPage?: number;
     className?: string;
     preserveState?: boolean;
+    preserveScroll?: boolean;
 }
 
 function stripHtml(html: string): string {
@@ -27,9 +28,10 @@ function isNavLabel(label: string): 'prev' | 'next' | false {
     return false;
 }
 
-export function LaravelPagination({ links, lastPage, className, preserveState = true }: LaravelPaginationProps) {
+export function LaravelPagination({ links, lastPage, className, preserveState = true, preserveScroll = false }: LaravelPaginationProps) {
     if (!links || links.length <= 3) return null;
     if (lastPage !== undefined && lastPage <= 1) return null;
+    const visitOptions = { preserveState, ...(preserveScroll ? { preserveScroll: true } : {}) };
 
     return (
         <nav aria-label="Pagination" className={cn('flex items-center justify-center gap-1', className)}>
@@ -43,7 +45,7 @@ export function LaravelPagination({ links, lastPage, className, preserveState = 
                             variant="outline"
                             size="sm"
                             disabled={!link.url}
-                            onClick={() => link.url && router.get(link.url, {}, { preserveState })}
+                            onClick={() => link.url && router.get(link.url, {}, visitOptions)}
                             aria-label="Previous page"
                         >
                             <ChevronLeft className="h-4 w-4" />
@@ -58,7 +60,7 @@ export function LaravelPagination({ links, lastPage, className, preserveState = 
                             variant="outline"
                             size="sm"
                             disabled={!link.url}
-                            onClick={() => link.url && router.get(link.url, {}, { preserveState })}
+                            onClick={() => link.url && router.get(link.url, {}, visitOptions)}
                             aria-label="Next page"
                         >
                             <ChevronRight className="h-4 w-4" />
@@ -72,7 +74,7 @@ export function LaravelPagination({ links, lastPage, className, preserveState = 
                         variant={link.active ? 'default' : 'outline'}
                         size="sm"
                         disabled={!link.url}
-                        onClick={() => link.url && router.get(link.url, {}, { preserveState })}
+                        onClick={() => link.url && router.get(link.url, {}, visitOptions)}
                         aria-current={link.active ? 'page' : undefined}
                         className="min-w-[36px]"
                     >

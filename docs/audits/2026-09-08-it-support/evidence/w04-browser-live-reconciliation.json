@@ -1,0 +1,254 @@
+{
+    "guard_passed": true,
+    "mutation_performed": false,
+    "prefix": "ITSupportW04 20260909",
+    "current_readonly_evidence": {
+        "existing_fixture_count": 7,
+        "fixture_aggregate": {
+            "total": 7,
+            "by_state": {
+                "ok": 1,
+                "at_risk": 1,
+                "breached": 1,
+                "met": 1,
+                "paused": 1,
+                "unmeasured": 2
+            },
+            "by_coverage": {
+                "none": 1,
+                "partial": 1,
+                "full": 5
+            },
+            "ever_breached": 1,
+            "clocks": {
+                "first_response": {
+                    "by_state": {
+                        "ok": 1,
+                        "at_risk": 1,
+                        "breached": 1,
+                        "met": 2,
+                        "paused": 0,
+                        "unmeasured": 2
+                    }
+                },
+                "resolution": {
+                    "by_state": {
+                        "ok": 4,
+                        "at_risk": 0,
+                        "breached": 0,
+                        "met": 1,
+                        "paused": 1,
+                        "unmeasured": 1
+                    }
+                }
+            },
+            "evaluated_at": "2026-09-09T02:22:12+00:00"
+        },
+        "technician_open_aggregate": {
+            "total": 16,
+            "by_state": {
+                "ok": 3,
+                "at_risk": 1,
+                "breached": 2,
+                "met": 0,
+                "paused": 1,
+                "unmeasured": 9
+            },
+            "by_coverage": {
+                "none": 8,
+                "partial": 2,
+                "full": 6
+            },
+            "ever_breached": 2,
+            "clocks": {
+                "first_response": {
+                    "by_state": {
+                        "ok": 3,
+                        "at_risk": 1,
+                        "breached": 2,
+                        "met": 1,
+                        "paused": 0,
+                        "unmeasured": 9
+                    }
+                },
+                "resolution": {
+                    "by_state": {
+                        "ok": 6,
+                        "at_risk": 0,
+                        "breached": 0,
+                        "met": 0,
+                        "paused": 1,
+                        "unmeasured": 9
+                    }
+                }
+            },
+            "evaluated_at": "2026-09-09T02:22:12+00:00"
+        },
+        "technician_resolved_30d_aggregate": {
+            "total": 1,
+            "by_state": {
+                "ok": 0,
+                "at_risk": 0,
+                "breached": 0,
+                "met": 1,
+                "paused": 0,
+                "unmeasured": 0
+            },
+            "by_coverage": {
+                "none": 0,
+                "partial": 0,
+                "full": 1
+            },
+            "ever_breached": 0,
+            "clocks": {
+                "first_response": {
+                    "by_state": {
+                        "ok": 0,
+                        "at_risk": 0,
+                        "breached": 0,
+                        "met": 1,
+                        "paused": 0,
+                        "unmeasured": 0
+                    }
+                },
+                "resolution": {
+                    "by_state": {
+                        "ok": 0,
+                        "at_risk": 0,
+                        "breached": 0,
+                        "met": 1,
+                        "paused": 0,
+                        "unmeasured": 0
+                    }
+                }
+            },
+            "evaluated_at": "2026-09-09T02:22:12+00:00"
+        },
+        "fixture_records": [
+            {
+                "id": 20,
+                "reference": "IT-000020",
+                "site_id": 9403,
+                "state": "ok"
+            },
+            {
+                "id": 21,
+                "reference": "IT-000021",
+                "site_id": 9403,
+                "state": "at_risk"
+            },
+            {
+                "id": 22,
+                "reference": "IT-000022",
+                "site_id": 9403,
+                "state": "breached"
+            },
+            {
+                "id": 23,
+                "reference": "IT-000023",
+                "site_id": 9404,
+                "state": "met"
+            },
+            {
+                "id": 24,
+                "reference": "IT-000024",
+                "site_id": 9404,
+                "state": "paused"
+            },
+            {
+                "id": 25,
+                "reference": "IT-000025",
+                "site_id": 9404,
+                "state": "unmeasured"
+            },
+            {
+                "id": 26,
+                "reference": "IT-000026",
+                "site_id": 9404,
+                "state": "unmeasured"
+            }
+        ]
+    },
+    "actors": {
+        "technician_id": 230,
+        "requester_id": 231
+    },
+    "site_ids": [
+        9403,
+        9404
+    ],
+    "proposed_tickets": {
+        "ok": {
+            "label": "On track",
+            "site_id": 9403,
+            "expected_state": "ok",
+            "coverage": "full"
+        },
+        "at_risk": {
+            "label": "Response at risk",
+            "site_id": 9403,
+            "expected_state": "at_risk",
+            "coverage": "full"
+        },
+        "breached": {
+            "label": "Late response retained",
+            "site_id": 9403,
+            "expected_state": "breached",
+            "coverage": "full"
+        },
+        "met": {
+            "label": "Resolved within both targets",
+            "site_id": 9404,
+            "expected_state": "met",
+            "coverage": "full"
+        },
+        "paused": {
+            "label": "Waiting for requester",
+            "site_id": 9404,
+            "expected_state": "paused",
+            "coverage": "full"
+        },
+        "unmeasured": {
+            "label": "No historical clocks recorded",
+            "site_id": 9404,
+            "expected_state": "unmeasured",
+            "coverage": "none"
+        },
+        "partial": {
+            "label": "Response clock not recorded",
+            "site_id": 9404,
+            "expected_state": "unmeasured",
+            "coverage": "partial"
+        }
+    },
+    "policy_scope": "Only new synthetic ticket snapshots; application grid untouched.",
+    "clock_minutes": {
+        "first_response": 600,
+        "resolution": 2400
+    },
+    "calendar": "Explicit continuous 24\/7 in Pacific\/Auckland; no holiday grid edit.",
+    "expected_initial_by_state": {
+        "ok": 1,
+        "at_risk": 1,
+        "breached": 1,
+        "met": 1,
+        "paused": 1,
+        "unmeasured": 2
+    },
+    "expected_initial_by_coverage": {
+        "none": 1,
+        "partial": 1,
+        "full": 5
+    },
+    "at_risk_remaining_minutes_on_creation": 120,
+    "requires_reviewed_create_flag": true,
+    "watchdog_freshness": {
+        "state": "unmeasured",
+        "last_success_at": null,
+        "latest_status": null,
+        "latest_started_at": null,
+        "required_since": "2026-09-09T02:00:00+00:00",
+        "evaluated_at": "2026-09-09T02:22:12+00:00",
+        "grace_seconds": 300
+    }
+}

@@ -1,0 +1,56 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_660bb4eb2a564207",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItTicketLifecycleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mresolving requires a note and posts it as the final public reply[39m[90m                                          [39m [90m229.33s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe notify toggle silences the requester but never the watchers[39m[90m                                             [39m [90m0.69s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mresolving inside the resolution target marks the SLA met[39m[90m                                                    [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclose requires a reason records it once and reopen brings the ticket back with a bump[39m[90m                       [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequesters can reopen within seven days, not after[39m[90m                                                          [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpersonal list reply and reopen controls respect settlement participant audience and the reopen window[39m[90m       [39m [90m5.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe auto-close command sweeps tickets past the reopen window[39m[90m                                                [39m [90m0.61s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTicketLifecycleTest[22m [90m>[39m resolving inside the resolution target marks the SLA met            
+[39;1m  Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+@@ @@
+-'met'
++'unmeasured'[39;22m
+
+  at [32mtests\Feature\It\ItTicketLifecycleTest.php[39m:[32m146[39m
+    142▕     $this->actingAs($this->hr)
+    143▕         ->post("/it/tickets/{$ticket->id}/resolve", ['expected_version' => $ticket->fresh()->lock_version, 'note' => 'Done inside target.'])
+    144▕         ->assertRedirect();
+    145▕ 
+  ➜ 146▕     expect($ticket->fresh()->sla_state)->toBe('met');
+    147▕ });
+    148▕ 
+    149▕ test('close requires a reason records it once and reopen brings the ticket back with a bump', function () {
+    150▕     Notification::fake();
+
+  [33m1   [39m[39;1mtests\Feature\It\ItTicketLifecycleTest.php[39;22m:[39;1m146[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m6 passed[39;22m[90m (100 assertions)[39m
+  [90mDuration:[39m [39m238.35s[39m
+

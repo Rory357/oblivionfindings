@@ -1,0 +1,46 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItApiOperationsPresenter.php",
+    "sha256": "7d2d238bc19410eff15a019cb9576c9963a7cc745e3087e57422d409768287ee"
+  },
+  {
+    "path": "app/Domain/It/Services/ItEmailDeliveryFailure.php",
+    "sha256": "c4cb19bb3bb01c4607ef8ec5fd33df60863fbc2ab5b39cf7e674c1ad215c2fe3"
+  },
+  {
+    "path": "app/Domain/It/Services/ItEmailDeliveryService.php",
+    "sha256": "ceda1a6daa33b7e4550a0fc2e9da6df02a3cdd7ce83d35fb7a581013d1f253af"
+  },
+  {
+    "path": "app/Models/ItEmailDelivery.php",
+    "sha256": "26ef1d05f280eb0f4f20d488f822b3eba9ef03876439797eab19ce782fad619b"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+    "sha256": "dcbbab0ac79bceaf3203b18eec2bb2a51de93831a7acf0b9f35f86cfa0b870eb"
+  },
+  {
+    "path": "resources/js/components/it/it-api-operations.tsx",
+    "sha256": "f189533410fd54ed722fc3326a05637c00a32687dbac7b320aa7caca8d6d3f83"
+  },
+  {
+    "path": "resources/js/components/it/it-service-operations.tsx",
+    "sha256": "bf72f6273359f654b088b3910413f78ec22ce368c5aa0082fec7ea78dc3f3585"
+  },
+  {
+    "path": "resources/js/components/it/it-api-operations.test.tsx",
+    "sha256": "c481007b74bbfcb33b9f81c805d40263c66055fd91a45187639fbb73b662e354"
+  },
+  {
+    "path": "tests/Feature/It/ItApiOperationsScopeTest.php",
+    "sha256": "8cd0a10d9a17780ca25bce5ee4143582a4fb3f73a6973d1f836081ff00c74f4b"
+  },
+  {
+    "path": "tests/Feature/It/ItServiceOperationsTest.php",
+    "sha256": "8f883020ed8296ed34638d4dc3514fc3f6582b05575bccc53b5856486ad0748e"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w13-api-browser-fixture.php",
+    "sha256": "8d79daae49945d001dd6a02fc4764a77720f58bddeef97efa9d68a584ec33ca2"
+  }
+]

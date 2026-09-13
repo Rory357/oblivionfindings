@@ -1,0 +1,13 @@
+{"sequence":1,"utc":"2026-09-10T06:28:10+00:00","pid":35108,"memory_bytes":2097152,"peak_memory_bytes":2097152,"phase":"prepend_started","memory_limit":"1024M"}
+{"sequence":2,"utc":"2026-09-10T06:28:12+00:00","pid":35108,"memory_bytes":14680064,"peak_memory_bytes":16777216,"phase":"event_tracer_registered"}
+{"sequence":3,"utc":"2026-09-10T06:28:14+00:00","pid":35108,"memory_bytes":16777216,"peak_memory_bytes":16777216,"phase":"phpunit_event","event":"PHPUnit\\Event\\TestRunner\\BootstrapFinished"}
+{"sequence":4,"utc":"2026-09-10T06:28:15+00:00","pid":35108,"memory_bytes":18874368,"peak_memory_bytes":18874368,"phase":"phpunit_event","event":"PHPUnit\\Event\\Test\\DataProviderMethodFinished"}
+{"sequence":5,"utc":"2026-09-10T06:28:15+00:00","pid":35108,"memory_bytes":18874368,"peak_memory_bytes":18874368,"phase":"phpunit_event","event":"PHPUnit\\Event\\Test\\DataProviderMethodFinished"}
+{"sequence":6,"utc":"2026-09-10T06:28:15+00:00","pid":35108,"memory_bytes":18874368,"peak_memory_bytes":18874368,"phase":"phpunit_event","event":"PHPUnit\\Event\\Test\\DataProviderMethodFinished"}
+{"sequence":7,"utc":"2026-09-10T06:28:15+00:00","pid":35108,"memory_bytes":18874368,"peak_memory_bytes":18874368,"phase":"phpunit_event","event":"PHPUnit\\Event\\Test\\DataProviderMethodFinished"}
+{"sequence":8,"utc":"2026-09-10T06:28:15+00:00","pid":35108,"memory_bytes":18874368,"peak_memory_bytes":18874368,"phase":"phpunit_event","event":"PHPUnit\\Event\\Test\\DataProviderMethodFinished"}
+{"sequence":9,"utc":"2026-09-10T06:28:15+00:00","pid":35108,"memory_bytes":18874368,"peak_memory_bytes":18874368,"phase":"phpunit_event","event":"PHPUnit\\Event\\Test\\DataProviderMethodFinished"}
+{"sequence":10,"utc":"2026-09-10T06:28:15+00:00","pid":35108,"memory_bytes":18874368,"peak_memory_bytes":18874368,"phase":"phpunit_event","event":"PHPUnit\\Event\\Test\\DataProviderMethodFinished"}
+{"sequence":11,"utc":"2026-09-10T06:28:15+00:00","pid":35108,"memory_bytes":20971520,"peak_memory_bytes":20971520,"phase":"phpunit_event","event":"PHPUnit\\Event\\TestRunner\\ExecutionStarted"}
+{"sequence":12,"utc":"2026-09-10T06:28:15+00:00","pid":35108,"memory_bytes":20971520,"peak_memory_bytes":20971520,"phase":"phpunit_event","event":"PHPUnit\\Event\\Test\\BeforeFirstTestMethodFinished"}
+{"sequence":13,"utc":"2026-09-10T06:28:15+00:00","pid":35108,"memory_bytes":20971520,"peak_memory_bytes":20971520,"phase":"phpunit_event","event":"PHPUnit\\Event\\Test\\PreparationStarted","test_file":"vendor/pestphp/pest/src/Factories/TestCaseFactory.php(175) : eval()'d code","test_line":15,"test_method_hash":"472a5fe75c41e6f4e38f28277aa0bf05984ceffb067ed2a2d3cfb5156d07c6ce"}

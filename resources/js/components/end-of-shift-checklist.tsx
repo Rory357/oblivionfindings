@@ -11,10 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import DictateButton from '@/components/dictate-button';
-import DraftResumePrompt from '@/components/draft-resume-prompt';
-import DraftSavedIndicator from '@/components/draft-saved-indicator';
 import HandoverWriteForm, {
-    emptyHandoverWriteValue,
     type HandoverWriteValue,
 } from '@/components/handover-write-form';
 import ShiftTaskList, {
@@ -39,7 +36,10 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
-import { useFormAutosave } from '@/hooks/use-form-autosave';
+import {
+    useHandoverEditor,
+    type HandoverPerson,
+} from '@/hooks/use-handover-editor';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 
@@ -56,6 +56,7 @@ export type EndOfShiftChecklistSession = {
     id: number;
     shift_id: number | null;
     client_name: string | null;
+    site_name?: string | null;
     break_minutes?: number;
     handover_submitted?: boolean;
     tasks?: ShiftTaskListItem[];
@@ -76,6 +77,7 @@ function ChecklistBody({
     blockers,
     tasks,
     onTasksChange,
+    onOpenTask,
     notes,
     setNotes,
     breakMinutes,
@@ -85,15 +87,16 @@ function ChecklistBody({
     clinicalOverrideLocked,
     handoverValue,
     setHandoverValue,
-    handoverSavedAt,
-    resumeAvailable,
-    onResumeHandoverDraft,
-    onDiscardHandoverDraft,
+    handoverPeople,
+    handoverLoading,
+    handoverError,
+    retryHandover,
 }: {
     session: EndOfShiftChecklistSession;
     blockers: EndOfShiftBlocker[];
     tasks: ShiftTaskListItem[];
     onTasksChange: (next: ShiftTaskListItem[]) => void;
+    onOpenTask?: (id: number) => void;
     notes: string;
     setNotes: (next: string) => void;
     breakMinutes: number;
@@ -103,10 +106,10 @@ function ChecklistBody({
     clinicalOverrideLocked: boolean;
     handoverValue: HandoverWriteValue;
     setHandoverValue: (next: HandoverWriteValue) => void;
-    handoverSavedAt: number | null;
-    resumeAvailable: { savedAt: number } | null;
-    onResumeHandoverDraft: () => void;
-    onDiscardHandoverDraft: () => void;
+    handoverPeople: HandoverPerson[];
+    handoverLoading: boolean;
+    handoverError: string;
+    retryHandover: () => void;
 }) {
     const t = useMyDayLabels();
     const otherBlockers = blockers.filter(
@@ -116,7 +119,7 @@ function ChecklistBody({
         (blocker) => blocker.key === 'handover_missing',
     );
     const incompleteTaskCount = tasks.filter(
-        (task) => !task.is_completed,
+        (task) => !task.is_completed && task.follow_through !== 'accepted_help',
     ).length;
     const showTaskList = (tasks?.length ?? 0) > 0;
 
@@ -185,7 +188,14 @@ function ChecklistBody({
                             }
                         >
                             {incompleteTaskCount === 0
-                                ? t('all_complete')
+                                ? tasks.some(
+                                      (task) =>
+                                          !task.is_completed &&
+                                          task.follow_through ===
+                                              'accepted_help',
+                                  )
+                                    ? 'Every task is done or has an owner'
+                                    : t('all_complete')
                                 : t('still_to_do', {
                                       open: incompleteTaskCount,
                                       total: tasks.length,
@@ -194,6 +204,7 @@ function ChecklistBody({
                     </div>
                     <ShiftTaskList
                         tasks={tasks}
+                        onOpenTask={onOpenTask}
                         onTasksChange={onTasksChange}
                         maxVisible={6}
                         submitOnToggle={false}
@@ -204,20 +215,31 @@ function ChecklistBody({
             {hasHandoverBlocker && session.shift_id ? (
                 <section id="handover" className="space-y-2">
                     <h3 className="text-sm font-semibold">{t('handover')}</h3>
-                    {resumeAvailable ? (
-                        <DraftResumePrompt
-                            savedAt={resumeAvailable.savedAt}
-                            onResume={onResumeHandoverDraft}
-                            onDiscard={onDiscardHandoverDraft}
-                            title="Resume your unfinished handover?"
-                            description="We kept your handover answers from earlier on this device."
+                    {handoverLoading ? (
+                        <p role="status">Loading people and saved notes…</p>
+                    ) : handoverError ? (
+                        <div role="alert">
+                            <p>{handoverError}</p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={retryHandover}
+                            >
+                                Retry
+                            </Button>
+                        </div>
+                    ) : (
+                        <HandoverWriteForm
+                            value={handoverValue}
+                            onChange={setHandoverValue}
+                            people={handoverPeople}
                         />
-                    ) : null}
-                    <HandoverWriteForm
-                        value={handoverValue}
-                        onChange={setHandoverValue}
-                    />
-                    <DraftSavedIndicator savedAt={handoverSavedAt} />
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                        These notes will be saved as a draft when you finish.
+                        Review and send the handover to share it with the
+                        incoming worker.
+                    </p>
                 </section>
             ) : null}
 
@@ -339,31 +361,27 @@ export default function EndOfShiftChecklist({
     session,
     open,
     onOpenChange,
+    onOpenTask,
 }: {
     session: EndOfShiftChecklistSession;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onOpenTask?: (id: number) => void;
 }) {
     const page = usePage().props as {
         auth?: { user?: { id?: number } };
         flash?: { clock_out_blockers?: EndOfShiftBlocker[] | null };
     };
-    const userId = page.auth?.user?.id ?? 0;
     const flashedClockOutBlockers = page.flash?.clock_out_blockers ?? null;
     const t = useMyDayLabels();
     const isMobile = useIsMobile();
     const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState('');
     const [notes, setNotes] = useState('');
     const [breakMinutes, setBreakMinutes] = useState(
         session.break_minutes ?? 0,
     );
     const [overrideReason, setOverrideReason] = useState('');
-    const [handoverValue, setHandoverValue] = useState<HandoverWriteValue>(
-        emptyHandoverWriteValue,
-    );
-    const [resumeAvailable, setResumeAvailable] = useState<{
-        savedAt: number;
-    } | null>(null);
     const [tasks, setTasks] = useState<ShiftTaskListItem[]>(
         session.tasks ?? [],
     );
@@ -384,6 +402,7 @@ export default function EndOfShiftChecklist({
         }
 
         setSubmitting(false);
+        setSubmitError('');
         setNotes('');
         setOverrideReason('');
         setBreakMinutes(session.break_minutes ?? 0);
@@ -413,7 +432,8 @@ export default function EndOfShiftChecklist({
     // reason just because the original payload still says X tasks pending.
     const blockers = useMemo(() => {
         const incompleteCount = tasks.filter(
-            (task) => !task.is_completed,
+            (task) =>
+                !task.is_completed && task.follow_through !== 'accepted_help',
         ).length;
         return (serverBlockers ?? session.end_of_shift_blockers ?? [])
             .map((blocker) =>
@@ -439,65 +459,18 @@ export default function EndOfShiftChecklist({
     const clinicalOverrideLocked =
         hasClinicalBlocker && !session.can_force_clinical_blockers;
     const force = otherBlockers.length > 0;
+    const handoverEditor = useHandoverEditor(
+        session.shift_id,
+        open && hasHandoverBlocker,
+    );
+    const { value: handoverValue, setValue: setHandoverValue } = handoverEditor;
     const canSubmit =
         !submitting &&
         !clinicalOverrideLocked &&
+        (!hasHandoverBlocker ||
+            !session.shift_id ||
+            (!handoverEditor.loading && !handoverEditor.error)) &&
         (!force || overrideReason.trim().length >= 4);
-    const handoverDraftKey = session.shift_id
-        ? `oblivion:clockout-handover:v1:u${userId}:s${session.shift_id}`
-        : null;
-    const handoverEligibleForSave =
-        open && hasHandoverBlocker && !!session.shift_id;
-    const {
-        savedAt: handoverSavedAt,
-        load: loadHandoverDraft,
-        clear: clearHandoverDraft,
-    } = useFormAutosave<Record<string, unknown>>(
-        handoverValue as unknown as Record<string, unknown>,
-        { shift_id: session.shift_id },
-        {
-            key: handoverDraftKey ?? 'oblivion:clockout-handover:v1:disabled',
-            enabled: !!handoverDraftKey && handoverEligibleForSave,
-        },
-    );
-
-    useEffect(() => {
-        if (!open) {
-            setResumeAvailable(null);
-            setHandoverValue(emptyHandoverWriteValue);
-            return;
-        }
-
-        if (!handoverEligibleForSave) {
-            setResumeAvailable(null);
-            setHandoverValue(emptyHandoverWriteValue);
-            return;
-        }
-
-        const existing = loadHandoverDraft();
-        const draftData = existing?.data as
-            | Partial<HandoverWriteValue>
-            | undefined;
-        const hasDraft =
-            !!draftData &&
-            (!!draftData.handover_notes?.trim() ||
-                (draftData.shift_rating !== null &&
-                    draftData.shift_rating !== undefined) ||
-                draftData.follow_up_needed === true ||
-                draftData.meds_completed === false);
-
-        if (hasDraft && draftData && existing) {
-            setHandoverValue({
-                ...emptyHandoverWriteValue,
-                ...draftData,
-            });
-            setResumeAvailable({ savedAt: existing.savedAt });
-            return;
-        }
-
-        setHandoverValue(emptyHandoverWriteValue);
-        setResumeAvailable(null);
-    }, [handoverEligibleForSave, loadHandoverDraft, open]);
 
     const postClockOut = () => {
         router.post(
@@ -511,6 +484,7 @@ export default function EndOfShiftChecklist({
                 task_updates: tasks.map((task) => ({
                     id: task.id,
                     is_completed: task.is_completed,
+                    expected_version: task.version ?? 0,
                 })),
                 handover:
                     hasHandoverBlocker && session.shift_id
@@ -519,17 +493,22 @@ export default function EndOfShiftChecklist({
                               shift_rating: handoverValue.shift_rating,
                               handover_notes: handoverValue.handover_notes,
                               follow_up_needed: handoverValue.follow_up_needed,
+                              worker_notes: handoverValue.worker_notes,
+                              expected_version: handoverValue.expected_version,
                           }
                         : null,
             },
             {
                 preserveScroll: true,
                 onSuccess: () => {
-                    clearHandoverDraft();
                     setServerBlockers(null);
                     onOpenChange(false);
                 },
-                onError: () => {
+                onError: (errors) => {
+                    setSubmitError(
+                        Object.values(errors).join(' ') ||
+                            'The shift could not be ended. Your answers are still here.',
+                    );
                     if (flashedClockOutBlockers?.length) {
                         setServerBlockers(flashedClockOutBlockers);
                     }
@@ -541,38 +520,48 @@ export default function EndOfShiftChecklist({
 
     const submit = () => {
         if (submitting) return;
+        setSubmitError('');
         setSubmitting(true);
         postClockOut();
     };
 
     const body = (
-        <ChecklistBody
-            session={session}
-            blockers={blockers}
-            tasks={tasks}
-            onTasksChange={setTasks}
-            notes={notes}
-            setNotes={setNotes}
-            breakMinutes={breakMinutes}
-            setBreakMinutes={setBreakMinutes}
-            overrideReason={overrideReason}
-            setOverrideReason={setOverrideReason}
-            clinicalOverrideLocked={clinicalOverrideLocked}
-            handoverValue={handoverValue}
-            setHandoverValue={setHandoverValue}
-            handoverSavedAt={handoverSavedAt}
-            resumeAvailable={resumeAvailable}
-            onResumeHandoverDraft={() => setResumeAvailable(null)}
-            onDiscardHandoverDraft={() => {
-                clearHandoverDraft();
-                setHandoverValue(emptyHandoverWriteValue);
-                setResumeAvailable(null);
-            }}
-        />
+        <>
+            {submitError && (
+                <p
+                    role="alert"
+                    className="mb-4 rounded-lg bg-status-critical-bg p-3 text-sm text-status-critical"
+                >
+                    {submitError}
+                </p>
+            )}
+            <ChecklistBody
+                session={session}
+                blockers={blockers}
+                tasks={tasks}
+                onTasksChange={setTasks}
+                onOpenTask={onOpenTask}
+                notes={notes}
+                setNotes={setNotes}
+                breakMinutes={breakMinutes}
+                setBreakMinutes={setBreakMinutes}
+                overrideReason={overrideReason}
+                setOverrideReason={setOverrideReason}
+                clinicalOverrideLocked={clinicalOverrideLocked}
+                handoverValue={handoverValue}
+                setHandoverValue={setHandoverValue}
+                handoverPeople={handoverEditor.editor?.people ?? []}
+                handoverLoading={handoverEditor.loading}
+                handoverError={handoverEditor.error}
+                retryHandover={handoverEditor.retry}
+            />
+        </>
     );
-    const title = session.client_name
-        ? t('end_shift_for', { name: session.client_name })
-        : t('end_shift');
+    const title = session.site_name
+        ? `End shift at ${session.site_name}`
+        : session.client_name
+          ? t('end_shift_for', { name: session.client_name })
+          : t('end_shift');
     const description =
         blockers.length === 0
             ? t('confirm_break_minutes')

@@ -6,10 +6,16 @@ use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Notifications\ItProvisioningCancelledNotification;
 use App\Domain\It\Contracts\TracksItEmailDelivery;
 use App\Domain\It\InboundEmailIngestor;
+use App\Domain\It\Services\ItAutomationOperationsPresenter;
+use App\Domain\It\Services\ItAutomationRunDiagnostics;
+use App\Domain\It\Services\ItAutomationRunOutcome;
 use App\Domain\It\Services\ItAutomationRunRecorder;
 use App\Domain\It\Services\ItAutomationScheduleCatalog;
+use App\Domain\It\Services\ItEmailDeliveryFailure;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Jobs\PollItMailboxJob;
+use App\Mail\MailNotSubmitted;
+use App\Mail\MailSubmissionRejected;
 use App\Models\AuditLog;
 use App\Models\ItAutomationRun;
 use App\Models\ItChange;
@@ -22,6 +28,7 @@ use App\Models\ItProvisioningRequest;
 use App\Models\ItService;
 use App\Models\ItTicket;
 use App\Models\ItTicketComment;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -38,6 +45,7 @@ use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
@@ -94,6 +102,11 @@ test('service operations schema records knowledge evidence email delivery and ca
 });
 
 test('knowledge can only enter managed lifecycle states through lifecycle actions', function () {
+    $this->manager->permissionOverrides()->syncWithoutDetaching(
+        Permission::query()->whereIn('key', ['it.knowledge.author', 'it.knowledge.review'])
+            ->pluck('id')->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all(),
+    );
+    $this->manager = $this->manager->fresh();
     $payload = [
         'title' => 'Managed lifecycle only',
         'category' => 'network',
@@ -140,6 +153,13 @@ test('knowledge follows review publish and retire lifecycle with ownership scope
     $site = Site::factory()->create();
     $service = ItService::factory()->create();
     $owner = serviceOperationsUser();
+    foreach ([$this->manager, $owner] as $knowledgeActor) {
+        $knowledgeActor->permissionOverrides()->syncWithoutDetaching(
+            Permission::query()->whereIn('key', ['it.knowledge.author', 'it.knowledge.review'])
+                ->pluck('id')->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all(),
+        );
+    }
+    $this->manager = $this->manager->fresh();
     serviceOperationsAssignSite($this->manager, $site);
     serviceOperationsAssignSite($owner, $site);
     HrEmployeeProfile::factory()->create([
@@ -259,13 +279,127 @@ test('public ticket replies create visible outbound delivery records and failed 
         ->and($retry->notification_uuid)->not->toBe($originalUuid)
         ->and($retry->retry_count)->toBe(1)
         ->and(AuditLog::query()->where('action', 'it.email.delivery.retried')->exists())->toBeTrue();
-    Notification::assertSentTo($this->worker, TicketRepliedNotification::class);
+    // HTTP requests execute their post-response jobs. Re-running the recovery
+    // drain must not send either the original or its retry a second time.
+    Notification::assertSentToTimes($this->worker, TicketRepliedNotification::class, 2);
+    expect(app(ItEmailDeliveryService::class)->dispatchPending(deliveryId: $retry->id))->toBe(0);
+    Notification::assertSentToTimes($this->worker, TicketRepliedNotification::class, 2);
 
     $this->actingAs($this->manager)
         ->post("/it/setup/email-deliveries/{$delivery->id}/retry")
         ->assertRedirect()
         ->assertSessionHas('error');
     expect(ItEmailDelivery::query()->count())->toBe(2);
+});
+
+test('delivery diagnostics never store arbitrary new failures or redisclose legacy provider messages', function () {
+    Notification::fake();
+    $site = serviceOperationsAssignSite($this->manager);
+    $ticket = ItTicket::factory()->create(['site_id' => $site->id, 'requester_user_id' => $this->worker->id]);
+    $service = app(ItEmailDeliveryService::class);
+    $private = 'PRIVATE_PROVIDER_SECRET_AND_BODY';
+    $delivery = ItEmailDelivery::factory()->create(['it_ticket_id' => $ticket->id, 'recipient_user_id' => $this->worker->id]);
+    $service->recordProviderStatus($delivery->notification_uuid, 'failed', $private);
+    expect($delivery->fresh()->getRawOriginal('last_error'))->toBe(ItEmailDeliveryFailure::MESSAGES['provider_failed']);
+    $delivery->update(['last_error' => $private]);
+    expect($delivery->fresh()->toArray())->not->toHaveKey('last_error');
+    $this->actingAs($this->manager)->get('/it/setup?tab=operations')->assertDontSee($private)
+        ->assertInertia(fn ($page) => $page->where('emailDeliveries.0.failure_category', 'legacy_failure')
+            ->where('emailDeliveries.0.last_error', ItEmailDeliveryFailure::MESSAGES['legacy_failure']));
+    // Presentation does not destructively rewrite historical evidence.
+    expect($delivery->fresh()->getRawOriginal('last_error'))->toBe($private);
+    $service->recordProviderStatus($delivery->notification_uuid, 'bounced', $private);
+    expect($delivery->fresh()->getRawOriginal('last_error'))->toBe(ItEmailDeliveryFailure::MESSAGES['provider_bounced']);
+});
+
+test('transport failures keep safe categories and preserve uncertain sending and provider outcomes', function () {
+    $site = serviceOperationsAssignSite($this->manager);
+    $ticket = ItTicket::factory()->create(['site_id' => $site->id, 'requester_user_id' => $this->worker->id]);
+    $service = app(ItEmailDeliveryService::class);
+    foreach ([
+        [new MailNotSubmitted('PRIVATE local preflight'), 'queued', 'not_submitted', 'failed'],
+        [new MailSubmissionRejected('PRIVATE provider body'), 'sending', 'submission_rejected', 'failed'],
+        [new RuntimeException('PRIVATE SMTP password'), 'queued', 'dispatch_failed', 'failed'],
+        [new RuntimeException('PRIVATE unknown acceptance'), 'sending', 'outcome_unknown', 'sending'],
+    ] as [$exception, $status, $category, $expectedStatus]) {
+        $delivery = ItEmailDelivery::factory()->create(['it_ticket_id' => $ticket->id, 'recipient_user_id' => $this->worker->id,
+            'status' => $status, 'sending_at' => $status === 'sending' ? now() : null]);
+        $notification = new TicketCreatedNotification($ticket);
+        $notification->id = $delivery->notification_uuid;
+        $service->recordNotificationEvent(new NotificationFailed(
+            $this->worker, $notification, 'mail', ['exception' => $exception],
+        ));
+        expect($delivery->fresh()->status)->toBe($expectedStatus)
+            ->and($delivery->fresh()->getRawOriginal('last_error'))->toBe(ItEmailDeliveryFailure::MESSAGES[$category]);
+    }
+});
+
+test('JSON delivery retry validates the current actor and returns one durable retry receipt', function () {
+    $site = serviceOperationsAssignSite($this->manager);
+    $ticket = ItTicket::factory()->create([
+        'site_id' => $site->id,
+        'requester_user_id' => $this->worker->id,
+    ]);
+    $delivery = ItEmailDelivery::factory()->create([
+        'it_ticket_id' => $ticket->id,
+        'recipient_user_id' => $this->worker->id,
+        'recipient_email' => $this->worker->email,
+        'notification_type' => 'ticket_created',
+        'audience' => 'receipt',
+        'notification_context' => [],
+        'status' => 'failed',
+        'failed_at' => now(),
+    ]);
+    $url = route('it.setup.email-deliveries.retry', $delivery);
+
+    $this->actingAs($this->manager)->postJson($url, [])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('expected_actor_id');
+    $this->actingAs($this->manager)->postJson($url, ['expected_actor_id' => $this->worker->id])
+        ->assertConflict();
+    expect(ItEmailDelivery::query()->count())->toBe(1)
+        ->and($delivery->fresh()->status)->toBe('failed');
+
+    $response = $this->actingAs($this->manager)->postJson($url, ['expected_actor_id' => $this->manager->id])
+        ->assertSuccessful()
+        ->assertJsonPath('data.original_delivery_id', $delivery->id)
+        ->assertJsonPath('data.status', 'queued')
+        ->assertJsonPath('data.actor_id', $this->manager->id)
+        ->assertJsonStructure(['data' => ['original_delivery_id', 'retry_delivery_id', 'status', 'actor_id']]);
+    $retryId = $response->json('data.retry_delivery_id');
+    expect($retryId)->toBeInt()
+        ->and(ItEmailDelivery::query()->findOrFail($retryId)->retry_of_delivery_id)->toBe($delivery->id)
+        ->and($delivery->fresh()->status)->toBe('retried');
+
+    $this->actingAs($this->manager)->postJson($url, ['expected_actor_id' => $this->manager->id])
+        ->assertConflict();
+    expect(ItEmailDelivery::query()->count())->toBe(2);
+});
+
+test('JSON delivery retry conceals a failed delivery outside the actor work scope', function () {
+    $site = serviceOperationsAssignSite($this->manager);
+    $restrictedActor = serviceOperationsUser();
+    serviceOperationsAssignSite($restrictedActor, Site::factory()->create());
+    $ticket = ItTicket::factory()->create([
+        'site_id' => $site->id,
+        'requester_user_id' => $this->worker->id,
+    ]);
+    $delivery = ItEmailDelivery::factory()->create([
+        'it_ticket_id' => $ticket->id,
+        'recipient_user_id' => $this->worker->id,
+        'recipient_email' => $this->worker->email,
+        'notification_type' => 'ticket_created',
+        'audience' => 'receipt',
+        'notification_context' => [],
+        'status' => 'failed',
+        'failed_at' => now(),
+    ]);
+
+    $this->actingAs($restrictedActor)
+        ->postJson(route('it.setup.email-deliveries.retry', $delivery), ['expected_actor_id' => $restrictedActor->id])
+        ->assertNotFound();
+    expect(ItEmailDelivery::query()->count())->toBe(1)
+        ->and($delivery->fresh()->status)->toBe('failed');
 });
 
 test('every mail-capable IT notification exposes delivery tracking context', function () {
@@ -333,6 +467,8 @@ test('provisioning cancellation mail is visible and can be retried safely', func
     expect($delivery->fresh()->status)->toBe('retried')
         ->and($retry->it_provisioning_request_id)->toBe($provisioning->id)
         ->and($retry->retry_of_delivery_id)->toBe($delivery->id);
+    Notification::assertNothingSent();
+    $deliveries->dispatchPending(deliveryId: $retry->id);
     Notification::assertSentTo($this->manager, ItProvisioningCancelledNotification::class);
 });
 
@@ -560,7 +696,9 @@ test('every IT mail type creates a visible delivery and can be retried safely', 
     $ticket = ItTicket::factory()->create([
         'site_id' => $site->id,
         'requester_user_id' => $this->worker->id,
+        'assigned_to_user_id' => $this->manager->id,
     ]);
+    $ticket->watchers()->attach($this->worker->id); // Reopen notices require a current watcher or assignee.
     $notifications = [
         new TicketApprovalNotification($ticket, 'requested'),
         new TicketAssignedNotification($ticket),
@@ -573,7 +711,9 @@ test('every IT mail type creates a visible delivery and can be retried safely', 
     $deliveries = app(ItEmailDeliveryService::class);
 
     foreach ($notifications as $notification) {
-        $deliveries->send($this->worker, $notification);
+        $recipient = $notification instanceof TicketSlaNotification || $notification instanceof TicketApprovalNotification || $notification instanceof TicketAssignedNotification
+            ? $this->manager : $this->worker;
+        $deliveries->send($recipient, $notification);
     }
     expect(ItEmailDelivery::query()->count())->toBe(7);
 
@@ -616,18 +756,22 @@ test('existing IT schedules are named once and their runs are recorded from Lara
     $events = collect(app(Schedule::class)->events())
         ->filter(fn ($event) => str_starts_with((string) $event->description, 'it.'));
     expect($events->pluck('description')->sort()->values()->all())->toBe([
+        'it.check-approval-deadlines',
         'it.check-sla',
         'it.close-resolved',
+        'it.dispatch-notifications',
         'it.poll-mailbox',
+        'it.retry-attachment-cleanup',
     ])->and($events->every(fn ($event) => $event->withoutOverlapping && $event->onOneServer))->toBeTrue();
 
-    $task = $events->firstWhere('description', 'it.check-sla');
+    $task = $events->firstWhere('description', 'it.close-resolved');
+    $task->exitCode = 0;
     $recorder = app(ItAutomationRunRecorder::class);
     $recorder->starting(new ScheduledTaskStarting($task));
     $recorder->finished(new ScheduledTaskFinished($task, 1.25));
 
     $run = ItAutomationRun::query()->sole();
-    expect($run->automation_key)->toBe('it.check-sla')
+    expect($run->automation_key)->toBe('it.close-resolved')
         ->and($run->status)->toBe('succeeded')
         ->and($run->runtime_ms)->toBe(1250);
 
@@ -636,9 +780,43 @@ test('existing IT schedules are named once and their runs are recorded from Lara
     expect(ItAutomationRun::query()->where('status', 'failed')->whereNotNull('error_summary')->exists())->toBeTrue();
 });
 
+test('SLA freshness reads only its own run evidence and agrees with the canonical catalogue', function () {
+    $this->travelTo(Carbon::parse('2026-09-09 01:20:00', 'UTC'));
+    $catalogue = app(ItAutomationScheduleCatalog::class);
+
+    expect($catalogue->freshnessFor('it.check-sla')['state'])->toBe('unmeasured')
+        ->and($catalogue->freshnessFor('it.unknown'))->toBeNull();
+
+    ItAutomationRun::factory()->create([
+        'automation_key' => 'it.check-sla',
+        'status' => 'succeeded',
+        'started_at' => now()->subHours(2)->subMinute(),
+        'finished_at' => now()->subHours(2),
+    ]);
+    ItAutomationRun::factory()->create([
+        'automation_key' => 'it.poll-mailbox',
+        'status' => 'failed',
+    ]);
+    expect($catalogue->freshnessFor('it.check-sla')['state'])->toBe('stale');
+
+    ItAutomationRun::factory()->create([
+        'automation_key' => 'it.check-sla',
+        'status' => 'succeeded',
+        'started_at' => now()->subMinute(),
+        'finished_at' => now(),
+    ]);
+    $freshness = $catalogue->freshnessFor('it.check-sla', now());
+    $definition = collect($catalogue->definitions())->firstWhere('key', 'it.check-sla');
+
+    expect($freshness['state'])->toBe('fresh')
+        ->and($freshness)->toBe($definition['freshness'])
+        ->and(ItAutomationRun::query()->count())->toBe(3);
+});
+
 test('automation completions update the exact run when executions overlap', function () {
-    $task = collect(app(Schedule::class)->events())->firstWhere('description', 'it.check-sla');
+    $task = collect(app(Schedule::class)->events())->firstWhere('description', 'it.close-resolved');
     $firstTask = clone $task;
+    $firstTask->exitCode = 0;
     $secondTask = clone $task;
     $recorder = app(ItAutomationRunRecorder::class);
 
@@ -797,13 +975,226 @@ test('setup shows an access-safe operations audit for channels automations and c
             ->has('automationRuns'));
 });
 
+test('a nonzero scheduler exit and its following failure event record one safe failed run', function () {
+    $task = clone collect(app(Schedule::class)->events())->firstWhere('description', 'it.close-resolved');
+    $recorder = app(ItAutomationRunRecorder::class);
+    $recorder->starting(new ScheduledTaskStarting($task));
+    $task->exitCode = 1;
+    $recorder->finished(new ScheduledTaskFinished($task, 0.75));
+    $recorder->failed(new ScheduledTaskFailed($task, new RuntimeException('Bearer private-secret /private/path?token=secret')));
+
+    $run = ItAutomationRun::query()->sole();
+    expect($run->status)->toBe('failed')->and($run->runtime_ms)->toBe(750)
+        ->and($run->error_summary)->toBe(ItAutomationRunDiagnostics::failure('it.close-resolved'))
+        ->and(app(ItAutomationScheduleCatalog::class)->freshnessFor('it.close-resolved')['last_success_at'])->toBeNull();
+
+    // Reusing a scheduler task on the next tick must still create a new attempt.
+    $recorder->starting(new ScheduledTaskStarting($task));
+    $task->exitCode = 0;
+    $recorder->finished(new ScheduledTaskFinished($task, 0.25));
+    expect(ItAutomationRun::query()->count())->toBe(2)
+        ->and($run->fresh()->status)->toBe('failed')
+        ->and(ItAutomationRun::query()->latest('id')->first()->status)->toBe('succeeded');
+});
+
+test('scheduler completion without an exit result never fabricates a successful check', function () {
+    $task = clone collect(app(Schedule::class)->events())->firstWhere('description', 'it.close-resolved');
+    $task->exitCode = null;
+    $recorder = app(ItAutomationRunRecorder::class);
+    $recorder->starting(new ScheduledTaskStarting($task));
+    $recorder->finished(new ScheduledTaskFinished($task, 0.01));
+    expect(ItAutomationRun::query()->sole()->status)->toBe('failed');
+});
+
+test('stale automation completions preserve the first terminal outcome and safe stored diagnostics', function () {
+    $recorder = app(ItAutomationRunRecorder::class);
+    $run = $recorder->begin('it.check-sla');
+    $stale = $run->fresh();
+    $recorder->completeRun($run, 'failed', 25, 'private-secret', ['checked' => 2]);
+    $finishedAt = $run->finished_at;
+    $this->travel(10)->seconds();
+    $recorder->completeRun($stale, 'succeeded', 200, 'another-secret', ['checked' => 99]);
+    expect($stale->status)->toBe('failed')->and($stale->runtime_ms)->toBe(25)
+        ->and($stale->finished_at->equalTo($finishedAt))->toBeTrue()
+        ->and($stale->result_summary)->toBe(['checked' => 2])
+        ->and($stale->error_summary)->toBe(ItAutomationRunDiagnostics::failure('it.check-sla'))
+        ->and($stale->toArray())->not->toHaveKeys(['error_summary', 'result_summary']);
+    expect(fn () => $recorder->completeRun($stale, 'running'))->toThrow(InvalidArgumentException::class);
+});
+
+test('operations conceals legacy scheduler exception text while preserving useful safe recovery guidance', function () {
+    $run = ItAutomationRun::factory()->create([
+        'automation_key' => 'it.close-resolved', 'status' => 'failed',
+        'error_summary' => 'Bearer private-secret /private/path?token=secret',
+        'result_summary' => ['private' => 'private-payload'],
+    ]);
+    $this->actingAs($this->manager)->get('/it/setup?tab=operations')
+        ->assertInertia(fn ($page) => $page
+            ->where('automationRuns.0.id', $run->id)
+            ->where('automationRuns.0.error_summary', ItAutomationRunDiagnostics::failure('it.close-resolved'))
+            ->missing('automationRuns.0.result_summary'));
+    expect($run->fresh()->error_summary)->toContain('private-secret');
+    $this->actingAs($this->worker)->get('/it/setup?tab=operations')->assertForbidden();
+});
+
+test('mailbox freshness requires a complete nonempty poll rather than a successful bounded batch', function () {
+    $complete = ItAutomationRun::factory()->create(['automation_key' => 'it.poll-mailbox', 'status' => 'succeeded',
+        'started_at' => now()->subMinutes(3), 'finished_at' => now()->subMinutes(2),
+        'result_summary' => ['connections' => 2, 'failed' => 0, 'pending' => 0, 'skipped' => 0]]);
+    foreach ([
+        ['connections' => 2, 'failed' => 0, 'pending' => 1, 'skipped' => 0],
+        ['connections' => 2, 'failed' => 0, 'pending' => 0, 'skipped' => 2],
+        ['connections' => 0, 'failed' => 0, 'pending' => 0, 'skipped' => 0],
+        ['connections' => '2', 'failed' => 0, 'pending' => 0, 'skipped' => 0],
+        ['connections' => 2, 'failed' => 0, 'skipped' => 0],
+        ['connections' => 2, 'failed' => -1, 'pending' => 0, 'skipped' => 0],
+    ] as $summary) {
+        $run = ItAutomationRun::factory()->create(['automation_key' => 'it.poll-mailbox', 'status' => 'succeeded',
+            'started_at' => now()->subMinute(), 'finished_at' => now(), 'result_summary' => $summary]);
+        expect(ItAutomationRunOutcome::state($run))->not->toBe('succeeded');
+        $freshness = app(ItAutomationScheduleCatalog::class)->freshnessFor('it.poll-mailbox');
+        expect($freshness['last_success_at'])->toBe($complete->finished_at->toIso8601String())
+            ->and($freshness['state'])->toBe('unmeasured');
+    }
+    $recovered = ItAutomationRun::factory()->create(['automation_key' => 'it.poll-mailbox', 'status' => 'succeeded',
+        'started_at' => now(), 'finished_at' => now(), 'result_summary' => ['connections' => 1, 'failed' => 0, 'pending' => 0, 'skipped' => 0]]);
+    expect(app(ItAutomationScheduleCatalog::class)->freshnessFor('it.poll-mailbox')['state'])->toBe('fresh')
+        ->and(ItAutomationRunOutcome::state($recovered))->toBe('succeeded');
+});
+
+test('mailbox outcomes reject inconsistent counts and distinguish failed pending skipped and no work', function () {
+    foreach ([
+        ['failed', ['connections' => 2, 'failed' => 1, 'pending' => 1, 'skipped' => 0]],
+        ['pending', ['connections' => 2, 'failed' => 0, 'pending' => 1, 'skipped' => 1]],
+        ['skipped', ['connections' => 2, 'failed' => 0, 'pending' => 0, 'skipped' => 1]],
+        ['no_work', ['connections' => 0, 'failed' => 0, 'pending' => 0, 'skipped' => 0]],
+        ['unknown', ['connections' => 1, 'failed' => 0, 'pending' => 2, 'skipped' => 0]],
+        ['unknown', ['connections' => true, 'failed' => 0, 'pending' => 0, 'skipped' => 0]],
+    ] as [$expected, $summary]) {
+        $run = new ItAutomationRun(['automation_key' => 'it.poll-mailbox', 'status' => 'succeeded', 'finished_at' => now(), 'result_summary' => $summary]);
+        expect(ItAutomationRunOutcome::state($run))->toBe($expected);
+    }
+});
+
+test('automation history paginates all retained executions and preserves the selected period', function () {
+    ItAutomationRun::factory()->count(27)->create(['automation_key' => 'it.close-resolved', 'status' => 'succeeded', 'started_at' => now(), 'finished_at' => now()]);
+    ItAutomationRun::factory()->create(['automation_key' => 'it.close-resolved', 'status' => 'failed', 'started_at' => now()->subDays(5)]);
+    $from = now()->toDateString();
+    $this->actingAs($this->manager)->get('/it/setup?tab=operations&automation_from='.$from)
+        ->assertInertia(fn ($page) => $page->where('operationsAudit.automation_history.total', 27)
+            ->has('operationsAudit.automation_history.rows', 25)
+            ->where('operationsAudit.automation_history.links.3.url', '/it/setup?tab=operations&automation_from='.$from.'&automation_page=2'));
+    $this->get('/it/setup?tab=operations&automation_from='.$from.'&automation_page=99')
+        ->assertInertia(fn ($page) => $page->where('operationsAudit.automation_history.page', 2)
+            ->has('operationsAudit.automation_history.rows', 2)
+            ->where('operationsAudit.automation_history.links.3.url', null));
+});
+
+test('automation recovery respects current mailbox authority and never serializes private run payloads', function () {
+    $run = ItAutomationRun::factory()->create(['automation_key' => 'it.poll-mailbox', 'status' => 'succeeded', 'finished_at' => now(),
+        'error_summary' => 'private-error', 'result_summary' => ['connections' => 2, 'failed' => 0, 'pending' => 1, 'skipped' => 0, 'private' => 'private-payload']]);
+    $presenter = app(ItAutomationOperationsPresenter::class);
+    $without = $presenter->operations($this->manager);
+    expect($without['rows'][0])->toMatchArray(['id' => $run->id, 'outcome' => 'pending', 'execution_status' => 'succeeded', 'mailbox_counts' => null, 'recovery_url' => null]);
+    $admin = serviceOperationsUser('admin');
+    $with = $presenter->operations($admin);
+    expect($with['rows'][0]['mailbox_counts'])->toMatchArray(['connections' => 2, 'failed' => 0, 'skipped' => 0, 'pending' => 1])
+        ->and($with['rows'][0]['recovery_url'])->toBe(route('settings.it-mailbox', absolute: false))
+        ->and(json_encode($with))->not->toContain('private-payload', 'private-error');
+    expect($presenter->operations($this->worker))->toMatchArray(['can_view' => false, 'rows' => [], 'total' => null]);
+});
+
+test('unfinished automation totals cover the whole period instead of the current page', function () {
+    $run = ItAutomationRun::factory()->create(['automation_key' => 'it.close-resolved', 'status' => 'running', 'started_at' => now()->subDay(), 'finished_at' => null]);
+    ItAutomationRun::factory()->count(26)->create(['automation_key' => 'it.close-resolved', 'status' => 'skipped', 'finished_at' => now()]);
+    $history = app(ItAutomationOperationsPresenter::class)->operations($this->manager);
+    expect($history['unfinished'])->toBe(1)->and($history['oldest_unfinished_at'])->toBe($run->started_at->toIso8601String())
+        ->and(collect($history['rows'])->pluck('id')->contains($run->id))->toBeFalse();
+});
+
+test('automation search covers retained pages and keeps its date period and query in navigation', function () {
+    ItAutomationRun::factory()->count(27)->create(['automation_key' => 'it.close-resolved', 'status' => 'skipped', 'started_at' => now(), 'finished_at' => now()]);
+    ItAutomationRun::factory()->create(['automation_key' => 'it.poll-mailbox', 'status' => 'failed', 'started_at' => now()]);
+    ItAutomationRun::factory()->create(['automation_key' => 'it.close-resolved', 'status' => 'failed', 'started_at' => now()->subDays(3)]);
+    $from = now()->toDateString();
+    $this->actingAs($this->manager)->get('/it/setup?tab=operations&automation_from='.$from.'&q=Close%20resolved')
+        ->assertInertia(fn ($page) => $page->where('operationsAudit.automation_history.total', 27)
+            ->has('operationsAudit.automation_history.rows', 25)
+            ->where('operationsAudit.automation_history.links.3.url', '/it/setup?tab=operations&automation_from='.$from.'&q=Close+resolved&automation_page=2'));
+    $this->get('/it/setup?tab=operations&automation_from='.$from.'&q=Close%20resolved&automation_page=2')
+        ->assertInertia(fn ($page) => $page->where('operationsAudit.automation_history.total', 27)
+            ->where('operationsAudit.automation_history.page', 2)->has('operationsAudit.automation_history.rows', 2));
+    $this->get('/it/setup?tab=operations&q=zz-no-matching-automation')
+        ->assertInertia(fn ($page) => $page->where('operationsAudit.automation_history.total', 0)
+            ->where('operationsAudit.automation_history.unfinished', 0)
+            ->where('operationsAudit.automation_history.oldest_unfinished_at', null)
+            ->has('operationsAudit.automation_history.rows', 0));
+});
+
+test('search outcome predicates agree with projected mailbox and legacy execution evidence', function () {
+    $base = ['automation_key' => 'it.poll-mailbox', 'status' => 'succeeded', 'finished_at' => now()];
+    $cases = [
+        [...$base, 'result_summary' => ['connections' => 1, 'failed' => 0, 'skipped' => 0, 'pending' => 0]],
+        [...$base, 'result_summary' => ['connections' => 1, 'failed' => 0, 'skipped' => 0, 'pending' => 1]],
+        [...$base, 'result_summary' => ['connections' => 1, 'failed' => 0, 'skipped' => 1, 'pending' => 0]],
+        [...$base, 'result_summary' => ['connections' => 1, 'failed' => 1, 'skipped' => 0, 'pending' => 0]],
+        [...$base, 'result_summary' => ['connections' => 0, 'failed' => 0, 'skipped' => 0, 'pending' => 0]],
+        [...$base, 'result_summary' => ['connections' => 1, 'failed' => 0, 'skipped' => 1, 'pending' => 1]],
+        [...$base, 'result_summary' => ['connections' => '1', 'failed' => 0, 'skipped' => 0, 'pending' => 0]],
+        [...$base, 'result_summary' => ['connections' => true, 'failed' => 0, 'skipped' => 0, 'pending' => 0]],
+        [...$base, 'result_summary' => ['connections' => 1, 'failed' => -1, 'skipped' => 0, 'pending' => 0]],
+        [...$base, 'result_summary' => ['connections' => 1]],
+        [...$base, 'result_summary' => null],
+        [...$base, 'result_summary' => ['connections' => ['private' => 'payload'], 'failed' => 0, 'skipped' => 0, 'pending' => 0]],
+        [...$base, 'automation_key' => 'it.close-resolved'],
+        [...$base, 'status' => 'running', 'finished_at' => null],
+        [...$base, 'status' => 'running'],
+        [...$base, 'finished_at' => null],
+        [...$base, 'status' => 'failed'],
+        [...$base, 'status' => 'skipped'],
+    ];
+    $runs = collect($cases)->map(fn ($attributes) => ItAutomationRun::factory()->create($attributes));
+    foreach (['succeeded', 'failed', 'pending', 'running', 'skipped', 'no_work', 'unknown'] as $state) {
+        $expected = $runs->filter(fn ($run) => ItAutomationRunOutcome::state($run) === $state)->pluck('id')->sort()->values()->all();
+        $actual = ItAutomationRunOutcome::whereState(ItAutomationRun::query(), [$state])->orderBy('id')->pluck('id')->all();
+        expect($actual)->toBe($expected);
+    }
+    $pending = app(ItAutomationOperationsPresenter::class)->operations($this->manager, ['q' => 'Mailbox scan pending']);
+    expect($pending['total'])->toBe(1)->and($pending['rows'][0]['outcome'])->toBe('pending');
+});
+
+test('automation search cannot probe private error payloads or unknown command names', function () {
+    $run = ItAutomationRun::factory()->create(['automation_key' => 'it.private-secret-marker', 'status' => 'failed',
+        'error_summary' => 'private-secret-marker', 'result_summary' => ['private' => 'private-secret-marker']]);
+    $presenter = app(ItAutomationOperationsPresenter::class);
+    foreach (['private-secret-marker', '%', "' OR 1=1 --"] as $query) {
+        expect($presenter->operations($this->manager, ['q' => $query]))->toMatchArray(['total' => 0, 'rows' => []]);
+    }
+    $byId = $presenter->operations($this->manager, ['q' => 'Run '.$run->id]);
+    expect($byId['total'])->toBe(1)->and($byId['rows'][0]['id'])->toBe($run->id)
+        ->and(json_encode($byId))->not->toContain('private-secret-marker');
+    expect($presenter->operations($this->worker, ['q' => 'Run '.$run->id]))->toMatchArray(['can_view' => false, 'total' => null, 'rows' => []]);
+    $this->actingAs($this->worker)->get('/it/setup?tab=operations&q=Failed')->assertForbidden();
+});
+
+test('searched unfinished totals and oldest evidence belong to the matched automation', function () {
+    ItAutomationRun::factory()->create(['automation_key' => 'it.check-sla', 'status' => 'running', 'started_at' => now()->subDays(4), 'finished_at' => null]);
+    $matched = ItAutomationRun::factory()->create(['automation_key' => 'it.close-resolved', 'status' => 'running', 'started_at' => now()->subDay(), 'finished_at' => null]);
+    $history = app(ItAutomationOperationsPresenter::class)->operations($this->manager, ['q' => 'Close resolved']);
+    expect($history['total'])->toBe(1)->and($history['unfinished'])->toBe(1)
+        ->and($history['oldest_unfinished_at'])->toBe($matched->started_at->toIso8601String());
+});
+
 test('the automation catalogue remains visible when console routes are not loaded', function () {
     $catalog = new ItAutomationScheduleCatalog(new Schedule(app()));
     $definitions = $catalog->definitions();
 
     expect($definitions)
-        ->toHaveCount(3)
+        ->toHaveCount(6)
         ->and($definitions[0])->toMatchArray(['key' => 'it.check-sla', 'label' => 'SLA watchdog'])
         ->and($definitions[1])->toMatchArray(['key' => 'it.close-resolved'])
-        ->and($definitions[2])->toMatchArray(['key' => 'it.poll-mailbox']);
+        ->and($definitions[2])->toMatchArray(['key' => 'it.poll-mailbox'])
+        ->and($definitions[3])->toMatchArray(['key' => 'it.dispatch-notifications', 'expression' => '* * * * *'])
+        ->and($definitions[4])->toMatchArray(['key' => 'it.retry-attachment-cleanup', 'expression' => '*/5 * * * *', 'overlap_minutes' => 10])
+        ->and($definitions[5])->toMatchArray(['key' => 'it.check-approval-deadlines', 'expression' => '* * * * *', 'overlap_minutes' => 10]);
 });

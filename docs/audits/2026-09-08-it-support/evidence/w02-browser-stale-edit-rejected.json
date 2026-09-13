@@ -1,0 +1,110 @@
+{
+    "captured_at": "2026-09-09T01:12:50+00:00",
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "database_mutations_performed": false,
+    "app_asset": "assets/app-DPggLS6p.js",
+    "app_css": [
+        "assets/app-pjifONb0.css"
+    ],
+    "it_asset": "assets/index-0mG74B2V.js",
+    "manifest_sha256": "c807d9c4cabf68e0012384b29ef5dea4a59d00cb4cf1930fbdeee633f8461ea1",
+    "tickets": [
+        {
+            "id": 15,
+            "reference": "IT-000015",
+            "requester_user_id": 231,
+            "site_id": 9403,
+            "status": "open",
+            "source": "portal",
+            "lock_version": 3,
+            "created_at": "2026-09-09T00:47:55.000000Z"
+        },
+        {
+            "id": 16,
+            "reference": "IT-000016",
+            "requester_user_id": 231,
+            "site_id": 9403,
+            "status": "open",
+            "source": "portal",
+            "lock_version": 3,
+            "created_at": "2026-09-09T00:59:45.000000Z"
+        },
+        {
+            "id": 17,
+            "reference": "IT-000017",
+            "requester_user_id": 230,
+            "site_id": 9404,
+            "status": "open",
+            "source": "agent",
+            "lock_version": 3,
+            "created_at": "2026-09-09T01:09:38.000000Z"
+        }
+    ],
+    "receipts": [
+        {
+            "it_ticket_id": 15,
+            "actor_user_id": 231,
+            "channel": "browser",
+            "operation": "ticket.create",
+            "request_uuid": "8f8cf5b7-cbc3-485d-8415-7a0131caf40b",
+            "committed_at": "2026-09-09T00:47:55.000000Z"
+        },
+        {
+            "it_ticket_id": 16,
+            "actor_user_id": 231,
+            "channel": "browser",
+            "operation": "ticket.create",
+            "request_uuid": "248bf09f-8d71-4d2f-abd7-f3d2d9e6f253",
+            "committed_at": "2026-09-09T00:59:45.000000Z"
+        },
+        {
+            "it_ticket_id": 17,
+            "actor_user_id": 230,
+            "channel": "browser",
+            "operation": "ticket.create",
+            "request_uuid": "7fd717ed-c0e2-46b4-910a-eafe672561b1",
+            "committed_at": "2026-09-09T01:09:38.000000Z"
+        }
+    ],
+    "deliveries": [
+        {
+            "it_ticket_id": 15,
+            "status": "accepted",
+            "attempt_count": 1,
+            "queued_at": "2026-09-09T00:47:55.000000Z",
+            "sending_at": "2026-09-09T00:47:56.000000Z",
+            "accepted_at": "2026-09-09T00:47:56.000000Z",
+            "dispatch_requested_at": "2026-09-09T00:47:55.000000Z",
+            "dispatch_finished_at": "2026-09-09T00:47:56.000000Z"
+        },
+        {
+            "it_ticket_id": 16,
+            "status": "accepted",
+            "attempt_count": 1,
+            "queued_at": "2026-09-09T00:59:45.000000Z",
+            "sending_at": "2026-09-09T00:59:45.000000Z",
+            "accepted_at": "2026-09-09T00:59:45.000000Z",
+            "dispatch_requested_at": "2026-09-09T00:59:45.000000Z",
+            "dispatch_finished_at": "2026-09-09T00:59:45.000000Z"
+        },
+        {
+            "it_ticket_id": 17,
+            "status": "accepted",
+            "attempt_count": 1,
+            "queued_at": "2026-09-09T01:09:38.000000Z",
+            "sending_at": "2026-09-09T01:09:38.000000Z",
+            "accepted_at": "2026-09-09T01:09:38.000000Z",
+            "dispatch_requested_at": "2026-09-09T01:09:38.000000Z",
+            "dispatch_finished_at": "2026-09-09T01:09:38.000000Z"
+        }
+    ],
+    "version_fixture": {
+        "id": 14,
+        "reference": "IT-000014",
+        "priority": "high",
+        "lock_version": 2,
+        "updated_at": "2026-09-09T01:11:01.000000Z",
+        "events_count": 3
+    },
+    "historical_closed_count": 1
+}

@@ -1,0 +1,16 @@
+vite v7.3.6 building client environment for production...
+✓ 0 modules transformed.
+✗ Build failed in 28.07s
+error during build:
+[@laravel/vite-plugin-wayfinder] [plugin @laravel/vite-plugin-wayfinder] Error generating types: Error: Command failed: php artisan wayfinder:generate --with-form
+
+    at getRollupError (file:///C:/Users/steph/Herd/oblivionfindings/node_modules/rollup/dist/es/shared/parseAst.js:406:41)
+    at error (file:///C:/Users/steph/Herd/oblivionfindings/node_modules/rollup/dist/es/shared/parseAst.js:402:42)
+    at Object.error (file:///C:/Users/steph/Herd/oblivionfindings/node_modules/rollup/dist/es/shared/node-entry.js:22659:20)
+    at runCommand (file:///C:/Users/steph/Herd/oblivionfindings/node_modules/@laravel/vite-plugin-wayfinder/dist/index.mjs:2101:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Promise.all (index 2)
+    at async PluginDriver.hookParallel (file:///C:/Users/steph/Herd/oblivionfindings/node_modules/rollup/dist/es/shared/node-entry.js:22891:9)
+    at async file:///C:/Users/steph/Herd/oblivionfindings/node_modules/rollup/dist/es/shared/node-entry.js:23863:13
+    at async catchUnfinishedHookActions (file:///C:/Users/steph/Herd/oblivionfindings/node_modules/rollup/dist/es/shared/node-entry.js:23335:16)
+    at async rollupInternal (file:///C:/Users/steph/Herd/oblivionfindings/node_modules/rollup/dist/es/shared/node-entry.js:23860:5)

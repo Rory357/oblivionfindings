@@ -1,0 +1,181 @@
+{
+    "ready": true,
+    "created_at": "2026-09-10T21:14:01+00:00",
+    "database": "oblivion_it_draft_browser_ba36125e97ac40d8",
+    "registry_count": 1013,
+    "fixtures": {
+        "sites": {
+            "a": 1,
+            "b": 2,
+            "c": 3
+        },
+        "actors": {
+            "requester": {
+                "id": 1,
+                "login": "w06-requester@demo.test"
+            },
+            "other": {
+                "id": 2,
+                "login": "w06-other@demo.test"
+            },
+            "tech": {
+                "id": 3,
+                "login": "w06-tech@demo.test"
+            },
+            "restricted": {
+                "id": 4,
+                "login": "w06-restricted@demo.test"
+            },
+            "cover": {
+                "id": 5,
+                "login": "w06-cover@demo.test"
+            },
+            "absent": {
+                "id": 6,
+                "login": "w06-absent@demo.test"
+            },
+            "settings": {
+                "id": 7,
+                "login": "w06-settings@demo.test"
+            },
+            "audit": {
+                "id": 8,
+                "login": "w06-audit@demo.test"
+            }
+        },
+        "permissions": {
+            "requester": [
+                "it.request"
+            ],
+            "other": [
+                "it.request"
+            ],
+            "tech": [
+                "it.request",
+                "it.view",
+                "it.manage",
+                "it.viewSensitive"
+            ],
+            "restricted": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ],
+            "cover": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ],
+            "absent": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ],
+            "settings": [
+                "it.request",
+                "settings.access.manage"
+            ],
+            "audit": [
+                "it.request",
+                "it.view",
+                "it.manage",
+                "audit.viewAny"
+            ]
+        },
+        "tickets": {
+            "public_workspace": {
+                "id": 1,
+                "reference": "IT-000001"
+            },
+            "sensitive_participant": {
+                "id": 2,
+                "reference": "IT-000002"
+            },
+            "unapproved_site": {
+                "id": 3,
+                "reference": "IT-000003"
+            },
+            "resolve_workspace": {
+                "id": 4,
+                "reference": "IT-000004"
+            },
+            "approval_workspace": {
+                "id": 5,
+                "reference": "IT-000005"
+            },
+            "approval_history": {
+                "id": 6,
+                "reference": "IT-000006"
+            },
+            "duplicate_workspace": {
+                "id": 7,
+                "reference": "IT-000007"
+            }
+        },
+        "approval_history_ids": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+        ],
+        "synthetic_approved_leave_id": 1,
+        "retention_is_synthetic_only": true
+    },
+    "drafts_enabled": true,
+    "synthetic_retention_days": [
+        2,
+        3
+    ],
+    "provider_configuration_checks": {
+        "app_settings_absent": true,
+        "service_providers_cleared": true,
+        "mailboxes_absent_before_synthetic_mailbox_setup": true
+    },
+    "mailbox_fixtures": {
+        "synthetic_only": true,
+        "operator_id": 7,
+        "connections": {
+            "microsoft": 1,
+            "google": 2
+        },
+        "inactive_sender_id": 9,
+        "messages_per_provider": 43,
+        "new_requests_per_provider": 29,
+        "changed_subject_reply": 28,
+        "duplicate_reply": 29,
+        "conflicting_identity": 30,
+        "inactive_sender": 31,
+        "duplicate_reference_header": 32,
+        "multiple_senders": 33,
+        "automatic_response": 34,
+        "delivery_report": 35,
+        "null_return_path": 36,
+        "complete_body": 37,
+        "missing_full_body": 38,
+        "attachment_request": 39,
+        "attachment_reply": 40,
+        "duplicate_attachment_reply": 41,
+        "unknown_sender_attachment": 42,
+        "infected_attachment": 43,
+        "scanner_is_synthetic": true,
+        "first_request_file_scan_unavailable_then_clean": true,
+        "microsoft_first_acknowledgement_is_lost": true
+    }
+}
+{
+  "started": true,
+  "token": "ba36125e97ac40d8",
+  "database": "oblivion_it_draft_browser_ba36125e97ac40d8",
+  "pid": 35200,
+  "url": "http://127.0.0.1:8766",
+  "root": "C:\\Users\\steph\\Herd\\oblivionfindings\\storage\\framework\\testing\\it-draft-browser-ba36125e97ac40d8",
+  "browser_verified": false
+}

@@ -1,0 +1,2 @@
+npm notice run npx
+npm notice run eslint resources/js/components/it/ticket-thread.tsx resources/js/components/it/ticket-workspace-header.tsx

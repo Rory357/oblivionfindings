@@ -1,0 +1,11 @@
+# W06 local recovery candidate authorization
+
+Implemented in the existing ItTicketDraftService, ItTicketDraftController and routes/it-drafts.php. This is a read-only authorization check for a latest unsaved snapshot retained in the draft client's RAM; it does not create another draft record, save fields, extend expiry, decrypt saved content or activate the feature.
+
+`POST /it/drafts/{draftUuid}/validate-candidate` accepts actor_user_id, expected_revision, candidate_uuid, fields, step_index and optional base_ticket_version. The caller creates a fresh candidate UUID for the exact frozen snapshot. The response contains canonical draft metadata and candidate identity: candidate_uuid, actor_user_id, draft_uuid, purpose, context_key, revision, base_ticket_version and authorized=true. It never returns the candidate fields or file names. The caller must validate every identity field and may not reuse the nonce for a changed snapshot.
+
+The existing locked actor/ticket/generation boundary and purpose allowlist apply. Both saved and newly selected Site/staff/asset/service/device/queue/provisioning bindings are rechecked before conflict metadata. Stale revision, expired/terminal generation, lost approval/role/Site/internal access and a committed intake receipt deny recovery. Original ticket base version is retained; candidate validation never adopts a newer ticket version. Canonical save/submit must still reauthorize when they later run.
+
+Actual regression: **42 tests,498 assertions,209.62s**, guarded wrapper exit0, disposable schema suffix271e84c2f9ac4ac0 removed. Files: ItTicketDraftTest and ItTicketDraftAttachmentTest. Five added cases cover nonmutation/non-disclosure, a newer unsaved Site losing access while the saved draft stays accessible, stale/terminal/restarted generations, original/future base versions and actor/purpose/internal audience denial. Existing staged-file lifecycle regressions passed. Explicit-path Pint passed. Independent source review found no additional concrete access/lifetime defect.
+
+Log: w06-draft-candidate-tests.txt. The RAM client integration and native-navigation browser recovery remain unverified until the next stable build and isolated browser journey.

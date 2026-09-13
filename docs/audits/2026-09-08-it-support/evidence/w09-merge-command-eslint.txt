@@ -1,0 +1,7 @@
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\hooks\use-it-ticket-merge-command.ts
+  154:21  warning  The ref value 'epoch.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'epoch.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+✖ 1 problem (0 errors, 1 warning)
+
+ESLint found too many warnings (maximum: 0).

@@ -128,14 +128,17 @@ export function AuditLogDialog({
 
     useEffect(() => {
         if (!isOpen) return;
+        const controller = new AbortController();
         setSearch(focusLabel ?? '');
         setAction('all');
         setRange('all');
         setError(null);
+        setRows([]);
         setLoading(true);
         const url = new URL(`/vendors/audit`, window.location.origin);
         if (siteId) url.searchParams.set('site_id', String(siteId));
         fetch(url.toString(), {
+            signal: controller.signal,
             credentials: 'include',
             headers: {
                 Accept: 'application/json',
@@ -145,16 +148,20 @@ export function AuditLogDialog({
             .then(async (res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = (await res.json()) as { logs: AuditRow[] };
-                setRows(data.logs ?? []);
+                if (!controller.signal.aborted) setRows(data.logs ?? []);
             })
-            .catch((e) =>
-                setError(
-                    e instanceof Error
-                        ? e.message
-                        : 'Could not load the audit log.',
-                ),
-            )
-            .finally(() => setLoading(false));
+            .catch((e) => {
+                if (!controller.signal.aborted)
+                    setError(
+                        e instanceof Error
+                            ? e.message
+                            : 'Could not load the audit log.',
+                    );
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
+        return () => controller.abort();
     }, [isOpen, focusLabel, siteId]);
 
     const rangeHours = useMemo(
@@ -294,7 +301,12 @@ export function AuditLogDialog({
                         type="button"
                         size="sm"
                         onClick={exportCsv}
-                        disabled={exporting || filtered.length === 0}
+                        disabled={
+                            exporting ||
+                            loading ||
+                            error !== null ||
+                            filtered.length === 0
+                        }
                     >
                         {exporting ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

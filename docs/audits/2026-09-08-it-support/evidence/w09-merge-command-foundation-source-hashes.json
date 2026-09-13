@@ -1,0 +1,62 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItTicketMergeService.php",
+    "sha256": "4316157d7cffd81b7193396c203ef4fc23ec74ab384d34697be6a5a93dd8432b"
+  },
+  {
+    "path": "app/Models/ItTicketCommandReceipt.php",
+    "sha256": "19e3a1fb0d5b4d126705300eddeb413dc46a239d7f5501008afe345aa30f8c7f"
+  },
+  {
+    "path": "app/Policies/ItTicketPolicy.php",
+    "sha256": "98d75bba388f24dc4e13a4714c544e9e606f960bca3df5a76586691e57e29759"
+  },
+  {
+    "path": "app/Http/Requests/It/MergeTicketRequest.php",
+    "sha256": "fe27ae5ecffdeab08f9dba623aaaccf6a6400032c00dc101a1e6c776047f2e51"
+  },
+  {
+    "path": "app/Http/Requests/It/ReadTicketMergeCommandRequest.php",
+    "sha256": "b78bf63907b173babb39e80698db833cf4d425b0a926af6adffd47fa6be485f3"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItTicketController.php",
+    "sha256": "5838d69a5b867456dd52bf29db5bbfff992b3c49dc0c53fd01dc2adf2b61f0d5"
+  },
+  {
+    "path": "routes/web.php",
+    "sha256": "d753fc52ad099094cbda3c16f393100ffc8bc4cba9cf6241d8275801b31ea5ee"
+  },
+  {
+    "path": "tests/Feature/It/ItTicketMergeTest.php",
+    "sha256": "5f808abc67e57afce59ceecdf95c119f913b973e44621a50b19885a8c4ac39dd"
+  },
+  {
+    "path": "resources/js/hooks/it-ticket-merge-preview.ts",
+    "sha256": "4c0e8dce4a36449ef4eae221ff5903a198b4fdf42e84d702b65188fc9d44960b"
+  },
+  {
+    "path": "resources/js/hooks/it-ticket-merge-preview.test.ts",
+    "sha256": "07e85bec19f46274957d01540b4fe240485aa327bdbd52acc18574ee427c2a15"
+  },
+  {
+    "path": "resources/js/hooks/use-it-ticket-merge-preview.test.tsx",
+    "sha256": "572374b65957463f73f450144b9f47484925e20f49af9e4bea427daa0a7e1140"
+  },
+  {
+    "path": "resources/js/hooks/it-ticket-merge-contract.ts",
+    "sha256": "2f4ff8f38f3fcc3b5852ebfd632fbc55b0a0a476dd5baa5e0d055df3c2fc324f"
+  },
+  {
+    "path": "resources/js/hooks/it-ticket-merge-contract.test.ts",
+    "sha256": "2b6b87a6e77eb73bb4f0e8fbf2235b8634bdada827c19c61f1f2132817451e0e"
+  },
+  {
+    "path": "resources/js/hooks/use-it-ticket-merge-command.ts",
+    "sha256": "db3fddec81e2a73dcf9be78b066942fb8fbd47a2a2d49a80800f93b1d707aa84"
+  },
+  {
+    "path": "resources/js/hooks/use-it-ticket-merge-command.test.tsx",
+    "sha256": "8ff61c6f90a9927591eeffc05780b8ec18bdae81fe8028d6f60ed2cb97be0eb4"
+  }
+]

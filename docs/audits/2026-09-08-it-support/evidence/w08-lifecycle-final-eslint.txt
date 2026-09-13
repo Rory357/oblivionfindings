@@ -1,0 +1,9 @@
+npm notice run npx
+npm notice run eslint resources/js/hooks/it-ticket-approval-contract.ts resources/js/hooks/it-ticket-approval-contract.test.ts resources/js/hooks/use-it-ticket-approval-command.ts resources/js/hooks/use-it-ticket-approval-command.test.tsx resources/js/hooks/it-work-task-command.ts resources/js/hooks/it-work-task-lifecycle.ts resources/js/hooks/use-it-work-task-command.ts resources/js/hooks/use-it-work-task-command.test.tsx resources/js/hooks/use-it-work-task-history.ts resources/js/hooks/use-it-work-task-history.test.tsx resources/js/hooks/use-it-work-task-editor.ts resources/js/hooks/it-work-task-memory.test.tsx resources/js/hooks/it-ticket-draft-contract.ts resources/js/hooks/it-ticket-draft-memory.ts resources/js/hooks/use-it-ticket-draft-memory.ts resources/js/components/it/ticket-work-tasks.tsx resources/js/components/it/ticket-work-task-wizard.tsx resources/js/components/it/ticket-work-task-recovery.tsx resources/js/components/it/ticket-work-task-history.tsx resources/js/components/it/ticket-work-task-action-dialog.tsx resources/js/components/it/__tests__/ticket-work-tasks.test.tsx resources/js/components/it/__tests__/ticket-work-task-wizard-focus.test.tsx resources/js/components/it/__tests__/ticket-work-task-review.test.tsx resources/js/components/it/__tests__/ticket-work-task-lifecycle.test.tsx resources/js/components/it/__tests__/ticket-work-task-focus.test.tsx resources/js/pages/it/tickets/show.tsx resources/js/pages/it/tickets/show.test.tsx --max-warnings=0
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\hooks\use-it-work-task-history.ts
+  52:21  warning  The ref value 'epoch.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'epoch.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+✖ 1 problem (0 errors, 1 warning)
+
+ESLint found too many warnings (maximum: 0).

@@ -1,0 +1,2613 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx (13 tests | 8 failed) 10029ms
+     × saves the exact intake draft before creating once with original actor and a consumed-generation reference 1034ms
+     × keeps text and does not create if draft saving is rejected 1050ms
+     × retains a canonical locator synchronously before acknowledged Save draft and close 1054ms
+     × debounces current text into a saved draft and never autosubmits a ticket 1044ms
+     × offers honest reference-only exit after an unknown save 1051ms
+     × persists an intentional clear even when the form returns to its initial values 1049ms
+     × saves technician dimensions and preserves automatic priority through the canonical create command 1061ms
+     × stages a real selected File once and sends only its canonical draft reference on create 1060ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > saves the exact intake draft before creating once with original actor and a consumed-generation reference
+TestingLibraryElementError: Unable to find role="button" and name "Save draft"
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_8d_"
+    aria-labelledby="radix-_r_8c_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_8b_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_8c_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_8d_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_8d_"
+    aria-labelledby="radix-_r_8c_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_8b_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_8c_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_8d_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx:332:22
+    330|     it('saves the exact intake draft before creating once with origina…
+    331|         page();
+    332|         await screen.findByRole('button', { name: 'Save draft' });
+       |                      ^
+    333|         fireEvent.change(input(), {
+    334|             target: { value: 'Draft-backed request' },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > keeps text and does not create if draft saving is rejected
+TestingLibraryElementError: Unable to find role="button" and name "Save draft"
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_9k_"
+    aria-labelledby="radix-_r_9j_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_9i_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_9j_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_9k_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_9k_"
+    aria-labelledby="radix-_r_9j_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_9i_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_9j_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_9k_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx:353:22
+    351|     it('keeps text and does not create if draft saving is rejected', a…
+    352|         page();
+    353|         await screen.findByRole('button', { name: 'Save draft' });
+       |                      ^
+    354|         fireEvent.change(input(), { target: { value: 'Keep this propos…
+    355|         vi.mocked(axios.request).mockRejectedValueOnce({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > retains a canonical locator synchronously before acknowledged Save draft and close
+TestingLibraryElementError: Unable to find role="button" and name "Save draft"
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_ar_"
+    aria-labelledby="radix-_r_aq_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_ap_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_aq_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_ar_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_ar_"
+    aria-labelledby="radix-_r_aq_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_ap_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_aq_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_ar_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx:373:22
+    371|         const onClose = vi.fn();
+    372|         page(onClose);
+    373|         await screen.findByRole('button', { name: 'Save draft' });
+       |                      ^
+    374|         fireEvent.change(input(), { target: { value: 'Close safely' } …
+    375|         fireEvent.click(screen.getByRole('button', { name: /^Cancel$/ …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > debounces current text into a saved draft and never autosubmits a ticket
+TestingLibraryElementError: Unable to find role="button" and name "Save draft"
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_ch_"
+    aria-labelledby="radix-_r_cg_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_cf_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_cg_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_ch_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_ch_"
+    aria-labelledby="radix-_r_cg_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_cf_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_cg_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_ch_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx:413:22
+    411|     it('debounces current text into a saved draft and never autosubmit…
+    412|         page();
+    413|         await screen.findByRole('button', { name: 'Save draft' });
+       |                      ^
+    414|         fireEvent.change(input(), { target: { value: 'First keystrokes…
+    415|         fireEvent.change(input(), {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > offers honest reference-only exit after an unknown save
+TestingLibraryElementError: Unable to find role="button" and name "Save draft"
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_do_"
+    aria-labelledby="radix-_r_dn_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_dm_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_dn_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_do_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_do_"
+    aria-labelledby="radix-_r_dn_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_dm_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_dn_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_do_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx:438:22
+    436|         const onClose = vi.fn();
+    437|         page(onClose);
+    438|         await screen.findByRole('button', { name: 'Save draft' });
+       |                      ^
+    439|         fireEvent.change(input(), { target: { value: 'Unconfirmed draf…
+    440|         vi.mocked(axios.request).mockRejectedValueOnce({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > persists an intentional clear even when the form returns to its initial values
+TestingLibraryElementError: Unable to find role="button" and name "Save draft"
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_ev_"
+    aria-labelledby="radix-_r_eu_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_et_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_eu_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_ev_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_ev_"
+    aria-labelledby="radix-_r_eu_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_et_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_eu_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_ev_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx:469:22
+    467|     it('persists an intentional clear even when the form returns to it…
+    468|         page();
+    469|         await screen.findByRole('button', { name: 'Save draft' });
+       |                      ^
+    470|         fireEvent.change(input(), {
+    471|             target: { value: 'Text that will be cleared' },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > saves technician dimensions and preserves automatic priority through the canonical create command
+TestingLibraryElementError: Unable to find role="button" and name "Save draft"
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_g6_"
+    aria-labelledby="radix-_r_g5_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_g4_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_g5_"
+    >
+      Log & triage ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_g6_"
+    >
+      Log a helpdesk ticket on behalf of a colleague and triage it in one pass.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Log & triage
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-file-text h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"
+              />
+              <path
+                d="M14 2v4a2 2 0 0 0 2 2h4"
+              />
+              <path
+                d="M10 9H8"
+              />
+              <path
+                d="M16 13H8"
+              />
+              <path
+                d="M16 17H8"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Details
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              What & where
+            </span>
+          </span>
+        </button>
+        <button
+      ...
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_g6_"
+    aria-labelledby="radix-_r_g5_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_g4_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_g5_"
+    >
+      Log & triage ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_g6_"
+    >
+      Log a helpdesk ticket on behalf of a colleague and triage it in one pass.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Log & triage
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-file-text h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"
+              />
+              <path
+                d="M14 2v4a2 2 0 0 0 2 2h4"
+              />
+              <path
+                d="M10 9H8"
+              />
+              <path
+                d="M16 13H8"
+              />
+              <path
+                d="M16 17H8"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Details
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              What & where
+            </span>
+          </span>
+        </button>
+        <button
+      ...
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx:494:22
+    492|             />,
+    493|         );
+    494|         await screen.findByRole('button', { name: 'Save draft' });
+       |                      ^
+    495|         fireEvent.change(
+    496|             screen.getByPlaceholderText(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > stages a real selected File once and sends only its canonical draft reference on create
+TestingLibraryElementError: Unable to find role="button" and name "Save draft"
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_h4_"
+    aria-labelledby="radix-_r_h3_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_h2_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_h3_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_h4_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_h4_"
+    aria-labelledby="radix-_r_h3_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_h2_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_h3_"
+    >
+      Raise a ticket
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_h4_"
+    >
+      Tell IT what you need help with.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Raise a ticket
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT helpdesk
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-ticket h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+              />
+              <path
+                d="M13 5v2"
+              />
+              <path
+                d="M13 17v2"
+              />
+              <path
+                d="M13 11v2"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Raise a ticket
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Tell IT what you need
+            </span>
+          </span>
+        </button>
+        <div
+          class="pt-4 mt-auto"
+        >
+          <div
+            class...
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx:521:22
+    519|     it('stages a real selected File once and sends only its canonical …
+    520|         const { container } = page();
+    521|         await screen.findByRole('button', { name: 'Save draft' });
+       |                      ^
+    522|         fireEvent.change(input(), { target: { value: 'Draft with proof…
+    523|         fireEvent.click(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  8 failed | 60 passed (68)
+   Start at  22:54:11
+   Duration  13.71s (transform 704ms, setup 398ms, import 4.60s, tests 14.48s, environment 3.00s)
+

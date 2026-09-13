@@ -2,7 +2,9 @@
 
 namespace App\Policies;
 
+use App\Domain\It\Services\ItTicketApprovalResponsibilityService;
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Models\ItTicket;
 use App\Models\ItTicketApproval;
 use App\Models\User;
 
@@ -14,14 +16,17 @@ use App\Models\User;
  */
 class ItTicketApprovalPolicy
 {
-    public function __construct(private readonly ItWorkAccessService $access) {}
+    public function __construct(private readonly ItWorkAccessService $access, private readonly ItTicketApprovalResponsibilityService $responsibility) {}
 
     /** Approve or reject a pending request — agent work, never your own. */
     public function decide(User $user, ItTicketApproval $approval): bool
     {
         return $approval->ticket !== null
+            && $user->canDo('it.manage')
             && $this->access->canWork($user, $approval->ticket)
+            && ! $approval->ticket->isMerged()
+            && in_array($approval->ticket->status, ItTicket::OPEN_STATUSES, true)
             && $approval->status === 'pending'
-            && (int) $approval->requested_by !== (int) $user->id;
+            && $this->responsibility->decisionBasis($approval, $approval->ticket, $user) !== null;
     }
 }

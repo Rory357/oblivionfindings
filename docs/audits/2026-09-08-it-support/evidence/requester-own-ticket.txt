@@ -1,0 +1,59 @@
+IT & Support
+IT-000001
+Back to IT & Support
+IT-000001
+In progress
+High
+via email
+E2E inbound email printer incident
+
+Raised by Support Worker 1 · Support Worker · 4w ago
+
+Conversation
+Activity
+0
+SUPPORT WORKER 1 — ORIGINAL REPORT
+
+A site printer stopped responding and the requester emailed the service desk.
+
+Support Worker 1
+· requester
+4w ago
+
+Requester confirmed the printer is still offline.
+
+Attach
+Ctrl+Enter to send
+Send reply
+PROPERTIES
+STATUS
+In progress
+PRIORITY
+High
+WORK TYPE
+Incident
+AFFECTED SERVICE
+Managed connectivity
+TICKET SITE
+All Sites
+CATEGORY
+Network
+ASSIGNEE
+Demo Admin
+LINKED CONTEXT
+
+No linked operational records are visible.
+
+WATCHERS (0)
+
+Nobody watching yet.
+
+REQUESTER
+Support Worker 1 · Support Worker
+SOURCE
+Email
+RAISED
+Mon 10 Aug, 12:10 am
+UPDATED
+Mon 10 Aug, 12:10 am
+Copy link to this ticket

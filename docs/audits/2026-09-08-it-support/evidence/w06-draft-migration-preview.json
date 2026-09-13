@@ -1,0 +1,135 @@
+{
+    "mode": "pretend",
+    "database_mutations_performed": false,
+    "database": "oblivion_findings_codex_test",
+    "draft_recovery_enabled": false,
+    "retention_values_unset": true,
+    "approval_fingerprint": "f9479fcda662070b201eddfe3390622e388bc76976a2de2d3adc6b47e79bdb3f",
+    "migration_sha256": "3e21b4fa1de519e1afa1e92b88b7099da8a89d884d6c111279dd67b642185fbe",
+    "gate_sha256": "3c38b46671224255fd55aba3a6fe6b9f81b66e51d28f1b674cce3e9a7c7ae31e",
+    "before": {
+        "preserved_records": {
+            "users": {
+                "count": 236,
+                "sha256": "28b534b88ff804a248dc4a35e440537504724d75a3484a59450e2985ed0cf3a9"
+            },
+            "roles": {
+                "count": 32,
+                "sha256": "0d9b6d11ed53f5ef2d2b1606585387c58d2a15efef08e775496cd0bb94e8140e"
+            },
+            "permissions": {
+                "count": 539,
+                "sha256": "dfc4e917b343c2cf9a72ecf27ff51f13f6c791e8fee28ea7189fa23c077aa5cc"
+            },
+            "role_user": {
+                "count": 385,
+                "sha256": "8fc98195eed40b0d8ccd6c1529b8b3deb2450c56f10734dae98e826e8c9a37f4"
+            },
+            "permission_user": {
+                "count": 47,
+                "sha256": "dcda1943620c4bd0f92490255e47e5171e69346ab2cd9ac571627300f89243cb"
+            },
+            "role_permission": {
+                "count": 1601,
+                "sha256": "cb38bdc1d8ca85edbdce5bafed0d3c2d4c2609b18cae317898523fad388a4282"
+            },
+            "sites": {
+                "count": 26,
+                "sha256": "c58741ee7cb234c7672a477ed238a80ce78e999f03c8f245f439cfde2a7ab7e0"
+            },
+            "it_tickets": {
+                "count": 26,
+                "sha256": "12c3d3278441b12f1e3560a2db50ff4690a71567f824aee826532200abbf9bac"
+            },
+            "it_ticket_comments": {
+                "count": 22,
+                "sha256": "2b92f651297bb94a0df418e197f42142868bec065278f235a6cd363babff3624"
+            },
+            "it_ticket_events": {
+                "count": 45,
+                "sha256": "aa123e3313122106a6fb6aca5412750a87dffd8400ff2837c096c9778a6cdcf0"
+            },
+            "it_attachments": {
+                "count": 12,
+                "sha256": "d8b548ac15dff6cebf3065c8813be4dccf20b9bafa58427e6e32e20b86ef1d10"
+            },
+            "it_ticket_command_receipts": {
+                "count": 5,
+                "sha256": "22a0331e6b1c844cdf33c2006aaa90a49ed76093c679441dba691d27ed693299"
+            },
+            "it_email_deliveries": {
+                "count": 9,
+                "sha256": "8cdd3bb8f32a1acecde908075f4d782801435fb7be3ab72cadd94ace7c000c06"
+            },
+            "it_teams": {
+                "count": 1,
+                "sha256": "a1316712a2fab14e4e9107450e83a90dc21d3a4ca43d985dd8d8d0f315e682be"
+            },
+            "it_queues": {
+                "count": 1,
+                "sha256": "63c853d387e60e4ea2a6af6d5b299c1a1dcdcdc0294ddb73afad6b4f0b1e5532"
+            },
+            "it_services": {
+                "count": 1,
+                "sha256": "4f92bbf2e6c25e132a0b7180207e038616eba02f67757e75c38e4d16a185989e"
+            },
+            "it_mailbox_connections": {
+                "count": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "app_settings": {
+                "count": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+        },
+        "migration_registry": {
+            "count": 998,
+            "sha256": "93803957aa150b6b5a5aeadcccb4a66bd61fe4263edccff743ae08e93708ace9"
+        },
+        "migration_state": "pending",
+        "unrelated_pending": [],
+        "draft_rows": null,
+        "design_hashes": {
+            "DESIGN.md": "96863e01d924e954255cd61f550396c2f2eea9778bbaab7e8570ef9d63279c22",
+            "design_styles/APP_SHELL_STYLE_GUIDE.md": "62515485265119962773e6015fefe38be94434aae468acd017c078da61b20ab5",
+            "design_styles/BUTTON_STYLE_GUIDE.md": "86259475c987d6e30001604316379eb608aea9f83e16941b6aa476a94bca6957",
+            "design_styles/DESIGN_TOKENS.md": "c3ee6c8acaa22049084f819e3ad2a33f457e936e467492079f16c15e9a611d2b",
+            "design_styles/LIST_STYLE_GUIDE.md": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac",
+            "design_styles/LOADER_STYLE_GUIDE.md": "cc20485e6e42e0a848b8cacc8ac6124e5e5a01206d966de6ebbbdec39dbe2a91",
+            "design_styles/NAVIGATION_STYLE_GUIDE.md": "9295cdb1386322b8a088ae03de41bc3c75a0fbe3e8fa3331c92c704ccb15895d",
+            "design_styles/PAGE_HEADER_STYLE_GUIDE.md": "a528a0e863a676fdbbfcb028e532ece2799e39a7345ca3c1eca619ac4491d931",
+            "design_styles/POPUP_STYLE_GUIDE.md": "aee723e21491e9be908554a6f200d73204280a63d9028ea78de6bb9049f4a477",
+            "design_styles/oblivion-loader-01-demo.html": "748c94c030984d16c1a78f3b70855d1cf8f22461ab017e4ac8287ab9e8809cdf"
+        }
+    },
+    "legacy_attachment_columns": [
+        "id",
+        "tenant_id",
+        "attachable_type",
+        "attachable_id",
+        "path",
+        "original_name",
+        "mime",
+        "size",
+        "uploaded_by",
+        "created_at",
+        "updated_at"
+    ],
+    "sql_preview": [
+        "create table `it_ticket_drafts` (`id` bigint unsigned not null auto_increment primary key, `actor_user_id` bigint unsigned not null, `purpose` varchar(32) not null, `context_key` varchar(64) not null, `audience` varchar(12) not null, `draft_uuid` char(36) not null, `it_ticket_id` bigint unsigned null, `request_uuid` char(36) null, `state` varchar(16) not null default 'active', `revision` bigint unsigned not null default '0', `last_base_revision` bigint unsigned null, `last_mutation` varchar(16) not null default 'initialized', `base_ticket_version` bigint unsigned null, `encrypted_payload` longtext null, `payload_hash` char(64) null, `bound_scope` json null, `saved_at` timestamp null, `expires_at` timestamp not null, `consumed_at` timestamp null, `discarded_at` timestamp null, `created_at` timestamp null, `updated_at` timestamp null) default character set utf8mb4 collate 'utf8mb4_unicode_ci'",
+        "alter table `it_ticket_drafts` add constraint `it_ticket_drafts_actor_user_id_foreign` foreign key (`actor_user_id`) references `users` (`id`) on delete restrict",
+        "alter table `it_ticket_drafts` add unique `it_ticket_drafts_context_unique`(`actor_user_id`, `purpose`, `context_key`, `audience`)",
+        "alter table `it_ticket_drafts` add unique `it_ticket_drafts_draft_uuid_unique`(`draft_uuid`)",
+        "alter table `it_ticket_drafts` add index `it_ticket_drafts_it_ticket_id_index`(`it_ticket_id`)",
+        "alter table `it_ticket_drafts` add index `it_ticket_drafts_expires_at_index`(`expires_at`)",
+        "alter table `it_attachments` add `draft_generation_uuid` char(36) null",
+        "alter table `it_attachments` add `draft_upload_uuid` char(36) null",
+        "alter table `it_attachments` add `draft_content_hash` char(64) null",
+        "alter table `it_attachments` add `draft_storage_state` varchar(24) null",
+        "alter table `it_attachments` add `draft_cleanup_attempts` int unsigned not null default '0'",
+        "alter table `it_attachments` add `draft_cleanup_error_code` varchar(64) null",
+        "alter table `it_attachments` add index `it_attachments_draft_generation_uuid_index`(`draft_generation_uuid`)",
+        "alter table `it_attachments` add unique `it_attachments_draft_upload_uuid_unique`(`draft_upload_uuid`)",
+        "alter table `it_attachments` add index `it_attachments_draft_storage_state_index`(`draft_storage_state`)"
+    ]
+}

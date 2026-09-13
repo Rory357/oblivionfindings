@@ -1,0 +1,20 @@
+{
+  "token": "68bc520ebf5d468d",
+  "checks": {
+    "baseline_no_merge": true,
+    "source_closed_to_survivor": true,
+    "survivor_open": true,
+    "twelve_approval_ids_parents_status_reasons_preserved": true,
+    "internal_note_preserved": true,
+    "two_matching_merge_events": true,
+    "one_merge_audit": true,
+    "unrelated_ticket_unchanged": true,
+    "read_only_evidence": true
+  },
+  "all_passed": true,
+  "source_version": 3,
+  "existing_merge_gaps": [
+    "Survivor version remains unchanged by the existing merge writer.",
+    "Source workflow_state remains submitted despite closed status."
+  ]
+}

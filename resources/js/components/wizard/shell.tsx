@@ -15,18 +15,21 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { Check, Pencil, Sparkles, X } from 'lucide-react';
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentProps, ComponentType, ReactNode } from 'react';
 
 export type WizardStep = {
     key: string;
     label: string;
     blurb: string;
     icon: ComponentType<{ className?: string }>;
+    /** Temporarily unavailable while a command or recovery owns the form. */
+    disabled?: boolean;
 };
 
 export function WizardShell({
     open,
     onClose,
+    onOpenAutoFocus,
     title,
     description,
     railIcon: RailIcon,
@@ -48,6 +51,8 @@ export function WizardShell({
 }: {
     open: boolean;
     onClose: () => void;
+    /** Optional initial focus after the shared Dialog captures its opener. */
+    onOpenAutoFocus?: ComponentProps<typeof DialogContent>['onOpenAutoFocus'];
     /** Screen-reader dialog title/description (visually hidden). */
     title: string;
     description: string;
@@ -80,6 +85,7 @@ export function WizardShell({
             <DialogContent
                 className="overflow-hidden p-0 [&>button]:hidden"
                 style={{ maxWidth, width: maxWidth }}
+                onOpenAutoFocus={onOpenAutoFocus}
             >
                 <DialogTitle className="sr-only">{title}</DialogTitle>
                 <DialogDescription className="sr-only">
@@ -120,9 +126,10 @@ export function WizardShell({
                                     <button
                                         key={s.key}
                                         type="button"
+                                        disabled={s.disabled}
                                         onClick={() => onStepClick(i)}
                                         className={cn(
-                                            'flex items-center gap-2.5 rounded-md p-2 text-left transition-colors',
+                                            'flex items-center gap-2.5 rounded-md p-2 text-left transition-colors disabled:pointer-events-none',
                                             active
                                                 ? 'bg-primary/10'
                                                 : 'hover:bg-accent',

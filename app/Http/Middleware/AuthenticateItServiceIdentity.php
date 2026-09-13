@@ -34,6 +34,9 @@ class AuthenticateItServiceIdentity
         if (! $actor) {
             return $this->deny('identity_inactive', 'This IT service identity is inactive.');
         }
+        if (! hash_equals((string) $identity->token_hash, hash('sha256', $secret))) {
+            return $this->deny('credential_invalid', 'A valid IT service credential is required.');
+        }
 
         if ($identity->require_signature) {
             $signatureFailure = $this->signatureFailure($request, $secret);
@@ -56,6 +59,7 @@ class AuthenticateItServiceIdentity
 
         $identity->forceFill(['last_used_at' => now()])->saveQuietly();
         $request->attributes->set('it_service_identity', $identity);
+        $request->attributes->set('it_authenticated_token_hash', hash('sha256', $secret));
         $request->setUserResolver(fn () => $actor);
 
         return $next($request);

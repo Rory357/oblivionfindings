@@ -1,0 +1,550 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/pages/it/tickets/show.test.tsx (7 tests | 1 failed) 1311ms
+     × uses keyboard tab navigation and a real scoped section search 361ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > uses keyboard tab navigation and a real scoped section search
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Service levels Details & links"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  navigation:
+
+  Name "Breadcrumb":
+  <nav
+    aria-label="Breadcrumb"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "Home":
+  <a
+    href="/dashboard"
+  />
+
+  Name "IT & Support":
+  <a
+    href="/it"
+  />
+
+  Name "IT-000042":
+  <a
+    href="/it/tickets/42"
+  />
+
+  Name "Back":
+  <a
+    aria-label="Back"
+    class="mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 transition-colors outline-none hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    href="/it"
+  />
+
+  Name "View ticket conversation":
+  <a
+    aria-label="View ticket conversation"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    href="/it/tickets/42?tab=messages"
+  />
+
+  Name "View required ticket work":
+  <a
+    aria-label="View required ticket work"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    href="/it/tickets/42?tab=tasks"
+  />
+
+  Name "View response and resolution clocks":
+  <a
+    aria-label="View response and resolution clocks"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 eh-meter--warning"
+    href="/it/tickets/42?tab=sla"
+  />
+
+  Name "View permitted linked records":
+  <a
+    aria-label="View permitted linked records"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    href="/it/tickets/42?tab=links"
+  />
+
+  Name "Printer evidence.txt100 B":
+  <a
+    class="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-card px-2 py-1 text-[11.5px] font-semibold text-primary hover:border-primary/50"
+    href="/it/attachments/7"
+    rel="noreferrer"
+    target="_blank"
+  />
+
+  Name "Assigned house":
+  <a
+    class="frontline-focus rounded-sm text-primary hover:underline"
+    href="/sites/10"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Investigate the shared printer":
+  <h1
+    class="truncate text-[22px] leading-tight font-bold tracking-tight"
+  />
+
+  Name "Ticket at a glance":
+  <h2
+    class="text-sm font-semibold"
+  />
+
+  Name "Service levels":
+  <h2
+    class="text-sm font-semibold"
+  />
+
+  Name "People & feedback":
+  <h2
+    class="text-sm font-semibold"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  Name "":
+  <p
+    class="mt-1 text-[13px] whitespace-pre-wrap"
+  />
+
+  Name "":
+  <p
+    class="text-sm font-medium break-words"
+  />
+
+  Name "":
+  <p
+    class="text-sm text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="text-[12px] text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Find a ticket section…":
+  <button
+    class="relative inline-flex h-9 min-w-[200px] flex-1 items-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground/55 transition-colors outline-none hover:bg-primary-foreground/15 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 lg:w-[250px] lg:flex-none"
+    type="button"
+  />
+
+  Name "Write a reply":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "Ticket actions":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Ticket actions"
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 w-9 justify-center px-0 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_16_"
+    type="button"
+  />
+
+  Name "Conversation":
+  <button
+    aria-pressed="true"
+    class="inline-flex shrink-0 items-center gap-[7px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 min-h-[46px] rounded-t-xl bg-background px-[18px] pb-3 font-semibold text-primary"
+    data-test="it-ticket-group-conversation"
+    type="button"
+  />
+
+  Name "Work":
+  <button
+    aria-pressed="false"
+    class="inline-flex shrink-0 items-center gap-[7px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-2 min-h-[42px] rounded-full px-[15px] font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    data-test="it-ticket-group-work"
+    type="button"
+  />
+
+  Name "Details & links":
+  <button
+    aria-pressed="false"
+    class="inline-flex shrink-0 items-center gap-[7px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-2 min-h-[42px] rounded-full px-[15px] font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    data-test="it-ticket-group-details"
+    type="button"
+  />
+
+  Name "Activity":
+  <button
+    aria-pressed="false"
+    class="inline-flex shrink-0 items-center gap-[7px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-2 min-h-[42px] rounded-full px-[15px] font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    data-test="it-ticket-group-activity"
+    type="button"
+  />
+
+  Name "Find a section":
+  <button
+    aria-label="Find a section"
+    class="mb-2 ml-auto inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80 focus-visible:outline-none"
+    data-test="it-ticket-search"
+    title="Find a section (/)"
+    type="button"
+  />
+
+  Name "Service levelsDetails & links":
+  <button
+    class="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+    type="button"
+  />
+
+  Name "Attach":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+    data-slot="button"
+  />
+
+  Name "Send reply":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-8 rounded-md px-3 has-[>svg]:px-2.5"
+    data-slot="button"
+    disabled=""
+  />
+
+  Name "Classification & ownership":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+  />
+
+  Name "View clock evidence":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+  />
+
+  --------------------------------------------------
+  toolbar:
+
+  Name "Ticket workspace":
+  <div
+    aria-label="Ticket workspace"
+    class="scrollbar-none flex items-end gap-1.5 overflow-x-auto pt-2"
+    role="toolbar"
+  />
+
+  --------------------------------------------------
+  tablist:
+
+  Name "Conversation sections":
+  <div
+    aria-label="Conversation sections"
+    class="flex flex-wrap items-center gap-1"
+    role="tablist"
+  />
+
+  --------------------------------------------------
+  tab:
+
+  Name "Messages":
+  <a
+    aria-controls="it-ticket-panel"
+    aria-selected="true"
+    class="relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none bg-primary/12 text-primary"
+    data-test="it-ticket-tab-messages"
+    href="/it/tickets/42?tab=messages"
+    id="it-ticket-tab-messages"
+    role="tab"
+    tabindex="0"
+  />
+
+  Name "Files":
+  <a
+    aria-controls="it-ticket-panel"
+    aria-selected="false"
+    class="relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none text-muted-foreground hover:bg-accent hover:text-foreground"
+    data-test="it-ticket-tab-files"
+    href="/it/tickets/42?tab=files"
+    id="it-ticket-tab-files"
+    role="tab"
+    tabindex="-1"
+  />
+
+  --------------------------------------------------
+  dialog:
+
+  Name "Jump to a section":
+  <div
+    aria-label="Jump to a section"
+    aria-modal="true"
+    class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-[12vh]"
+    data-test="it-ticket-search-palette"
+    role="dialog"
+  />
+
+  --------------------------------------------------
+  textbox:
+
+  Name "Find a section in this ticket":
+  <input
+    aria-label="Find a section in this ticket"
+    class="h-12 w-full bg-transparent text-sm outline-none focus-visible:ring-0"
+    placeholder="Jump to a section…"
+    value="service"
+  />
+
+  Name "Your reply":
+  <textarea
+    aria-label="Your reply"
+    class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    placeholder="Write a reply for the people involved in this ticket…"
+    rows="3"
+  />
+
+  --------------------------------------------------
+  tabpanel:
+
+  Name "Messages":
+  <div
+    aria-labelledby="it-ticket-tab-messages"
+    id="it-ticket-panel"
+    role="tabpanel"
+  />
+
+  --------------------------------------------------
+  complementary:
+
+  Name "Ticket at a glance":
+  <aside
+    aria-label="Ticket at a glance"
+    class="flex min-w-0 flex-col gap-5"
+  />
+
+  --------------------------------------------------
+  term:
+
+  Name "":
+  <dt
+    class="text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <dt
+    class="text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <dt
+    class="text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <dt
+    class="text-xs text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  definition:
+
+  Name "":
+  <dd
+    class="mt-1 font-medium"
+  />
+
+  Name "":
+  <dd
+    class="mt-1 font-medium"
+  />
+
+  Name "":
+  <dd
+    class="mt-1 font-medium"
+  />
+
+  Name "":
+  <dd
+    class="mt-1 font-medium"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <nav
+        aria-label="Breadcrumb"
+      >
+        <a
+          href="/dashboard"
+        >
+          Home
+        </a>
+        <a
+          href="/it"
+        >
+          IT & Support
+        </a>
+        <a
+          href="/it/tickets/42"
+        >
+          IT-000042
+        </a>
+      </nav>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header
+            class="eh-header text-primary-foreground"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <a
+                      aria-label="Back"
+                      class="mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 transition-colors outline-none hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+                      href="/it"
+                    >
+                      <svg
+                        class="lucide lucide-chevron-left size-4"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 18-6-6 6-6"
+                        />
+                      </svg>
+                    </a>
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-ticket size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+                        />
+                        <path
+                          d="M13 5v2"
+                        />
+                        <path
+                          d="M13 17v2"
+                        />
+                        <path
+                          d="M13 11v2"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="truncate text-[22px] leading-tight font-bold tracking-tight"
+                        >
+                          Investigate the shared printer
+                        </h1>
+                        <span
+                          class="inline-flex items-center gap-1 border px-2.5 py-0.5 text-xs bg-status-warning-bg text-status-warning border-status-warning/30 rounded-[8px] font-semibold"
+                        >
+                          Open
+                        </span>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        IT-000042
+                         · 
+                        Raised by
+                         
+                        Alex Requester
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <button
+                      class="relative inline-flex h-9 min-w-[200px] flex-1 items-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground/55 transition-colors outline-none hover:bg-primary-foreground/15 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 lg:w-[250px] lg:flex-none"
+                      type="button"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        ...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/tickets/show.test.tsx:210:32
+    208|         expect(screen.getByText('Nothing matches “clock”.')).toBeVisib…
+    209|         fireEvent.change(screen.getByRole('textbox', { name: 'Find a s…
+    210|         fireEvent.click(screen.getByRole('button', { name: 'Service le…
+       |                                ^
+    211|         expect(visit).toHaveBeenLastCalledWith('/it/tickets/42', { tab…
+    212|         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 9 passed (10)
+   Start at  15:29:49
+   Duration  5.02s (transform 656ms, setup 270ms, import 3.86s, tests 1.53s, environment 1.70s)
+

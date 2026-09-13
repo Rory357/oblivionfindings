@@ -1,0 +1,10 @@
+{
+  "token_matches": true,
+  "ticket4_closed_version6": true,
+  "ticket1_closed_version2": true,
+  "exactly_two_close_events": true,
+  "single_reason_matches": true,
+  "bulk_reason_matches": true,
+  "exactly_two_close_audits": true,
+  "closed_ticket_not_changed_by_bulk": true
+}

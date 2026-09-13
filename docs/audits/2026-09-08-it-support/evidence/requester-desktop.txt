@@ -1,0 +1,62 @@
+Home
+IT & Support
+IT & Support
+5 open
+
+Get help · Raise and track your requests
+
+Get help
+MY OPEN TICKETS
+5
+track your requests
+WAITING
+0
+check the latest update
+RESOLVED
+0
+last 30 days
+Status
+Service catalogue
+1
+My tickets
+0
+Knowledge
+
+Tickets you’ve raised — IT sees new ones instantly.
+
+Raise a ticket
+TICKET
+ASSIGNEE
+PRIORITY
+STATUS
+RAISED
+Request managed network access
+IT-000005 · Network · Business reason: A support worker needs approved connectivity at the managed site.
+With IT for triage
+Normal
+Open
+4w ago
+E2E SD-WAN firmware change
+IT-000003 · Network · Upgrade managed gateways during the approved maintenance window.
+Demo Admin
+High
+Open
+4w ago
+E2E regional connectivity outage
+IT-000004 · Network · A regional carrier fault has affected multiple sites.
+Demo Admin
+Urgent
+Open
+4w ago
+E2E inbound email printer incident
+IT-000001 · Network · A site printer stopped responding and the requester emailed the service desk.
+Demo Admin
+High
+In progress
+4w ago
+E2E recurring WAN instability
+IT-000002 · Network · Recurring packet loss affects several managed site links.
+Demo Admin
+High
+In progress
+4w ago

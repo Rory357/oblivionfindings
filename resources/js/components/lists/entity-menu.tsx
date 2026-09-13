@@ -12,6 +12,7 @@ import { MoreVertical } from 'lucide-react';
 import {
     type ComponentType,
     type MouseEvent as ReactMouseEvent,
+    useCallback,
     useEffect,
     useRef,
     useState,
@@ -52,21 +53,25 @@ export function compactMenu(
     return out;
 }
 
-/** The kebab — the always-visible actions entry point on cards and rows. */
+/** The kebab — the actions entry point when a card or row has actions. */
 export function EntityKebab({
     actions,
     className,
+    label = 'More actions',
 }: {
     actions: MenuItem[];
     className?: string;
+    label?: string;
 }) {
+    if (actions.length === 0) return null;
+
     return (
         <div onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <button
                         type="button"
-                        aria-label="More actions"
+                        aria-label={label}
                         className={cn(
                             'flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
                             className,
@@ -123,6 +128,17 @@ export function EntityContextMenu({
 }) {
     const ref = useRef<HTMLDivElement>(null);
     const [pos, setPos] = useState({ x, y });
+    const returnFocus = useRef<HTMLElement | null>(null);
+
+    useEffect(() => {
+        returnFocus.current =
+            document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
+        ref.current
+            ?.querySelector<HTMLButtonElement>('[role="menuitem"]')
+            ?.focus();
+    }, []);
 
     useEffect(() => {
         const el = ref.current;
@@ -140,7 +156,12 @@ export function EntityContextMenu({
     useEffect(() => {
         const close = () => onClose();
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                onClose();
+                if (returnFocus.current?.isConnected)
+                    returnFocus.current.focus();
+            }
         };
         window.addEventListener('mousedown', close);
         window.addEventListener('scroll', close, true);
@@ -155,6 +176,40 @@ export function EntityContextMenu({
     return (
         <div
             ref={ref}
+            role="menu"
+            aria-label={title}
+            onKeyDown={(event) => {
+                const items = Array.from(
+                    ref.current?.querySelectorAll<HTMLButtonElement>(
+                        '[role="menuitem"]',
+                    ) ?? [],
+                );
+                if (event.key === 'Tab') {
+                    onClose();
+                    return;
+                }
+                if (
+                    !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(
+                        event.key,
+                    ) ||
+                    items.length === 0
+                )
+                    return;
+                event.preventDefault();
+                const current = items.indexOf(
+                    document.activeElement as HTMLButtonElement,
+                );
+                const next =
+                    event.key === 'Home'
+                        ? 0
+                        : event.key === 'End'
+                          ? items.length - 1
+                          : (current +
+                                (event.key === 'ArrowDown' ? 1 : -1) +
+                                items.length) %
+                            items.length;
+                items[next].focus();
+            }}
             style={{ left: pos.x, top: pos.y }}
             onMouseDown={(e) => e.stopPropagation()}
             onContextMenu={(e) => e.preventDefault()}
@@ -172,10 +227,15 @@ export function EntityContextMenu({
             </div>
             {items.map((it, i) =>
                 it.separator ? (
-                    <div key={`s${i}`} className="my-1 h-px bg-border" />
+                    <div
+                        role="separator"
+                        key={`s${i}`}
+                        className="my-1 h-px bg-border"
+                    />
                 ) : (
                     <button
                         key={i}
+                        role="menuitem"
                         type="button"
                         onClick={() => {
                             onClose();
@@ -210,9 +270,17 @@ export function useEntityContextMenu<T>() {
         null,
     );
     const open = (e: ReactMouseEvent, record: T) => {
+        // Links keep browser-native Open in new tab / Copy link actions.
+        if (e.target instanceof Element && e.target.closest('a[href]')) return;
         e.preventDefault();
-        setCtx({ x: e.clientX, y: e.clientY, record });
+        const bounds = e.currentTarget.getBoundingClientRect();
+        const keyboard = e.clientX === 0 && e.clientY === 0;
+        setCtx({
+            x: keyboard ? bounds.left + 12 : e.clientX,
+            y: keyboard ? bounds.top + 12 : e.clientY,
+            record,
+        });
     };
-    const close = () => setCtx(null);
+    const close = useCallback(() => setCtx(null), []);
     return { ctx, open, close } as const;
 }

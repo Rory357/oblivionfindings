@@ -1,0 +1,18 @@
+[
+  {
+    "path": "resources/js/components/confirm-dialog.tsx",
+    "sha256": "1a6ba6fb5aa55de5f2cdd29fe9203581e8931c258fffa458c6d434f7a4cf39c3"
+  },
+  {
+    "path": "resources/js/components/it/ticket-work-task-action-dialog.tsx",
+    "sha256": "d80447942e1d80c1037a93de619aec23ba8ac72ae15882e2d8566b099f561307"
+  },
+  {
+    "path": "resources/js/components/it/__tests__/ticket-work-task-focus.test.tsx",
+    "sha256": "e06a713904d90152f3610c86e765bed903c7a03d27f9f3fd1d1d31b66e8b88c0"
+  },
+  {
+    "path": "resources/js/components/__tests__/confirm-dialog-focus.test.tsx",
+    "sha256": "cb9b7e13a1141e314464144337878909ef75db8982bfa8115b3adcd5d0911c22"
+  }
+]

@@ -1,0 +1,8 @@
+Browser tab: 2, Title: "Not Found", URL: "https://oblivionfindings.test/it/tickets/7".
+1 AXWebArea Not Found, URL: oblivionfindings.test/it/tickets/7
+	2 container
+		3 heading 404, Value: 1
+			4 text 404
+		5 text Not Found
+
+The focused UI element is 1 AXWebArea Not Found, URL: oblivionfindings.test/it/tickets/7

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\It;
 
+use App\Domain\It\Services\ItKbAccessService;
 use App\Domain\It\Services\ItKbLifecycleService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\It\DeleteKbArticleRequest;
@@ -16,7 +17,7 @@ use Illuminate\Http\Request;
 /**
  * Knowledge-base authoring (§I). Agents create, edit and publish/unpublish
  * articles; requesters read the published ones (browse/vote lands with 14c).
- * Every write is `it.manage`-gated; Site-specific audiences are bounded by
+ * Authoring and publication have independent grants; Site audiences are bounded by
  * canonical approved-Site assignments.
  */
 class ItKbController extends Controller
@@ -29,7 +30,11 @@ class ItKbController extends Controller
     {
         $user = $request->user();
         $data = $request->validated();
-        $article = $this->lifecycle->create($user, $data);
+        try {
+            $article = $this->lifecycle->create($user, $data);
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
 
         return redirect()->back()
             ->with('success', "Article “{$article->title}” saved as a draft.")
@@ -129,7 +134,9 @@ class ItKbController extends Controller
         string $success,
         ?string $reason = null,
     ) {
-        abort_unless($request->user()?->canDo('it.manage'), 403);
+        $capability = in_array($method, ['publish', 'retire'], true)
+            ? ItKbAccessService::REVIEW : ItKbAccessService::AUTHOR;
+        abort_unless($request->user()?->canDo($capability), 403);
         try {
             $reason === null
                 ? $this->lifecycle->{$method}($article, $request->user())

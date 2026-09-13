@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { AlertTriangle, Check } from 'lucide-react';
 import {
     cloneElement,
+    Fragment,
     isValidElement,
     useId,
     type ComponentType,
@@ -48,10 +49,19 @@ export const WIZARD_FOOTER_CLASS =
 /*  Field + section primitives                                         */
 /* ------------------------------------------------------------------ */
 
-export function FieldErr({ children }: { children?: ReactNode }) {
+export function FieldErr({
+    children,
+    id,
+}: {
+    children?: ReactNode;
+    id?: string;
+}) {
     if (!children) return null;
     return (
-        <p className="mt-1 flex items-center gap-1 text-xs text-status-critical">
+        <p
+            id={id}
+            className="mt-1 flex items-center gap-1 text-xs text-status-critical"
+        >
             <AlertTriangle className="h-3 w-3 shrink-0" />
             {children}
         </p>
@@ -64,6 +74,9 @@ export function Field({
     hint,
     error,
     span,
+    htmlFor,
+    labelId,
+    errorId,
     children,
 }: {
     label?: string;
@@ -71,16 +84,18 @@ export function Field({
     hint?: string;
     error?: string;
     span?: boolean;
+    htmlFor?: string;
+    labelId?: string;
+    errorId?: string;
     children: ReactNode;
 }) {
-    // Associate the visible label with its control for screen readers. Only a
-    // single child element without its own id is given the generated id (so
-    // composite controls — Select/TilePicker/fragments — are left untouched and
-    // the htmlFor simply doesn't bind, exactly as before).
+    // Preserve a direct control's id; fragments cannot accept DOM attributes.
+    // Composite fields can explicitly identify their real picker and error.
     const generatedId = useId();
-    const child = isValidElement(children)
-        ? (children as ReactElement<{ id?: string }>)
-        : null;
+    const child =
+        isValidElement(children) && children.type !== Fragment
+            ? (children as ReactElement<{ id?: string }>)
+            : null;
     const controlId = child && child.props.id == null ? generatedId : undefined;
     const control = controlId
         ? cloneElement(child as ReactElement<{ id?: string }>, {
@@ -92,7 +107,8 @@ export function Field({
         <div className={cn('min-w-0', span && 'sm:col-span-2')}>
             {label ? (
                 <Label
-                    htmlFor={controlId}
+                    id={labelId}
+                    htmlFor={htmlFor ?? child?.props.id ?? controlId}
                     className="mb-1.5 flex items-center gap-1.5"
                 >
                     {label}
@@ -107,7 +123,7 @@ export function Field({
                 </Label>
             ) : null}
             {control}
-            <FieldErr>{error}</FieldErr>
+            <FieldErr id={errorId}>{error}</FieldErr>
         </div>
     );
 }

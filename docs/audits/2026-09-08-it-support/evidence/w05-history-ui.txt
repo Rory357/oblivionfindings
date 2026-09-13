@@ -1,0 +1,420 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/pages/it/knowledge-access.test.tsx (9 tests | 1 failed) 953ms
+     × shows the full My requests count and applies requester-safe URL search and status in both layouts 128ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > shows the full My requests count and applies requester-safe URL search and status in both layouts
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name `/My requests.*3/`
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search your requests…"
+    type="search"
+    value="printer"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Open":
+  <button
+    aria-controls="radix-_r_25_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-1"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Clear Status":
+  <button
+    aria-label="Clear Status"
+    class="mr-1.5 inline-flex size-3.5 shrink-0 items-center justify-center rounded-[4px] hover:bg-primary/20"
+    type="button"
+  />
+
+  Name "Find a view":
+  <button
+    aria-label="Find a view"
+    class="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
+    title="Find a view"
+    type="button"
+  />
+
+  Name "Actions for Printer needs toner":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Printer needs toner"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_29_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  tablist:
+
+  Name "IT views":
+  <div
+    aria-label="IT views"
+    class="flex w-full flex-wrap items-end gap-1"
+    role="tablist"
+  />
+
+  --------------------------------------------------
+  tab:
+
+  Name "Service catalogue0":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "My requests3":
+  <button
+    aria-selected="true"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary"
+    role="tab"
+    type="button"
+  />
+
+  Name "Knowledge":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="text-[12.5px] text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "My requests":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 800px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "RequestHelping youPriorityStatusRaisedActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 2.6fr 1.2fr .7fr 1.2fr .8fr 32px;"
+  />
+
+  Name "Printer needs tonerIT-000001 · HardwareWith IT for triageNormalOpenToday":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 2.6fr 1.2fr .7fr 1.2fr .8fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Request":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Helping you":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Priority":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Status":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Raised":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Printer needs tonerIT-000001 · Hardware":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "With IT for triage":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Normal":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Open":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Today":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "Printer needs toner":
+  <a
+    href="/it/tickets/1"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header>
+            <div
+              class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+            >
+              <svg
+                class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="8"
+                />
+                <path
+                  d="m21 21-4.3-4.3"
+                />
+              </svg>
+              <input
+                class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                placeholder="Search your requests…"
+                type="search"
+                value="printer"
+              />
+              <kbd
+                aria-hidden="true"
+                class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+              >
+                /
+              </kbd>
+            </div>
+            <div
+              aria-label="List layout"
+              class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+              role="radiogroup"
+            >
+              <button
+                aria-checked="false"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-layout-grid size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="14"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="14"
+                  />
+                </svg>
+                Cards
+              </button>
+              <button
+                aria-checked="true"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-list size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M3 12h.01"
+                  />
+                  <path
+                    d="M3 18h.01"
+                  />
+                  <path
+                    d="M3 6h.01"
+                  />
+                  <path
+                    d="M8 12h13"
+                  />
+             ...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:150:23
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed (9)
+   Start at  15:05:23
+   Duration  4.39s (transform 400ms, setup 116ms, import 2.32s, tests 953ms, environment 846ms)
+

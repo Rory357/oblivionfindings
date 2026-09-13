@@ -2,16 +2,15 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
+    CalendarCheck,
     CheckCircle2,
     ClipboardCheck,
-    FileText,
     HeartPulse,
     Home,
     ListChecks,
     Pill,
     ShieldAlert,
     ShieldCheck,
-    Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -22,12 +21,9 @@ import { RunModal } from '@/components/checklists/run-modal';
 import EndOfShiftChecklist, {
     type EndOfShiftBlocker,
 } from '@/components/end-of-shift-checklist';
-import { StaffHeader } from '@/components/staff-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import useLiveRefresh from '@/hooks/use-live-refresh';
-import { useMyDayLabels } from '@/hooks/use-my-day-labels';
-import { useUndoableAction } from '@/hooks/use-undoable-action';
 import AppLayout from '@/layouts/app-layout';
 import { formatRelative, formatTime } from '@/lib/datetime';
 
@@ -38,38 +34,39 @@ import {
     WriteHandoverDialog,
 } from './_dialogs';
 
-import { DatePopover } from './components/date-popover';
+import { BeforeYouFinish } from './components/before-you-finish';
+import { DayWorkList } from './components/day-work-list';
 import { DigestPanel } from './components/digest-panel';
-import { MyDayHero } from './components/my-day-hero';
-import { PaperworkPanel } from './components/paperwork-panel';
-import { StreamContextMenu } from './components/stream-context-menu';
-import { TomorrowPanel } from './components/tomorrow-panel';
-import { WhatsNextRail } from './components/whats-next-rail';
-import { residentHue, residentInitials } from './lib/resident-hue';
 import {
-    buildStream,
-    isoToHourMinute,
-    type StreamItem,
-} from './lib/stream-grouping';
+    MyDayHeader,
+    type MyDayView,
+    type WorkFilter,
+} from './components/my-day-header';
+import { PaperworkPanel } from './components/paperwork-panel';
+import { QuickAddTask } from './components/quick-add-task';
+import { RecordCareActions } from './components/record-care-actions';
+import { ShiftSummary } from './components/shift-summary';
+import { TaskDetailDialog } from './components/task-detail-dialog';
+import { TaskHelpInbox } from './components/task-help-inbox';
+import { TomorrowPanel } from './components/tomorrow-panel';
+import { residentHue, residentInitials } from './lib/resident-hue';
+import { buildStream } from './lib/stream-grouping';
 import type {
     MyDayActiveRound,
     MyDayActiveSite,
     MyDayFirstAidFollowup,
-    MyDayHandover,
-    MyDayHrTask,
     MyDayLoneWorkerSession,
     MyDayMedDue,
     MyDayMyTasks,
-    MyDayNotification,
     MyDayPageProps,
     MyDayPpe,
-    MyDayPreShiftBriefing,
     MyDayResident,
     MyDayShiftTask,
     MyDayTaskFollowup,
     MyDayTimesheet,
     ShiftChecklistRun,
 } from './lib/types';
+import { workDueAt, workIsDone } from './lib/work-priority';
 
 /* -------------------------------------------------------------------------- */
 /*  /my-day — desktop frontline home                                          */
@@ -79,15 +76,8 @@ import type {
  * intentionally web-only (≥768 px); no native application surface is part of
  * this product scope.
  *
- * Top-down composition:
- *   • AppLayout (default experience) with the AppSidebar
- *   • Extended StaffHeader (date popover + global links + search + live + bell)
- *   • MyDayHero (gradient banner with avatar stack, badges-with-popovers, stats,
- *     quick actions, resident PageTabs footer)
- *   • Two-column body: WhatsNextRail | DigestPanel (handover/needs-you/updates)
- *     + PaperworkPanel + TomorrowPanel. The Digest "Needs you" tab absorbs
- *     the open items (alerts/incidents/follow-ups) that used to sit in a
- *     separate full-width grid below the rail.
+ * Shared Event Horizon header; direct Today / Handover / My shift views;
+ * priority work beside clear shift and recording actions.
  */
 
 interface AuthUser {
@@ -102,6 +92,7 @@ interface AuthUser {
 interface SharedAuth {
     user?: AuthUser | null;
     can?: {
+        timesheets?: { create?: boolean };
         staff?: {
             availabilityUpdateSelf?: boolean;
         };
@@ -125,34 +116,53 @@ export default function MyDay() {
         can_record_clinical?: boolean;
     };
     const auth = props.auth;
-    const t = useMyDayLabels();
 
-    const workerFirstName =
-        auth?.user?.first_name ?? auth?.user?.name?.split(' ')[0] ?? 'there';
     const availabilityHref =
         auth?.user?.id && auth?.can?.staff?.availabilityUpdateSelf
             ? `/staff/${auth.user.id}/availability`
             : null;
 
-    // Date popover — anchored to the title.
-    const [dateOpen, setDateOpen] = useState(false);
+    const [view, setView] = useState<MyDayView>('today');
+    const [search, setSearch] = useState('');
+    const [workFilter, setWorkFilter] = useState<WorkFilter>('all');
+    const [addTaskOpen, setAddTaskOpen] = useState(false);
+    const [newTaskTime, setNewTaskTime] = useState<number>();
+    const openNewTask = (at?: number) => {
+        setNewTaskTime(at);
+        setAddTaskOpen(true);
+    };
+    const [openTaskId, setOpenTaskId] = useState<number | null>(null);
+    const [savedTasks, setSavedTasks] = useState<
+        Record<number, MyDayShiftTask>
+    >({});
+    const updateTask = (task: MyDayShiftTask) => {
+        setSavedTasks((current) => ({ ...current, [task.id]: task }));
+        router.reload({
+            only: [
+                'active_shift',
+                'clock',
+                'task_creation',
+                'help_requests',
+                'handover',
+                'handover_draft',
+                'outgoing_handover',
+            ],
+            preserveScroll: true,
+            onSuccess: () =>
+                setSavedTasks((current) => {
+                    if ((current[task.id]?.version ?? -1) > (task.version ?? 0))
+                        return current;
+                    const next = { ...current };
+                    delete next[task.id];
+                    return next;
+                }),
+        });
+    };
 
     // Active resident filter (multi-resident sites only).
     const [activeResidentId, setActiveResidentId] = useState<'all' | number>(
         'all',
     );
-
-    // Digest panel tab.
-    const [digestTab, setDigestTab] = useState<
-        'handover' | 'alerts' | 'notifs'
-    >('handover');
-
-    // Right-click context menu.
-    const [ctxMenu, setCtxMenu] = useState<{
-        item: StreamItem;
-        x: number;
-        y: number;
-    } | null>(null);
 
     // End-of-shift + outgoing-handover sheets — both reuse the existing
     // components already shipped for the legacy clock-in/active-shift cards.
@@ -173,7 +183,12 @@ export default function MyDay() {
         useState<MyDayTimesheet | null>(null);
 
     // Live refresh — Inertia partial reload every 60s (unless guarded).
-    const { lastUpdatedAt, isRefreshing, refreshNow } = useLiveRefresh({
+    const {
+        lastUpdatedAt,
+        isRefreshing,
+        refreshNow,
+        hasError: refreshFailed,
+    } = useLiveRefresh({
         intervalMs: 60_000,
     });
 
@@ -219,46 +234,45 @@ export default function MyDay() {
     // is the active shift's care plan + meds at the site for today). When there's
     // no active shift we fall back to today's shifts' first one.
     const visibleTasks: MyDayShiftTask[] = useMemo(() => {
-        const tasks = activeShift?.tasks ?? props.shifts?.[0]?.tasks ?? [];
-        const fallbackClientId =
-            activeShift?.client?.id ?? props.shifts?.[0]?.client?.id ?? null;
-        return tasks.map((task) => ({
+        const source = activeShift?.tasks ?? [];
+        const byId = new Map(source.map((task) => [task.id, task]));
+        Object.values(savedTasks)
+            .filter((task) => task.shift_id === activeShift?.id)
+            .forEach((task) => {
+                const server = byId.get(task.id);
+                if (!server || (task.version ?? 0) >= (server.version ?? 0))
+                    byId.set(task.id, { ...server, ...task });
+            });
+        return [...byId.values()].map((task) => ({
             ...task,
-            client_id: task.client_id ?? fallbackClientId ?? undefined,
+            client_id:
+                task.task_scope === 'site'
+                    ? null
+                    : (task.client_id ?? activeShift?.client?.id ?? null),
         }));
-    }, [activeShift, props.shifts]);
+    }, [activeShift, savedTasks]);
+
+    const helpRequests = (props.help_requests ?? [])
+        .map((task) => {
+            const saved = savedTasks[task.id];
+            return saved && (saved.version ?? 0) >= (task.version ?? 0)
+                ? { ...task, ...saved }
+                : task;
+        })
+        .filter(
+            (task) => !task.is_completed && task.help?.status !== 'declined',
+        );
 
     const visibleMeds: MyDayMedDue[] = useMemo(
         () => props.medications_due ?? [],
         [props.medications_due],
     );
 
-    const residentTaskCounts = useMemo(() => {
-        const m = new Map<
-            number,
-            { tasks: number; meds: number; medsOverdue: number }
-        >();
-        residents.forEach((r) =>
-            m.set(r.id, { tasks: 0, meds: 0, medsOverdue: 0 }),
-        );
-        visibleTasks.forEach((task) => {
-            if (task.client_id == null) return;
-            const entry = m.get(task.client_id);
-            if (entry) entry.tasks += 1;
-        });
-        visibleMeds.forEach((med) => {
-            const entry = m.get(med.client_id);
-            if (entry) {
-                entry.meds += 1;
-                if (med.status === 'overdue') entry.medsOverdue += 1;
-            }
-        });
-        return m;
-    }, [residents, visibleTasks, visibleMeds]);
-
     const filteredTasks = useMemo(() => {
         if (activeResidentId === 'all') return visibleTasks;
-        return visibleTasks.filter((t) => t.client_id === activeResidentId);
+        return visibleTasks.filter(
+            (t) => t.client_id === activeResidentId || t.task_scope === 'site',
+        );
     }, [activeResidentId, visibleTasks]);
 
     const filteredMeds = useMemo(() => {
@@ -274,28 +288,30 @@ export default function MyDay() {
                 residentFilter:
                     activeResidentId === 'all' ? null : activeResidentId,
                 fallbackClientId: singleResident?.id ?? null,
+                includeSiteTasks: true,
             }),
         [filteredTasks, filteredMeds, activeResidentId, singleResident],
     );
 
-    const residentNotes = useMemo(() => {
-        const m = new Map<number, string | null | undefined>();
-        residents.forEach((r) => m.set(r.id, r.care_note_preview));
-        return m;
-    }, [residents]);
-
-    const tasksDone = filteredTasks.filter((t) => t.is_completed).length;
-    const medsGiven = filteredMeds.filter((m) => m.status === 'given').length;
-    const medsOverdue = filteredMeds.filter(
-        (m) => m.status === 'overdue',
-    ).length;
-    const overdueMeds = visibleMeds.filter((m) => m.status === 'overdue');
+    const overdueMeds = visibleMeds.filter((med) => med.status === 'overdue');
+    const attentionTasks = visibleTasks.filter(
+        (task) =>
+            !task.is_completed &&
+            task.follow_through !== 'accepted_help' &&
+            ((task.scheduled_for && Date.parse(task.scheduled_for) <= now) ||
+                ['requested', 'declined', 'accepted'].includes(
+                    task.help?.status ?? '',
+                )),
+    );
     const openItemTasks = (props.tasks ?? []).filter((t) =>
         ['alert', 'incident', 'followup', 'note_followup'].includes(t.type),
     );
-    const alertTasks = openItemTasks.filter((t) => t.type === 'alert');
     const openItemsCount =
-        openItemTasks.length + (props.incidents?.length ?? 0) + medsOverdue;
+        openItemTasks.length +
+        (props.incidents?.length ?? 0) +
+        overdueMeds.length +
+        attentionTasks.length +
+        helpRequests.filter((task) => task.help?.status === 'requested').length;
 
     // Clock & shift labels
     const openSession = props.clock?.open_session ?? null;
@@ -307,7 +323,6 @@ export default function MyDay() {
     // ticking `now` above and re-arm a 30s interval while a session is open.
     const clockInAt = openSession?.clock_in_at ?? null;
     useEffect(() => {
-        if (!clockInAt) return;
         setNow(Date.now());
         const id = setInterval(() => setNow(Date.now()), 30_000);
         return () => clearInterval(id);
@@ -319,43 +334,6 @@ export default function MyDay() {
           )
         : 0;
     const clockedLabel = `${Math.floor(clockedMinutes / 60)}h ${clockedMinutes % 60}m`;
-    const shiftStartLabel = isoToHourMinute(activeShift?.starts_at);
-    const shiftEndLabel = isoToHourMinute(activeShift?.ends_at);
-    const shiftDurationHours = activeShift
-        ? Math.round(
-              (new Date(activeShift.ends_at).getTime() -
-                  new Date(activeShift.starts_at).getTime()) /
-                  3_600_000,
-          )
-        : 8;
-    // "Live shift · since X" only makes sense when this worker has an open
-    // attendance session. X should be THIS session's clock-in time — the
-    // shift's `actual_starts_at` is the historical first-start (set by the
-    // earliest session on the shift, including a previous worker's), so it
-    // misleadingly survives clock-out and ends up showing a time hours before
-    // the current worker actually arrived. Prefer the open session's
-    // clock_in_at and only fall back to actual_starts_at when the session
-    // hasn't reported one yet.
-    const liveSinceTime = clockedIn
-        ? isoToHourMinute(
-              openSession?.clock_in_at ?? activeShift?.actual_starts_at,
-          )
-        : '';
-    const liveSinceLabel = !clockedIn
-        ? t('hero_not_clocked_in')
-        : liveSinceTime
-          ? t('hero_live_since', { time: liveSinceTime })
-          : t('hero_live_shift');
-    const clockedSubLabel = `of ${shiftDurationHours}h`;
-
-    const today = useMemo(
-        () => parsePageDate(props.today ?? props.today_iso ?? null),
-        [props.today, props.today_iso],
-    );
-    const shiftIsoDates = useMemo(
-        () => (props.shifts ?? []).map((s) => s.starts_at.slice(0, 10)),
-        [props.shifts],
-    );
     const checklistProviderValue = useMemo(() => {
         if (!props.checklistConfig || !site) return null;
 
@@ -394,8 +372,6 @@ export default function MyDay() {
     // ──────────────────────────────────────────────────────────────────────
     // Mutations
     // ──────────────────────────────────────────────────────────────────────
-
-    const { run: runUndoable } = useUndoableAction();
 
     // PR 4.5 removed the legacy `/my-tasks/clock/{in,out}` shortcuts; the
     // canonical clock flow goes through AttendanceController so the open
@@ -440,25 +416,28 @@ export default function MyDay() {
     // `open_timesheet_id`, which the effect below uses to open the refreshed
     // popup without sending the worker away from /my-day.
     const todaysTimesheet = useMemo<MyDayTimesheet | null>(() => {
-        const todayIso = props.today_iso;
-        if (!todayIso) return null;
+        if (!activeShift) return null;
         return (
             (props.timesheets ?? []).find(
                 (ts) =>
-                    ts.work_date_iso === todayIso &&
+                    ts.shift_id === activeShift.id &&
                     (ts.status === 'draft' || ts.status === 'returned'),
             ) ?? null
         );
-    }, [props.timesheets, props.today_iso]) as MyDayTimesheet | null;
+    }, [props.timesheets, activeShift]) as MyDayTimesheet | null;
 
     const handleOpenTimesheets = useCallback(() => {
+        if (!activeShift) {
+            setView('shift');
+            return;
+        }
         if (todaysTimesheet) {
             setTimesheetUnderReview(todaysTimesheet);
             return;
         }
         router.post(
             '/my-tasks/timesheet/ensure-today',
-            {},
+            { shift_id: activeShift?.id },
             {
                 preserveScroll: true,
                 // ensure-today returns `back()->withErrors(['timesheet' => …])` when
@@ -470,7 +449,7 @@ export default function MyDay() {
                 },
             },
         );
-    }, [todaysTimesheet]);
+    }, [todaysTimesheet, activeShift]);
 
     // Inertia flash `open_timesheet_id` is set by /ensure-today after it
     // finds-or-creates a draft for today. When we see it land, look up the
@@ -560,94 +539,6 @@ export default function MyDay() {
         router.visit(`/clients/${clientId}?tab=progress_notes`);
     }, []);
 
-    const handleToggleTask = useCallback((taskId: number) => {
-        router.post(
-            `/my-tasks/shift-task/${taskId}/complete`,
-            {},
-            { preserveScroll: true },
-        );
-    }, []);
-
-    // A medications_due row addresses a single dose occurrence by medication id
-    // (the route-model-bound URL param) + scheduled_for (the slot). The same
-    // ClientMedication can appear twice in the rail (e.g. 09:00 + 13:00), so
-    // scheduled_for is what tells the endpoint which dose was acted on.
-    const handleGiveMed = useCallback(
-        (medicationId: number, scheduledFor: string) => {
-            runUndoable({
-                message: t('toast_marking_dose_given'),
-                durationMs: 5_000,
-                onCommit: () => {
-                    router.post(
-                        `/my-day/medications/${medicationId}/administer`,
-                        { scheduled_for: scheduledFor },
-                        {
-                            preserveScroll: true,
-                            only: ['medications_due', 'stats'] as never,
-                            // Surface a server rejection (e.g. controlled drug needs a
-                            // witness, or the dose is outside its time window) instead
-                            // of silently leaving the row unchanged.
-                            onError: (errors) => {
-                                const message = Object.values(errors)[0];
-                                toast.error(
-                                    typeof message === 'string'
-                                        ? message
-                                        : t('toast_dose_record_failed'),
-                                );
-                            },
-                        },
-                    );
-                },
-                undoneMessage: t('toast_dose_left_as_due'),
-            });
-        },
-        [runUndoable, t],
-    );
-
-    const handleRefuseMed = useCallback(
-        (medicationId: number, scheduledFor: string) => {
-            if (!confirm(t('confirm_refuse_dose'))) return;
-            const reason = window.prompt(
-                t('prompt_refuse_dose_reason'),
-                t('default_refuse_dose_reason'),
-            );
-            if (reason === null) return;
-            const trimmedReason = reason.trim();
-            if (!trimmedReason) return;
-            router.post(
-                `/my-day/medications/${medicationId}/refuse`,
-                {
-                    scheduled_for: scheduledFor,
-                    reason_code: 'refused',
-                    reason: trimmedReason,
-                },
-                {
-                    preserveScroll: true,
-                    onError: (errors) => {
-                        const message = Object.values(errors)[0];
-                        toast.error(
-                            typeof message === 'string'
-                                ? message
-                                : t('toast_dose_record_failed'),
-                        );
-                    },
-                },
-            );
-        },
-        [t],
-    );
-
-    const handleSnoozeMed = useCallback(
-        (medicationId: number, scheduledFor: string) => {
-            router.post(
-                `/my-day/medications/${medicationId}/snooze`,
-                { minutes: 15, scheduled_for: scheduledFor },
-                { preserveScroll: true },
-            );
-        },
-        [],
-    );
-
     const handleAckAlert = useCallback((alert: MyDayTaskFollowup) => {
         const alertId = alert.meta?.alert_id;
         if (!alertId) return;
@@ -681,188 +572,478 @@ export default function MyDay() {
         setTimesheetUnderReview(ts);
     }, []);
 
-    const handleContextMenuAction = useCallback(
-        (action: string) => {
-            if (!ctxMenu) return;
-            const item = ctxMenu.item;
-            if (action === 'complete-task' && item.kind === 'task')
-                handleToggleTask(item.data.id);
-            if (action === 'give-med' && item.kind === 'med')
-                handleGiveMed(item.data.medication_id, item.data.scheduled_for);
-            if (action === 'snooze-med' && item.kind === 'med')
-                handleSnoozeMed(
-                    item.data.medication_id,
-                    item.data.scheduled_for,
-                );
-            if (action === 'refuse-med' && item.kind === 'med')
-                handleRefuseMed(
-                    item.data.medication_id,
-                    item.data.scheduled_for,
-                );
-            if (
-                action === 'open-emar' &&
-                item.kind === 'med' &&
-                props.can_open_emar &&
-                item.data.emar_url
-            )
-                router.visit(item.data.emar_url);
-            if (
-                action === 'open-care-plan' &&
-                item.kind === 'task' &&
-                item.clientId
-            ) {
-                router.visit(`/clients/${item.clientId}?tab=care_plans`);
-            }
-            if (action === 'add-note') {
-                handleAddNote(item.clientId ?? null);
-            }
-            setCtxMenu(null);
-        },
-        [
-            ctxMenu,
-            handleToggleTask,
-            handleGiveMed,
-            handleSnoozeMed,
-            handleRefuseMed,
-            handleAddNote,
-            props.can_open_emar,
-        ],
+    const workItems = stream.filter((item) => {
+        if (workFilter === 'tasks' && item.kind !== 'task') return false;
+        if (workFilter === 'meds' && item.kind !== 'med') return false;
+        if (
+            workFilter === 'attention' &&
+            (workIsDone(item) ||
+                (item.kind === 'task'
+                    ? !attentionTasks.some((task) => task.id === item.data.id)
+                    : workDueAt(item) > now))
+        )
+            return false;
+        const label =
+            item.kind === 'task' ? item.data.label : item.data.medication_name;
+        const name =
+            residents.find((person) => person.id === item.clientId)?.name ??
+            (item.clientId === null ? 'Whole site' : '');
+        return (
+            !search.trim() ||
+            (label + ' ' + name)
+                .toLowerCase()
+                .includes(search.trim().toLowerCase())
+        );
+    });
+    const clearFilters = () => {
+        setActiveResidentId('all');
+        setSearch('');
+        setWorkFilter('all');
+    };
+    const helperTaskUnderReview = helpRequests.find(
+        (task) => task.id === openTaskId,
     );
-
-    // ──────────────────────────────────────────────────────────────────────
-    // Header — date popover, global links, live indicator, notifications
-    // ──────────────────────────────────────────────────────────────────────
-
-    const header = (
-        <StaffHeader
-            title={t('today')}
-            subtitle={today.label}
-            titleChevron
-            titleOpen={dateOpen}
-            onTitleClick={() => setDateOpen((v) => !v)}
-            titlePopover={
-                dateOpen ? (
-                    <DatePopover
-                        anchor={today.date}
-                        shiftDates={shiftIsoDates}
-                        onSelect={() => setDateOpen(false)}
-                        onClose={() => setDateOpen(false)}
-                    />
-                ) : null
-            }
-            globalLinks={[
-                { icon: Users, label: 'Clients', href: '/clients' },
-                { icon: Home, label: 'Sites & Locations', href: '/sites' },
-                { icon: Calendar, label: 'My Calendar', href: '/my-calendar' },
-                {
-                    icon: FileText,
-                    label: 'My Timesheets',
-                    href: '/operations/timesheets',
-                },
-            ]}
-            search={{ placeholder: t('staff_header_search'), hint: '⌘K' }}
-            liveIndicator={{
-                lastUpdatedAt,
-                isRefreshing,
-                onRefresh: refreshNow,
-            }}
-            notifications={{
-                count: props.stats?.notifications_unread ?? 0,
-                href: '/notifications',
-            }}
-            action={
-                <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                        const shiftId =
-                            activeShift?.id ?? props.shifts?.[0]?.id;
-                        router.visit(
-                            shiftId
-                                ? `/incidents/create?shift_id=${shiftId}`
-                                : '/incidents/create',
-                        );
-                    }}
-                >
-                    <AlertTriangle className="h-3.5 w-3.5" />{' '}
-                    {t('btn_report_incident')}
-                </Button>
-            }
+    const taskUnderReview =
+        visibleTasks.find((task) => task.id === openTaskId) ??
+        helperTaskUnderReview;
+    const people = residents.length
+        ? residents
+        : singleResident
+          ? [singleResident]
+          : [];
+    const canAddTask = !!props.task_creation?.can_create;
+    const headerTasks = view === 'today' ? filteredTasks : visibleTasks;
+    const headerMeds = view === 'today' ? filteredMeds : visibleMeds;
+    const digest = (
+        <DigestPanel
+            mode={view === 'today' ? 'attention' : 'handover'}
+            handover={props.handover ?? null}
+            alertTasks={openItemTasks}
+            incidents={props.incidents ?? []}
+            notifications={props.notifications ?? []}
+            onAckAlert={handleAckAlert}
+            onSnoozeAlert={handleSnoozeAlert}
+            onConfirmHandoverRead={handleConfirmHandoverRead}
+            onFollowUpAdded={updateTask}
+            onOpenTask={setOpenTaskId}
         />
     );
 
     return (
-        <AppLayout header={header} contentClassName="w-full p-5">
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'My Day', href: '/my-day' },
+            ]}
+            contentClassName="my-day-desktop w-full p-5"
+        >
             <Head title="My Day" />
 
-            <MyDayHero
-                workerFirstName={workerFirstName}
-                site={site}
-                singleResident={singleResident}
-                activeShiftId={activeShift?.id ?? null}
-                shiftStartLabel={shiftStartLabel}
-                shiftEndLabel={shiftEndLabel}
-                shiftDurationHours={shiftDurationHours}
-                clockedLabel={clockedLabel}
-                clockedSubLabel={clockedSubLabel}
-                tasksDone={tasksDone}
-                totalTasks={filteredTasks.length}
-                medsGiven={medsGiven}
-                totalMeds={filteredMeds.length}
-                medsOverdue={medsOverdue}
-                openItemsCount={openItemsCount}
-                overdueMeds={overdueMeds}
-                openItems={openItemTasks}
+            <MyDayHeader
+                unavailable={props.data_unavailable}
+                dateLabel={props.today}
+                siteName={site?.name ?? activeShift?.location ?? ''}
+                shiftLabel={
+                    activeShift
+                        ? formatTime(activeShift.starts_at) +
+                          ' – ' +
+                          formatTime(activeShift.ends_at)
+                        : 'No rostered shift'
+                }
                 clockedIn={clockedIn}
-                isOnBreak={isOnBreak}
-                handoverSubmitted={openSession?.handover_submitted ?? false}
-                onClockToggle={handleClockToggle}
-                onBreakToggle={handleBreakToggle}
-                onOpenTimesheet={handleOpenTimesheets}
-                onWriteHandover={handleWriteHandover}
-                onOpenVitals={() => setVitalsOpen(true)}
-                onOpenMeal={() => setMealLogOpen(true)}
-                activeResidentId={activeResidentId}
-                onResidentChange={setActiveResidentId}
-                residentTaskCounts={residentTaskCounts}
-                residentNotes={residentNotes}
-                liveSinceLabel={liveSinceLabel}
-                availabilityHref={availabilityHref}
+                hasShift={!!activeShift}
+                onBreak={isOnBreak}
+                residents={people}
+                person={activeResidentId}
+                onPerson={setActiveResidentId}
+                search={search}
+                onSearch={setSearch}
+                workFilter={workFilter}
+                onWorkFilter={setWorkFilter}
+                view={view}
+                onView={setView}
+                taskTotal={headerTasks.length}
+                taskDone={
+                    headerTasks.filter((task) => task.is_completed).length
+                }
+                medTotal={headerMeds.length}
+                medRecorded={
+                    headerMeds.filter((med) =>
+                        ['given', 'refused', 'withheld'].includes(med.status),
+                    ).length
+                }
+                attention={openItemsCount}
+                unreadHandover={!!props.handover?.unread}
+                canAdd={canAddTask}
+                onAdd={() => openNewTask()}
             />
-
-            <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-                <div className="min-w-0">
-                    <WhatsNextRail
-                        stream={stream}
-                        residents={
-                            residents.length > 0
-                                ? residents
-                                : singleResident
-                                  ? [singleResident]
-                                  : []
+            <div className="h-5" aria-hidden="true" />
+            {(refreshFailed || !!props.data_unavailable?.length) && (
+                <Card role="alert" className="mb-5 border-status-warning/30">
+                    <CardContent className="space-y-2 p-4">
+                        <h2 className="font-semibold">
+                            Some information could not be loaded
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                            {props.data_unavailable?.length
+                                ? props.data_unavailable.join(', ') + '. '
+                                : ''}
+                            Showing the last information loaded. Refresh to try
+                            again.
+                        </p>
+                        <Button
+                            variant="outline"
+                            onClick={refreshNow}
+                            disabled={isRefreshing}
+                        >
+                            Retry loading
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
+            {(openItemTasks.length > 0 ||
+                !!props.incidents?.length ||
+                overdueMeds.length > 0 ||
+                helpRequests.some(
+                    (task) => task.help?.status === 'requested',
+                ) ||
+                attentionTasks.some((task) => !!task.help)) && (
+                <Card className="mb-5 border-status-warning/30 bg-status-warning-bg">
+                    <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+                        <div>
+                            <h2 className="font-semibold text-status-warning">
+                                {openItemsCount}{' '}
+                                {openItemsCount === 1
+                                    ? 'item needs'
+                                    : 'items need'}{' '}
+                                attention
+                                {activeShift ? ' across your shift' : ''}
+                            </h2>
+                            <p className="mt-1 text-sm">
+                                {overdueMeds.length
+                                    ? overdueMeds.length +
+                                      ' overdue medication doses. '
+                                    : ''}
+                                {attentionTasks.length
+                                    ? `${attentionTasks.length} ${attentionTasks.length === 1 ? 'task needs' : 'tasks need'} attention. `
+                                    : ''}
+                                Alerts and follow-ups stay visible when you
+                                filter a person.
+                            </p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setView('today');
+                                clearFilters();
+                                setWorkFilter('attention');
+                            }}
+                        >
+                            Review attention items
+                        </Button>
+                        {overdueMeds.length > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setView('today');
+                                    clearFilters();
+                                    setWorkFilter('meds');
+                                }}
+                            >
+                                Open medication list
+                            </Button>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+            {props.active_lone_worker_session ? (
+                <LoneWorkerCheckInCard
+                    session={props.active_lone_worker_session}
+                    onCheckIn={handleLoneWorkerCheckIn}
+                    onEmergency={handleLoneWorkerEmergency}
+                />
+            ) : null}
+            {activeRound ? <ActiveRoundBanner round={activeRound} /> : null}
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                <div className="flex min-w-0 flex-col gap-5">
+                    {view === 'today' && (
+                        <TaskHelpInbox
+                            tasks={helpRequests}
+                            onOpen={setOpenTaskId}
+                        />
+                    )}
+                    {view === 'today' &&
+                        workFilter === 'attention' &&
+                        (openItemTasks.length > 0 ||
+                            !!props.incidents?.length) &&
+                        digest}
+                    {view === 'today' && (
+                        <DayWorkList
+                            items={workItems}
+                            residents={people}
+                            now={now}
+                            canAdd={canAddTask}
+                            hasShift={!!activeShift}
+                            shift={activeShift}
+                            filtered={
+                                !!search ||
+                                activeResidentId !== 'all' ||
+                                workFilter !== 'all'
+                            }
+                            onClearFilters={clearFilters}
+                            onAdd={openNewTask}
+                            onOpenTask={setOpenTaskId}
+                            onAddNote={handleAddNote}
+                        />
+                    )}
+                    {view === 'handover' && (
+                        <>
+                            <div className="flex items-center justify-between gap-3">
+                                <h2 className="text-section-title">Handover</h2>
+                                {openSession?.shift_id && (
+                                    <Button onClick={handleWriteHandover}>
+                                        Write handover
+                                    </Button>
+                                )}
+                            </div>
+                            {digest}
+                        </>
+                    )}
+                    {(view === 'handover' || view === 'shift') &&
+                        props.handover_draft &&
+                        !(
+                            view === 'shift' &&
+                            props.outgoing_handover?.id ===
+                                props.handover_draft.id
+                        ) && (
+                            <Card>
+                                <CardContent className="flex items-center justify-between gap-4 p-5">
+                                    <div>
+                                        <h2 className="text-section-title">
+                                            Your handover draft
+                                        </h2>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            Saved, but not sent yet. Review the
+                                            notes and choose the incoming shift.
+                                        </p>
+                                    </div>
+                                    <Button asChild>
+                                        <Link
+                                            href={
+                                                props.handover_draft.review_url
+                                            }
+                                        >
+                                            Review and send
+                                        </Link>
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        )}
+                    {view === 'shift' && (
+                        <>
+                            <div>
+                                <h2 className="text-section-title">My shift</h2>
+                                <p className="text-subtle mt-1">
+                                    Your time, handover and next shift.
+                                </p>
+                            </div>
+                            {activeShift && (
+                                <BeforeYouFinish
+                                    summary={props.outgoing_handover}
+                                    timesheet={(props.timesheets ?? []).find(
+                                        (sheet) =>
+                                            sheet.shift_id === activeShift.id,
+                                    )}
+                                    workLeft={
+                                        visibleTasks.filter(
+                                            (task) =>
+                                                !task.is_completed &&
+                                                task.follow_through !==
+                                                    'accepted_help',
+                                        ).length +
+                                        visibleMeds.filter(
+                                            (med) =>
+                                                ![
+                                                    'given',
+                                                    'refused',
+                                                    'withheld',
+                                                ].includes(med.status),
+                                        ).length
+                                    }
+                                    followedUp={
+                                        visibleTasks.filter(
+                                            (task) =>
+                                                !task.is_completed &&
+                                                task.follow_through ===
+                                                    'accepted_help',
+                                        ).length
+                                    }
+                                    onNotes={
+                                        openSession?.shift_id &&
+                                        props.clock?.can_clock
+                                            ? handleWriteHandover
+                                            : undefined
+                                    }
+                                    onWork={() => {
+                                        clearFilters();
+                                        setView('today');
+                                    }}
+                                    onTime={
+                                        auth?.can?.timesheets?.create ||
+                                        props.timesheets?.some(
+                                            (sheet) =>
+                                                sheet.shift_id ===
+                                                activeShift.id,
+                                        )
+                                            ? handleOpenTimesheets
+                                            : undefined
+                                    }
+                                    unavailable={
+                                        !!props.data_unavailable?.length ||
+                                        refreshFailed
+                                    }
+                                />
+                            )}
+                            <div
+                                className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3"
+                                aria-label="Shift actions"
+                            >
+                                <Button
+                                    variant="outline"
+                                    className="h-auto min-h-24 justify-start p-5 text-left whitespace-normal"
+                                    asChild
+                                >
+                                    <Link href="/my-calendar">
+                                        <Calendar className="size-5" />
+                                        <span>
+                                            Open my calendar
+                                            <span className="text-subtle mt-1 block">
+                                                See when and where you’re
+                                                working
+                                            </span>
+                                        </span>
+                                    </Link>
+                                </Button>
+                                {availabilityHref && (
+                                    <Button
+                                        variant="outline"
+                                        className="h-auto min-h-24 justify-start p-5 text-left whitespace-normal"
+                                        asChild
+                                    >
+                                        <Link href={availabilityHref}>
+                                            <CalendarCheck className="size-5" />
+                                            <span>
+                                                Update my availability
+                                                <span className="text-subtle mt-1 block">
+                                                    Let the team know when you
+                                                    can work
+                                                </span>
+                                            </span>
+                                        </Link>
+                                    </Button>
+                                )}
+                            </div>
+                            <PaperworkPanel
+                                timesheets={
+                                    activeShift
+                                        ? (props.timesheets ?? []).filter(
+                                              (sheet) =>
+                                                  sheet.shift_id !==
+                                                  activeShift.id,
+                                          )
+                                        : (props.timesheets ?? [])
+                                }
+                                hrTasks={props.hr_tasks ?? []}
+                                onSubmitTimesheet={handleTimesheetSubmit}
+                            />
+                            <TomorrowPanel
+                                briefing={props.next_shift_briefing ?? null}
+                                heading="Next shift"
+                            />
+                        </>
+                    )}
+                </div>
+                <aside className="flex min-w-0 flex-col gap-5">
+                    <ShiftSummary
+                        location={
+                            site?.name ??
+                            activeShift?.location ??
+                            openSession?.location
                         }
-                        activeResidentId={activeResidentId}
-                        onToggleTask={handleToggleTask}
-                        onGiveMed={handleGiveMed}
-                        onSnoozeMed={handleSnoozeMed}
-                        onRefuseMed={handleRefuseMed}
-                        onAddNote={(item) =>
-                            handleAddNote(item.clientId ?? null)
+                        startsAt={
+                            activeShift?.starts_at ??
+                            openSession?.shift_starts_at
                         }
-                        onOpenContextMenu={(item, x, y) =>
-                            setCtxMenu({ item, x, y })
+                        endsAt={
+                            activeShift?.ends_at ?? openSession?.shift_ends_at
+                        }
+                        clockInAt={clockInAt}
+                        clockedIn={clockedIn}
+                        onBreak={isOnBreak}
+                        elapsed={clockedLabel}
+                        hasShift={!!activeShift}
+                        canClock={!!props.clock?.can_clock}
+                        canReviewTime={
+                            !!props.timesheets?.length ||
+                            (!!auth?.can?.timesheets?.create && !!activeShift)
+                        }
+                        onClock={handleClockToggle}
+                        onToggleBreak={handleBreakToggle}
+                        onReviewTime={handleOpenTimesheets}
+                    />
+                    {view === 'today' && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-section-title">
+                                    From the last shift
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <p className="border-l-2 border-border pl-3 text-sm leading-relaxed text-muted-foreground">
+                                    {props.handover?.worker_notes
+                                        ? `Notes for ${props.handover.worker_notes.people.map((person) => person.name).join(', ') || 'this shift'}. Open the handover to read each section.`
+                                        : props.handover?.summary ||
+                                          'No incoming handover is available for this shift.'}
+                                </p>
+                                {props.handover?.id && (
+                                    <Button
+                                        variant="outline"
+                                        className="frontline-tap w-full"
+                                        onClick={() => {
+                                            setView('handover');
+                                        }}
+                                    >
+                                        {props.handover.unread
+                                            ? 'Read handover'
+                                            : 'Open handover'}
+                                    </Button>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
+                    <RecordCareActions
+                        people={people}
+                        selectedPerson={
+                            view === 'today' ? activeResidentId : 'all'
+                        }
+                        canRecordObservation={
+                            !!(
+                                props.can_record_observation ||
+                                props.can_record_clinical
+                            )
+                        }
+                        onNote={handleAddNote}
+                        onMeal={() => setMealLogOpen(true)}
+                        onObservation={() => setVitalsOpen(true)}
+                        onIncident={() =>
+                            router.visit(
+                                activeShift
+                                    ? '/incidents/create?shift_id=' +
+                                          activeShift.id
+                                    : '/incidents/create',
+                            )
                         }
                     />
-                </div>
-
-                <aside className="flex min-w-0 flex-col gap-4">
-                    {props.active_lone_worker_session ? (
-                        <LoneWorkerCheckInCard
-                            session={props.active_lone_worker_session}
-                            onCheckIn={handleLoneWorkerCheckIn}
-                            onEmergency={handleLoneWorkerEmergency}
-                        />
-                    ) : null}
 
                     {props.first_aid_followups?.length ? (
                         <FirstAidFollowupsCard
@@ -879,10 +1060,6 @@ export default function MyDay() {
 
                     {props.myTasks && props.myTasks.total > 0 ? (
                         <MyTasksCard tasks={props.myTasks} />
-                    ) : null}
-
-                    {activeRound ? (
-                        <ActiveRoundBanner round={activeRound} />
                     ) : null}
 
                     {activeShift &&
@@ -921,48 +1098,61 @@ export default function MyDay() {
                             </CardContent>
                         </Card>
                     ) : null}
-
-                    <DigestPanel
-                        tab={digestTab}
-                        onTabChange={setDigestTab}
-                        handover={
-                            (props.handover ?? null) as MyDayHandover | null
-                        }
-                        alertTasks={openItemTasks}
-                        incidents={props.incidents ?? []}
-                        notifications={
-                            (props.notifications ?? []) as MyDayNotification[]
-                        }
-                        onAckAlert={handleAckAlert}
-                        onSnoozeAlert={handleSnoozeAlert}
-                        onConfirmHandoverRead={handleConfirmHandoverRead}
-                    />
-                    <PaperworkPanel
-                        timesheets={
-                            (props.timesheets ?? []) as MyDayTimesheet[]
-                        }
-                        hrTasks={(props.hr_tasks ?? []) as MyDayHrTask[]}
-                        onSubmitTimesheet={handleTimesheetSubmit}
-                    />
-                    <TomorrowPanel
-                        briefing={
-                            (props.next_shift_briefing ??
-                                null) as MyDayPreShiftBriefing | null
-                        }
-                    />
                 </aside>
             </div>
 
-            <div className="h-16" />
+            <div
+                className="mt-5 flex items-center justify-end gap-2 text-xs text-muted-foreground"
+                aria-live="polite"
+            >
+                <span>
+                    {isRefreshing
+                        ? 'Refreshing…'
+                        : (refreshFailed
+                              ? 'Refresh failed. Last updated '
+                              : 'Updated ') + formatRelative(lastUpdatedAt)}
+                </span>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={isRefreshing}
+                    onClick={refreshNow}
+                >
+                    Refresh
+                </Button>
+            </div>
 
-            {ctxMenu ? (
-                <StreamContextMenu
-                    menu={ctxMenu}
-                    canOpenEmar={props.can_open_emar ?? false}
-                    onClose={() => setCtxMenu(null)}
-                    onAction={handleContextMenuAction}
+            {addTaskOpen && activeShift && (
+                <QuickAddTask
+                    open
+                    onOpenChange={setAddTaskOpen}
+                    shift={activeShift}
+                    siteName={site?.name ?? ''}
+                    workerName={auth?.user?.name ?? 'You'}
+                    clients={props.task_creation?.clients ?? []}
+                    initialPerson={view === 'today' ? activeResidentId : 'all'}
+                    initialTime={newTaskTime}
+                    onCreated={updateTask}
                 />
-            ) : null}
+            )}
+            {taskUnderReview && (
+                <TaskDetailDialog
+                    key={taskUnderReview.id}
+                    task={taskUnderReview}
+                    actorId={auth?.user?.id}
+                    requestedBy={helperTaskUnderReview?.requested_by_name}
+                    personName={
+                        helperTaskUnderReview?.person_name ??
+                        people.find(
+                            (person) => person.id === taskUnderReview.client_id,
+                        )?.name ??
+                        'Whole site'
+                    }
+                    onClose={() => setOpenTaskId(null)}
+                    onSaved={updateTask}
+                    onAddNote={() => handleAddNote(taskUnderReview.client_id)}
+                />
+            )}
 
             <VitalsRecordDialog
                 residents={
@@ -1005,6 +1195,7 @@ export default function MyDay() {
                         session={{
                             id: openSession.id,
                             shift_id: openSession.shift_id,
+                            site_name: site?.name ?? null,
                             client_name:
                                 openSession.client_name ??
                                 activeShift?.client?.name ??
@@ -1016,6 +1207,7 @@ export default function MyDay() {
                             // `completed_at`. Our payload may omit it on tasks
                             // that are still open, so default to null.
                             tasks: (openSession.tasks ?? []).map((task) => ({
+                                ...task,
                                 id: task.id,
                                 label: task.label,
                                 is_completed: task.is_completed,
@@ -1027,6 +1219,10 @@ export default function MyDay() {
                         }}
                         open={endShiftOpen}
                         onOpenChange={setEndShiftOpen}
+                        onOpenTask={(id) => {
+                            setEndShiftOpen(false);
+                            setOpenTaskId(id);
+                        }}
                     />
                     <WriteHandoverDialog
                         shiftId={openSession.shift_id ?? null}
@@ -1392,7 +1588,7 @@ function MyTasksCard({ tasks }: { tasks: MyDayMyTasks }) {
 
     return (
         <section
-            aria-label="My tasks"
+            aria-label="Other assigned work"
             className="rounded-xl border border-border bg-card p-4"
         >
             <div className="flex items-start gap-3">
@@ -1401,7 +1597,7 @@ function MyTasksCard({ tasks }: { tasks: MyDayMyTasks }) {
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-foreground">
-                        My tasks
+                        Other assigned work
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                         {overdueCount > 0

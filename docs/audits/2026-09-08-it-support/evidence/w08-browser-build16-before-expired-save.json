@@ -1,0 +1,123 @@
+{
+    "observed_at": "2026-09-09T22:12:50+00:00",
+    "token": "06eacb4368dd44d0",
+    "database": "oblivion_it_draft_browser_06eacb4368dd44d0",
+    "time_context": {
+        "elapsed_ms": 0.13,
+        "rows": [
+            {
+                "session_time_zone": "SYSTEM",
+                "system_time_zone": "New Zealand Standard Time"
+            }
+        ]
+    },
+    "tickets": {
+        "elapsed_ms": 0.37,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 1,
+                "status": "open"
+            },
+            {
+                "id": 4,
+                "lock_version": 1,
+                "status": "open"
+            }
+        ]
+    },
+    "tasks": {
+        "elapsed_ms": 0.27,
+        "rows": []
+    },
+    "dependencies": {
+        "elapsed_ms": 1.63,
+        "rows": []
+    },
+    "receipts": {
+        "elapsed_ms": 0.34,
+        "rows": []
+    },
+    "events": {
+        "elapsed_ms": 0.28,
+        "rows": []
+    },
+    "audits": {
+        "elapsed_ms": 0.34,
+        "rows": []
+    },
+    "approvals": {
+        "ticket": {
+            "elapsed_ms": 0.17,
+            "rows": [
+                {
+                    "id": 5,
+                    "lock_version": 2,
+                    "status": "open"
+                }
+            ]
+        },
+        "requests": {
+            "elapsed_ms": 0.3,
+            "rows": [
+                {
+                    "id": 13,
+                    "it_ticket_id": 5,
+                    "status": "pending",
+                    "requested_by": 3,
+                    "primary_approver_user_id": 6,
+                    "cover_approver_user_id": 5,
+                    "approver_id": null,
+                    "expires_at": "2026-09-10 10:13:00",
+                    "remind_at": null,
+                    "decided_at": null,
+                    "expired_at": null,
+                    "cancelled_at": null,
+                    "cancelled_by_user_id": null,
+                    "request_reason_sha256": "0951153e539cf1fb47302d0edfd60f5690eef664d018f5377ec3166b27d5bd77",
+                    "decision_reason_sha256": null,
+                    "cancellation_reason_sha256": null
+                }
+            ]
+        },
+        "receipts": {
+            "elapsed_ms": 0.22,
+            "rows": [
+                {
+                    "id": 1,
+                    "actor_user_id": 3,
+                    "operation": "approval.request",
+                    "request_uuid": "8a88128c-7bbb-466b-be39-29bd26a81a78",
+                    "it_ticket_id": 5,
+                    "committed_ticket_version": 2,
+                    "committed_at": "2026-09-10 10:10:54"
+                }
+            ]
+        },
+        "events": {
+            "elapsed_ms": 0.25,
+            "rows": [
+                {
+                    "id": 1,
+                    "actor_user_id": 3,
+                    "type": "approval_requested",
+                    "created_at": "2026-09-09 22:10:54"
+                }
+            ]
+        },
+        "audits": {
+            "elapsed_ms": 0.22,
+            "rows": [
+                {
+                    "id": 21,
+                    "user_id": 3,
+                    "action": "it.ticket.approval.requested",
+                    "created_at": "2026-09-10 10:10:54"
+                }
+            ]
+        }
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false
+}

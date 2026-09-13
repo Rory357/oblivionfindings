@@ -3,8 +3,16 @@
 namespace App\Services;
 
 use App\Contracts\CalendarOAuthToken;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use App\Domain\It\Data\ItEmailAttachment;
+use App\Domain\It\Exceptions\ItInboundContentException;
+use App\Domain\It\Services\ItEmailAttachments;
+use App\Domain\It\Services\ItEmailContent;
+use App\Domain\It\Services\ItEmailHeaders;
+use App\Services\Integration\Exceptions\MailboxProviderFailure;
+use App\Services\Integration\MailboxMessagePage;
+use App\Services\Integration\MailboxProviderHttp;
+use App\Services\Integration\MailboxResponseBody;
+use DateTimeInterface;
 
 /**
  * Gmail read for the IT support mailbox poller (E5). Sibling of
@@ -20,37 +28,25 @@ class GoogleGmailService
 
     protected function client()
     {
-        if ($this->token->needsRefresh()) {
-            $this->refreshAccessToken();
-        }
-
-        return Http::withToken((string) $this->token->getAccessToken())
-            ->baseUrl('https://gmail.googleapis.com/gmail/v1');
+        return MailboxProviderHttp::client($this->token, 'google');
     }
 
-    protected function refreshAccessToken(): void
+    /** Submit once; a missing acknowledgement is uncertain and must not trigger a blind resend. */
+    public function sendMimeMail(string $mime): string
     {
-        $refreshToken = $this->token->getRefreshToken();
-        if (! $refreshToken) {
-            return;
+        $response = MailboxProviderHttp::send(fn () => $this->client()->post('/users/me/messages/send', [
+            'raw' => rtrim(strtr(base64_encode($mime), '+/', '-_'), '='),
+        ]));
+        if ($response->status() !== 200) {
+            throw new MailboxProviderFailure('invalid_response');
+        }
+        $body = MailboxProviderHttp::object($response);
+        $id = $body['id'] ?? null;
+        if (! is_string($id) || $id === '' || strlen($id) > 255 || preg_match('/[\x00-\x20\x7f]/', $id)) {
+            throw new MailboxProviderFailure('invalid_response');
         }
 
-        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
-            'client_id' => config('services.google.client_id'),
-            'client_secret' => config('services.google.client_secret'),
-            'grant_type' => 'refresh_token',
-            'refresh_token' => $refreshToken,
-        ]);
-
-        if ($response->successful()) {
-            $this->token->storeRefreshedToken(
-                (string) $response->json('access_token'),
-                $response->json('refresh_token'),
-                (int) $response->json('expires_in', 3600),
-            );
-        } else {
-            Log::warning('Google token refresh failed', ['status' => $response->status()]);
-        }
+        return $id;
     }
 
     /**
@@ -61,106 +57,102 @@ class GoogleGmailService
      */
     public function listUnreadMessages(string $mailbox = 'me', int $limit = 25): array
     {
-        $list = $this->client()->get('/users/me/messages', [
-            'q' => 'is:unread in:inbox',
-            'maxResults' => $limit,
-        ]);
+        $page = $this->discoverUnread($mailbox, null, null, $limit);
 
-        if (! $list->successful()) {
-            return [];
+        return array_map(fn (string $id) => $this->readMessage($mailbox, $id), $page->remoteIds);
+    }
+
+    public function discoverUnread(string $mailbox, ?DateTimeInterface $before, ?string $continuation = null, int $limit = 100): MailboxMessagePage
+    {
+        if ($limit < 1 || $limit > 100 || ($continuation !== null && (strlen($continuation) > 16384 || $continuation === ''))) {
+            throw new MailboxProviderFailure('invalid_response');
+        }
+        $list = MailboxProviderHttp::send(fn () => $this->client()->get('/users/me/messages', [
+            'q' => 'is:unread in:inbox'.($before ? ' before:'.$before->getTimestamp() : ''),
+            'maxResults' => $limit,
+            ...($continuation !== null ? ['pageToken' => $continuation] : []),
+        ]));
+        $body = MailboxProviderHttp::object($list);
+        $stubs = $body['messages'] ?? [];
+        if (! is_array($stubs) || ! array_is_list($stubs)) {
+            throw new MailboxProviderFailure('invalid_response');
+        }
+        $ids = [];
+        foreach ($stubs as $stub) {
+            if (! is_array($stub) || ! is_string($stub['id'] ?? null) || $stub['id'] === '') {
+                throw new MailboxProviderFailure('invalid_response');
+            }
+            $ids[] = $stub['id'];
+        }
+        $next = $body['nextPageToken'] ?? null;
+        if ($next !== null && ! is_string($next)) {
+            throw new MailboxProviderFailure('invalid_response');
         }
 
-        return collect($list->json('messages', []))
-            ->map(fn (array $stub) => $this->fetchMessage((string) ($stub['id'] ?? '')))
-            ->filter()
-            ->values()
-            ->all();
+        return new MailboxMessagePage($ids, $next);
     }
 
     /** Remove the UNREAD label so the next poll doesn't re-ingest the message. */
     public function markRead(string $mailbox, string $messageId): bool
     {
-        return $this->client()
+        MailboxProviderHttp::send(fn () => $this->client()
             ->post('/users/me/messages/'.rawurlencode($messageId).'/modify', [
                 'removeLabelIds' => ['UNREAD'],
-            ])
-            ->successful();
+            ]));
+
+        return true;
     }
 
     /**
-     * Full message → normalised row, or null when unfetchable/malformed.
+     * A failed or malformed detail is a failed read, never a silently dropped message.
      *
-     * @return array{remote_id:string,from:string,subject:?string,text:string,message_id:?string,in_reply_to:?string}|null
+     * @return array{remote_id:string,from:string,subject:?string,text:string,message_id:?string,in_reply_to:?string}
      */
-    private function fetchMessage(string $id): ?array
+    public function readMessage(string $mailbox, string $id, bool $includeAttachments = false): array
     {
         if ($id === '') {
-            return null;
+            throw new MailboxProviderFailure('invalid_response');
         }
 
-        $response = $this->client()->get('/users/me/messages/'.rawurlencode($id), ['format' => 'full']);
-        if (! $response->successful()) {
-            return null;
+        $response = MailboxProviderHttp::send(fn () => MailboxProviderHttp::client($this->token, 'google',
+            $includeAttachments ? ItEmailAttachments::MESSAGE_RESPONSE_BYTES : MailboxResponseBody::DEFAULT_LIMIT)
+            ->get('/users/me/messages/'.rawurlencode($id), ['format' => 'full']));
+        $body = MailboxProviderHttp::object($response);
+        if (($body['id'] ?? null) !== $id || ! is_array($body['payload'] ?? null) || ! is_array($body['payload']['headers'] ?? null)) {
+            throw new MailboxProviderFailure('invalid_response');
         }
-
-        $payload = (array) $response->json('payload', []);
-        $headers = collect($payload['headers'] ?? [])
-            ->keyBy(fn ($h) => strtolower((string) ($h['name'] ?? '')));
-        $header = fn (string $name): ?string => $headers->get($name)['value'] ?? null;
-
-        $from = $this->addressFrom((string) $header('from'));
-        if ($from === '') {
-            return null;
-        }
+        $payload = $body['payload'];
+        $parser = new ItEmailHeaders;
+        $headers = $parser->read($payload['headers']);
+        $header = fn (string $name): ?string => $headers[$name] ?? null;
+        $content = new ItEmailContent;
+        $content->assertHumanMessage($headers, is_string($payload['mimeType'] ?? null) ? $payload['mimeType'] : null);
+        $from = $parser->sender($header('from'));
 
         return [
             'remote_id' => $id,
             'from' => $from,
             'subject' => $header('subject'),
-            'text' => $this->plainTextBody($payload, (string) $response->json('snippet', '')),
+            'text' => $content->gmail($payload, fn (string $attachmentId): array => MailboxProviderHttp::object(
+                MailboxProviderHttp::send(fn () => $this->client()->get('/users/me/messages/'.rawurlencode($id).'/attachments/'.rawurlencode($attachmentId)))
+            )),
             'message_id' => $header('message-id'),
             'in_reply_to' => $header('in-reply-to'),
+            'references' => $header('references'),
+            ...($includeAttachments ? ['attachments' => (new ItEmailAttachments)->gmail($payload)] : []),
         ];
     }
 
-    /** Bare address from an RFC "Name <address>" From header. */
-    private function addressFrom(string $header): string
+    /** Unscanned bytes: caller must use canonical private staging and scan policy. */
+    public function readAttachmentContents(string $mailbox, string $messageId, ItEmailAttachment $file): string
     {
-        return preg_match('/<([^>]+)>/', $header, $m) ? trim($m[1]) : trim($header);
-    }
-
-    /** Best-effort plain text: text/plain part, else stripped html, else snippet. */
-    private function plainTextBody(array $payload, string $snippet): string
-    {
-        $plain = $this->findPart($payload, 'text/plain');
-        if ($plain !== null) {
-            return trim($plain);
+        if ($file->provider !== 'google' || $messageId === '' || strlen($messageId) > 4096 || preg_match('/[\x00-\x20\x7f]/', $messageId)) {
+            throw new ItInboundContentException('invalid_attachment_metadata');
         }
 
-        $html = $this->findPart($payload, 'text/html');
-        if ($html !== null) {
-            return trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5));
-        }
-
-        return trim($snippet);
-    }
-
-    /** Depth-first hunt for a MIME part's base64url-decoded body. */
-    private function findPart(array $part, string $mimeType): ?string
-    {
-        if (($part['mimeType'] ?? '') === $mimeType && ! empty($part['body']['data'])) {
-            $decoded = base64_decode(strtr((string) $part['body']['data'], '-_', '+/'));
-
-            return $decoded === false ? null : $decoded;
-        }
-
-        foreach ((array) ($part['parts'] ?? []) as $child) {
-            $found = $this->findPart((array) $child, $mimeType);
-            if ($found !== null) {
-                return $found;
-            }
-        }
-
-        return null;
+        return (new ItEmailAttachments)->contents($file, fn (string $id): array => MailboxProviderHttp::object(
+            MailboxProviderHttp::send(fn () => MailboxProviderHttp::client($this->token, 'google', ItEmailAttachments::FILE_RESPONSE_BYTES)
+                ->get('/users/me/messages/'.rawurlencode($messageId).'/attachments/'.rawurlencode($id)))
+        ));
     }
 }

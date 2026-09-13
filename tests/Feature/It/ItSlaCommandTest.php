@@ -30,10 +30,15 @@ function itSlaCmdTicket(User $requester, array $overrides = []): ItTicket
             'category' => 'hardware',
             'priority' => 'normal',
         ], array_intersect_key($overrides, array_flip(['title', 'category', 'priority', 'description']))))
-        ->assertRedirect();
+        ->assertRedirect()->assertSessionHasNoErrors();
 
     $ticket = ItTicket::query()->latest('id')->first();
     $direct = array_diff_key($overrides, array_flip(['title', 'category', 'priority', 'description']));
+    foreach (['first_responded_at', 'waiting_since'] as $timestamp) {
+        if (($direct[$timestamp] ?? null) === 'at_creation') {
+            $direct[$timestamp] = $ticket->created_at;
+        }
+    }
     if ($direct !== []) {
         $ticket->forceFill($direct)->save();
         $ticket->refresh();
@@ -125,16 +130,16 @@ test('paused waiting minutes hold the resolution clock back', function () {
     // Normal defaults: resolution 4320m (3 days). Stamp first response on
     // all three so only the resolution clock is live.
     $banked = itSlaCmdTicket($this->worker, [
-        'first_responded_at' => now(),
+        'first_responded_at' => 'at_creation',
         'sla_paused_minutes' => 2000,
     ]);
     $liveWaiting = itSlaCmdTicket($this->worker, [
-        'first_responded_at' => now(),
+        'first_responded_at' => 'at_creation',
         'status' => 'waiting',
-        'waiting_since' => now(),
+        'waiting_since' => 'at_creation',
     ]);
     $control = itSlaCmdTicket($this->worker, [
-        'first_responded_at' => now(),
+        'first_responded_at' => 'at_creation',
     ]);
 
     // 3 days + 1 hour: the raw resolution target has passed on all three.
@@ -145,7 +150,7 @@ test('paused waiting minutes hold the resolution clock back', function () {
     // Banked pause (2000m) and a live pause running since creation both
     // push the effective deadline out; the unpaused control breaches.
     expect($banked->refresh()->sla_state)->toBe('ok');
-    expect($liveWaiting->refresh()->sla_state)->toBe('ok');
+    expect($liveWaiting->refresh()->sla_state)->toBe('paused');
     expect($control->refresh()->sla_state)->toBe('breached');
 });
 
@@ -181,7 +186,7 @@ test('an unassigned urgent ticket escalates to admins once after 30 minutes', fu
     Notification::assertSentToTimes($admin, TicketSlaNotification::class, 1);
 });
 
-test('unstamped, resolved and met tickets are left alone', function () {
+test('unstamped tickets become unmeasured and settled met outcomes remain met', function () {
     Notification::fake();
     // Factory fixtures never stamp SLA targets — the command must skip them.
     $legacy = ItTicket::factory()->create(['status' => 'open']);
@@ -189,14 +194,14 @@ test('unstamped, resolved and met tickets are left alone', function () {
     // Resolved inside target → met; resolution drops it out of the open set.
     $met = itSlaCmdTicket($this->worker, ['priority' => 'urgent']);
     $this->actingAs($this->hr)
-        ->post("/it/tickets/{$met->id}/resolve", ['note' => 'Swapped the charger.'])
+        ->post("/it/tickets/{$met->id}/resolve", ['expected_version' => $met->fresh()->lock_version, 'note' => 'Swapped the charger.'])
         ->assertRedirect();
     expect($met->refresh()->sla_state)->toBe('met');
 
     $this->travel(10)->days();
     $this->artisan('it:check-sla')->assertSuccessful();
 
-    expect($legacy->refresh()->sla_state)->toBe('ok');
+    expect($legacy->refresh()->sla_state)->toBe('unmeasured');
     expect($legacy->events()->count())->toBe(0);
     expect($met->refresh()->sla_state)->toBe('met');
     expect($met->events()->whereIn('type', ['sla_at_risk', 'sla_breached', 'sla_escalated'])->count())->toBe(0);
@@ -205,12 +210,12 @@ test('unstamped, resolved and met tickets are left alone', function () {
     Notification::assertSentTimes(TicketSlaNotification::class, 0);
 });
 
-test('a growing waiting pause relaxes a breached ticket without re-paging anyone', function () {
+test('a later pause retains breach history without re-paging anyone', function () {
     Notification::fake();
     $ticket = itSlaCmdTicket($this->worker, [
         'priority' => 'urgent',
         'assigned_to_user_id' => $this->hr->id,
-        'first_responded_at' => now(), // isolate the resolution clock (240m)
+        'first_responded_at' => 'at_creation', // isolate the resolution clock (240m)
     ]);
 
     $this->travel(250)->minutes();
@@ -224,7 +229,7 @@ test('a growing waiting pause relaxes a breached ticket without re-paging anyone
     $ticket->forceFill(['sla_paused_minutes' => 300])->save();
     $this->artisan('it:check-sla')->assertSuccessful();
 
-    expect($ticket->refresh()->sla_state)->toBe('ok');
+    expect($ticket->refresh()->sla_state)->toBe('breached');
     expect($ticket->events()->where('type', 'sla_breached')->count())->toBe(1);
     Notification::assertSentToTimes($this->hr, TicketSlaNotification::class, 1);
 });

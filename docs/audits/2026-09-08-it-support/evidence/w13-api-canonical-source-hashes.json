@@ -1,0 +1,66 @@
+[
+  {
+    "path": "app/Domain/It/Enums/ItTicketCommandChannel.php",
+    "sha256": "2082f06be0f3b75d8ba3453211489b1ca261bb051e8d1f7d8f5c19fe8b246add"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketIntakeService.php",
+    "sha256": "05b443756ac2ab67256f3dfe2bf6260e0a7bcee5e6e87a839c21595b9014be83"
+  },
+  {
+    "path": "app/Domain/It/Services/ItApiWorkItemService.php",
+    "sha256": "6e494a2a8c7c13cae414e01b0958e656771dcc26a7d94f9e595fd43ab8e46c24"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketInteractionService.php",
+    "sha256": "64029db2476fd44df92ac347b7314e9f73746cb1fc33a6c20d659c3c42cb9c25"
+  },
+  {
+    "path": "app/Http/Controllers/Api/ItApiWorkItemController.php",
+    "sha256": "d18508a9a7f8195c09bb2910d034cca424931b38c226a1d4ca043bbb08e1acc0"
+  },
+  {
+    "path": "app/Http/Middleware/RecordItApiRequest.php",
+    "sha256": "21a65389b1c6389001261c41bf3d4bf62e7ed7b3956e842154503228fee94be9"
+  },
+  {
+    "path": "tests/Feature/It/ItApiPublicationTest.php",
+    "sha256": "bf8d8f7e812c6ac06d7a2d7e6534c1d4135c23faaec6c3713f4c802d8173f9c4"
+  },
+  {
+    "path": "tests/Feature/It/ItApiCanonicalLifecycleTest.php",
+    "sha256": "b8c918899beb8e65d9c2ebc63a0ce255038f8912cc452ec4456379147709c3cb"
+  },
+  {
+    "path": "tests/Feature/It/ItSecureApiAccessBoundaryTest.php",
+    "sha256": "3e113d84739a8b084e0d3ec790dc45c5d40da7113efc0ad4b765a8ff4a4cbd7a"
+  },
+  {
+    "path": "tests/Feature/It/ItTicketRoutingDecisionTest.php",
+    "sha256": "92aaf4b8767b3f61008112d7b44ac2940b3944a043ed3ac635d57cdacd3d3ff3"
+  },
+  {
+    "path": "tests/Concurrency/It/ItApiPublicationConcurrencyTest.php",
+    "sha256": "63d11ec315dc5170f40af48d08bed35c107922d4b9e3ac5ac1b33838af213f71"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w13-api-browser-fixture.php",
+    "sha256": "8e037d920d451e00a00a39129bfc3968ab22888ed0db9578693d081a6d38f2be"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-environment.ps1",
+    "sha256": "04c5ed10ba8a992e36c61745b21fade485efa31ec022be0f32d4a8c19c888fec"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-runtime.php",
+    "sha256": "05bd53faa2a1f10d85d228860946469e119251bb6a1911eb186c7fcc2f28ffa1"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-bootstrap.php",
+    "sha256": "5d8d92ce0bfe346fccb3f6c0aa8816ec9dbb447a3f631fc34f8f82dacc181d8c"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-router.php",
+    "sha256": "840e9dd01c1ea0fc6537b5f34fe9cc3fd3d5dc9c46be371e32359e76befaafa3"
+  }
+]

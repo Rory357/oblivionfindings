@@ -5,7 +5,7 @@ import {
     screen,
     waitFor,
 } from '@testing-library/react';
-import axios from 'axios';
+import axios, { type AxiosError } from 'axios';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -135,9 +135,36 @@ const outcomeOnlyCases: Array<[string, (data: ReportData) => void]> = [
 
 beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(axios.get).mockReset();
+    vi.mocked(axios.isAxiosError).mockImplementation(
+        (cause: unknown): cause is AxiosError =>
+            cause instanceof Object &&
+            'isAxiosError' in cause &&
+            cause.isAxiosError === true,
+    );
 });
 
 describe('IT reports request truthfulness', () => {
+    it('keeps failed watchdog evidence visible when there are no authorized ticket records', async () => {
+        const data = reportData({
+            from: '2026-06-01',
+            to: '2026-06-07',
+            days: 7,
+            open: 0,
+        });
+        vi.mocked(axios.get).mockResolvedValueOnce({
+            data: {
+                ...data,
+                kpis: {
+                    ...data.kpis,
+                    sla_watchdog: { state: 'failed', last_success_at: null },
+                },
+            },
+        });
+        render(<ItReports />);
+        expect(await screen.findByText('No data to report yet')).toBeVisible();
+        expect(screen.getByText(/SLA watchdog failed/)).toBeVisible();
+    });
     it('shows permission-restricted outcomes without inventing zero counts or destinations', async () => {
         const data = {
             ...reportData({
@@ -212,12 +239,12 @@ describe('IT reports request truthfulness', () => {
             .mockReturnValueOnce(thirtyDay.promise)
             .mockReturnValueOnce(sevenDay.promise);
 
-        render(<ItReports />);
+        const view = render(<ItReports days={30} />);
 
         expect(screen.getByRole('status')).toHaveTextContent(
             'Loading reports for the selected range',
         );
-        fireEvent.click(screen.getByRole('button', { name: '7 days' }));
+        view.rerender(<ItReports days={7} />);
 
         await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(2));
         const firstSignal = vi.mocked(axios.get).mock.calls[0][1]?.signal;
@@ -266,10 +293,10 @@ describe('IT reports request truthfulness', () => {
             })
             .mockReturnValueOnce(sevenDay.promise);
 
-        render(<ItReports />);
+        const view = render(<ItReports days={30} />);
 
         expect(await screen.findByText(/9 May.*7 Jun/)).toBeVisible();
-        fireEvent.click(screen.getByRole('button', { name: '7 days' }));
+        view.rerender(<ItReports days={7} />);
 
         expect(
             await screen.findByText('Loading reports for the selected range…'),
@@ -286,5 +313,152 @@ describe('IT reports request truthfulness', () => {
         expect(alert).toHaveTextContent('Reports could not be loaded');
         expect(screen.queryByText(/9 May.*7 Jun/)).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+        expect(
+            screen.getByText('Helpdesk analytics — unavailable'),
+        ).toBeVisible();
+        expect(
+            screen.queryByText(/Helpdesk analytics — loading/),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+        vi.mocked(axios.get).mockResolvedValueOnce({
+            data: reportData({
+                from: '2026-06-01',
+                to: '2026-06-07',
+                days: 7,
+                open: 7,
+            }),
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+        expect(await screen.findByText(/1 Jun.*7 Jun/)).toBeVisible();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it.each([401, 419])(
+        'provides session recovery after HTTP %s and restores only the explicitly retried range',
+        async (status) => {
+            vi.mocked(axios.get)
+                .mockResolvedValueOnce({
+                    data: reportData({
+                        from: '2026-05-09',
+                        to: '2026-06-07',
+                        days: 30,
+                        open: 30,
+                    }),
+                })
+                .mockRejectedValueOnce({
+                    isAxiosError: true,
+                    response: { status },
+                });
+            const view = render(<ItReports days={30} />);
+            expect(await screen.findByText(/9 May.*7 Jun/)).toBeVisible();
+            view.rerender(<ItReports days={7} />);
+
+            const alert = await screen.findByRole('alert');
+            expect(alert).toHaveTextContent('Your session has expired');
+            expect(alert).not.toHaveTextContent('Check your connection');
+            expect(
+                screen.getByText('Helpdesk analytics — unavailable'),
+            ).toBeVisible();
+            expect(screen.queryByText(/9 May.*7 Jun/)).not.toBeInTheDocument();
+            expect(
+                screen.queryByText('Operational outcomes'),
+            ).not.toBeInTheDocument();
+            expect(
+                screen.queryByRole('link', { name: 'Export' }),
+            ).not.toBeInTheDocument();
+            const login = screen.getByRole('link', { name: 'Sign in again' });
+            expect(login).toHaveAttribute('href', '/login');
+            expect(login).toHaveAttribute('target', '_blank');
+            expect(login).toHaveAttribute('rel', 'noopener noreferrer');
+            expect(axios.get).toHaveBeenCalledTimes(2);
+
+            vi.mocked(axios.get).mockResolvedValueOnce({
+                data: reportData({
+                    from: '2026-06-01',
+                    to: '2026-06-07',
+                    days: 7,
+                    open: 7,
+                }),
+            });
+            fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+            expect(await screen.findByText(/1 Jun.*7 Jun/)).toBeVisible();
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+            expect(
+                screen.queryByRole('link', { name: 'Sign in again' }),
+            ).not.toBeInTheDocument();
+            expect(axios.get).toHaveBeenCalledTimes(3);
+            expect(vi.mocked(axios.get).mock.calls[2][1]?.params).toEqual(
+                vi.mocked(axios.get).mock.calls[1][1]?.params,
+            );
+        },
+    );
+
+    it('conceals results after permission denial and rechecks access without claiming a connection failure', async () => {
+        vi.mocked(axios.get)
+            .mockResolvedValueOnce({
+                data: reportData({
+                    from: '2026-05-09',
+                    to: '2026-06-07',
+                    days: 30,
+                    open: 30,
+                }),
+            })
+            .mockRejectedValue({
+                isAxiosError: true,
+                response: { status: 403 },
+            });
+        const view = render(<ItReports days={30} />);
+        expect(await screen.findByText('Operational outcomes')).toBeVisible();
+        view.rerender(<ItReports days={7} />);
+
+        const alert = await screen.findByRole('alert');
+        expect(alert).toHaveTextContent('Your access to reports has changed');
+        expect(alert).not.toHaveTextContent('Check your connection');
+        expect(
+            screen.getByText('Helpdesk analytics — unavailable'),
+        ).toBeVisible();
+        expect(
+            screen.queryByText('Operational outcomes'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('link', { name: 'Export' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('link', { name: 'Sign in again' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check access again' }),
+        );
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+            'Your access to reports has changed',
+        );
+        expect(axios.get).toHaveBeenCalledTimes(3);
+        expect(
+            screen.queryByText('Operational outcomes'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('ignores a stale authentication failure after a newer range succeeds', async () => {
+        const previous = deferred<{ data: ReportData }>();
+        vi.mocked(axios.get)
+            .mockReturnValueOnce(previous.promise)
+            .mockResolvedValueOnce({
+                data: reportData({
+                    from: '2026-06-01',
+                    to: '2026-06-07',
+                    days: 7,
+                    open: 7,
+                }),
+            });
+        const view = render(<ItReports days={30} />);
+        view.rerender(<ItReports days={7} />);
+        expect(await screen.findByText(/1 Jun.*7 Jun/)).toBeVisible();
+        await act(async () => {
+            previous.reject({ isAxiosError: true, response: { status: 401 } });
+            await previous.promise.catch(() => undefined);
+        });
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(screen.getByText(/1 Jun.*7 Jun/)).toBeVisible();
     });
 });

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\It;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItLinkedContextOptions;
 use App\Domain\It\Services\ItMajorIncidentService;
+use App\Domain\It\Services\ItSlaReadService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\It\StoreItMajorIncidentRequest;
@@ -133,7 +134,7 @@ class ItMajorIncidentController extends Controller
                 'description' => $majorIncident->ticket->description,
                 'category' => $majorIncident->ticket->category,
                 'next_action' => $majorIncident->ticket->next_action,
-                'sla_state' => $majorIncident->ticket->sla_state,
+                ...app(ItSlaReadService::class)->present($majorIncident->ticket),
                 'resolution_summary' => $majorIncident->ticket->resolution_summary,
                 'comments_count' => $majorIncident->ticket->comments_count,
                 'tasks_count' => $majorIncident->ticket->tasks_count,

@@ -75,6 +75,7 @@ import {
     type RecurPreset,
 } from '@/lib/calendar/recur';
 import type { SharedData } from '@/types';
+import { formatDateTime } from '@/lib/datetime';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -171,6 +172,35 @@ export interface EventTypeOption {
     site_types?: string[] | null;
 }
 
+export interface CalendarDataAdapter {
+    loadItems: (range: {
+        start: Date;
+        end: Date;
+        signal?: AbortSignal;
+        committeeId?: number | null;
+    }) => Promise<{
+        events: CalendarItem[];
+        availability?: Record<string, string>;
+        totals?: Record<string, number>;
+    }>;
+    title?: string;
+    subline?: string;
+    breadcrumbs?: { title: string; href?: string }[];
+    allowSubscriptions?: boolean;
+    initialSources?: string[];
+    initialView?: CalView;
+    sourceFilters?: SourceDef[];
+    committeeOptions?: { value: string; label: string }[];
+    onOpenItem?: (item: Decorated) => boolean | void;
+    onMove?: (item: Decorated, start: Date, end?: Date) => void;
+    onCreate?: (seed: CreateSeed) => void;
+    showApprovalMeter?: boolean;
+    mineLink?: { href: string; label: string };
+    primaryAction?: { href: string; label: string };
+    exportFilename?: string;
+    searchPlaceholder?: string;
+}
+
 export interface SiteCalendarProps {
     context: 'page' | 'profile';
     scope: 'global' | 'site';
@@ -191,12 +221,13 @@ export interface SiteCalendarProps {
     pendingApprovalCount?: number;
     mineCount?: number;
     overdueCount?: number;
+    dataAdapter?: CalendarDataAdapter;
 }
 
-type CalView = 'month' | 'week' | 'day' | 'agenda' | 'timeline';
+export type CalView = 'month' | 'week' | 'day' | 'agenda' | 'timeline';
 
 /** Seed for the create dialog when opened from the right-click QuickAdd menu. */
-type CreateSeed = { date: Date; hour?: number; eventType?: string };
+export type CreateSeed = { date: Date; hour?: number; eventType?: string };
 
 /** Fallback source taxonomy (mirrors CalendarSources::all()) for embeds that
  *  don't receive server props (e.g. the Site Profile Calendar tab). */
@@ -479,7 +510,8 @@ function periodLabel(view: CalView, navDate: Date): string {
     if (view === 'week') {
         const s = startOfWeek(navDate);
         const e = addDays(s, 6);
-        return `${s.getDate()} ${MO[s.getMonth()].slice(0, 3)} – ${e.getDate()} ${MO[e.getMonth()].slice(0, 3)} ${e.getFullYear()}`;
+        const startYear = s.getFullYear() !== e.getFullYear() ? ` ${s.getFullYear()}` : '';
+        return `${s.getDate()} ${MO[s.getMonth()].slice(0, 3)}${startYear} – ${e.getDate()} ${MO[e.getMonth()].slice(0, 3)} ${e.getFullYear()}`;
     }
     return `${MO[navDate.getMonth()]} ${navDate.getFullYear()}`;
 }
@@ -559,23 +591,37 @@ export default function SiteCalendar({
     pendingApprovalCount: pendingApprovalCountProp,
     mineCount: mineCountProp,
     overdueCount: overdueCountProp,
+    dataAdapter,
 }: SiteCalendarProps) {
-    const [view, setView] = useState<CalView>('month');
+    const effectiveSources = dataAdapter?.sourceFilters ?? sources;
+    const [view, setView] = useState<CalView>(
+        () => dataAdapter?.initialView ?? 'month',
+    );
     const [navDate, setNavDate] = useState(() => new Date());
     const [colorBy, setColorBy] = useState<ColorBy>('source');
     const [density, setDensity] = useState<Density>('comfortable');
     const [events, setEvents] = useState<Decorated[]>([]);
     const [railEvents, setRailEvents] = useState<Decorated[]>([]);
     const [loading, setLoading] = useState(true);
+    const [sourceAvailability, setSourceAvailability] = useState<Record<string, string>>({});
+    const [railAvailability, setRailAvailability] = useState<Record<string, string>>({});
+    const [railUnavailable, setRailUnavailable] = useState(false);
+    const [lastScheduleLoad, setLastScheduleLoad] = useState<number | null>(null);
+    const unavailableSources = [...new Set([...Object.keys(sourceAvailability).filter(key => sourceAvailability[key] === 'unavailable'), ...Object.keys(railAvailability).filter(key => railAvailability[key] === 'unavailable')])];
     // Distinguish a real fetch failure (403 vs network) from a genuinely empty
     // period, so "no events" doesn't silently mask a broken feed (G-5).
     const [fetchError, setFetchError] = useState<
         'forbidden' | 'network' | null
     >(null);
     const [enabledSources, setEnabledSources] = useState<Set<string>>(
-        () => new Set(sources.map((s) => s.key)),
+        () =>
+            new Set(
+                dataAdapter?.initialSources ??
+                    effectiveSources.map((s) => s.key),
+            ),
     );
     const [houseFilter, setHouseFilter] = useState<number | 'all'>('all');
+    const [committeeFilter, setCommitteeFilter] = useState<string>('all');
     // Header scoped search — narrows the loaded feed by entry/site name.
     const [q, setQ] = useState('');
     const [selected, setSelected] = useState<Decorated | null>(null);
@@ -616,21 +662,62 @@ export default function SiteCalendar({
 
     const srcByKey = useMemo(
         () =>
-            Object.fromEntries(sources.map((s) => [s.key, s])) as Record<
+            Object.fromEntries(effectiveSources.map((s) => [s.key, s])) as Record<
                 string,
                 SourceDef
             >,
-        [sources],
+        [effectiveSources],
     );
     const eventTypeByKey = useMemo(
         () => Object.fromEntries(eventTypes.map((t) => [t.key, t])),
         [eventTypes],
     );
 
+    const fetchGenerationRef = useRef(0);
+    const abortControllerRef = useRef<AbortController | null>(null);
+
     const fetchEvents = useCallback(async () => {
+        const generation = ++fetchGenerationRef.current;
+        abortControllerRef.current?.abort();
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         setLoading(true);
         setFetchError(null);
         const { start, end } = viewRange(view, navDate);
+
+        if (dataAdapter) {
+            try {
+                const res = await dataAdapter.loadItems({
+                    start,
+                    end,
+                    signal: controller.signal,
+                    committeeId:
+                        committeeFilter === 'all'
+                            ? null
+                            : Number(committeeFilter),
+                });
+                if (generation === fetchGenerationRef.current) {
+                    setEvents((res.events ?? []).map(decorate));
+                    setSourceAvailability(res.availability ?? {});
+                    if (!Object.values(res.availability ?? {}).includes('unavailable')) setLastScheduleLoad(Date.now());
+                    setFetchError(null);
+                }
+            } catch (err: unknown) {
+                if ((err as Error)?.name === 'AbortError') return;
+                if (generation === fetchGenerationRef.current) {
+                    const status = (err as any)?.response?.status ?? (err as any)?.status ?? (err as any)?.statusCode;
+                    setEvents([]);
+                    setFetchError(status === 403 ? 'forbidden' : 'network');
+                }
+            } finally {
+                if (generation === fetchGenerationRef.current) {
+                    setLoading(false);
+                }
+            }
+            return;
+        }
+
         const params = new URLSearchParams({
             start: start.toISOString(),
             end: end.toISOString(),
@@ -641,23 +728,34 @@ export default function SiteCalendar({
                 : `/sites/${site?.id}/calendar/events?${params}`;
         try {
             const res = await fetch(url, {
+                signal: controller.signal,
                 headers: { Accept: 'application/json' },
             });
             if (!res.ok) {
-                setEvents([]);
-                setFetchError(res.status === 403 ? 'forbidden' : 'network');
+                if (generation === fetchGenerationRef.current) {
+                    setEvents([]);
+                    setFetchError(res.status === 403 ? 'forbidden' : 'network');
+                }
                 return;
             }
             const data = await res.json();
-            setEvents((data.events ?? []).map(decorate));
-            setFetchError(null);
-        } catch {
-            setEvents([]);
-            setFetchError('network');
+            if (generation === fetchGenerationRef.current) {
+                setEvents((data.events ?? []).map(decorate));
+                setFetchError(null);
+            }
+        } catch (err: unknown) {
+            if ((err as Error)?.name === 'AbortError') return;
+            if (generation === fetchGenerationRef.current) {
+                const status = (err as any)?.response?.status ?? (err as any)?.status ?? (err as any)?.statusCode;
+                setEvents([]);
+                setFetchError(status === 403 ? 'forbidden' : 'network');
+            }
         } finally {
-            setLoading(false);
+            if (generation === fetchGenerationRef.current) {
+                setLoading(false);
+            }
         }
-    }, [view, navDate, scope, site?.id]);
+    }, [view, navDate, scope, site?.id, dataAdapter, committeeFilter]);
 
     useEffect(() => {
         void fetchEvents();
@@ -669,6 +767,27 @@ export default function SiteCalendar({
         const start = addDays(new Date(), -45);
         start.setHours(0, 0, 0, 0);
         const end = addDays(new Date(), 30);
+
+        if (dataAdapter) {
+            try {
+                const res = await dataAdapter.loadItems({
+                    start,
+                    end,
+                    committeeId:
+                        committeeFilter === 'all'
+                            ? null
+                            : Number(committeeFilter),
+                });
+                setRailEvents((res.events ?? []).map(decorate));
+                setRailAvailability(res.availability ?? {});
+                setRailUnavailable(false);
+            } catch {
+                setRailEvents([]);
+                setRailUnavailable(true);
+            }
+            return;
+        }
+
         const params = new URLSearchParams({
             start: start.toISOString(),
             end: end.toISOString(),
@@ -690,7 +809,7 @@ export default function SiteCalendar({
         } catch {
             setRailEvents([]);
         }
-    }, [scope, site?.id]);
+    }, [scope, site?.id, dataAdapter, committeeFilter]);
 
     useEffect(() => {
         void fetchRail();
@@ -746,7 +865,7 @@ export default function SiteCalendar({
     // keeps tracking what's on screen.
     const narrowed =
         houseFilter !== 'all' ||
-        enabledSources.size !== sources.length ||
+        enabledSources.size !== effectiveSources.length ||
         searchText !== '';
 
     const overdueDerived = useMemo(
@@ -781,12 +900,6 @@ export default function SiteCalendar({
             ).length,
         [periodEvents],
     );
-    const periodStatLabel =
-        view === 'day'
-            ? 'This day'
-            : view === 'week'
-              ? 'This week'
-              : 'This month';
 
     const pendingApprovals = useMemo(
         () =>
@@ -825,6 +938,7 @@ export default function SiteCalendar({
                 visibleRailEvents.filter(
                     (e) =>
                         e.status !== 'cancelled' &&
+                        e.status !== 'completed' &&
                         sameDay(e._start, addDays(start, i)),
                 ).length,
         );
@@ -895,13 +1009,23 @@ export default function SiteCalendar({
     // A global create needs at least one accessible site to target; without one the
     // dialog opens with no options and submit is silently disabled, so gate it (G-10).
     const canCreateHere =
-        canCreate && (scope === 'site' ? Boolean(site) : sites.length > 0);
+        canCreate &&
+        (dataAdapter
+            ? true
+            : scope === 'site'
+              ? Boolean(site)
+              : sites.length > 0);
 
     // Drag-to-reschedule a manual entry. Repeating series are edited from the
     // detail panel (single-occurrence overrides) rather than dragged, for v1.
     const reschedule = useCallback(
         (ev: Decorated, start: Date, end?: Date) => {
-            if (!ev.editable || !ev.site) return;
+            if (!ev.editable) return;
+            if (dataAdapter) {
+                dataAdapter.onMove?.(ev, start, end);
+                return;
+            }
+            if (!ev.site) return;
             // Repeating series can't be dragged (single-occurrence overrides only) —
             // tell the user instead of silently doing nothing (G-13).
             if (ev.recurrence || ev.isOccurrence) {
@@ -930,17 +1054,25 @@ export default function SiteCalendar({
                     preserveScroll: true,
                     preserveState: true,
                     onSuccess: refresh,
+                    onError: () => { toast.error('Could not reschedule this entry. Please try again.'); refresh(); },
                 },
             );
         },
-        [refresh],
+        [refresh, dataAdapter],
     );
 
-    const openCreate = useCallback((s: CreateSeed | null = null) => {
-        setEditEvent(null);
-        setSeed(s);
-        setCreateOpen(true);
-    }, []);
+    const openCreate = useCallback(
+        (s: CreateSeed | null = null) => {
+            if (dataAdapter?.onCreate) {
+                dataAdapter.onCreate(s ?? { date: navDate });
+                return;
+            }
+            setEditEvent(null);
+            setSeed(s ?? { date: navDate });
+            setCreateOpen(true);
+        },
+        [dataAdapter, navDate],
+    );
 
     useEffect(() => {
         if (!canCreateHere || typeof window === 'undefined') return;
@@ -968,6 +1100,9 @@ export default function SiteCalendar({
             srcByKey,
             onSelect: (ev: Decorated) => {
                 hidePreview();
+                if (dataAdapter?.onOpenItem) {
+                    if (dataAdapter.onOpenItem(ev) !== false) return;
+                }
                 setSelected(ev);
             },
             onCreateAt: canCreateHere
@@ -1000,6 +1135,7 @@ export default function SiteCalendar({
             openCreate,
             showPreview,
             hidePreview,
+            dataAdapter,
         ],
     );
 
@@ -1021,7 +1157,7 @@ export default function SiteCalendar({
                         navDate={navDate}
                         sourcesOff={enabledSources.size === 0}
                         filtersActive={
-                            enabledSources.size !== sources.length ||
+                            enabledSources.size !== effectiveSources.length ||
                             (scope === 'global' && houseFilter !== 'all')
                         }
                     />
@@ -1030,7 +1166,7 @@ export default function SiteCalendar({
                     <TimelineView
                         events={visibleEvents}
                         navDate={navDate}
-                        sources={sources}
+                        sources={effectiveSources}
                     />
                 )}
             </div>
@@ -1155,28 +1291,30 @@ export default function SiteCalendar({
                     )}
                 </Button>
 
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSubscribeOpen(true)}
-                >
-                    <Rss className="mr-1 h-4 w-4" />
-                    <span className="hidden sm:inline">Subscribe</span>
-                </Button>
+                {dataAdapter?.allowSubscriptions !== false && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSubscribeOpen(true)}
+                    >
+                        <Rss className="mr-1 h-4 w-4" />
+                        <span className="hidden sm:inline">Subscribe</span>
+                    </Button>
+                )}
             </div>
         </GuardrailCard>
     );
 
     const legend = (
         <div className="flex flex-wrap items-center gap-1.5">
-            {sources.map((s) => {
+            {effectiveSources.map((s) => {
                 const on = enabledSources.has(s.key);
                 return (
                     <Button
                         unstyled
                         key={s.key}
                         onClick={() => toggleSource(s.key)}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-opacity ${on ? '' : 'opacity-40'}`}
+                        className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-opacity md:min-h-0 ${on ? '' : 'opacity-40'}`}
                         style={{
                             background: `var(--src-${s.key}-bg)`,
                             borderColor: `var(--src-${s.key}-ln)`,
@@ -1198,6 +1336,11 @@ export default function SiteCalendar({
 
     const content = (
         <div className="space-y-3">
+            {(unavailableSources.length > 0 || railUnavailable) && <GuardrailCard unstyled role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg px-4 py-3 text-sm text-status-warning">
+                <AlertTriangle className="size-4" />
+                <span className="min-w-0 flex-1">{[...unavailableSources.map(key => effectiveSources.find(source => source.key === key)?.label ?? key), ...(railUnavailable ? ['Upcoming and overdue summary'] : [])].join(', ')} unavailable. Showing only the information loaded; the schedule may be incomplete.{lastScheduleLoad && ` Last complete calendar load: ${formatDateTime(lastScheduleLoad)}.`}</span>
+                <Button variant="outline" className="frontline-tap" onClick={refresh}>Retry loading</Button>
+            </GuardrailCard>}
             {fetchError && (
                 <div
                     role="alert"
@@ -1260,6 +1403,9 @@ export default function SiteCalendar({
                             today={now}
                             onSelect={(ev) => {
                                 hidePreview();
+                                if (dataAdapter?.onOpenItem) {
+                                    if (dataAdapter.onOpenItem(ev) !== false) return;
+                                }
                                 setSelected(ev);
                             }}
                             onApprovals={() => setApprovalsOpen(true)}
@@ -1272,7 +1418,7 @@ export default function SiteCalendar({
         </div>
     );
 
-    const allSourcesOn = enabledSources.size === sources.length;
+    const allSourcesOn = enabledSources.size === effectiveSources.length;
 
     // Top row, right: scoped search + glass secondaries + exactly ONE white
     // primary (PAGE_HEADER_STYLE_GUIDE.md §4).
@@ -1282,9 +1428,9 @@ export default function SiteCalendar({
                 value={q}
                 onChange={setQ}
                 placeholder={
-                    scope === 'site'
+                    dataAdapter?.searchPlaceholder ?? (scope === 'site'
                         ? 'Search this calendar…'
-                        : 'Search entries, sites…'
+                        : 'Search entries, sites…')
                 }
             />
             <div className="relative">
@@ -1352,12 +1498,16 @@ export default function SiteCalendar({
                     />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-60">
-                    <DropdownMenuItem onSelect={() => setSubscribeOpen(true)}>
-                        <Rss className="mr-2 h-4 w-4" /> Add to your calendar
-                    </DropdownMenuItem>
+                    {dataAdapter?.allowSubscriptions !== false && (
+                        <DropdownMenuItem
+                            onSelect={() => setSubscribeOpen(true)}
+                        >
+                            <Rss className="mr-2 h-4 w-4" /> Add to your calendar
+                        </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                         onSelect={() =>
-                            downloadICS(visibleEvents, 'site-calendar.ics')
+                            downloadICS(visibleEvents, dataAdapter?.exportFilename ?? 'site-calendar.ics')
                         }
                     >
                         <Download className="mr-2 h-4 w-4" /> Export this period
@@ -1392,7 +1542,12 @@ export default function SiteCalendar({
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
-            {canCreate && (
+            {dataAdapter?.primaryAction && (
+                <PageHeaderPrimaryButton onClick={() => router.visit(dataAdapter.primaryAction!.href)}>
+                    {dataAdapter.primaryAction.label}
+                </PageHeaderPrimaryButton>
+            )}
+            {canCreate && !dataAdapter?.primaryAction && (
                 <PageHeaderPrimaryButton
                     icon={Plus}
                     onClick={() => openCreate()}
@@ -1416,7 +1571,7 @@ export default function SiteCalendar({
                 <PageHeaderFilterButton icon={Filter} active={!allSourcesOn}>
                     {allSourcesOn
                         ? 'Display'
-                        : `Sources · ${enabledSources.size}/${sources.length}`}
+                        : `Sources · ${enabledSources.size}/${effectiveSources.length}`}
                 </PageHeaderFilterButton>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-72">
@@ -1471,7 +1626,7 @@ export default function SiteCalendar({
                                         allSourcesOn
                                             ? new Set()
                                             : new Set(
-                                                  sources.map((s) => s.key),
+                                                  effectiveSources.map((s) => s.key),
                                               ),
                                     )
                                 }
@@ -1481,7 +1636,7 @@ export default function SiteCalendar({
                             </Button>
                         </div>
                         <div className="max-h-44 space-y-0.5 overflow-y-auto">
-                            {sources.map((s) => {
+                            {effectiveSources.map((s) => {
                                 const on = enabledSources.has(s.key);
                                 return (
                                     <Button
@@ -1547,6 +1702,19 @@ export default function SiteCalendar({
             >
                 Today
             </PageHeaderFilterButton>
+            {dataAdapter?.committeeOptions &&
+            dataAdapter.committeeOptions.length > 0 ? (
+                <PageHeaderFilterSelect
+                    icon={Users}
+                    label="All committees"
+                    value={committeeFilter}
+                    options={[
+                        { value: 'all', label: 'All committees' },
+                        ...dataAdapter.committeeOptions,
+                    ]}
+                    onChange={(v) => setCommitteeFilter(v)}
+                />
+            ) : null}
             {scope === 'global' && sites.length > 0 ? (
                 <PageHeaderFilterSelect
                     icon={Home}
@@ -1577,19 +1745,42 @@ export default function SiteCalendar({
     const headerMeters = (
         <>
             <PageHeaderMeterBlock
-                label={periodStatLabel}
+                label="Viewing"
+                className="min-w-[220px]!"
+                value={fetchError || railUnavailable || unavailableSources.length ? 'Incomplete schedule' : `${periodCount} ${periodCount === 1 ? 'entry' : 'entries'}`}
                 ariaLabel="View this period in the agenda"
                 onClick={() => setView('agenda')}
             >
-                <PageHeaderMeterBig>{periodCount}</PageHeaderMeterBig>
+                <div
+                    className="flex items-center gap-3 [&_.eh-meter-big]:text-3xl"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    data-testid="calendar-date-anchor"
+                >
+                    <PageHeaderMeterBig>{navDate.getDate()}</PageHeaderMeterBig>
+                    <div className="flex min-w-0 flex-col leading-tight">
+                        <span className="text-section-title text-primary-foreground!">
+                            {MO[navDate.getMonth()]}
+                        </span>
+                        <span className="text-sm font-semibold tabular-nums">
+                            {navDate.getFullYear()}
+                        </span>
+                    </div>
+                </div>
                 <PageHeaderMeterCaption>
-                    dated entries · {enabledSources.size}{' '}
-                    {enabledSources.size === 1 ? 'source' : 'sources'}
+                    {view === 'week'
+                        ? periodLabel(view, navDate)
+                        : navDate.toLocaleDateString('en-NZ', {
+                              weekday: 'long',
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                          })}
                 </PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock
                 label="Next 7 days"
-                value={next7Total}
+                value={fetchError || railUnavailable || unavailableSources.length ? '—' : next7Total}
                 ariaLabel="View the coming week"
                 onClick={() => {
                     setNavDate(new Date());
@@ -1625,12 +1816,12 @@ export default function SiteCalendar({
                 ariaLabel="View overdue entries in the agenda"
                 onClick={() => setView('agenda')}
             >
-                <PageHeaderMeterBig>{overdueCount}</PageHeaderMeterBig>
+                <PageHeaderMeterBig>{fetchError || railUnavailable || unavailableSources.length ? '—' : overdueCount}</PageHeaderMeterBig>
                 <PageHeaderMeterCaption>
                     past their due date
                 </PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
-            <PageHeaderMeterBlock
+            {dataAdapter?.showApprovalMeter !== false && <PageHeaderMeterBlock
                 label="To approve"
                 tone={toApproveCount > 0 ? 'warning' : 'success'}
                 ariaLabel={
@@ -1646,11 +1837,11 @@ export default function SiteCalendar({
                 <PageHeaderMeterCaption>
                     awaiting sign-off
                 </PageHeaderMeterCaption>
-            </PageHeaderMeterBlock>
+            </PageHeaderMeterBlock>}
             <PageHeaderMeterBlock
                 label="Mine"
-                href="/my-calendar"
-                ariaLabel="Open My Calendar"
+                href={dataAdapter?.mineLink?.href ?? (dataAdapter ? '/governance/my-work' : '/my-calendar')}
+                ariaLabel={dataAdapter?.mineLink?.label ?? (dataAdapter ? 'Open My Work' : 'Open My Calendar')}
             >
                 <PageHeaderMeterBig>{mineCount}</PageHeaderMeterBig>
                 <PageHeaderMeterCaption>
@@ -1788,6 +1979,7 @@ export default function SiteCalendar({
             <PageLayout
                 hero={
                     <PageHeader
+                        className="max-md:[&_button]:min-h-[44px] max-md:[&_button]:min-w-[44px]"
                         variant={scope === 'site' ? 'profile' : 'index'}
                         icon={CalendarDays}
                         backHref={
@@ -1796,12 +1988,13 @@ export default function SiteCalendar({
                                 : undefined
                         }
                         title={
-                            scope === 'site'
+                            dataAdapter?.title ??
+                            (scope === 'site'
                                 ? (site?.name ?? 'Site Calendar')
-                                : 'Site Calendar'
+                                : 'Site Calendar')
                         }
                         titleChip={
-                            overdueCount > 0 ? (
+                            fetchError || railUnavailable || unavailableSources.length ? <PageHeaderStatusChip variant="warning">Schedule incomplete</PageHeaderStatusChip> : loading ? <PageHeaderStatusChip variant="neutral">Loading schedule</PageHeaderStatusChip> : overdueCount > 0 ? (
                                 <PageHeaderStatusChip variant="critical">
                                     {overdueCount} overdue
                                 </PageHeaderStatusChip>
@@ -1816,9 +2009,10 @@ export default function SiteCalendar({
                             )
                         }
                         subline={
-                            scope === 'site'
-                                ? `Site calendar · manual events and auto-derived obligations · ${sources.length} sources`
-                                : `Manual events and auto-derived obligations · ${sources.length} sources · ${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`
+                            dataAdapter?.subline ??
+                            (scope === 'site'
+                                ? `Site calendar · manual events and auto-derived obligations · ${effectiveSources.length} sources`
+                                : `Manual events and auto-derived obligations · ${effectiveSources.length} sources · ${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`)
                         }
                         actions={headerActions}
                         meters={headerMeters}
@@ -3421,8 +3615,8 @@ function QuickAddMenu({
     };
 
     const hourDate = ctx.hour != null ? new Date(ctx.date) : null;
-    if (hourDate && ctx.hour != null) hourDate.setHours(ctx.hour, 0, 0, 0);
-    const where = `${siteName ? `to ${siteName} · ` : ''}${WD[ctx.date.getDay()]} ${ctx.date.getDate()} ${MO[ctx.date.getMonth()].slice(0, 3)}${hourDate ? ` · ${fmtTime(hourDate)}` : ''}`;
+    if (hourDate && ctx.hour != null) hourDate.setHours(Math.floor(ctx.hour), Math.round((ctx.hour % 1) * 60), 0, 0);
+    const where = `${siteName ? `to ${siteName} · ` : ''}${WD[ctx.date.getDay()]} ${ctx.date.getDate()} ${MO[ctx.date.getMonth()].slice(0, 3)} ${ctx.date.getFullYear()}${hourDate ? ` · ${fmtTime(hourDate)}` : ''}`;
 
     return createPortal(
         <div
@@ -3456,7 +3650,7 @@ function QuickAddMenu({
                                 aria-hidden="true"
                                 className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-md"
                                 style={{
-                                    background: `${t.color}1a`,
+                                    background: `color-mix(in oklch, ${t.color} 10%, transparent)`,
                                     color: t.color,
                                 }}
                             >

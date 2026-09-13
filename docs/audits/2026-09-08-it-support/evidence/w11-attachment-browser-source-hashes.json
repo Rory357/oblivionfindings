@@ -1,0 +1,171 @@
+{
+  "sources": [
+    {
+      "path": "app/Domain/It/Services/ItAttachmentStorageIntentService.php",
+      "sha256": "146267400ae7484b2539c73466ffff8d65db8275f80f8ec82431f30de34ed70a"
+    },
+    {
+      "path": "app/Domain/It/Services/ItAttachmentStorageService.php",
+      "sha256": "9822d44b1d0dd4840b71a80418b0140d1d124dff4e534485c56441b69c3c98cd"
+    },
+    {
+      "path": "app/Domain/It/Services/ItInboundAttachmentStaging.php",
+      "sha256": "c5ad0cab2c920c4eeee5bc04bce209c02d665a1f79c209ff571d83a933c92dfd"
+    },
+    {
+      "path": "app/Domain/It/Services/ItAttachmentCleanupReadService.php",
+      "sha256": "3e6736f09d91f8f34226b7fac1d642902af802aff8736de5252427bea1829707"
+    },
+    {
+      "path": "app/Console/Commands/RetryItAttachmentCleanup.php",
+      "sha256": "d3c33b17de447cc342d15fb2d2399f6ee14460ed08c7b1e6f4bf9ba0ce2dbd55"
+    },
+    {
+      "path": "tests/Unit/It/RetryItAttachmentCleanupTest.php",
+      "sha256": "2696c0546e4f9ff28f8af8ad2182a923e228a36cfe29f30974ffad1f4d2adff6"
+    },
+    {
+      "path": "tests/Feature/It/ItAttachmentCleanupOperationsTest.php",
+      "sha256": "f4bdac9ec13ffb900ed94f9ff8ceb6bfdcedc611359498e8ca8ff73d5b680bfa"
+    },
+    {
+      "path": "tests/Concurrency/It/ItAttachmentCleanupCommandTest.php",
+      "sha256": "0ed3cb342fd143a2a9e1e74bfe96912d9f820a16a4684e4d12e4d88b85c718a6"
+    },
+    {
+      "path": "tests/Concurrency/It/ItInboundAttachmentStagingTest.php",
+      "sha256": "4aed57bb3cae6378f1662515dc3a69ef5a0e37363767a9907c31069c8bd5d05c"
+    },
+    {
+      "path": "docs/audits/2026-09-08-it-support/evidence/w11-mailbox-browser-fixture.php",
+      "sha256": "001743226103fc3ed7d23cfcc3db8c2a053ceb9e6f96a3bda3f1a04c37b575f3"
+    },
+    {
+      "path": "docs/audits/2026-09-08-it-support/evidence/w11-browser-mailbox-reconcile.php",
+      "sha256": "9fa70357d2f564fa89cbb1af3916976062f75c5101404e1a55639176ab082aca"
+    },
+    {
+      "path": "resources/js/components/it/it-service-operations.tsx",
+      "sha256": "741a9c8b72e6b90cb92a7215bc4f3d8b048cace5de5c6af16c139586cde8890f"
+    },
+    {
+      "path": "resources/js/components/it/__tests__/it-service-operations.test.tsx",
+      "sha256": "08223ca36ad4c57be3ea0f19e9e6340cda238c8ceccd4a39b35ab79e61bf21d7"
+    },
+    {
+      "path": "docs/runbooks/it-attachment-storage-recovery.md",
+      "sha256": "b985e1fa5a5c2ccc15f54c651b36ce45f281ca3733055279f59dd16531d0b13c"
+    },
+    {
+      "path": "app/Domain/It/Exceptions/ItInboundAttachmentUnavailable.php",
+      "sha256": "011eead4645402465b2e96df732388737290c6e66229d259e18ed782f5ca011b"
+    },
+    {
+      "path": "app/Domain/It/Services/ItMailboxConnectionPresenter.php",
+      "sha256": "7c217e9c65f4b244ea3f5aa97555a0e2234295fd6790a108ddfc25360debd379"
+    },
+    {
+      "path": "resources/js/components/settings/it-mailbox-provider.tsx",
+      "sha256": "b58bc305a419a3e95b3b781dd36a5282bff4a58b4fd6a6c5ea7579a7651b02ca"
+    },
+    {
+      "path": "tests/Feature/It/ItMailboxSettingsTest.php",
+      "sha256": "26bc2c36d81f05464d92c11ce620c48e53ee27b49b4e150aa1aafce3b6957004"
+    },
+    {
+      "path": "docs/audits/2026-09-08-it-support/evidence/w10-owned-browser-refresh-assets.ps1",
+      "sha256": "b26369145f4acbfd93726cd75e2ad8526a03b050728537ac5632bd87f90f7b2a"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "DESIGN.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/DESIGN_TOKENS.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LIST_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LOADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/oblivion-loader-01-demo.html",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "unchanged": true
+    }
+  ],
+  "tests": [
+    {
+      "token": "it_b853404eee5740df",
+      "log": "w11-cleanup-audit-failure-command-tests.txt",
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 74,
+      "seconds": 170,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    },
+    {
+      "token": "it_106dc9d5e53d4710",
+      "log": "w11-cleanup-audit-failure-staging-tests.txt",
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 86,
+      "seconds": 181,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    },
+    {
+      "token": "it_4aa64d1ccb874a0b",
+      "log": "w11-attachment-guidance-tests.txt",
+      "passed": 22,
+      "failed": 0,
+      "errors": 0,
+      "assertions": 258,
+      "seconds": 209,
+      "postflightChecks": 14,
+      "isolatedSchemaAbsent": true
+    }
+  ],
+  "browserRecords": {
+    "token": "724533b40323406b",
+    "providers": 2,
+    "messagesPerProvider": 43,
+    "canonicalTickets": 58,
+    "canonicalReplies": 4,
+    "canonicalFiles": 4,
+    "retainedQuarantineFiles": 4,
+    "removedTemporaryCopies": 6,
+    "remainingPrivateObjects": 8,
+    "exactRuntimeRemoved": true,
+    "browserDownloadCompletion": "unverified_tool_error"
+  },
+  "assetManifestSha256": "f4cf36bf858b5ad84cd0b7f9f3f7834124884e62fbb3362eb965818ad2942a1f"
+}

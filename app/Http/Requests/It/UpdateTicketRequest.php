@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\BindsItBrowserActor;
 use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
+use App\Http\Requests\It\Concerns\HasItDraftCommit;
 use App\Models\ItTicket;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -13,22 +15,35 @@ use Illuminate\Validation\Rule;
  */
 class UpdateTicketRequest extends FormRequest
 {
+    use BindsItBrowserActor;
     use ConcealsInaccessibleItWork;
+    use HasItDraftCommit;
 
     public function authorize(): bool
     {
         $this->workableTicketOrNotFound();
 
-        return (bool) $this->user()?->canDo('it.manage');
+        return $this->hasCurrentBrowserActor() && (bool) $this->user()?->canDo('it.manage');
     }
 
     /** @return array<string, array<int, mixed>> */
     public function rules(): array
     {
         return [
+            ...$this->browserActorRules(),
+            ...$this->draftCommitRules(),
+            'expected_version' => ['required', 'integer', 'min:1'],
             // Settlement always uses the reasoned resolve/close journeys.
             'status' => ['sometimes', Rule::in(ItTicket::OPEN_STATUSES)],
             'priority' => ['sometimes', Rule::in(ItTicket::PRIORITIES)],
+            'impact' => ['sometimes', Rule::in(ItTicket::IMPACTS)],
+            'urgency' => ['sometimes', Rule::in(ItTicket::URGENCIES)],
+            'priority_reason' => ['nullable', 'string', 'max:1000'],
+            'release_priority_override' => ['sometimes', 'boolean'],
+            'routing_reason' => ['nullable', 'string', 'max:1000'],
+            'release_routing_override' => ['sometimes', 'boolean'],
+            'queue_id' => ['sometimes', 'integer', 'exists:it_queues,id'],
+            'owner_user_id' => ['sometimes', 'integer', 'exists:users,id'],
             'work_type' => ['sometimes', Rule::in(ItTicket::INTAKE_WORK_TYPES)],
             'it_service_id' => ['sometimes', 'nullable', 'integer', 'exists:it_services,id'],
             'category' => ['sometimes', Rule::in(ItTicket::CATEGORIES)],

@@ -1,0 +1,94 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItApiWorkItemService.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Domain/It/Services/ItApiFieldPolicy.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketTriageService.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketLinkService.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Middleware/RecordItApiRequest.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Controllers/Api/ItApiWorkItemController.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Requests/It/Api/TransitionItApiWorkItemRequest.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Requests/It/Api/UpdateItApiWorkItemRequest.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Requests/It/Api/LinkItApiWorkItemRequest.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Requests/It/StoreItServiceIdentityRequest.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Resources/ItApiWorkItemResource.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Models/ItServiceIdentity.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Models/ItTicketCommandReceipt.php",
+    "unchanged": true
+  },
+  {
+    "path": "routes/api-hr.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Feature/It/ItApiRelatedCommandTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Feature/It/ItApiMutationContractTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Feature/It/ItSecureApiTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Concurrency/It/ItApiPublicationConcurrencyTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Support/It/api-publication-concurrency-worker.php",
+    "unchanged": true
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w13-api-browser-fixture.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Feature/It/ItTicketVersionTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "docs/it-support-service-api-v1.md",
+    "unchanged": true
+  }
+]

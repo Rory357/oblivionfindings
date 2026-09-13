@@ -1,0 +1,77 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_6a63967dd5c54ac2",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItTicketCommentDeliveryTest[39m
+  [31;1m⨯[39;22m[90m [39m[90msaved reply details refresh current delivery evidence without exposing private transport fields[39m[90m           [39m [90m168.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly current leaf attempts count and their comment identity survives a moved canonical parent[39m[90m               [39m [90m0.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90mabsent historical evidence differs from a receipted reply that requested no notification[39m[90m                    [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic participants do not receive other authors delivery evidence and internal notes never gain a mail pro[39m[90m…[39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelivery projection refreshes revoked actor and canonical comment ownership[39m[90m                                 [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical delivery log filters older replies before pagination and rejects inaccessible or internal comment[39m[90m…[39m [90m5.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing additive delivery columns remain explicitly unrecorded[39m[90m                                              [39m [90m0.67s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTicketCommentDeliveryTest[22m [90m>[39m saved reply details refresh current delivery evidence with…   
+[39;1m  Header [Cache-Control] was found, but value [no-cache, private] does not match [no-store, private].
+Failed asserting that two strings are equal.
+--- Expected
++++ Actual
+@@ @@
+-'no-store, private'
++'no-cache, private'[39;22m
+
+  at [32mtests\Feature\It\ItTicketCommentDeliveryTest.php[39m:[32m45[39m
+     41▕ test('saved reply details refresh current delivery evidence without exposing private transport fields', function () {
+     42▕     $comment = deliveryEvidenceReply($this->ticket, $this->agent);
+     43▕     $delivery = ItEmailDelivery::query()->where('it_ticket_comment_id', $comment->id)->sole();
+     44▕     $this->actingAs($this->agent)->getJson('/it/tickets/'.$this->ticket->id)->assertOk()
+  ➜  45▕         ->assertHeader('Cache-Control', 'no-store, private')
+     46▕         ->assertJsonPath('comments.0.delivery.tracking', 'recorded')
+     47▕         ->assertJsonPath('comments.0.delivery.attempt_statuses.queued', 1)
+     48▕         ->assertJsonPath('comments.0.delivery.review_url', '/it/setup?tab=operations&delivery_comment_id='.$comment->id);
+     49▕     $delivery->update(['status' => 'failed', 'last_error' => 'PRIVATE provider diagnostic 123',
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m6 passed[39;22m[90m (64 assertions)[39m
+  [90mDuration:[39m [39m177.30s[39m
+
+{"exit_code":1,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_6a63967dd5c54ac2",
+    "database_mutations_performed": false
+}

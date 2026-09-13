@@ -1,0 +1,4 @@
+npm notice run npx
+npm notice run prettier --write resources/js/components/it/__tests__/ticket-reply-composer.test.tsx resources/js/pages/it/tickets/show.test.tsx
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx 547ms
+resources/js/pages/it/tickets/show.test.tsx 143ms

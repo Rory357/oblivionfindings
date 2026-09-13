@@ -1,0 +1,5 @@
+npm notice run npx
+npm notice run prettier --write resources/js/components/it/ticket-reopen-dialog.tsx resources/js/components/it/ticket-version-conflict.tsx resources/js/components/it/__tests__/ticket-reopen-dialog.test.tsx
+resources/js/components/it/ticket-reopen-dialog.tsx 720ms
+resources/js/components/it/ticket-version-conflict.tsx 59ms
+resources/js/components/it/__tests__/ticket-reopen-dialog.test.tsx 116ms

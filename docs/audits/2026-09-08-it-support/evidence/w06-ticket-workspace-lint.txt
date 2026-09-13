@@ -1,0 +1,8 @@
+npm notice run npx
+npm notice run eslint resources/js/pages/it/tickets/show.tsx resources/js/pages/it/tickets/show.test.tsx resources/js/components/it/ticket-workspace-header.tsx resources/js/components/it/ticket-thread.tsx resources/js/components/page/page-header.tsx resources/js/components/page/grouped-profile-nav.tsx resources/js/test/page-grouped-profile-nav.test.tsx
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\test\page-grouped-profile-nav.test.tsx
+  55:13  warning  Consider <Button> from @/components/ui/button. If the raw <button> is intentional (custom layout / selector card), add an inline disable comment with reason  no-restricted-syntax
+
+✖ 1 problem (0 errors, 1 warning)
+

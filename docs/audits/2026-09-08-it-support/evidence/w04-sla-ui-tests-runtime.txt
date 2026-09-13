@@ -1,0 +1,366 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/it-reports.test.tsx (7 tests | 2 failed) 1438ms
+     × cancels the prior range and ignores an out-of-order response 25ms
+     × withholds prior data and shows an inline error when the selected range fails 1019ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/it-reports.test.tsx > IT reports request truthfulness > cancels the prior range and ignores an out-of-order response
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "7 days"
+
+Here are the accessible roles:
+
+  paragraph:
+
+  Name "":
+  <p
+    class="text-[12.5px] text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  status:
+
+  Name "":
+  <p
+    aria-live="polite"
+    class="text-sm text-muted-foreground"
+    role="status"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="flex flex-col gap-4"
+    >
+      <div
+        class="flex flex-wrap items-center gap-2"
+      >
+        <svg
+          class="lucide lucide-chart-column h-4 w-4 text-muted-foreground"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M3 3v16a2 2 0 0 0 2 2h16"
+          />
+          <path
+            d="M18 17V9"
+          />
+          <path
+            d="M13 17V5"
+          />
+          <path
+            d="M8 17v-3"
+          />
+        </svg>
+        <p
+          class="text-[12.5px] text-muted-foreground"
+        >
+          Helpdesk analytics —
+           
+          loading…
+        </p>
+        <div
+          class="ml-auto flex items-center gap-2"
+        />
+      </div>
+      <div
+        class="flex flex-col gap-4"
+      >
+        <p
+          aria-live="polite"
+          class="text-sm text-muted-foreground"
+          role="status"
+        >
+          Loading reports for the selected range…
+        </p>
+        <div
+          class="grid grid-cols-2 gap-3 md:grid-cols-4"
+        >
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+        </div>
+        <div
+          aria-hidden="true"
+          class="h-64 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+        />
+      </div>
+    </div>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/it/__tests__/it-reports.test.tsx:220:32
+    218|             'Loading reports for the selected range',
+    219|         );
+    220|         fireEvent.click(screen.getByRole('button', { name: '7 days' })…
+       |                                ^
+    221|
+    222|         await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(2)…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  resources/js/components/it/__tests__/it-reports.test.tsx > IT reports request truthfulness > withholds prior data and shows an inline error when the selected range fails
+TestingLibraryElementError: Unable to find an element with the text: /9 May.*7 Jun/. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="flex flex-col gap-4"
+    >
+      <div
+        class="flex flex-wrap items-center gap-2"
+      >
+        <svg
+          class="lucide lucide-chart-column h-4 w-4 text-muted-foreground"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M3 3v16a2 2 0 0 0 2 2h16"
+          />
+          <path
+            d="M18 17V9"
+          />
+          <path
+            d="M13 17V5"
+          />
+          <path
+            d="M8 17v-3"
+          />
+        </svg>
+        <p
+          class="text-[12.5px] text-muted-foreground"
+        >
+          Helpdesk analytics —
+           
+          loading…
+        </p>
+        <div
+          class="ml-auto flex items-center gap-2"
+        />
+      </div>
+      <div
+        class="flex flex-col gap-4"
+      >
+        <p
+          aria-live="polite"
+          class="text-sm text-muted-foreground"
+          role="status"
+        >
+          Loading reports for the selected range…
+        </p>
+        <div
+          class="grid grid-cols-2 gap-3 md:grid-cols-4"
+        >
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+        </div>
+        <div
+          aria-hidden="true"
+          class="h-64 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+        />
+      </div>
+    </div>
+  </div>
+</body>
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="flex flex-col gap-4"
+    >
+      <div
+        class="flex flex-wrap items-center gap-2"
+      >
+        <svg
+          class="lucide lucide-chart-column h-4 w-4 text-muted-foreground"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M3 3v16a2 2 0 0 0 2 2h16"
+          />
+          <path
+            d="M18 17V9"
+          />
+          <path
+            d="M13 17V5"
+          />
+          <path
+            d="M8 17v-3"
+          />
+        </svg>
+        <p
+          class="text-[12.5px] text-muted-foreground"
+        >
+          Helpdesk analytics —
+           
+          loading…
+        </p>
+        <div
+          class="ml-auto flex items-center gap-2"
+        />
+      </div>
+      <div
+        class="flex flex-col gap-4"
+      >
+        <p
+          aria-live="polite"
+          class="text-sm text-muted-foreground"
+          role="status"
+        >
+          Loading reports for the selected range…
+        </p>
+        <div
+          class="grid grid-cols-2 gap-3 md:grid-cols-4"
+        >
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden="true"
+            class="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+          />
+        </div>
+        <div
+          aria-hidden="true"
+          class="h-64 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+        />
+      </div>
+    </div>
+  </div>
+</body>
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/it-reports.test.tsx:271:29
+    269|         render(<ItReports />);
+    270|
+    271|         expect(await screen.findByText(/9 May.*7 Jun/)).toBeVisible();
+       |                             ^
+    272|         fireEvent.click(screen.getByRole('button', { name: '7 days' })…
+    273|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 13 passed (15)
+   Start at  14:02:30
+   Duration  4.18s (transform 257ms, setup 256ms, import 3.59s, tests 1.69s, environment 1.78s)
+

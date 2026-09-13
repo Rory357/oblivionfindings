@@ -1,0 +1,20 @@
+
+Fatal error: Uncaught ReflectionException: Class "Kernel" does not exist in C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Container\Container.php:1125
+Stack trace:
+#0 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Container\Container.php(1125): ReflectionClass->__construct('Kernel')
+#1 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Container\Container.php(936): Illuminate\Container\Container->build('Kernel')
+#2 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Application.php(1078): Illuminate\Container\Container->resolve('Kernel', Array, true)
+#3 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Container\Container.php(864): Illuminate\Foundation\Application->resolve('Kernel', Array)
+#4 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Application.php(1058): Illuminate\Container\Container->make('Kernel', Array)
+#5 C:\Users\steph\Herd\oblivionfindings\docs\audits\2026-09-08-it-support\evidence\w01-fine-capability-browser-fixtures.php(7): Illuminate\Foundation\Application->make('Kernel')
+#6 {main}
+
+Next Illuminate\Contracts\Container\BindingResolutionException: Target class [Kernel] does not exist. in C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Container\Container.php:1127
+Stack trace:
+#0 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Container\Container.php(936): Illuminate\Container\Container->build('Kernel')
+#1 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Application.php(1078): Illuminate\Container\Container->resolve('Kernel', Array, true)
+#2 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Container\Container.php(864): Illuminate\Foundation\Application->resolve('Kernel', Array)
+#3 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Application.php(1058): Illuminate\Container\Container->make('Kernel', Array)
+#4 C:\Users\steph\Herd\oblivionfindings\docs\audits\2026-09-08-it-support\evidence\w01-fine-capability-browser-fixtures.php(7): Illuminate\Foundation\Application->make('Kernel')
+#5 {main}
+  thrown in C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Container\Container.php on line 1127

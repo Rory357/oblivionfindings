@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax -- Shared two-tier navigation uses native
  * controls for accessible tab, group, search, and pin interactions. */
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { Search } from 'lucide-react';
 import {
@@ -413,7 +414,6 @@ export function TabSearchPalette({
 }) {
     const [query, setQuery] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
-    const previousFocusRef = useRef<HTMLElement | null>(null);
     const flat = useMemo(
         () =>
             groups.flatMap((group) =>
@@ -428,33 +428,8 @@ export function TabSearchPalette({
     );
 
     useEffect(() => {
-        if (!open) {
-            previousFocusRef.current?.focus();
-            previousFocusRef.current = null;
-
-            return;
-        }
-
-        previousFocusRef.current =
-            document.activeElement instanceof HTMLElement
-                ? document.activeElement
-                : null;
-        setQuery('');
-        const timeout = window.setTimeout(() => inputRef.current?.focus(), 30);
-        return () => window.clearTimeout(timeout);
+        if (open) setQuery('');
     }, [open]);
-
-    useEffect(() => {
-        if (!open) return;
-
-        const onKey = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') onClose();
-        };
-        document.addEventListener('keydown', onKey);
-        return () => document.removeEventListener('keydown', onKey);
-    }, [open, onClose]);
-
-    if (!open) return null;
 
     const normalizedQuery = query.trim().toLowerCase();
     const results = normalizedQuery
@@ -466,19 +441,23 @@ export function TabSearchPalette({
         : flat;
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-[12vh]"
-            onMouseDown={onClose}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Jump to a section"
-            data-test={`${testIdPrefix}-search-palette`}
+        <Dialog
+            open={open}
+            onOpenChange={(nextOpen) => {
+                if (!nextOpen) onClose();
+            }}
         >
-            <div
-                className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl motion-safe:animate-in motion-safe:duration-200 motion-safe:fade-in-0 motion-safe:slide-in-from-top-2"
-                onMouseDown={(event) => event.stopPropagation()}
+            <DialogContent
+                className="gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-lg"
+                aria-describedby={undefined}
+                data-test={`${testIdPrefix}-search-palette`}
+                onOpenAutoFocus={(event) => {
+                    event.preventDefault();
+                    inputRef.current?.focus();
+                }}
             >
-                <div className="flex items-center gap-2 border-b border-border px-4">
+                <DialogTitle className="sr-only">Jump to a section</DialogTitle>
+                <div className="flex items-center gap-2 border-b border-border pr-12 pl-4">
                     <Search className="h-[18px] w-[18px] text-muted-foreground" />
                     <input
                         ref={inputRef}
@@ -488,9 +467,6 @@ export function TabSearchPalette({
                         placeholder="Jump to a section…"
                         className="h-12 w-full bg-transparent text-sm outline-none focus-visible:ring-0"
                     />
-                    <span className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                        Esc
-                    </span>
                 </div>
                 <div className="max-h-[50vh] overflow-y-auto p-2">
                     {results.length === 0 ? (
@@ -504,6 +480,7 @@ export function TabSearchPalette({
                                 <button
                                     key={tab.key}
                                     type="button"
+                                    aria-label={`${tab.label}, ${tab.groupLabel}`}
                                     onClick={() => {
                                         onTab(tab.key);
                                         onClose();
@@ -529,7 +506,7 @@ export function TabSearchPalette({
                         })
                     )}
                 </div>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 }

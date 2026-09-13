@@ -1,0 +1,5 @@
+Command:
+& 'C:\Users\steph\.hermes\node\node.exe' node_modules\eslint\bin\eslint.js resources/js/pages/settings/email-settings.tsx resources/js/components/settings/email-configuration-dialog.tsx resources/js/components/settings/email-configuration-contract.ts resources/js/components/settings/email-configuration-contract.test.ts resources/js/components/settings/email-configuration-dialog.test.tsx resources/js/pages/settings/email-settings.test.tsx --max-warnings=0
+
+Exit code: 0
+Stdout: (empty)

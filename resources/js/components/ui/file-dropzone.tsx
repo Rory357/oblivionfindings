@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import { FileText, Trash2, Upload, UploadCloud } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type AriaAttributes, type ReactNode } from 'react';
 
 export function formatFileSize(bytes: number): string {
     if (!bytes) return '';
@@ -20,6 +20,10 @@ export function formatFileSize(bytes: number): string {
  * Extracted from the Add Site documents step so every modal shares one look.
  */
 export function FileDropzone({
+    id,
+    'aria-labelledby': labelledBy,
+    'aria-describedby': describedBy,
+    'aria-invalid': invalid,
     onFiles,
     accept,
     multiple = true,
@@ -27,6 +31,10 @@ export function FileDropzone({
     hint = 'PDF, Word, images',
     disabled = false,
 }: {
+    id?: string;
+    'aria-labelledby'?: string;
+    'aria-describedby'?: string;
+    'aria-invalid'?: AriaAttributes['aria-invalid'];
     onFiles: (files: File[]) => void;
     accept?: string;
     multiple?: boolean;
@@ -46,9 +54,13 @@ export function FileDropzone({
     return (
         <>
             <div
+                id={id}
                 role="button"
                 tabIndex={disabled ? -1 : 0}
                 aria-disabled={disabled}
+                aria-labelledby={labelledBy}
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
                 onClick={() => !disabled && inputRef.current?.click()}
                 onKeyDown={(e) => {
                     if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
@@ -90,14 +102,26 @@ export function FileDropzone({
                     <UploadCloud className="h-7 w-7" />
                 </span>
                 <div>
-                    <div className="text-sm font-semibold">{dragging ? 'Drop files to upload' : title}</div>
+                    <div id={id ? `${id}-title` : undefined} className="text-sm font-semibold">{dragging ? 'Drop files to upload' : title}</div>
                     <div className="mt-0.5 text-[13px] text-muted-foreground">
                         or <span className="font-semibold text-primary">browse</span> from your computer
                     </div>
                 </div>
                 {hint ? <div className="text-[11px] text-muted-foreground">{hint}</div> : null}
             </div>
-            <input ref={inputRef} type="file" accept={accept} multiple={multiple} className="hidden" onChange={(e) => emit(e.target.files)} />
+            <input
+                id={id ? `${id}-input` : undefined}
+                ref={inputRef}
+                type="file"
+                accept={accept}
+                multiple={multiple}
+                disabled={disabled}
+                aria-labelledby={labelledBy}
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
+                className="hidden"
+                onChange={(e) => emit(e.target.files)}
+            />
         </>
     );
 }

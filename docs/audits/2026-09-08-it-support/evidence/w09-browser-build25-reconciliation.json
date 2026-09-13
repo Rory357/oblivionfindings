@@ -1,0 +1,12 @@
+{
+  "final_open_version10_two_reopens": true,
+  "first_resolution": true,
+  "internal_reason_exact": true,
+  "second_resolution": true,
+  "requester_reason_exact": true,
+  "only_four_comments": true,
+  "unsent_proposal_absent": true,
+  "exactly_two_reopen_events_and_audits": true,
+  "requester_pointer_and_it_responsibility": true,
+  "current_resolution_cleared": true
+}

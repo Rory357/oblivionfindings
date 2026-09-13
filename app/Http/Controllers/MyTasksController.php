@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Services\AttendanceService;
+use App\Domain\Shifts\Timesheets\TimesheetAllocationService;
 use App\Http\Resources\MyShiftResource;
 use App\Models\Client;
 use App\Models\ClientIncident;
@@ -24,8 +25,11 @@ use App\Models\SiteChecklistRun;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\GuidedRoundService;
+use App\Services\HandoverWorkerNotes;
 use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\MyDay\ShiftTaskHelpService;
+use App\Services\MyDay\ShiftTaskWorkService;
 use App\Services\ShiftHandoverService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskItem;
@@ -33,7 +37,6 @@ use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
 use App\Support\ResidentHue;
 use App\Support\RunDetailPresenter;
-use App\Support\ShiftTaskSupport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -43,9 +46,12 @@ use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class MyTasksController extends Controller
 {
+    private array $unavailableSections = [];
+
     private const PRIORITY_ORDER = [
         'critical' => 0,
         'high' => 1,
@@ -87,7 +93,7 @@ class MyTasksController extends Controller
         //     filter tabs render correctly. Falls back to the shift's
         //     single client for 1:1 visits.
         $activeShift = $this->resolveActiveShiftModel($user, $workerNow);
-        $activeSitePayload = $this->buildActiveSitePayload($activeShift);
+        $activeSitePayload = $this->buildActiveSitePayload($activeShift, $user);
 
         // 3. Medications due — aggregate across every resident at the active
         //    site when present, otherwise fall back to the shifts' client list
@@ -103,11 +109,12 @@ class MyTasksController extends Controller
                 $canRecordControlledMedications,
                 $canAccessControlledMedications,
                 $canOpenEmar,
+                $activeShift,
             )
             : [];
 
         // 4. Timesheets
-        $timesheets = $this->getTimesheets($userId);
+        $timesheets = $this->getTimesheets($user);
 
         // 5. Incidents
         $incidents = $this->getIncidents($userId, $queryNow);
@@ -155,13 +162,20 @@ class MyTasksController extends Controller
         //     mirrors MyShiftResource so the front-end can use one TS type.
         $activeShiftCard = $activeShift
             ? array_merge(
-                MyShiftResource::fromShift($activeShift, $workerNow),
+                $this->workerShiftPayload($user, $activeShift, $workerNow),
                 ['site' => $activeSitePayload]
             )
             : null;
         $activeShiftSiteId = $activeShift?->site_id ? (int) $activeShift->site_id : null;
         $workerToday = $workerNow->toDateString();
         $shiftChecklists = $this->buildShiftChecklists($user, $activeShiftSiteId, $workerToday);
+        $outgoingHandover = null;
+        try {
+            $outgoingHandover = app(HandoverWorkerNotes::class)->shiftSummary($activeShift, $user);
+        } catch (\Throwable $error) {
+            report($error);
+            $this->unavailableSections[] = 'Handover summary';
+        }
 
         return Inertia::render('my-day/index', [
             'today' => $todayFormatted,
@@ -194,9 +208,16 @@ class MyTasksController extends Controller
             // Cross-module "My tasks" card — the signed-in user's open work
             // items from the /tasks aggregator (assigned=me), capped at 8
             // rows. `total` carries the uncapped count for the footer link.
-            'myTasks' => $this->getMyAggregatedTasks($user),
+            'myTasks' => $this->getMyAggregatedTasks($user, array_column($activeShiftCard['tasks'] ?? [], 'id')),
             'active_shift' => $activeShiftCard,
+            'task_creation' => [
+                'can_create' => $activeShift && app(ShiftTaskWorkService::class)->canCreate($user, $activeShift),
+                'shift_id' => $activeShift?->id,
+                'clients' => $activeShift ? app(ShiftTaskWorkService::class)->availableClients($user, $activeShift)
+                    ->map(fn (Client $client) => ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)])->all() : [],
+            ],
             'shiftChecklists' => $shiftChecklists,
+            'help_requests' => $this->getHelpRequests($user),
             'checklistConfig' => $this->buildChecklistConfig($user, $workerToday),
             'runDetail' => RunDetailPresenter::for(
                 $request->integer('run'),
@@ -206,6 +227,8 @@ class MyTasksController extends Controller
             'next_shift_briefing' => $nextShiftBriefing,
             'previous_shift' => $previousShift,
             'handover' => $handover,
+            'handover_draft' => app(HandoverWorkerNotes::class)->latestDraft($user),
+            'outgoing_handover' => $outgoingHandover,
             // Per-worker observation capabilities, used by the Vitals & obs
             // flow on /my-day to gate the observation-type list. We resolve
             // them here (rather than client-side via auth) because permission
@@ -222,6 +245,7 @@ class MyTasksController extends Controller
             // `labels` prop shared globally by HandleInertiaRequests for
             // terminology overrides (client.singular, etc.).
             'my_day_labels' => Lang::get('my-day'),
+            'data_unavailable' => array_values(array_unique($this->unavailableSections)),
         ]);
     }
 
@@ -284,6 +308,7 @@ class MyTasksController extends Controller
                 ->count();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Shift claims';
 
             return 0;
         }
@@ -329,6 +354,7 @@ class MyTasksController extends Controller
                 ->open()
                 ->whereHas('shift', fn ($query) => $query
                     ->where('user_id', $user->id)
+                    ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $user))
                     ->visibleToFrontline())
                 ->with(['shift' => fn ($query) => $query->with($relations)])
                 ->latest('clock_in_at')
@@ -344,7 +370,8 @@ class MyTasksController extends Controller
             $shift = Shift::query()
                 ->where('user_id', $user->id)
                 ->visibleToFrontline()
-                ->whereIn('status', ['in_progress', 'scheduled', 'draft'])
+                ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $user))
+                ->whereIn('status', ['in_progress', 'scheduled'])
                 ->where(function ($query) use ($nowUtc, $workerDayStart, $workerDayEnd) {
                     $query
                         ->where(function ($overlap) use ($nowUtc) {
@@ -362,6 +389,7 @@ class MyTasksController extends Controller
             return $shift;
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Current shift';
 
             return null;
         }
@@ -372,7 +400,7 @@ class MyTasksController extends Controller
      * snapshot used by the new /my-day hero. Returns null when the active
      * shift has no site or no residents.
      */
-    private function buildActiveSitePayload(?Shift $shift): ?array
+    private function buildActiveSitePayload(?Shift $shift, User $user): ?array
     {
         if (! $shift || ! $shift->site) {
             return null;
@@ -380,11 +408,8 @@ class MyTasksController extends Controller
         $site = $shift->site;
         $residents = $site->clients
             ->filter(fn (Client $c) => ($c->status ?? 'active') !== 'archived')
+            ->filter(fn (Client $c) => Gate::forUser($user)->allows('view', $c))
             ->values();
-
-        if ($residents->isEmpty()) {
-            return null;
-        }
 
         return [
             'id' => $site->id,
@@ -454,9 +479,18 @@ class MyTasksController extends Controller
                 ->first();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Clock and shift review';
             // Fail soft — home should still render without the clock card.
         }
 
+        if ($openSession) {
+            try {
+                $this->siteAccess->resolveAuthorizedAttendanceSession($user, $openSession->id);
+            } catch (HttpException $exception) {
+                $this->unavailableSections[] = 'Clock and shift review';
+                $openSession = null;
+            }
+        }
         $openShift = $openSession?->shift;
         $openShiftTasks = $openShift?->tasks ?? collect();
         $openShiftTaskTotal = $openShiftTasks->count();
@@ -483,14 +517,7 @@ class MyTasksController extends Controller
                 'break_minutes' => (int) $openSession->break_minutes,
                 'break_count' => (int) $openSession->break_count,
                 'is_on_break' => (bool) $openSession->break_started_at,
-                'tasks' => $openShiftTasks->map(fn ($task) => [
-                    'id' => $task->id,
-                    'label' => $task->label,
-                    'scheduled_time' => ShiftTaskSupport::normalizeTime($task->scheduled_time),
-                    'scheduled_for' => $openShift ? $task->setRelation('shift', $openShift)->scheduledFor()?->toIso8601String() : null,
-                    'is_completed' => (bool) $task->is_completed,
-                    'completed_at' => $task->completed_at?->toIso8601String(),
-                ])->values()->all(),
+                'tasks' => $openShift ? $this->workerShiftPayload($user, $openShift)['tasks'] : [],
                 'task_progress' => $openShiftTaskTotal > 0
                     ? round(($openShiftTaskDone / $openShiftTaskTotal) * 100)
                     : 100,
@@ -522,15 +549,15 @@ class MyTasksController extends Controller
      * read before starting this shift. Looks for a submitted handover either
      * explicitly targeted at this incoming shift, or — if nothing matches
      * directly — the most recent submitted handover for the same client from
-     * the last 24 hours. Never returns acknowledged handovers (they've been
-     * read) so this prompt only appears once.
+     * the last 24 hours. Acknowledged handovers remain available for reference;
+     * read status and linked follow-up completion are separate facts.
      */
     private function findIncomingHandover(User $user, Shift $activeShift): ?array
     {
         try {
             $handover = ShiftHandover::query()
                 ->tap(fn ($query) => $this->siteAccess->applyHandoverScope($query, $user))
-                ->where('status', ShiftHandoverService::STATUS_SUBMITTED)
+                ->whereIn('status', [ShiftHandoverService::STATUS_SUBMITTED, ShiftHandoverService::STATUS_ACKNOWLEDGED])
                 ->where(function ($q) use ($activeShift, $user) {
                     $q->where('incoming_shift_id', $activeShift->id)
                         ->orWhere(function ($nested) use ($activeShift, $user) {
@@ -540,13 +567,17 @@ class MyTasksController extends Controller
                                         ->orWhereNull('incoming_staff_id');
                                 })
                                 ->when($activeShift->client_id, fn ($c) => $c->where('client_id', $activeShift->client_id))
+                                ->whereHas('outgoingShift', fn ($outgoing) => $outgoing
+                                    ->where('site_id', $activeShift->site_id ?? $activeShift->client?->site_id)
+                                    ->where('id', '!=', $activeShift->id))
                                 ->where('created_at', '>=', now()->subHours(24));
                         });
                 })
                 ->with([
                     'outgoingStaff:id,name',
-                    'client:id,first_name,last_name',
-                    'outgoingShift:id,ends_at',
+                    'client',
+                    'outgoingShift',
+                    'incomingShift',
                 ])
                 ->latest('submitted_at')
                 ->latest('id')
@@ -556,13 +587,22 @@ class MyTasksController extends Controller
                 return null;
             }
 
+            Gate::forUser($user)->authorize('view', $handover->client);
+
             return [
                 'id' => $handover->id,
                 'handover_notes' => $handover->handover_notes,
+                'worker_notes' => app(HandoverWorkerNotes::class)->present($handover, $user),
                 'client_mood' => $handover->client_mood,
-                'medications_due' => $handover->medications_due ?? [],
+                // Match the canonical handover presenter: this legacy snapshot
+                // may contain controlled medication identities without row-level classification.
+                'medications_due' => $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
+                    ? ($handover->medications_due ?? []) : [],
                 'incidents_to_note' => $handover->incidents_to_note ?? [],
                 'follow_up_items' => $handover->follow_up_items ?? [],
+                'follow_ups' => app(ShiftHandoverService::class)->myDayFollowUps($handover, $user),
+                'acknowledged_at' => $handover->acknowledged_at?->toIso8601String(),
+                'can_acknowledge' => app(ShiftHandoverService::class)->canAcknowledge($handover, $user),
                 'submitted_at' => optional($handover->submitted_at)->toIso8601String(),
                 'outgoing_staff_name' => $handover->outgoingStaff?->name,
                 'outgoing_shift_ends_at' => optional($handover->outgoingShift?->ends_at)->toIso8601String(),
@@ -572,6 +612,7 @@ class MyTasksController extends Controller
             ];
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Incoming handover';
 
             return null;
         }
@@ -594,9 +635,12 @@ class MyTasksController extends Controller
                 'role' => 'Previous shift',
             ] : null,
             'summary' => $handover['handover_notes'] ?? null,
+            'worker_notes' => $handover['worker_notes'] ?? null,
             'flags' => $this->handoverDigestFlags($handover),
-            'unread' => true,
+            'unread' => empty($handover['acknowledged_at']),
+            'can_acknowledge' => $handover['can_acknowledge'] ?? false,
             'recorded_at' => $handover['submitted_at'] ?? null,
+            'follow_ups' => $handover['follow_ups'] ?? [],
         ];
     }
 
@@ -670,25 +714,58 @@ class MyTasksController extends Controller
                 ->exists();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Outgoing handover';
 
             return false;
         }
+    }
+
+    private function getHelpRequests(User $user): array
+    {
+        try {
+            return app(ShiftTaskHelpService::class)->inbox($user);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $this->unavailableSections[] = 'Help requests';
+
+            return [];
+        }
+    }
+
+    private function workerShiftPayload(User $user, Shift $shift, ?Carbon $now = null): array
+    {
+        $work = app(ShiftTaskWorkService::class);
+        $clientIds = $work->availableClients($user, $shift)->modelKeys();
+        $shift->setRelation('tasks', $shift->tasks->filter(fn ($task) => $task->task_scope === 'site'
+            || ! ($task->client_id ?? $shift->client_id)
+            || in_array((int) ($task->client_id ?? $shift->client_id), $clientIds, true)
+        )->values());
+        $payload = MyShiftResource::fromShift($shift, $now);
+        if ($shift->client_id && ! in_array((int) $shift->client_id, $clientIds, true)) {
+            $payload['client'] = null;
+        }
+        $canChange = $work->canChange($user, $shift);
+        $payload['tasks'] = array_map(fn ($task) => [...$task, 'can_complete' => $canChange], $payload['tasks']);
+
+        return $payload;
     }
 
     private function getShifts(User $user, Carbon $today, Carbon $tomorrowEnd, Carbon $workerNow): Collection
     {
         try {
             return Shift::where('user_id', $user->id)
+                ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $user))
                 ->visibleToFrontline()
                 ->whereBetween('starts_at', [$today, $tomorrowEnd])
                 ->with(['client:id,first_name,last_name,profile_photo_path', 'serviceContext:id,name', 'tasks'])
                 ->orderBy('starts_at')
                 ->get()
-                ->map(function (Shift $shift) use ($workerNow) {
-                    return MyShiftResource::fromShift($shift, $workerNow);
+                ->map(function (Shift $shift) use ($workerNow, $user) {
+                    return $this->workerShiftPayload($user, $shift, $workerNow);
                 });
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Shifts';
 
             return collect();
         }
@@ -701,6 +778,7 @@ class MyTasksController extends Controller
         bool $canRecordControlled,
         bool $canAccessControlled,
         bool $canOpenEmar,
+        ?Shift $activeShift = null,
     ): array {
         if (empty($clientIds)) {
             return [];
@@ -710,6 +788,16 @@ class MyTasksController extends Controller
             $scheduleService = app(MarScheduleService::class);
             $windowStart = $now->copy()->subHours(2);
             $windowEnd = $now->copy()->addHours(4);
+            if ($activeShift?->starts_at && $activeShift->ends_at) {
+                $windowStart = $activeShift->starts_at->copy()->timezone($this->workerTimezone());
+                if ($activeShift->actual_starts_at?->lt($windowStart)) {
+                    $windowStart = $activeShift->actual_starts_at->copy()->timezone($this->workerTimezone());
+                }
+                $windowEnd = $activeShift->ends_at->copy()->timezone($this->workerTimezone());
+                if ($now->gt($windowEnd)) {
+                    $windowEnd = $now->copy();
+                }
+            }
 
             $medications = ClientMedication::whereIn('client_id', $clientIds)
                 ->active()
@@ -815,6 +903,7 @@ class MyTasksController extends Controller
             return $result;
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Medications';
 
             return [];
         }
@@ -866,6 +955,7 @@ class MyTasksController extends Controller
             return $briefing;
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Next shift';
 
             return null;
         }
@@ -918,6 +1008,7 @@ class MyTasksController extends Controller
             return $summary;
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Previous shift';
 
             return null;
         }
@@ -978,6 +1069,7 @@ class MyTasksController extends Controller
                 ->all();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Some shift information';
 
             return [];
         }
@@ -1051,6 +1143,7 @@ class MyTasksController extends Controller
             ];
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Medication round';
 
             return null;
         }
@@ -1108,6 +1201,7 @@ class MyTasksController extends Controller
             ];
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Lone-worker check-in';
 
             return null;
         }
@@ -1149,6 +1243,7 @@ class MyTasksController extends Controller
                 ->all();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'First-aid follow-ups';
 
             return [];
         }
@@ -1194,6 +1289,7 @@ class MyTasksController extends Controller
                 ->all();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'PPE';
 
             return [];
         }
@@ -1208,7 +1304,7 @@ class MyTasksController extends Controller
      *
      * @return array{total: int, items: array<int, array<string, mixed>>}
      */
-    private function getMyAggregatedTasks(User $user): array
+    private function getMyAggregatedTasks(User $user, array $currentShiftTaskIds = []): array
     {
         try {
             $aggregator = app(TaskAggregator::class);
@@ -1218,7 +1314,8 @@ class MyTasksController extends Controller
                 ['assigned' => 'me'],
             );
             // itemsFor() excludes done items by default; keep a guard anyway.
-            $items = array_values(array_filter($items, fn (TaskItem $i) => $i->bucket !== TaskItem::BUCKET_DONE));
+            $currentIds = array_map(fn ($id) => 'shift_task-'.$id, $currentShiftTaskIds);
+            $items = array_values(array_filter($items, fn (TaskItem $i) => $i->bucket !== TaskItem::BUCKET_DONE && ! in_array($i->id, $currentIds, true)));
 
             return [
                 'total' => count($items),
@@ -1235,19 +1332,22 @@ class MyTasksController extends Controller
             ];
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Other tasks';
 
             return ['total' => 0, 'items' => []];
         }
     }
 
-    private function getTimesheets(int $userId): array
+    private function getTimesheets(User $user): array
     {
         try {
-            return Timesheet::where('user_id', $userId)
+            return Timesheet::where('user_id', $user->id)
+                ->tap(fn ($query) => $this->siteAccess->applyTimesheetScope($query, $user))
                 ->whereIn('status', ['draft', 'submitted', 'returned'])
                 ->with([
                     'client:id,first_name,last_name',
                     'clientAllocations',
+                    'shift.attendanceSessions',
                     // Eligible-client roster for the per-client allocation popup
                     // (residents at the shift's site, plus any explicit group
                     // pivot rows when the dormant schema starts being used).
@@ -1256,41 +1356,25 @@ class MyTasksController extends Controller
                 ->orderByDesc('work_date')
                 ->limit(10)
                 ->get()
-                ->map(function (Timesheet $ts) {
+                ->map(function (Timesheet $ts) use ($user) {
                     $clientName = $ts->client
                         ? trim($ts->client->first_name.' '.$ts->client->last_name)
                         : null;
 
-                    // The popup needs to know which residents/clients the
-                    // worker may attribute time to. Combine the timesheet's
-                    // primary client + the site's residents into a
-                    // deduplicated roster keyed by id.
-                    $candidatesById = [];
-                    if ($ts->client) {
-                        $candidatesById[$ts->client->id] = [
-                            'id' => (int) $ts->client->id,
-                            'name' => $clientName,
-                            'is_primary' => true,
-                        ];
-                    }
-                    $siteClients = $ts->shift?->site?->clients ?? collect();
-                    foreach ($siteClients as $sc) {
-                        if (! isset($candidatesById[$sc->id])) {
-                            $candidatesById[$sc->id] = [
-                                'id' => (int) $sc->id,
-                                'name' => trim($sc->first_name.' '.$sc->last_name),
-                                'is_primary' => false,
-                            ];
-                        }
-                    }
+                    $allocationService = app(TimesheetAllocationService::class);
+                    $candidates = $allocationService->candidates($ts, $user);
+                    $clockRunning = $ts->shift?->attendanceSessions->contains(fn ($session) => (int) $session->user_id === (int) $user->id && $session->clock_out_at === null) ?? false;
 
                     return [
                         'id' => $ts->id,
+                        'shift_id' => $ts->shift_id,
                         'work_date' => Carbon::parse($ts->work_date)->format('D, j M Y'),
                         'work_date_iso' => Carbon::parse($ts->work_date)->toDateString(),
                         'client_name' => $clientName,
                         'client_id' => $ts->client_id,
                         'hours' => $ts->total_hours,
+                        'paid_minutes' => $ts->total_minutes,
+                        'paid_minutes' => $ts->total_minutes,
                         'status' => $ts->status,
                         'return_notes' => $ts->returned_notes,
                         'starts_at' => $ts->starts_at?->toIso8601String(),
@@ -1310,12 +1394,18 @@ class MyTasksController extends Controller
                         'client_allocations' => $ts->effectiveClientAllocations()->all(),
                         'allocation_method' => $ts->dominantAllocationMethod(),
                         // Eligible client roster the worker can attribute time to.
-                        'clients_candidates' => array_values($candidatesById),
+                        'clients_candidates' => $candidates,
+                        'allocation_revision' => $allocationService->revision($ts),
+                        'can_save_allocation' => $user->canDo('timesheets.update') && in_array($ts->status, ['draft', 'returned'], true) && ! $ts->is_protected_from_changes,
+                        'can_submit' => $user->canDo('timesheets.submit') && in_array($ts->status, ['draft', 'returned'], true) && ! $ts->is_protected_from_changes && ! $clockRunning,
+                        'clock_running' => $clockRunning,
+                        'site_name' => $ts->shift?->site?->name ?? $ts->shift_site_name_snapshot,
                     ];
                 })
                 ->all();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Timesheets';
 
             return [];
         }
@@ -1355,6 +1445,7 @@ class MyTasksController extends Controller
                 ->all();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Incidents';
 
             return [];
         }
@@ -1504,6 +1595,7 @@ class MyTasksController extends Controller
                 ->all();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Some shift information';
 
             return [];
         }
@@ -1555,6 +1647,7 @@ class MyTasksController extends Controller
                 ->all();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Some shift information';
 
             return [];
         }
@@ -1592,6 +1685,7 @@ class MyTasksController extends Controller
                 ->all();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Some shift information';
 
             return [];
         }
@@ -1622,6 +1716,7 @@ class MyTasksController extends Controller
                 ->all();
         } catch (\Throwable $e) {
             report($e);
+            $this->unavailableSections[] = 'Updates';
 
             return [];
         }
