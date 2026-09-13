@@ -7,6 +7,7 @@ use App\Domain\Governance\Models\BudgetAdjustment;
 use App\Domain\Governance\Models\BudgetAllocation;
 use App\Domain\Governance\Models\BudgetLineItem;
 use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Models\GovernanceResolutionBinding;
 use App\Domain\Governance\Models\MeetingAgendaItem;
 use App\Domain\Governance\Models\Resolution;
 use App\Models\User;
@@ -356,47 +357,11 @@ class GovernanceNestedMutationService
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $hasSubjectMatch = false;
-
-                // 1. Explicit budget_adjustment_id binding in resolution cost_impact or paper_snapshot
-                if (!empty($resolution->cost_impact['budget_adjustment_id']) && (int) $resolution->cost_impact['budget_adjustment_id'] === (int) $lockedAdjustment->id) {
-                    $hasSubjectMatch = true;
-                } elseif (!empty($resolution->paper_snapshot['cost_impact']['budget_adjustment_id']) && (int) $resolution->paper_snapshot['cost_impact']['budget_adjustment_id'] === (int) $lockedAdjustment->id) {
-                    $hasSubjectMatch = true;
-                }
-                // 2. Explicit budget_id AND budget_line_item_id binding
-                elseif (!empty($resolution->cost_impact['budget_id']) 
-                    && (int) $resolution->cost_impact['budget_id'] === (int) $lockedBudget->id 
-                    && !empty($resolution->cost_impact['budget_line_item_id']) 
-                    && (int) $resolution->cost_impact['budget_line_item_id'] === (int) $lockedAdjustment->budget_line_item_id) {
-                    $hasSubjectMatch = true;
-                }
-                // 3. Exact adjustment reference in motion or title
-                elseif (!empty($lockedAdjustment->adjustment_reference) && (
-                    str_contains($resolution->exact_motion ?? '', $lockedAdjustment->adjustment_reference) ||
-                    str_contains($resolution->title, $lockedAdjustment->adjustment_reference)
-                )) {
-                    $hasSubjectMatch = true;
-                }
-                // 4. Exact match of adjustment reason or line item description within motion or title
-                elseif (
-                    (!empty($lockedAdjustment->reason) && (
-                        str_contains(strtolower($resolution->exact_motion ?? ''), strtolower($lockedAdjustment->reason)) ||
-                        str_contains(strtolower($resolution->title), strtolower($lockedAdjustment->reason))
-                    )) ||
-                    (!empty($lockedLine->description) && (
-                        str_contains(strtolower($resolution->exact_motion ?? ''), strtolower($lockedLine->description)) ||
-                        str_contains(strtolower($resolution->title), strtolower($lockedLine->description))
-                    ))
-                ) {
-                }
-
-                if (! $hasSubjectMatch) {
-                    throw ValidationException::withMessages([
-                        'approval_resolution' => 'The board resolution does not authorize this specific budget adjustment subject.',
-                        'approval_resolution_id' => 'The board resolution does not authorize this specific budget adjustment subject.',
-                    ]);
-                }
+                // Authority is only the explicit binding created while the paper was
+                // a draft: exact adjustment, budget, line, direction, amount and a
+                // fingerprint of the terms voted on. Motion wording, titles, reasons,
+                // line descriptions and JSON hints never confer authority.
+                $this->assertBoundAdjustmentAuthority($actor, $resolution, $lockedBudget, $lockedLine, $lockedAdjustment);
             } else {
                 $lockedLine = $lockedBudget->lineItems()
                     ->whereKey((int) $lockedAdjustment->budget_line_item_id)
@@ -681,6 +646,58 @@ class GovernanceNestedMutationService
         }
 
         return number_format($next, 2, '.', '');
+    }
+
+    private function assertBoundAdjustmentAuthority(
+        User $actor,
+        Resolution $lockedResolution,
+        Budget $lockedBudget,
+        BudgetLineItem $lockedLine,
+        BudgetAdjustment $lockedAdjustment,
+    ): void {
+        $authority = app(GovernanceResolutionAuthorityService::class);
+        $reject = function (string $reason): never {
+            $message = 'The board resolution does not authorize this specific budget adjustment. '.$reason;
+
+            throw ValidationException::withMessages([
+                'approval_resolution' => $message,
+                'approval_resolution_id' => $message,
+            ]);
+        };
+
+        $binding = GovernanceResolutionBinding::query()
+            ->where('resolution_id', $lockedResolution->getKey())
+            ->where('subject_type', GovernanceResolutionBinding::SUBJECT_BUDGET_ADJUSTMENT)
+            ->where('subject_id', $lockedAdjustment->getKey())
+            ->lockForUpdate()
+            ->first();
+
+        if ($binding) {
+            if ((int) $binding->budget_id !== (int) $lockedBudget->getKey()
+                || (int) $binding->budget_line_item_id !== (int) $lockedLine->getKey()) {
+                $reject('The resolution was bound to a different budget line.');
+            }
+
+            if ((string) $binding->direction !== (string) $lockedAdjustment->adjustment_type) {
+                $reject("The resolution approved direction '{$binding->direction}', but the adjustment direction is now '{$lockedAdjustment->adjustment_type}'.");
+            }
+
+            if (GovernanceResolutionAuthorityService::money($binding->amount) !== GovernanceResolutionAuthorityService::money($lockedAdjustment->amount)) {
+                $reject('The resolution was bound to a different amount.');
+            }
+        }
+
+        try {
+            $authority->verifyAndConsume(
+                $lockedResolution,
+                GovernanceResolutionBinding::SUBJECT_BUDGET_ADJUSTMENT,
+                (int) $lockedAdjustment->getKey(),
+                $authority->budgetAdjustmentTerms($lockedAdjustment),
+                (int) $actor->getKey(),
+            );
+        } catch (\DomainException $exception) {
+            $reject($exception->getMessage());
+        }
     }
 
     private function assertSubmittedAdjustment(BudgetAdjustment $adjustment): void

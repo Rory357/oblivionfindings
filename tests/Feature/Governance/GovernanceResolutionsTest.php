@@ -369,5 +369,213 @@ class GovernanceResolutionsTest extends TestCase
         $response->assertRedirect();
         $response->assertSessionHas('success', 'Voting opened.');
     }
+
+    // ── Decisions & actions hub: one wizard for authoring and editing ──────
+
+    public function test_create_page_redirects_to_the_register_wizard_with_the_meeting_preselected(): void
+    {
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin);
+
+        $this->actingAs($admin)
+            ->get("/governance/resolutions/create?meeting_id={$meeting->id}")
+            ->assertRedirect("/governance/resolutions?create=1&meeting_id={$meeting->id}");
+
+        $this->actingAs($admin)
+            ->get('/governance/resolutions/create')
+            ->assertRedirect('/governance/resolutions?create=1');
+
+        $member = $this->createUserWithRole('board_member');
+        $this->createBoardMember($member);
+        $this->actingAs($member)->get('/governance/resolutions/create')->assertForbidden();
+    }
+
+    public function test_register_carries_wizard_options_only_for_paper_authors(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->createMeeting($admin);
+
+        $this->actingAs($admin)
+            ->get('/governance/resolutions?create=1')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Resolutions/Index')
+                ->where('can_create', true)
+                ->where('can_publish', true)
+                ->has('meetings', 1)
+                ->has('committees')
+                ->has('users')
+                ->has('authoritySubjects')
+                ->where('authoritySubjectGroups', fn ($groups) => collect($groups)
+                    ->every(fn ($group) => in_array($group['subject_type'], \App\Domain\Governance\Models\GovernanceResolutionBinding::SUBJECT_TYPES, true))));
+
+        $member = $this->createUserWithRole('board_member');
+        $this->createBoardMember($member);
+
+        $this->actingAs($member)
+            ->get('/governance/resolutions')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('can_create', false)
+                ->where('authoritySubjects', null)
+                ->has('users', 0)
+                ->has('authoritySubjectGroups', 0));
+    }
+
+    public function test_register_filters_and_summary_reflect_the_query(): void
+    {
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin);
+        $this->createResolution($admin, ['title' => 'Draft fleet paper', 'status' => 'draft']);
+        $this->createResolution($admin, ['title' => 'Carried housing paper', 'status' => 'closed', 'outcome' => 'carried', 'governance_meeting_id' => $meeting->id]);
+
+        $this->actingAs($admin)
+            ->get('/governance/resolutions?status=draft')
+            ->assertInertia(fn ($page) => $page
+                ->where('filters.status', 'draft')
+                ->has('resolutions.data', 1)
+                ->where('resolutions.data.0.title', 'Draft fleet paper')
+                ->where('summary.total', 2)
+                ->where('summary.draft', 1)
+                ->where('summary.carried', 1));
+
+        $this->actingAs($admin)
+            ->get("/governance/resolutions?outcome=carried&meeting={$meeting->id}&search=housing")
+            ->assertInertia(fn ($page) => $page
+                ->where('filters.outcome', 'carried')
+                ->where('filters.meeting', (string) $meeting->id)
+                ->has('resolutions.data', 1)
+                ->where('resolutions.data.0.title', 'Carried housing paper'));
+    }
+
+    public function test_show_presents_attachments_without_storage_paths_and_edit_options_only_while_editable(): void
+    {
+        $admin = $this->createAdminUser();
+        $draft = $this->createResolution($admin, [
+            'attachments' => [[
+                'id' => 'att-1',
+                'path' => 'governance/resolutions/secret-storage-location/contract.pdf',
+                'original_name' => 'contract.pdf',
+                'mime_type' => 'application/pdf',
+            ]],
+        ]);
+
+        $response = $this->actingAs($admin)->get("/governance/resolutions/{$draft->id}?edit=1");
+        $response->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Resolutions/Show')
+                ->where('can_manage', true)
+                ->where('attachments.0.original_name', 'contract.pdf')
+                ->missing('attachments.0.path')
+                ->missing('resolution.attachments')
+                ->has('authoritySubjects')
+                ->has('authoritySubjectGroups')
+                ->has('committees'));
+        $this->assertStringNotContainsString('secret-storage-location', $response->getContent());
+
+        $open = $this->createResolution($admin, [
+            'status' => 'open',
+            'paper_snapshot' => [
+                'version_number' => 1,
+                'attachments' => [['id' => 'att-2', 'path' => 'governance/resolutions/frozen-secret-path/brief.pdf', 'original_name' => 'brief.pdf']],
+            ],
+        ]);
+
+        $openResponse = $this->actingAs($admin)->get("/governance/resolutions/{$open->id}");
+        $openResponse->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('can_manage', false)
+                ->where('can_close_voting', true)
+                ->where('authoritySubjects', null)
+                ->has('meetings', 0)
+                ->where('paper_snapshot.attachments.0.original_name', 'brief.pdf')
+                ->missing('paper_snapshot.attachments.0.path')
+                ->missing('resolution.paper_snapshot'));
+        $this->assertStringNotContainsString('frozen-secret-path', $openResponse->getContent());
+    }
+
+    public function test_wizard_authoring_stays_in_context_and_reports_an_unpublishable_paper_honestly(): void
+    {
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin);
+        $meetingUrl = "/governance/meetings/{$meeting->id}?tab=resolutions";
+
+        $this->actingAs($admin)
+            ->from($meetingUrl)
+            ->post('/governance/resolutions', [
+                'title' => 'Incomplete paper from the meeting',
+                'meeting_id' => $meeting->id,
+                'publish_now' => true,
+                '_modal' => true,
+            ])
+            ->assertRedirect($meetingUrl)
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('resolutions', [
+            'title' => 'Incomplete paper from the meeting',
+            'governance_meeting_id' => $meeting->id,
+            'status' => 'draft',
+        ]);
+    }
+
+    public function test_publishing_from_the_wizard_requires_the_open_voting_ability(): void
+    {
+        // A CEO may author papers (policy) once given the register permissions,
+        // but opening voting is reserved to the chair, secretary and admins.
+        $ceo = $this->createUserWithRole('ceo');
+        foreach (['governance.resolutions.view', 'governance.resolutions.manage'] as $key) {
+            $permission = \App\Models\Permission::query()->where('key', $key)->firstOrFail();
+            $ceo->permissionOverrides()->sync([$permission->id => ['allowed' => true]], false);
+        }
+
+        $payload = [
+            'title' => 'CEO-authored decision paper',
+            'exact_motion' => 'That the board approves the proposal.',
+            'context' => 'Background for the proposal.',
+            'purpose' => 'decision',
+            'options' => [
+                ['label' => 'Approve', 'description' => 'Proceed'],
+                ['label' => 'Decline', 'description' => 'Do not proceed'],
+            ],
+            'recommendation' => 'Approve.',
+            'cost_impact' => ['has_cost' => false],
+            'service_user_implications' => 'None.',
+            'risk_equity_implications' => 'None.',
+            'publish_now' => true,
+            '_modal' => true,
+        ];
+
+        $this->actingAs($ceo)
+            ->get('/governance/resolutions')
+            ->assertInertia(fn ($page) => $page
+                ->where('can_create', true)
+                ->where('can_publish', false));
+
+        $this->actingAs($ceo)
+            ->from('/governance/resolutions')
+            ->post('/governance/resolutions', $payload)
+            ->assertRedirect('/governance/resolutions')
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('resolutions', ['title' => 'CEO-authored decision paper', 'status' => 'draft']);
+    }
+
+    public function test_inertia_edit_with_a_stale_version_reports_the_conflict_in_the_wizard(): void
+    {
+        $admin = $this->createAdminUser();
+        $resolution = $this->createResolution($admin, ['version_number' => 4]);
+
+        $this->actingAs($admin)
+            ->from("/governance/resolutions/{$resolution->id}")
+            ->withHeaders(['X-Inertia' => 'true'])
+            ->put("/governance/resolutions/{$resolution->id}", [
+                'title' => 'Edited from a stale tab',
+                'expected_version' => 3,
+            ])
+            ->assertSessionHasErrors('expected_version');
+
+        $this->assertSame(4, $resolution->fresh()->version_number);
+        $this->assertNotSame('Edited from a stale tab', $resolution->fresh()->title);
+    }
 }
 

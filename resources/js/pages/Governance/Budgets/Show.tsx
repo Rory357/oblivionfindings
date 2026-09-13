@@ -1,5 +1,7 @@
+import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
 import {
     PageHeader,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -71,6 +73,7 @@ import {
     Wallet,
 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
+import { BudgetWizardDialog } from './_dialogs';
 
 interface LineItem {
     id: number;
@@ -92,6 +95,11 @@ interface CarriedResolution {
     title: string;
     outcome: string | null;
     cost_impact?: { amount?: number; currency?: string } | null;
+    authority_bindings?: {
+        subject_type: string;
+        subject_id: number;
+        consumed_at: string | null;
+    }[];
 }
 
 interface Adjustment {
@@ -184,6 +192,9 @@ export default function BudgetShow({
     const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
     const [actualsDialogOpen, setActualsDialogOpen] = useState(false);
     const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
+    // Edit wizard (replaces the retired edit page); `/edit` deep links land
+    // here with ?edit=1.
+    const [editOpen, setEditOpen] = useDialogDeepLink('edit', canEdit);
 
     const lineItemForm = useForm({
         category: 'operations',
@@ -205,12 +216,14 @@ export default function BudgetShow({
         notes: '',
     });
 
+    // No resolution is attached while requesting: a decision paper can only
+    // be bound to an adjustment that already exists, so board approval is
+    // applied from the adjustment row once its bound paper is carried.
     const adjustmentForm = useForm({
         budget_line_item_id: '',
         adjustment_type: 'increase',
         amount: '',
         reason: '',
-        approval_resolution_id: '',
     });
 
     const allocationForm = useForm({
@@ -398,6 +411,18 @@ export default function BudgetShow({
         );
     };
 
+    // Only a carried resolution explicitly bound to this exact adjustment
+    // (and not yet used) can approve it.
+    const boundResolutionsFor = (adjustmentId: number) =>
+        carriedResolutions.filter((res) =>
+            (res.authority_bindings ?? []).some(
+                (binding) =>
+                    binding.subject_type === 'budget_adjustment' &&
+                    binding.subject_id === adjustmentId &&
+                    !binding.consumed_at,
+            ),
+        );
+
     const pendingAdjustments = (budget.adjustments || []).filter(
         (a) => a.status === 'submitted',
     );
@@ -476,14 +501,12 @@ export default function BudgetShow({
                         actions={
                             <>
                                 {canEdit && (
-                                    <Button variant="outline" asChild>
-                                        <Link
-                                            href={`/governance/budgets/${budget.id}/edit`}
-                                        >
-                                            <Pencil className="mr-1 h-4 w-4" />
-                                            Edit
-                                        </Link>
-                                    </Button>
+                                    <PageHeaderGlassButton
+                                        icon={Pencil}
+                                        onClick={() => setEditOpen(true)}
+                                    >
+                                        Edit budget
+                                    </PageHeaderGlassButton>
                                 )}
                                 {canPropose &&
                                     (budget.line_items || []).length > 0 && (
@@ -587,8 +610,9 @@ export default function BudgetShow({
                     />
                 }
             >
+                <div className="flex flex-col gap-5">
                 {/* Summary Cards */}
-                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-5">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-5">
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
@@ -697,7 +721,7 @@ export default function BudgetShow({
 
                 {/* Approval / Resolution Banner */}
                 {budget.status === 'approved' && budget.approval_resolution && (
-                    <Card className="mb-6 border-status-success/30 bg-status-success-bg">
+                    <Card className="border-status-success/30 bg-status-success-bg">
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
                                 <CheckCircle className="h-6 w-6 text-status-success" />
@@ -720,7 +744,7 @@ export default function BudgetShow({
                     </Card>
                 )}
                 {budget.status === 'proposed' && budget.approval_resolution && (
-                    <Card className="mb-6 border-status-warning/30 bg-status-warning-bg">
+                    <Card className="border-status-warning/30 bg-status-warning-bg">
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -755,7 +779,7 @@ export default function BudgetShow({
                 )}
 
                 {/* Tabs */}
-                <Tabs defaultValue="line-items" className="space-y-6">
+                <Tabs defaultValue="line-items" className="flex flex-col gap-5">
                     <TabsList>
                         <TabsTrigger value="line-items">
                             Line Items ({(budget.line_items || []).length})
@@ -1527,63 +1551,14 @@ export default function BudgetShow({
                                                             ).toFixed(2)}
                                                             ) and requires a
                                                             carried board
-                                                            resolution.
+                                                            resolution. After
+                                                            you submit, bind a
+                                                            decision paper to
+                                                            this adjustment;
+                                                            once it is carried,
+                                                            apply it from the
+                                                            adjustment row.
                                                         </p>
-                                                        {carriedResolutions.length >
-                                                            0 && (
-                                                            <div className="mt-2">
-                                                                <Label className="text-xs">
-                                                                    Attach
-                                                                    Carried
-                                                                    Resolution
-                                                                    (optional)
-                                                                </Label>
-                                                                <Select
-                                                                    value={
-                                                                        adjustmentForm
-                                                                            .data
-                                                                            .approval_resolution_id ||
-                                                                        undefined
-                                                                    }
-                                                                    onValueChange={(
-                                                                        v,
-                                                                    ) =>
-                                                                        adjustmentForm.setData(
-                                                                            'approval_resolution_id',
-                                                                            v,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <SelectTrigger className="h-8 text-xs">
-                                                                        <SelectValue placeholder="Select carried resolution..." />
-                                                                    </SelectTrigger>
-                                                                    <SelectContent>
-                                                                        {carriedResolutions.map(
-                                                                            (
-                                                                                res,
-                                                                            ) => (
-                                                                                <SelectItem
-                                                                                    key={
-                                                                                        res.id
-                                                                                    }
-                                                                                    value={String(
-                                                                                        res.id,
-                                                                                    )}
-                                                                                >
-                                                                                    {
-                                                                                        res.resolution_reference
-                                                                                    }{' '}
-                                                                                    —{' '}
-                                                                                    {
-                                                                                        res.title
-                                                                                    }
-                                                                                </SelectItem>
-                                                                            ),
-                                                                        )}
-                                                                    </SelectContent>
-                                                                </Select>
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 )}
                                                 <p className="text-xs text-muted-foreground">
@@ -1733,7 +1708,7 @@ export default function BudgetShow({
                                                                                     Board decision required
                                                                                 </Link>
                                                                             </Button>
-                                                                            {carriedResolutions.length > 0 && (
+                                                                            {boundResolutionsFor(adj.id).length > 0 && (
                                                                                 <Select
                                                                                     onValueChange={(val) =>
                                                                                         approveAdjustment(
@@ -1746,7 +1721,7 @@ export default function BudgetShow({
                                                                                         <SelectValue placeholder="Apply carried resolution..." />
                                                                                     </SelectTrigger>
                                                                                     <SelectContent>
-                                                                                        {carriedResolutions.map(
+                                                                                        {boundResolutionsFor(adj.id).map(
                                                                                             (res) => (
                                                                                                 <SelectItem
                                                                                                     key={res.id}
@@ -2623,7 +2598,26 @@ export default function BudgetShow({
                         </form>
                     </DialogContent>
                 </Dialog>
+                </div>
             </PageLayout>
+
+            {canEdit ? (
+                <BudgetWizardDialog
+                    isOpen={editOpen}
+                    onClose={() => setEditOpen(false)}
+                    options={{ categories }}
+                    budget={{
+                        id: budget.id,
+                        fiscal_year: budget.fiscal_year,
+                        title: budget.title,
+                        description: budget.description,
+                        total_budget: budget.total_budget,
+                        status: budget.status,
+                        version_number: budget.version_number,
+                        line_items: budget.line_items ?? [],
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }

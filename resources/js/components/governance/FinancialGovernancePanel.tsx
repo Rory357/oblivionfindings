@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -10,6 +9,8 @@ import {
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import { ArrowRight, Building2, DollarSign, HandCoins } from 'lucide-react';
+
+import { CockpitCardStatus } from './CockpitCardStatus';
 
 interface CockpitCardMetric {
     label: string;
@@ -38,15 +39,6 @@ const TONE_VALUE: Record<string, string> = {
     critical: 'text-status-critical',
     warning: 'text-status-warning',
     muted: 'text-muted-foreground',
-};
-
-const STATUS_BADGE: Record<string, string> = {
-    critical:
-        'border-status-critical/30 bg-status-critical-bg text-status-critical',
-    warning:
-        'border-status-warning/30 bg-status-warning-bg text-status-warning',
-    good: 'border-status-success/30 bg-status-success-bg text-status-success',
-    unknown: 'border-border bg-muted text-muted-foreground',
 };
 
 function MiniBlock({
@@ -82,14 +74,7 @@ function MiniBlock({
                         </p>
                     </div>
                 </div>
-                <Badge
-                    className={cn(
-                        'border text-[10px] uppercase',
-                        STATUS_BADGE[card.status] ?? STATUS_BADGE.unknown,
-                    )}
-                >
-                    {card.status}
-                </Badge>
+                <CockpitCardStatus status={card.status} />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -146,7 +131,9 @@ export function FinancialGovernancePanel({
     return (
         <Card data-dusk="cockpit-financial">
             <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Financial Governance</CardTitle>
+                <CardTitle className="text-section-title">
+                    Financial Governance
+                </CardTitle>
                 <CardDescription>
                     Budget posture, spend approvals, and items requiring board
                     sign-off.

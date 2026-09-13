@@ -8,13 +8,13 @@ import {
     ChevronRight,
     Copy,
     ExternalLink,
-    Inbox,
     ListChecks,
     Search,
     Vote as VoteIcon,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
+import { GovernanceHomeRail } from '@/components/governance/GovernanceHomeRail';
 import {
     EntityTable,
     type EntityTableColumn,
@@ -26,13 +26,11 @@ import {
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
-    PageHeaderRail,
     PageHeaderSearch,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -41,8 +39,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
+import {
+    formatDateOnly,
+    formatDateTimeLong,
+    toDateInput,
+} from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { PageProps } from '@/types';
 
@@ -148,6 +152,30 @@ function getKindIcon(kind: string) {
     }
 }
 
+const KIND_BADGE: Record<string, { label: string; variant: StatusVariant }> = {
+    vote: { label: 'Vote', variant: 'warning' },
+    read: { label: 'Read', variant: 'info' },
+    act: { label: 'Act', variant: 'critical' },
+    know: { label: 'Know', variant: 'neutral' },
+};
+
+const WORK_STATUS_BADGE: Record<string, { label: string; variant: StatusVariant }> = {
+    pending: { label: 'Pending', variant: 'neutral' },
+    due_soon: { label: 'Due soon', variant: 'warning' },
+    overdue: { label: 'Overdue', variant: 'critical' },
+    blocked: { label: 'Blocked', variant: 'critical' },
+    completed: { label: 'Completed', variant: 'success' },
+};
+
+/** Whole days between two YYYY-MM-DD calendar dates (no timezone drift). */
+function calendarDayDiff(from: string, to: string): number {
+    const toUtc = (value: string) => {
+        const [y, m, d] = value.split('-').map(Number);
+        return Date.UTC(y, (m ?? 1) - 1, d ?? 1);
+    };
+    return Math.round((toUtc(to) - toUtc(from)) / 86_400_000);
+}
+
 function formatDueDate(dueDateString: string | null | undefined): {
     text: string;
     tone: 'critical' | 'warning' | 'neutral';
@@ -156,15 +184,10 @@ function formatDueDate(dueDateString: string | null | undefined): {
         return { text: 'No deadline', tone: 'neutral' };
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const due = new Date(dueDateString);
-    due.setHours(0, 0, 0, 0);
-
-    const diffDays = Math.round(
-        (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-    );
+    // Compare Auckland calendar dates — parsing YYYY-MM-DD with `new Date()`
+    // shifts the day in non-NZ browser timezones.
+    const dueDay = dueDateString.substring(0, 10);
+    const diffDays = calendarDayDiff(toDateInput(new Date()), dueDay);
 
     if (diffDays < 0) {
         const overdueDays = Math.abs(diffDays);
@@ -183,10 +206,18 @@ function formatDueDate(dueDateString: string | null | undefined): {
         return { text: `Due in ${diffDays}d`, tone: 'warning' };
     }
     return {
-        text: dueDateString.substring(0, 10),
+        text: formatDateOnly(dueDay, dueDay),
         tone: 'neutral',
     };
 }
+
+const KIND_OPTIONS = (totals: GovernanceWorkFeed['totals']) => [
+    { value: 'all', label: `All work (${totals.all})` },
+    { value: 'vote', label: `Vote (${totals.vote})` },
+    { value: 'read', label: `Read (${totals.read})` },
+    { value: 'act', label: `Act (${totals.act})` },
+    { value: 'know', label: `Know (${totals.know})` },
+];
 
 export default function MyWorkIndex({ auth, feed, filters }: Props) {
     const [searchQuery, setSearchQuery] = useState(filters.search ?? '');
@@ -266,25 +297,14 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
             label: 'Kind',
             width: '95px',
             cell: (row) => {
-                const label = row.kind.toUpperCase();
-                const variant =
-                    row.kind === 'vote'
-                        ? 'border-purple-300/40 bg-purple-500/10 text-purple-700 dark:text-purple-300'
-                        : row.kind === 'read'
-                          ? 'border-blue-300/40 bg-blue-500/10 text-blue-700 dark:text-blue-300'
-                          : row.kind === 'act'
-                            ? 'border-amber-300/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
-                            : 'border-slate-300/40 bg-slate-500/10 text-slate-700 dark:text-slate-300';
+                const meta = KIND_BADGE[row.kind] ?? {
+                    label: row.kind,
+                    variant: 'neutral' as const,
+                };
                 return (
-                    <Badge
-                        variant="outline"
-                        className={cn(
-                            'text-[11px] font-medium tracking-wide uppercase',
-                            variant,
-                        )}
-                    >
-                        {label}
-                    </Badge>
+                    <StatusBadge size="sm" variant={meta.variant}>
+                        {meta.label}
+                    </StatusBadge>
                 );
             },
         },
@@ -322,21 +342,23 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
             width: '160px',
             cell: (row) => {
                 const isBlocked = row.status === 'blocked';
-                const colorClass = governanceStatusColor(row.status);
+                const meta = WORK_STATUS_BADGE[row.status] ?? {
+                    label: row.status.replace(/_/g, ' '),
+                    variant: 'neutral' as const,
+                };
                 const blockerReason =
                     row.required_action?.blocked_reason ||
                     (isBlocked ? 'Awaiting prerequisites' : null);
 
                 return (
                     <div className="flex flex-col gap-0.5">
-                        <span
-                            className={cn(
-                                'inline-flex w-fit items-center rounded-md border px-2 py-0.5 text-[11px] font-medium',
-                                colorClass,
-                            )}
+                        <StatusBadge
+                            size="sm"
+                            variant={meta.variant}
+                            className="w-fit"
                         >
-                            {row.status.replace(/_/g, ' ')}
-                        </span>
+                            {meta.label}
+                        </StatusBadge>
                         {isBlocked && blockerReason && (
                             <span
                                 className="max-w-[150px] truncate text-[10.5px] text-status-critical"
@@ -463,15 +485,32 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                         variant="index"
                         icon={ListChecks}
                         title="My work"
+                        titleDusk="governance-my-work-heading"
                         titleChip={
-                            <span
-                                dusk="governance-my-work-heading"
-                                className="hidden"
-                            >
-                                My work
-                            </span>
+                            feed.totals.overdue > 0 ? (
+                                <PageHeaderStatusChip variant="critical">
+                                    {feed.totals.overdue} overdue
+                                </PageHeaderStatusChip>
+                            ) : feed.totals.pending > 0 ? (
+                                <PageHeaderStatusChip variant="warning">
+                                    {feed.totals.pending} pending
+                                </PageHeaderStatusChip>
+                            ) : (
+                                <PageHeaderStatusChip variant="success">
+                                    Up to date
+                                </PageHeaderStatusChip>
+                            )
                         }
-                        subline="Your board decisions, reading and follow-up"
+                        subline={[
+                            'Your board decisions, reading and follow-up',
+                            `${feed.totals.pending} pending`,
+                            `${feed.totals.completed} completed with receipts`,
+                            unavailableSources.length > 0
+                                ? 'Some sources unavailable'
+                                : null,
+                        ]
+                            .filter(Boolean)
+                            .join(' · ')}
                         actions={
                             <form
                                 onSubmit={handleSearchSubmit}
@@ -552,10 +591,38 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                                             : `${feed.totals.know} updates`}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Completed"
+                                    href="/governance/my-work?status=completed"
+                                    tone={
+                                        feed.totals.completed > 0
+                                            ? 'success'
+                                            : 'brand'
+                                    }
+                                    ariaLabel="View completed work and receipts"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {feed.totals.completed}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {feed.totals.completed === 1
+                                            ? '1 receipt'
+                                            : `${feed.totals.completed} receipts`}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
                             </>
                         }
                         filters={
                             <div className="flex flex-wrap items-center gap-2">
+                                <PageHeaderFilterSelect
+                                    icon={ListChecks}
+                                    label="Kind"
+                                    value={currentKind}
+                                    options={KIND_OPTIONS(feed.totals)}
+                                    onChange={(val) =>
+                                        applyFilters({ kind: val, page: 1 })
+                                    }
+                                />
                                 <PageHeaderFilterSelect
                                     label="Status"
                                     value={currentStatus}
@@ -598,55 +665,30 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                             </div>
                         }
                         rail={
-                            <PageHeaderRail
-                                items={[
-                                    {
-                                        key: 'all',
-                                        label: 'All work',
-                                        count: feed.totals.all,
-                                    },
-                                    {
-                                        key: 'vote',
-                                        label: 'Vote',
-                                        count: feed.totals.vote,
-                                    },
-                                    {
-                                        key: 'read',
-                                        label: 'Read',
-                                        count: feed.totals.read,
-                                    },
-                                    {
-                                        key: 'act',
-                                        label: 'Act',
-                                        count: feed.totals.act,
-                                    },
-                                    {
-                                        key: 'know',
-                                        label: 'Know',
-                                        count: feed.totals.know,
-                                    },
-                                ]}
-                                value={currentKind}
-                                onSelect={(key) =>
-                                    applyFilters({ kind: key, page: 1 })
-                                }
+                            <GovernanceHomeRail
+                                value="my-work"
+                                myWorkCount={feed.totals.pending}
                             />
                         }
                     />
                 }
             >
-                <div className="space-y-4">
+                <div className="flex flex-col gap-5">
                     {/* Source availability banner if any source failed */}
                     {unavailableSources.length > 0 && (
                         <div
+                            role="alert"
                             data-dusk="source-unavailable-banner"
-                            className="flex items-center gap-3 rounded-lg border border-amber-300/40 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200"
+                            className="flex items-center gap-3 rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-sm text-status-warning"
                         >
-                            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                            <AlertTriangle
+                                className="size-5 shrink-0"
+                                aria-hidden="true"
+                            />
                             <div>
                                 <span className="font-semibold">
-                                    Notice: Some source systems could not be
-                                    reached ({unavailableSources.join(', ')}).
+                                    Some source systems could not be reached (
+                                    {unavailableSources.join(', ')}).
                                 </span>{' '}
                                 Your work list may be incomplete. Missing
                                 records from unavailable sources are not marked
@@ -657,49 +699,41 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
 
                     {/* Work feed table or empty states */}
                     {feed.items.length === 0 ? (
-                        <Card className="rounded-[14px] p-12 text-center">
-                            <CardContent className="flex flex-col items-center justify-center space-y-3">
-                                {isFiltered ? (
-                                    <>
-                                        <div className="rounded-full bg-muted p-4">
-                                            <Search className="h-8 w-8 text-muted-foreground" />
-                                        </div>
-                                        <h3 className="text-base font-semibold text-foreground">
-                                            No results for these filters
-                                        </h3>
-                                        <p className="max-w-md text-sm text-muted-foreground">
-                                            No personal obligations match the
-                                            selected kind, status, or search
-                                            criteria.
-                                        </p>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                setSearchQuery('');
-                                                router.get('/governance/my-work');
-                                            }}
-                                        >
-                                            Reset filters
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="rounded-full bg-status-success-bg p-4 text-status-success">
-                                            <CheckCircle2 className="h-8 w-8" />
-                                        </div>
-                                        <h3 className="text-base font-semibold text-foreground">
-                                            Nothing pending for you
-                                        </h3>
-                                        <p className="max-w-md text-sm text-muted-foreground">
-                                            You are completely caught up on all
-                                            board votes, required reading, and
-                                            assigned action items.
-                                        </p>
-                                    </>
-                                )}
-                            </CardContent>
-                        </Card>
+                        isFiltered ? (
+                            <EmptyState
+                                icon={Search}
+                                title="No results for these filters"
+                                description="No personal obligations match the selected kind, status, due date or search."
+                                action={
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearchQuery('');
+                                            router.get('/governance/my-work');
+                                        }}
+                                    >
+                                        Reset filters
+                                    </Button>
+                                }
+                            />
+                        ) : unavailableSources.length > 0 ? (
+                            <EmptyState
+                                icon={AlertTriangle}
+                                title="Nothing found in the sources that loaded"
+                                description="Some sources could not be reached, so obligations from them are not shown. Try again shortly."
+                            />
+                        ) : (
+                            <EmptyState
+                                icon={CheckCircle2}
+                                title="Nothing pending for you"
+                                description={
+                                    feed.totals.completed > 0
+                                        ? `No votes, reading or assigned actions are waiting on you. ${feed.totals.completed} completed ${feed.totals.completed === 1 ? 'item has a receipt' : 'items have receipts'} under Completed.`
+                                        : 'No votes, reading or assigned actions are waiting on you.'
+                                }
+                            />
+                        )
                     ) : (
                         <>
                             <EntityTable<GovernanceWorkItemData>
@@ -846,11 +880,23 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                                         </span>
                                         <div className="mt-0.5 text-foreground font-medium">
                                             {selectedReceiptItem.receipt
-                                                ?.completed_at
-                                                ? new Date(
-                                                      selectedReceiptItem.receipt.completed_at,
-                                                  ).toLocaleString()
-                                                : 'Confirmed'}
+                                                ?.completed_at ? (
+                                                <time
+                                                    dateTime={
+                                                        selectedReceiptItem
+                                                            .receipt
+                                                            .completed_at
+                                                    }
+                                                >
+                                                    {formatDateTimeLong(
+                                                        selectedReceiptItem
+                                                            .receipt
+                                                            .completed_at,
+                                                    )}
+                                                </time>
+                                            ) : (
+                                                'Confirmed'
+                                            )}
                                         </div>
                                     </div>
                                 </div>

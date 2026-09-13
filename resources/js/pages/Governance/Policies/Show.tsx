@@ -1,11 +1,18 @@
+import { Head, router, useForm } from '@inertiajs/react';
+import { BookOpen, CheckCircle, Pencil, Shield } from 'lucide-react';
+import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import { ProgressValue } from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -15,33 +22,30 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
-import { cn } from '@/lib/utils';
+import { formatDateOnly, formatDateLong } from '@/lib/datetime';
 import { PageProps } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { BookOpen, CheckCircle, Shield } from 'lucide-react';
+
+import {
+    POLICY_STATUS_VARIANT,
+    PolicyWizardDialog,
+    policyCategoryLabel,
+    policyStatusLabel,
+    type PolicyWizardRecord,
+} from './_dialogs';
 
 interface Attestation {
     id: number;
-    user: { id: number; name: string };
+    user: { id: number | null; name: string };
     version: number;
-    attested_at: string;
+    attested_at: string | null;
     notes: string | null;
 }
 
-interface Policy {
-    id: number;
-    title: string;
-    category: string;
-    description: string | null;
-    content: string;
+interface Policy extends PolicyWizardRecord {
     version: number;
-    status: string;
-    effective_date: string;
-    review_date: string;
-    requires_attestation: boolean;
     approved_by_user: { name: string } | null;
     approved_at: string | null;
     attestations: Attestation[];
@@ -53,32 +57,66 @@ interface Props extends PageProps {
     canEdit: boolean;
 }
 
+function DetailRow({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="flex justify-between gap-4">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="text-right">{value}</span>
+        </div>
+    );
+}
+
 export default function PolicyShow({
     auth,
     policy,
     attestationStats,
     canEdit,
 }: Props) {
+    const [editOpen, setEditOpen] = useDialogDeepLink('edit', canEdit);
     const attestForm = useForm({ acknowledged: false, notes: '' });
+    const today = new Date().toISOString().split('T')[0];
+
+    const isActive = policy.status === 'active';
+    const reviewOverdue = Boolean(
+        isActive && policy.review_date && policy.review_date < today,
+    );
+    const myAttestation = policy.attestations.find(
+        (a) => a.user.id === auth.user.id,
+    );
+    const attestPercent =
+        attestationStats.total_required > 0
+            ? (attestationStats.completed / attestationStats.total_required) *
+              100
+            : 0;
 
     const handleAttest = (e: React.FormEvent) => {
         e.preventDefault();
-        attestForm.post(`/governance/policies/${policy.id}/attest`);
+        attestForm.post(`/governance/policies/${policy.id}/attest`, {
+            preserveScroll: true,
+            onSuccess: () => attestForm.reset(),
+        });
     };
 
-    const handleApprove = () => {
-        router.post(`/governance/policies/${policy.id}/approve`);
-    };
+    const handleApprove = () =>
+        router.post(
+            `/governance/policies/${policy.id}/approve`,
+            {},
+            { preserveScroll: true },
+        );
 
-    const getStatusColor = (status: string) => governanceStatusColor(status);
+    const closeEdit = () => setEditOpen(false);
 
     return (
         <AppLayout
+            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Policies', href: '/governance/policies' },
-                { title: policy.title, href: `/governance/policies/${policy.id}` },
+                {
+                    title: policy.title,
+                    href: `/governance/policies/${policy.id}`,
+                },
             ]}
         >
             <Head title={policy.title} />
@@ -90,116 +128,135 @@ export default function PolicyShow({
                         icon={BookOpen}
                         title={policy.title}
                         titleDusk="policy-heading"
+                        wrapTitle
                         titleChip={
-                            <div className="flex items-center gap-1.5">
-                                <Badge variant="outline">
-                                    v{policy.version}
-                                </Badge>
-                                <Badge
-                                    className={cn(
-                                        'text-xs',
-                                        getStatusColor(policy.status),
-                                    )}
-                                >
-                                    {policy.status.replace('_', ' ')}
-                                </Badge>
-                            </div>
+                            <PageHeaderStatusChip
+                                variant={
+                                    POLICY_STATUS_VARIANT[policy.status] ??
+                                    'neutral'
+                                }
+                            >
+                                {policyStatusLabel(policy.status)}
+                            </PageHeaderStatusChip>
                         }
-                        subline={`${policy.category} policy · Review: ${new Date(policy.review_date).toLocaleDateString('en-NZ')}`}
+                        subline={`${policyCategoryLabel(policy.category)} policy · Version ${policy.version} · Review ${formatDateOnly(policy.review_date)}`}
+                        actions={
+                            <>
+                                {canEdit ? (
+                                    <PageHeaderGlassButton
+                                        icon={Pencil}
+                                        onClick={() => setEditOpen(true)}
+                                    >
+                                        Edit
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                {canEdit && policy.status === 'draft' ? (
+                                    <PageHeaderPrimaryButton
+                                        icon={Shield}
+                                        onClick={handleApprove}
+                                    >
+                                        Approve
+                                    </PageHeaderPrimaryButton>
+                                ) : null}
+                            </>
+                        }
                         meters={
                             <>
                                 <PageHeaderMeterBlock
                                     label="Status"
-                                    href={`/governance/policies/${policy.id}`}
+                                    ariaLabel={`View ${policyStatusLabel(policy.status).toLowerCase()} policies`}
+                                    href={`/governance/policies?status=${policy.status}`}
                                 >
                                     <PageHeaderMeterBig>
-                                        <span className="capitalize">
-                                            {policy.status.replace('_', ' ')}
-                                        </span>
+                                        {policyStatusLabel(policy.status)}
                                     </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Lifecycle</PageHeaderMeterCaption>
+                                    <PageHeaderMeterCaption>
+                                        {policy.approved_by_user
+                                            ? `Approved by ${policy.approved_by_user.name}`
+                                            : 'Not yet approved'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                {policy.requires_attestation ? (
+                                    <PageHeaderMeterBlock
+                                        label="Attestations"
+                                        value={`${attestationStats.completed}/${attestationStats.total_required}`}
+                                        ariaLabel="View policy attestations"
+                                        href="/governance/policies/attestations"
+                                    >
+                                        <PageHeaderMeterBar
+                                            percent={attestPercent}
+                                        />
+                                        <PageHeaderMeterCaption>
+                                            {Math.round(attestPercent)}% of
+                                            active board members
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                                <PageHeaderMeterBlock
+                                    label="Effective"
+                                    ariaLabel="View active policies"
+                                    href="/governance/policies?status=active"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {formatDateOnly(policy.effective_date)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Version {policy.version}
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Version"
-                                    href={`/governance/policies/${policy.id}`}
+                                    label="Next review"
+                                    tone={reviewOverdue ? 'critical' : 'brand'}
+                                    ariaLabel="View policies overdue for review"
+                                    href="/governance/policies?review=overdue"
                                 >
                                     <PageHeaderMeterBig>
-                                        v{policy.version}
+                                        {formatDateOnly(policy.review_date)}
                                     </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Current release</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Attestations"
-                                    href={`/governance/policies/${policy.id}`}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {attestationStats.completed}/{attestationStats.total_required}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Sign-offs</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Review"
-                                    href={`/governance/policies/${policy.id}`}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {new Date(policy.review_date).toLocaleDateString('en-NZ')}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Scheduled review</PageHeaderMeterCaption>
+                                    <PageHeaderMeterCaption>
+                                        {reviewOverdue
+                                            ? 'Review overdue'
+                                            : 'Scheduled review'}
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                             </>
-                        }
-                        actions={
-                            <div className="flex gap-2">
-                                {canEdit && policy.status === 'draft' && (
-                                    <Button
-                                        onClick={handleApprove}
-                                        variant="default"
-                                    >
-                                        <Shield className="mr-2 h-4 w-4" />{' '}
-                                        Approve
-                                    </Button>
-                                )}
-                                {canEdit && (
-                                    <Link
-                                        href={`/governance/policies/${policy.id}/edit`}
-                                    >
-                                        <Button variant="outline">Edit</Button>
-                                    </Link>
-                                )}
-                            </div>
                         }
                     />
                 }
             >
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <div className="space-y-6 lg:col-span-2">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                    <div className="flex flex-col gap-5 lg:col-span-2">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Policy Content</CardTitle>
+                                <CardTitle>Policy content</CardTitle>
+                                {policy.description ? (
+                                    <CardDescription>
+                                        {policy.description}
+                                    </CardDescription>
+                                ) : null}
                             </CardHeader>
                             <CardContent>
-                                <div
-                                    className="prose max-w-none"
-                                    dangerouslySetInnerHTML={{
-                                        __html: policy.content,
-                                    }}
-                                />
+                                {/* Policy wording is authored as plain text — render it as text, never HTML. */}
+                                <div className="prose max-w-none whitespace-pre-wrap">
+                                    {policy.content}
+                                </div>
                             </CardContent>
                         </Card>
 
-                        {policy.requires_attestation && (
+                        {policy.requires_attestation && isActive ? (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Your Attestation</CardTitle>
+                                    <CardTitle>Your attestation</CardTitle>
                                     <CardDescription>
-                                        Acknowledge that you have read and
-                                        understood this policy
+                                        {myAttestation?.attested_at
+                                            ? `You attested to version ${policy.version} on ${formatDateLong(myAttestation.attested_at)}.`
+                                            : 'Acknowledge that you have read and understood this policy.'}
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <form
                                         onSubmit={handleAttest}
-                                        className="space-y-4"
+                                        className="flex flex-col gap-4"
                                     >
                                         <div className="flex items-center gap-2">
                                             <Checkbox
@@ -223,7 +280,8 @@ export default function PolicyShow({
                                             </label>
                                         </div>
                                         <Textarea
-                                            placeholder="Optional notes..."
+                                            aria-label="Attestation notes"
+                                            placeholder="Optional notes (e.g. queries or clarifications)"
                                             value={attestForm.data.notes}
                                             onChange={(e) =>
                                                 attestForm.setData(
@@ -232,116 +290,121 @@ export default function PolicyShow({
                                                 )
                                             }
                                         />
-                                        <Button
-                                            type="submit"
-                                            disabled={
-                                                !attestForm.data.acknowledged ||
-                                                attestForm.processing
-                                            }
-                                        >
-                                            <CheckCircle className="mr-2 h-4 w-4" />{' '}
-                                            Submit Attestation
-                                        </Button>
+                                        <div>
+                                            <Button
+                                                type="submit"
+                                                disabled={
+                                                    !attestForm.data
+                                                        .acknowledged ||
+                                                    attestForm.processing
+                                                }
+                                            >
+                                                <CheckCircle className="h-4 w-4" />
+                                                {myAttestation
+                                                    ? 'Re-confirm attestation'
+                                                    : 'Submit attestation'}
+                                            </Button>
+                                        </div>
                                     </form>
                                 </CardContent>
                             </Card>
-                        )}
+                        ) : null}
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="flex flex-col gap-5">
                         <Card>
                             <CardHeader>
                                 <CardTitle>Details</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-3 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">
-                                        Version
-                                    </span>
-                                    <span>{policy.version}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">
-                                        Effective Date
-                                    </span>
-                                    <span>
-                                        {new Date(
-                                            policy.effective_date,
-                                        ).toLocaleDateString('en-NZ')}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">
-                                        Review Date
-                                    </span>
-                                    <span>
-                                        {new Date(
-                                            policy.review_date,
-                                        ).toLocaleDateString('en-NZ')}
-                                    </span>
-                                </div>
-                                {policy.approved_by_user && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">
-                                            Approved By
-                                        </span>
-                                        <span>
-                                            {policy.approved_by_user.name}
-                                        </span>
-                                    </div>
-                                )}
+                            <CardContent className="flex flex-col gap-3 text-sm">
+                                <DetailRow
+                                    label="Category"
+                                    value={policyCategoryLabel(policy.category)}
+                                />
+                                <DetailRow
+                                    label="Version"
+                                    value={String(policy.version)}
+                                />
+                                <DetailRow
+                                    label="Effective date"
+                                    value={formatDateOnly(policy.effective_date)}
+                                />
+                                <DetailRow
+                                    label="Review date"
+                                    value={formatDateOnly(policy.review_date)}
+                                />
+                                <DetailRow
+                                    label="Attestation"
+                                    value={
+                                        policy.requires_attestation
+                                            ? 'Required'
+                                            : 'Not required'
+                                    }
+                                />
+                                {policy.approved_by_user ? (
+                                    <DetailRow
+                                        label="Approved by"
+                                        value={`${policy.approved_by_user.name}${policy.approved_at ? ` · ${formatDateLong(policy.approved_at)}` : ''}`}
+                                    />
+                                ) : null}
                             </CardContent>
                         </Card>
 
-                        {policy.requires_attestation && (
+                        {policy.requires_attestation ? (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Attestation Progress</CardTitle>
+                                    <CardTitle>Attestation progress</CardTitle>
+                                    <CardDescription>
+                                        {attestationStats.completed} of{' '}
+                                        {attestationStats.total_required} active
+                                        board members
+                                    </CardDescription>
                                 </CardHeader>
-                                <CardContent>
-                                    <div className="mb-3 text-center">
-                                        <span className="text-3xl font-bold">
-                                            {attestationStats.completed}
-                                        </span>
-                                        <span className="text-muted-foreground">
-                                            {' '}
-                                            / {attestationStats.total_required}
-                                        </span>
-                                    </div>
-                                    <div className="h-2 w-full rounded-full bg-muted">
-                                        <div
-                                            className="h-2 rounded-full bg-status-success transition-all"
-                                            style={{
-                                                width: `${attestationStats.total_required > 0 ? (attestationStats.completed / attestationStats.total_required) * 100 : 0}%`,
-                                            }}
-                                        />
-                                    </div>
-                                    {policy.attestations.length > 0 && (
-                                        <div className="mt-4 space-y-2">
+                                <CardContent className="flex flex-col gap-4">
+                                    <ProgressValue
+                                        percent={attestPercent}
+                                        tone="success"
+                                    >
+                                        {Math.round(attestPercent)}% attested
+                                    </ProgressValue>
+                                    {policy.attestations.length > 0 ? (
+                                        <ul className="flex flex-col gap-2">
                                             {policy.attestations.map((att) => (
-                                                <div
+                                                <li
                                                     key={att.id}
                                                     className="flex items-center gap-2 text-sm"
                                                 >
                                                     <CheckCircle className="h-4 w-4 text-status-success" />
                                                     <span>{att.user.name}</span>
-                                                    <span className="ml-auto text-muted-foreground">
-                                                        {new Date(
+                                                    <span className="ml-auto text-caption">
+                                                        {formatDateLong(
                                                             att.attested_at,
-                                                        ).toLocaleDateString(
-                                                            'en-NZ',
                                                         )}
                                                     </span>
-                                                </div>
+                                                </li>
                                             ))}
-                                        </div>
+                                        </ul>
+                                    ) : (
+                                        <EmptyState
+                                            variant="inline"
+                                            icon={CheckCircle}
+                                            title="No attestations recorded yet"
+                                        />
                                     )}
                                 </CardContent>
                             </Card>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             </PageLayout>
+
+            {canEdit ? (
+                <PolicyWizardDialog
+                    open={editOpen}
+                    onClose={closeEdit}
+                    policy={policy}
+                />
+            ) : null}
         </AppLayout>
     );
 }

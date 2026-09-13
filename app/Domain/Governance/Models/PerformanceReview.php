@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Models;
 
+use App\Domain\Governance\Services\GovernanceResolutionAuthorityService;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PerformanceReview extends Model
 {
@@ -141,12 +144,89 @@ class PerformanceReview extends Model
         ]);
     }
 
-    public function approve(?int $resolutionId = null): void
+    /**
+     * Board approval — completes the review.
+     *
+     * Completing without a resolution records no resolution authority. When a
+     * resolution is cited, authority comes only from an explicit binding
+     * created while the paper was a draft, naming this exact review and a
+     * fingerprint of the board decision (rating, assessment, decision, notes
+     * and goal scores). Motion wording never confers authority; the binding is
+     * verified under row locks and consumed once.
+     *
+     * @throws ValidationException when the cited resolution does not authorise this review
+     */
+    public function approve(?int $resolutionId = null, ?int $actorId = null): void
     {
-        $this->update([
-            'status' => 'completed',
-            'approval_resolution_id' => $resolutionId,
-            'approved_by_board_at' => now(),
-        ]);
+        if ($resolutionId === null) {
+            $this->update([
+                'status' => 'completed',
+                'approval_resolution_id' => null,
+                'approved_by_board_at' => now(),
+            ]);
+
+            return;
+        }
+
+        $authority = app(GovernanceResolutionAuthorityService::class);
+
+        DB::transaction(function () use ($resolutionId, $actorId, $authority) {
+            $lockedReview = static::query()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
+            $resolution = Resolution::query()->whereKey($resolutionId)->lockForUpdate()->first();
+
+            if (! $resolution) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'The selected resolution does not exist.',
+                ]);
+            }
+
+            if ($resolution->status !== 'closed' || $resolution->outcome !== 'carried') {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'Only a closed resolution with a carried outcome can approve a performance review.',
+                ]);
+            }
+
+            if ($lockedReview->isCompleted()) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'This performance review is already completed.',
+                ]);
+            }
+
+            $alreadyUsed = static::query()
+                ->where('approval_resolution_id', $resolutionId)
+                ->where('id', '!=', $lockedReview->id)
+                ->exists();
+
+            if ($alreadyUsed) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'The selected resolution has already been applied to another performance review.',
+                ]);
+            }
+
+            // Hold the scored goals steady while the decision is compared.
+            $lockedReview->goals()->lockForUpdate()->get(['id']);
+
+            try {
+                $authority->verifyAndConsume(
+                    $resolution,
+                    GovernanceResolutionBinding::SUBJECT_PERFORMANCE_REVIEW,
+                    (int) $lockedReview->getKey(),
+                    $authority->performanceReviewTerms($lockedReview),
+                    $actorId ?? auth()->id(),
+                );
+            } catch (\DomainException $exception) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'The selected resolution does not authorize approval of this performance review. '.$exception->getMessage(),
+                ]);
+            }
+
+            $lockedReview->update([
+                'status' => 'completed',
+                'approval_resolution_id' => $resolutionId,
+                'approved_by_board_at' => now(),
+            ]);
+        }, 3);
+
+        $this->refresh();
     }
 }

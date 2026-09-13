@@ -126,6 +126,14 @@ class Resolution extends Model
         return $this->hasMany(MeetingAgendaItem::class);
     }
 
+    /**
+     * Explicit records (and revisions) this paper was authored to approve.
+     */
+    public function authorityBindings(): HasMany
+    {
+        return $this->hasMany(GovernanceResolutionBinding::class);
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'draft';
@@ -241,6 +249,18 @@ class Resolution extends Model
             'deadline' => $this->deadline?->toIso8601String(),
             'governance_meeting_id' => $this->governance_meeting_id,
             'board_committee_id' => $this->board_committee_id,
+            'authority_bindings' => $this->authorityBindings()
+                ->orderBy('id')
+                ->get()
+                ->map(fn (GovernanceResolutionBinding $binding) => [
+                    'subject_type' => $binding->subject_type,
+                    'subject_id' => $binding->subject_id,
+                    'subject_revision' => $binding->subject_revision,
+                    'subject_fingerprint' => $binding->subject_fingerprint,
+                    'bound_terms' => $binding->bound_terms,
+                ])
+                ->values()
+                ->all(),
             'frozen_at' => now()->toIso8601String(),
         ];
 
@@ -422,6 +442,34 @@ class Resolution extends Model
         }
 
         return $createdActions;
+    }
+
+    /**
+     * Supporting documents as a safe presentation payload (never the stored
+     * path). A download URL is issued only when the caller has confirmed the
+     * viewer can pass the download route's gates.
+     *
+     * @return array<int, array{id: ?string, original_name: string, mime_type: ?string, size_bytes: ?int, uploaded_at: ?string, uploaded_by_name: ?string, download_url: ?string}>
+     */
+    public function presentAttachments(bool $canDownload = true): array
+    {
+        $existing = is_array($this->attachments) ? $this->attachments : [];
+
+        return collect($existing)
+            ->filter(fn ($row) => is_array($row))
+            ->map(fn (array $row) => [
+                'id' => $row['id'] ?? null,
+                'original_name' => $row['original_name'] ?? 'attachment',
+                'mime_type' => $row['mime_type'] ?? null,
+                'size_bytes' => isset($row['size_bytes']) ? (int) $row['size_bytes'] : null,
+                'uploaded_at' => $row['uploaded_at'] ?? null,
+                'uploaded_by_name' => $row['uploaded_by_name'] ?? null,
+                'download_url' => $canDownload && isset($row['id'])
+                    ? "/governance/resolutions/{$this->id}/attachments/{$row['id']}/download"
+                    : null,
+            ])
+            ->values()
+            ->all();
     }
 
     public function actionItems(): HasMany

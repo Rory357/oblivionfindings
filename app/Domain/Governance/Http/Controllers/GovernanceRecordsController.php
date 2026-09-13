@@ -42,6 +42,7 @@ class GovernanceRecordsController extends Controller
                 ->orderByDesc('updated_at');
 
             $documents = $docQuery->paginate(15, ['*'], 'doc_page')
+                ->withQueryString()
                 ->through(fn (GovernanceDocument $doc) => [
                     'id' => $doc->id,
                     'title' => $doc->title,
@@ -66,6 +67,7 @@ class GovernanceRecordsController extends Controller
             $meetQuery = $this->recordAccess->scopeMeetings($meetQuery, $viewer);
 
             $meetings = $meetQuery->paginate(15, ['*'], 'meeting_page')
+                ->withQueryString()
                 ->through(fn (GovernanceMeeting $m) => [
                     'id' => $m->id,
                     'title' => $m->title,
@@ -90,6 +92,7 @@ class GovernanceRecordsController extends Controller
             $resQuery = $this->recordAccess->scopeResolutions($resQuery, $viewer);
 
             $resolutions = $resQuery->paginate(15, ['*'], 'res_page')
+                ->withQueryString()
                 ->through(fn (Resolution $r) => [
                     'id' => $r->id,
                     'resolution_reference' => $r->resolution_reference,
@@ -111,6 +114,7 @@ class GovernanceRecordsController extends Controller
                 ->orderBy('title');
 
             $policies = $polQuery->paginate(15, ['*'], 'pol_page')
+                ->withQueryString()
                 ->through(fn (GovernancePolicy $p) => [
                     'id' => $p->id,
                     'policy_code' => $p->policy_code,
@@ -124,6 +128,7 @@ class GovernanceRecordsController extends Controller
         return Inertia::render('Governance/Records/Index', [
             'tab' => $tab,
             'search' => $search,
+            'category' => $canViewDocuments ? $request->query('category') : null,
             'capabilities' => [
                 'documents' => $canViewDocuments,
                 'meetings' => $canViewMeetings,

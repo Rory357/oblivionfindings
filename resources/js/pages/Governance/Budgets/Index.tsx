@@ -1,28 +1,36 @@
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import {
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    ProgressValue,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBar,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { EmptyList } from '@/components/ui/empty-state';
-import { Progress } from '@/components/ui/progress';
+import { EmptyState } from '@/components/ui/empty-state';
+import type { StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
-import { cn } from '@/lib/utils';
-import { show as showBudget } from '@/routes/governance/budgets';
 import { PageProps } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import {
-    AlertTriangle,
-    CheckCircle,
-    Clock,
-    DollarSign,
-    FileText,
-} from 'lucide-react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { ExternalLink, Plus, Wallet, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { BudgetWizardDialog, type BudgetFormOptions } from './_dialogs';
 
 interface Budget {
     id: number;
@@ -39,42 +47,275 @@ interface Budget {
 
 interface Props extends PageProps {
     budgets: Budget[] | { data: Budget[] };
+    canCreate?: boolean;
+    /** New-budget wizard options — only sent to viewers who may create. */
+    formOptions?: BudgetFormOptions | null;
 }
 
-export default function BudgetsIndex({ auth, budgets }: Props) {
-    const budgetItems = Array.isArray(budgets)
-        ? budgets
-        : (budgets?.data ?? []);
+const ALL = '__all';
+const PENDING = ['proposed', 'under_review'];
 
-    const getStatusColor = (status: string) => governanceStatusColor(status);
+const STATUS_OPTIONS = [
+    { value: ALL, label: 'Any status' },
+    { value: 'drafting', label: 'Drafting' },
+    { value: 'pending', label: 'Pending review' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'rejected', label: 'Rejected' },
+];
 
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case 'approved':
-                return <CheckCircle className="h-4 w-4 text-status-success" />;
-            case 'proposed':
-            case 'under_review':
-                return <Clock className="h-4 w-4 text-status-warning" />;
-            case 'rejected':
-                return (
-                    <AlertTriangle className="h-4 w-4 text-status-critical" />
-                );
-            default:
-                return <FileText className="h-4 w-4 text-muted-foreground" />;
+function budgetStatusVariant(status: string): StatusVariant {
+    if (status === 'approved') return 'success';
+    if (status === 'rejected') return 'critical';
+    if (PENDING.includes(status)) return 'warning';
+    return 'neutral';
+}
+
+const humanise = (value: string) =>
+    value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
+
+const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency: 'NZD',
+        maximumFractionDigits: 0,
+    }).format(Number(amount) || 0);
+
+/**
+ * The index loads every budget (no server pagination), so the header
+ * filters narrow the list client-side from the URL query — meter links
+ * (`?status=approved`) and shared URLs land on the same view.
+ */
+function useUrlFilters() {
+    const page = usePage();
+    const params = new URLSearchParams(page.url.split('?')[1] ?? '');
+    return {
+        status: params.get('status'),
+        fiscal_year: params.get('fiscal_year'),
+        search: params.get('search'),
+    };
+}
+
+export default function BudgetsIndex({
+    budgets,
+    canCreate: canCreateProp = false,
+    formOptions = null,
+}: Props) {
+    const budgetItems = useMemo(
+        () => (Array.isArray(budgets) ? budgets : (budgets?.data ?? [])),
+        [budgets],
+    );
+    const filters = useUrlFilters();
+    const [search, setSearch] = useState(filters.search ?? '');
+    const ctxMenu = useEntityContextMenu<Budget>();
+    const canCreate = Boolean(canCreateProp && formOptions);
+    const [createOpen, setCreateOpen] = useDialogDeepLink('create', canCreate);
+
+    const go = (next: Partial<typeof filters>) => {
+        const merged = { ...filters, ...next };
+        const query = Object.fromEntries(
+            Object.entries(merged).filter(([, value]) => value),
+        );
+        router.get('/governance/budgets', query, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            if ((filters.search ?? '') !== search) {
+                go({ search: search.trim() || null });
+            }
+        }, 350);
+        return () => clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
+
+    const fiscalYears = useMemo(
+        () =>
+            Array.from(new Set(budgetItems.map((b) => String(b.fiscal_year))))
+                .sort()
+                .reverse(),
+        [budgetItems],
+    );
+
+    const visible = budgetItems.filter((budget) => {
+        if (filters.status === 'pending' && !PENDING.includes(budget.status))
+            return false;
+        if (
+            filters.status &&
+            filters.status !== 'pending' &&
+            budget.status !== filters.status
+        )
+            return false;
+        if (
+            filters.fiscal_year &&
+            String(budget.fiscal_year) !== filters.fiscal_year
+        )
+            return false;
+        if (filters.search) {
+            const q = filters.search.toLowerCase();
+            const haystack =
+                `${budget.title ?? ''} ${budget.fiscal_year}`.toLowerCase();
+            if (!haystack.includes(q)) return false;
         }
-    };
+        return true;
+    });
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-NZ', {
-            style: 'currency',
-            currency: 'NZD',
-            maximumFractionDigits: 0,
-        }).format(amount);
-    };
+    const approved = budgetItems.filter((b) => b.status === 'approved');
+    const pending = budgetItems.filter((b) => PENDING.includes(b.status));
+    const allocated = budgetItems.reduce(
+        (sum, b) => sum + Number(b.total_allocated || 0),
+        0,
+    );
+    const actual = budgetItems.reduce(
+        (sum, b) => sum + Number(b.total_actual || 0),
+        0,
+    );
+    const hasFilters = Boolean(
+        filters.status || filters.fiscal_year || filters.search,
+    );
+
+    const titleFor = (budget: Budget) =>
+        budget.title || `Budget ${budget.fiscal_year}`;
+    const open = (budget: Budget) =>
+        router.visit(`/governance/budgets/${budget.id}`);
+    const actionsFor = (budget: Budget): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Open budget',
+                icon: ExternalLink,
+                onClick: () => open(budget),
+            },
+        ]);
+
+    const header = (
+        <PageHeader
+            icon={Wallet}
+            title="Budgets"
+            subline="Plan, approve and monitor financial budgets across fiscal years"
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search budgets…"
+                    />
+                    {canCreate ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                        >
+                            New budget
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Budgets"
+                        href="/governance/budgets"
+                    >
+                        <PageHeaderMeterBig>
+                            {budgetItems.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Across {fiscalYears.length} fiscal year
+                            {fiscalYears.length === 1 ? '' : 's'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Approved"
+                        href="/governance/budgets?status=approved"
+                        tone={approved.length > 0 ? 'success' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>
+                            {approved.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            In effect
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Pending review"
+                        href="/governance/budgets?status=pending"
+                        tone={pending.length > 0 ? 'warning' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>
+                            {pending.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Proposed or under review
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Spent"
+                        value={
+                            allocated > 0
+                                ? `${Math.round((actual / allocated) * 100)}%`
+                                : undefined
+                        }
+                        href="/governance/budgets"
+                        tone={
+                            allocated > 0 && actual > allocated
+                                ? 'warning'
+                                : 'brand'
+                        }
+                    >
+                        <PageHeaderMeterBig>
+                            {formatCurrency(actual)}
+                        </PageHeaderMeterBig>
+                        {allocated > 0 ? (
+                            <PageHeaderMeterBar
+                                percent={(actual / allocated) * 100}
+                            />
+                        ) : null}
+                        <PageHeaderMeterCaption>
+                            {allocated > 0
+                                ? actual > allocated
+                                    ? `${formatCurrency(actual - allocated)} over ${formatCurrency(allocated)}`
+                                    : `${formatCurrency(allocated - actual)} left of ${formatCurrency(allocated)}`
+                                : 'No line items budgeted yet'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={filters.status ?? ALL}
+                        allValue={ALL}
+                        options={STATUS_OPTIONS}
+                        onChange={(value) =>
+                            go({ status: value === ALL ? null : value })
+                        }
+                    />
+                    <PageHeaderFilterSelect
+                        label="Fiscal year"
+                        value={filters.fiscal_year ?? ALL}
+                        allValue={ALL}
+                        options={[
+                            { value: ALL, label: 'Any year' },
+                            ...fiscalYears.map((year) => ({
+                                value: year,
+                                label: `FY ${year}`,
+                            })),
+                        ]}
+                        onChange={(value) =>
+                            go({ fiscal_year: value === ALL ? null : value })
+                        }
+                    />
+                </>
+            }
+            rail={<GovernanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
@@ -83,275 +324,189 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
         >
             <Head title="Budgets" />
 
-            <PageLayout
-                hero={
-                    <PageHeader
-                        icon={DollarSign}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
                         title="Budgets"
-                        subline="Plan, approve, and monitor financial budgets across fiscal years."
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Total budgets"
-                                    href="/governance/budgets"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {budgetItems.length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Fiscal years</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Approved"
-                                    href="/governance/budgets?status=approved"
-                                    tone="brand"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {budgetItems.filter(
-                                            (b) => b.status === 'approved',
-                                        ).length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>In effect</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Pending review"
-                                    href="/governance/budgets"
-                                    tone={budgetItems.some((b) => ['proposed', 'under_review'].includes(b.status)) ? 'warning' : undefined}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {budgetItems.filter((b) =>
-                                            ['proposed', 'under_review'].includes(
-                                                b.status,
-                                            ),
-                                        ).length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Under review</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
-                        }
-                        actions={
-                            (auth.can as any)?.governance?.budgets?.create ? (
-                                <Button size="sm" asChild>
-                                    <Link href="/governance/budgets/create">
-                                        New Budget
-                                    </Link>
-                                </Button>
-                            ) : undefined
-                        }
+                        caption={`${visible.length} of ${budgetItems.length} shown`}
                     />
-                }
-            >
-                {/* Summary Stats */}
-                {budgetItems.length > 0 && (
-                    <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Total Budgets
-                                        </p>
-                                        <p className="text-2xl font-bold">
-                                            {budgetItems.length}
-                                        </p>
-                                    </div>
-                                    <DollarSign className="h-8 w-8 text-muted-foreground" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Approved
-                                        </p>
-                                        <p className="text-2xl font-bold text-status-success">
-                                            {
-                                                budgetItems.filter(
-                                                    (b) =>
-                                                        b.status === 'approved',
-                                                ).length
-                                            }
-                                        </p>
-                                    </div>
-                                    <CheckCircle className="h-8 w-8 text-status-success" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Pending Review
-                                        </p>
-                                        <p className="text-2xl font-bold text-status-warning">
-                                            {
-                                                budgetItems.filter((b) =>
-                                                    [
-                                                        'proposed',
-                                                        'under_review',
-                                                    ].includes(b.status),
-                                                ).length
-                                            }
-                                        </p>
-                                    </div>
-                                    <Clock className="h-8 w-8 text-status-warning" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
 
-                {/* Budgets List */}
-                {budgetItems.length === 0 ? (
-                    <EmptyList
-                        icon={DollarSign}
-                        itemName="budget"
-                        description="Create your first budget to start financial planning."
-                        createHref="/governance/budgets/create"
-                        createLabel="Create Budget"
-                    />
-                ) : (
-                    <div className="space-y-4">
-                        {budgetItems.map((budget) => {
-                            const utilization =
-                                budget.total_allocated > 0
-                                    ? (budget.total_actual /
-                                          budget.total_allocated) *
-                                      100
-                                    : 0;
-                            const variance =
-                                budget.total_actual - budget.total_allocated;
-
-                            return (
-                                <Card
-                                    key={budget.id}
-                                    className="transition-shadow hover:shadow-md"
-                                >
-                                    <CardContent className="pt-6">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                                <div className="mb-2 flex items-center gap-3">
-                                                    <h3 className="text-xl font-semibold">
-                                                        <Link
-                                                            href={showBudget.url(
-                                                                {
-                                                                    budget: budget.id,
-                                                                },
-                                                            )}
-                                                            className="hover:text-status-info"
-                                                        >
-                                                            {budget.title ||
-                                                                `Budget ${budget.fiscal_year}`}
-                                                        </Link>
-                                                    </h3>
-                                                    <Badge
-                                                        className={cn(
-                                                            getStatusColor(
-                                                                budget.status,
-                                                            ),
-                                                        )}
-                                                    >
-                                                        {budget.status.replace(
-                                                            '_',
-                                                            ' ',
-                                                        )}
-                                                    </Badge>
-                                                    <Badge variant="outline">
-                                                        v{budget.version_number}
-                                                    </Badge>
-                                                </div>
-                                                <p className="mb-3 text-muted-foreground">
-                                                    Fiscal Year:{' '}
-                                                    {budget.fiscal_year}
-                                                </p>
-
-                                                {/* Budget progress bar */}
-                                                <div className="flex items-center gap-4">
-                                                    <div className="max-w-md flex-1">
-                                                        <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                                                            <span>
-                                                                {formatCurrency(
-                                                                    budget.total_actual,
-                                                                )}{' '}
-                                                                spent
-                                                            </span>
-                                                            <span>
-                                                                {formatCurrency(
-                                                                    budget.total_allocated,
-                                                                )}{' '}
-                                                                budgeted
-                                                            </span>
-                                                        </div>
-                                                        <Progress
-                                                            value={Math.min(
-                                                                utilization,
-                                                                100,
-                                                            )}
-                                                            className="h-2"
-                                                        />
-                                                    </div>
-                                                    <span className="text-sm text-muted-foreground">
-                                                        {budget.line_items_count ||
-                                                            0}{' '}
-                                                        line items
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <div className="ml-6 text-right">
-                                                <p className="text-2xl font-bold">
-                                                    {formatCurrency(
-                                                        budget.total_budget,
-                                                    )}
-                                                </p>
-                                                <div className="mt-1 flex items-center justify-end gap-1">
-                                                    {getStatusIcon(
-                                                        budget.status,
-                                                    )}
-                                                    <span
-                                                        className={cn(
-                                                            'text-sm',
-                                                            budget.approved_by_board_at
-                                                                ? 'text-status-success'
-                                                                : 'text-status-warning',
-                                                        )}
-                                                    >
-                                                        {budget.approved_by_board_at
-                                                            ? 'Approved'
-                                                            : 'Pending Approval'}
-                                                    </span>
-                                                </div>
-                                                {variance !== 0 &&
-                                                    budget.total_allocated >
-                                                        0 && (
-                                                        <p
-                                                            className={cn(
-                                                                'mt-1 text-xs',
-                                                                variance > 0
-                                                                    ? 'text-status-critical'
-                                                                    : 'text-status-success',
-                                                            )}
-                                                        >
-                                                            {variance > 0
-                                                                ? '+'
-                                                                : ''}
-                                                            {formatCurrency(
-                                                                variance,
-                                                            )}{' '}
-                                                            variance
-                                                        </p>
-                                                    )}
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-                    </div>
-                )}
+                    {visible.length === 0 ? (
+                        <EmptyState
+                            icon={Wallet}
+                            title={
+                                hasFilters
+                                    ? 'No budgets match your filters'
+                                    : 'No budgets yet'
+                            }
+                            description={
+                                hasFilters
+                                    ? 'Try clearing a filter or search term.'
+                                    : 'Create your first budget to start financial planning.'
+                            }
+                            action={
+                                hasFilters ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearch('');
+                                            go({
+                                                status: null,
+                                                fiscal_year: null,
+                                                search: null,
+                                            });
+                                        }}
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                        Clear filters
+                                    </Button>
+                                ) : canCreate ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
+                                        <Plus className="h-3.5 w-3.5" />
+                                        Create budget
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={visible}
+                            rowKey={(budget) => budget.id}
+                            identityLabel="Budget"
+                            identity={(budget) => ({
+                                icon: Wallet,
+                                name: titleFor(budget),
+                                subline: `Fiscal year ${budget.fiscal_year}`,
+                            })}
+                            hrefFor={(budget) =>
+                                `/governance/budgets/${budget.id}`
+                            }
+                            onOpen={open}
+                            onRowContextMenu={ctxMenu.open}
+                            actionsFor={actionsFor}
+                            columns={[
+                                {
+                                    key: 'status',
+                                    label: 'Status',
+                                    width: '0.9fr',
+                                    cell: (budget) => (
+                                        <EntityStatusChip
+                                            variant={budgetStatusVariant(
+                                                budget.status,
+                                            )}
+                                        >
+                                            {humanise(budget.status)}
+                                        </EntityStatusChip>
+                                    ),
+                                },
+                                {
+                                    key: 'version',
+                                    label: 'Version',
+                                    width: '0.5fr',
+                                    cell: (budget) => (
+                                        <EntityChip>
+                                            v{budget.version_number}
+                                        </EntityChip>
+                                    ),
+                                },
+                                {
+                                    key: 'total',
+                                    label: 'Total budget',
+                                    width: '0.9fr',
+                                    align: 'right',
+                                    cell: (budget) => (
+                                        <span className="font-semibold tabular-nums">
+                                            {formatCurrency(
+                                                budget.total_budget,
+                                            )}
+                                        </span>
+                                    ),
+                                },
+                                {
+                                    key: 'spend',
+                                    label: 'Spent of budgeted',
+                                    width: '1.4fr',
+                                    cell: (budget) => {
+                                        const pct =
+                                            budget.total_allocated > 0
+                                                ? (budget.total_actual /
+                                                      budget.total_allocated) *
+                                                  100
+                                                : null;
+                                        return (
+                                            <ProgressValue
+                                                percent={pct}
+                                                tone={
+                                                    pct != null && pct > 100
+                                                        ? 'critical'
+                                                        : 'brand'
+                                                }
+                                            >
+                                                {formatCurrency(
+                                                    budget.total_actual,
+                                                )}{' '}
+                                                of{' '}
+                                                {formatCurrency(
+                                                    budget.total_allocated,
+                                                )}
+                                            </ProgressValue>
+                                        );
+                                    },
+                                },
+                                {
+                                    key: 'lines',
+                                    label: 'Line items',
+                                    width: '0.6fr',
+                                    align: 'right',
+                                    cell: (budget) => (
+                                        <span className="tabular-nums">
+                                            {budget.line_items_count || 0}
+                                        </span>
+                                    ),
+                                },
+                                {
+                                    key: 'approval',
+                                    label: 'Board approval',
+                                    width: '0.9fr',
+                                    cell: (budget) =>
+                                        budget.approved_by_board_at ? (
+                                            <EntityStatusChip variant="success">
+                                                Approved
+                                            </EntityStatusChip>
+                                        ) : (
+                                            <EntityStatusChip variant="warning">
+                                                Pending approval
+                                            </EntityStatusChip>
+                                        ),
+                                },
+                            ]}
+                        />
+                    )}
+                </div>
             </PageLayout>
+
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={Wallet}
+                    title={titleFor(ctxMenu.ctx.record)}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
+
+            {canCreate && formOptions ? (
+                <BudgetWizardDialog
+                    isOpen={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    options={formOptions}
+                />
+            ) : null}
         </AppLayout>
     );
 }

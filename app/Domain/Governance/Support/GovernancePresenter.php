@@ -103,6 +103,7 @@ class GovernancePresenter
             'workflow_summary' => $workflow['summary'] ?? ['total' => 0, 'critical' => 0, 'overdue' => 0],
             'role_actions' => $this->roleActions($user),
             'kpi_band' => $this->buildKpiBand($widgets, $workflow, $user),
+            'assurance' => $this->buildAssurance($widgets, $user),
             'next_meeting' => $this->buildNextMeeting($user),
             'board_pack' => $this->buildBoardPack($user),
             'calendar_events' => $this->buildCalendarEvents($user),
@@ -159,7 +160,8 @@ class GovernancePresenter
             $overdueActions = (int) ($workflow['summary']['overdue'] ?? 0);
         }
 
-        $topRisks = $widgets['top_risks'] ?? [];
+        $topRisks = is_array($widgets['top_risks'] ?? null) ? $widgets['top_risks'] : [];
+        $risksAvailable = array_key_exists('above_appetite', $topRisks);
         $risksOverAppetite = (int) ($topRisks['above_appetite'] ?? 0);
 
         $attestation = $this->policyAttestationPercent();
@@ -186,9 +188,11 @@ class GovernancePresenter
             [
                 'key' => 'risks_over_appetite',
                 'label' => 'Risks Over Appetite',
-                'value' => (string) $risksOverAppetite,
-                'sublabel' => $risksOverAppetite > 0 ? 'Review required' : 'Within appetite',
-                'tone' => $risksOverAppetite > 0 ? 'critical' : 'success',
+                'value' => $risksAvailable ? (string) $risksOverAppetite : '—',
+                'sublabel' => ! $risksAvailable
+                    ? 'Risk data unavailable'
+                    : ($risksOverAppetite > 0 ? 'Review required' : 'None above appetite'),
+                'tone' => ! $risksAvailable ? 'muted' : ($risksOverAppetite > 0 ? 'critical' : 'success'),
                 'href' => '/governance/risks',
             ],
             [
@@ -276,6 +280,172 @@ class GovernancePresenter
             ],
             'checklist' => $checklist['items'] ?? [],
             'next_step' => $checklist['next_step'] ?? null,
+            'member_readiness' => $user !== null ? $this->memberMeetingReadiness($meeting, $user) : null,
+        ];
+    }
+
+    /**
+     * What the viewer personally has to do before this meeting. Derived from
+     * the same permitted records as their meeting workspace (visible agenda,
+     * the pack they may open, resolutions they may view) and from the same
+     * vote obligations as My work — never the administrative preparation
+     * steps (CEO report, pack generation, signing) of the checklist.
+     *
+     * @return array<string, mixed>
+     */
+    protected function memberMeetingReadiness(GovernanceMeeting $meeting, User $user): array
+    {
+        $meetingHref = "/governance/meetings/{$meeting->id}";
+        $boardMember = $user->boardMember;
+
+        $pack = $this->boardPackAccess->visiblePack($user, $meeting->boardPack);
+        $packPublished = $pack !== null && $pack->distributed_at !== null;
+        $packRead = $packPublished && ($boardMember
+            ? $pack->hasMemberRead($boardMember->id)
+            : collect($pack->read_tracking ?? [])->contains(fn ($entry) => (int) ($entry['user_id'] ?? 0) === (int) $user->id));
+
+        $papers = app(\App\Domain\Governance\Services\ExecutiveMeetingAccessService::class)
+            ->visibleAgendaItems($user, $meeting)
+            ->count();
+
+        $recordAccess = app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class);
+        $visibleResolutions = $meeting->resolutions
+            ->filter(fn ($resolution) => $recordAccess->canViewResolution($user, $resolution))
+            ->values();
+        $visibleResolutionIds = $visibleResolutions->pluck('id')->map(fn ($id) => (int) $id);
+
+        // Votes open for me: exactly the vote obligations My work lists, limited
+        // to this meeting's resolutions.
+        $votesAvailable = true;
+        $votesOpen = 0;
+        try {
+            $availability = [];
+            $voteSourceIds = app(\App\Domain\Governance\Services\GovernanceWorkQuery::class)
+                ->queryVoteItems($user, $availability)
+                ->map(fn ($item) => (int) ($item->source['id'] ?? 0));
+            $votesAvailable = ($availability['resolutions'] ?? 'available') !== 'unavailable';
+            $votesOpen = $visibleResolutionIds->intersect($voteSourceIds)->count();
+        } catch (\Throwable $e) {
+            report($e);
+            $votesAvailable = false;
+        }
+
+        $declaredConflicts = 0;
+        $decisionsToCheck = 0;
+        if ($boardMember !== null) {
+            $declaredResolutionIds = \App\Domain\Governance\Models\ConflictDeclaration::query()
+                ->where('board_member_id', $boardMember->id)
+                ->where(function ($query) use ($meeting, $visibleResolutionIds) {
+                    $query->where('governance_meeting_id', $meeting->id)
+                        ->orWhereIn('resolution_id', $visibleResolutionIds->all());
+                })
+                ->get(['id', 'resolution_id']);
+            $declaredConflicts = $declaredResolutionIds->count();
+            $declaredIds = $declaredResolutionIds->pluck('resolution_id')->filter()->map(fn ($id) => (int) $id);
+
+            $decisionsToCheck = $visibleResolutions
+                ->whereIn('status', ['draft', 'open'])
+                ->reject(fn ($resolution) => $declaredIds->contains((int) $resolution->id))
+                ->count();
+        }
+
+        $rsvp = null;
+        if ($boardMember !== null && $meeting->isInvited($boardMember)) {
+            $response = $meeting->rsvps()->where('board_member_id', $boardMember->id)->value('response');
+            $rsvp = ['invited' => true, 'response' => $response];
+        }
+
+        return [
+            'workspace_href' => $meetingHref,
+            'pack' => [
+                'published' => $packPublished,
+                'read' => $packRead,
+                'revision_number' => $packPublished ? ($pack->revision_number ?? 1) : null,
+                'href' => $packPublished ? "/governance/packs/{$pack->id}" : null,
+            ],
+            'papers' => [
+                'count' => $papers,
+                'href' => "{$meetingHref}?tab=agenda",
+            ],
+            'votes' => [
+                'available' => $votesAvailable,
+                'open' => $votesOpen,
+                'href' => "{$meetingHref}?tab=resolutions",
+            ],
+            'conflicts' => [
+                'is_member' => $boardMember !== null,
+                'declared' => $declaredConflicts,
+                'decisions_to_check' => $decisionsToCheck,
+                'href' => "{$meetingHref}?tab=resolutions",
+            ],
+            'rsvp' => $rsvp,
+        ];
+    }
+
+    /**
+     * Concise board assurance for Home. Every count uses the same query as the
+     * register view its link opens, and a source that failed is reported as
+     * unavailable — never as zero or "within appetite".
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    protected function buildAssurance(array $widgets, ?User $user): array
+    {
+        $topRisks = is_array($widgets['top_risks'] ?? null) ? $widgets['top_risks'] : null;
+        $risksAvailable = $topRisks !== null && ($topRisks['status'] ?? null) !== 'unavailable' && array_key_exists('above_appetite', $topRisks);
+
+        $obligationsOverdue = null;
+        try {
+            if (Schema::hasTable('compliance_obligations')) {
+                $obligationsOverdue = ComplianceObligation::query()->overdue()->count();
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        $actionsOverdue = null;
+        try {
+            if (Schema::hasTable('action_items')) {
+                $actionQuery = ActionItem::query()->overdue();
+                if ($user !== null) {
+                    app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
+                        ->scopeActionItems($actionQuery, $user);
+                }
+                $actionsOverdue = $actionQuery->count();
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        $financial = is_array($widgets['financial'] ?? null) ? $widgets['financial'] : [];
+        $financialStatus = $financial['status'] ?? 'unknown';
+        $variance = isset($financial['variance']) && is_numeric($financial['variance']) ? (float) $financial['variance'] : null;
+        $financialAvailable = ! in_array($financialStatus, ['unknown', 'unavailable'], true) && $variance !== null;
+
+        return [
+            'risks_above_appetite' => [
+                'available' => $risksAvailable,
+                'count' => $risksAvailable ? (int) $topRisks['above_appetite'] : null,
+                'tracked' => $risksAvailable ? (int) ($topRisks['count'] ?? 0) : null,
+                'href' => '/governance/risks?above_appetite=1',
+            ],
+            'obligations_overdue' => [
+                'available' => $obligationsOverdue !== null,
+                'count' => $obligationsOverdue,
+                'href' => '/governance/compliance?status=overdue',
+            ],
+            'actions_overdue' => [
+                'available' => $actionsOverdue !== null,
+                'count' => $actionsOverdue,
+                'href' => '/governance/actions?status=overdue',
+            ],
+            'financial_variance' => [
+                'available' => $financialAvailable,
+                'variance_percent' => $financialAvailable ? round($variance, 1) : null,
+                'material' => $financialAvailable ? abs($variance) > 5 : null,
+                'threshold_percent' => 5,
+                'href' => '/governance/budgets',
+            ],
         ];
     }
 
@@ -891,7 +1061,10 @@ class GovernancePresenter
 
         $daysUntilMeeting = now()->startOfDay()->diffInDays($meeting->scheduled_at?->copy()->startOfDay(), false);
         $quorum = $meeting->calculateQuorum();
-        $agendaCount = $meeting->agendaItems->count();
+        // Same audience contract as the meeting workspace and readiness checklist.
+        $agendaCount = app(\App\Domain\Governance\Services\ExecutiveMeetingAccessService::class)
+            ->visibleAgendaItems($user, $meeting)
+            ->count();
         $pack = $user
             ? $this->boardPackAccess->visiblePack($user, $meeting->boardPack)
             : null;
@@ -1013,6 +1186,10 @@ class GovernancePresenter
 
     protected function presentTopRisksCard(array $widget, array $freshness): array
     {
+        if (($widget['status'] ?? null) === 'unavailable' || ! array_key_exists('above_appetite', $widget)) {
+            return $this->unavailableCard('top_risks', 'Risk posture', 'Active risks, critical exposure, and items outside appetite.', 'Governance risk register', $freshness, ['Critical', 'High', 'Above appetite', 'Tracked'], '/governance/risks');
+        }
+
         return $this->makeCard(
             'top_risks',
             'Risk posture',
@@ -1305,7 +1482,11 @@ class GovernancePresenter
 
     protected function presentComplianceCalendarCard(array $widget, array $freshness): array
     {
-        $collection = collect($widget);
+        if (($widget['status'] ?? null) === 'unavailable') {
+            return $this->unavailableCard('compliance_calendar', 'Compliance calendar', 'Upcoming and overdue governance obligations.', 'Compliance register', $freshness, ['Upcoming obligations', 'Overdue', 'Due this week'], '/governance/compliance/calendar');
+        }
+
+        $collection = collect($widget)->filter(fn ($item) => is_array($item));
 
         return $this->makeCard(
             'compliance_calendar',
@@ -1451,6 +1632,26 @@ class GovernancePresenter
     protected function makeCard(string $key, string $title, string $description, string $status, string $source, array $freshness, array $metrics, array $highlights, string $href): array
     {
         return compact('key', 'title', 'description', 'status', 'source', 'freshness', 'metrics', 'highlights', 'href');
+    }
+
+    /**
+     * A card whose source failed: status `unknown`, every metric "Unavailable".
+     *
+     * @param  array<int, string>  $metricLabels
+     */
+    protected function unavailableCard(string $key, string $title, string $description, string $source, array $freshness, array $metricLabels, string $href): array
+    {
+        return $this->makeCard(
+            $key,
+            $title,
+            $description,
+            'unknown',
+            $source,
+            $this->freshnessFor($key, $freshness),
+            array_map(fn (string $label) => $this->metric($label, 'Unavailable', 'muted'), $metricLabels),
+            ['This information could not be loaded. Figures are not shown as zero.'],
+            $href
+        );
     }
 
     protected function metric(string $label, mixed $value, string $tone = 'default'): array

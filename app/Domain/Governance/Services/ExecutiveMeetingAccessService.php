@@ -6,6 +6,7 @@ use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\MeetingAgendaItem;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 final class ExecutiveMeetingAccessService
 {
@@ -113,6 +114,28 @@ final class ExecutiveMeetingAccessService
         }
 
         return false;
+    }
+
+    /**
+     * The agenda items a viewer is permitted to see, in their loaded order.
+     *
+     * This is the single audience contract for agenda items: the member
+     * meeting workspace renders exactly these records, and readiness counts
+     * (checklists, Home cards) must be derived from the same collection so a
+     * confidential item never inflates a count the viewer cannot open.
+     * Without a viewer only non-confidential items are counted.
+     *
+     * @return Collection<int, MeetingAgendaItem>
+     */
+    public function visibleAgendaItems(?User $user, GovernanceMeeting $meeting): Collection
+    {
+        $meeting->loadMissing('agendaItems');
+
+        return $meeting->agendaItems
+            ->filter(fn (MeetingAgendaItem $item) => $user !== null
+                ? $this->canViewAgendaItem($user, $meeting, $item)
+                : ! $item->is_confidential)
+            ->values();
     }
 
     public function canManageConfidentialAgenda(User $user, GovernanceMeeting $meeting): bool

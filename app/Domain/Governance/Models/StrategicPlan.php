@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Models;
 
+use App\Domain\Governance\Services\GovernanceResolutionAuthorityService;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class StrategicPlan extends Model
 {
@@ -115,78 +118,77 @@ class StrategicPlan extends Model
         return in_array($this->status, ['archived', 'completed']);
     }
 
-    public function approve(int $resolutionId): void
+    /**
+     * Approve this plan under a carried resolution.
+     *
+     * Authority comes only from an explicit binding created while the paper
+     * was a draft, naming this exact plan id and revision (version plus a
+     * fingerprint of its content). Titles and motion wording never confer
+     * authority. The binding is verified under row locks and consumed once.
+     */
+    public function approve(int $resolutionId, ?int $actorId = null): void
     {
-        $resolution = Resolution::find($resolutionId);
-        if (! $resolution) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'resolution_id' => 'The selected resolution does not exist.',
-            ]);
-        }
+        $authority = app(GovernanceResolutionAuthorityService::class);
 
-        if ($resolution->status !== 'closed' || $resolution->outcome !== 'carried') {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'resolution_id' => 'Only a closed resolution with a carried outcome can approve a strategic plan.',
-            ]);
-        }
+        DB::transaction(function () use ($resolutionId, $actorId, $authority) {
+            $lockedPlan = static::query()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
+            $resolution = Resolution::query()->whereKey($resolutionId)->lockForUpdate()->first();
 
-        $resText = strtolower($resolution->title . ' ' . ($resolution->exact_motion ?? ''));
-        $planTitle = strtolower(trim($this->title));
+            if (! $resolution) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'The selected resolution does not exist.',
+                ]);
+            }
 
-        $hasMatch = false;
+            if ($resolution->status !== 'closed' || $resolution->outcome !== 'carried') {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'Only a closed resolution with a carried outcome can approve a strategic plan.',
+                ]);
+            }
 
-        // 1. Explicit strategic_plan_id binding in resolution
-        if (!empty($resolution->strategic_plan_id) && (int) $resolution->strategic_plan_id === (int) $this->id) {
-            $hasMatch = true;
-        } elseif (!empty($resolution->cost_impact['strategic_plan_id']) && (int) $resolution->cost_impact['strategic_plan_id'] === (int) $this->id) {
-            $hasMatch = true;
-        } elseif (!empty($resolution->paper_snapshot['strategic_plan_id']) && (int) $resolution->paper_snapshot['strategic_plan_id'] === (int) $this->id) {
-            $hasMatch = true;
-        }
-        // 2. Exact plan title contained in motion or title
-        elseif (!empty($planTitle) && (str_contains(strtolower($resolution->title), $planTitle) || str_contains(strtolower($resolution->exact_motion ?? ''), $planTitle))) {
-            $hasMatch = true;
-        }
-        // 3. Explicit motion specifying approval of strategic plan matching plan title or reference
-        elseif ((str_contains($resText, 'approve strategic plan') || str_contains($resText, 'adopt strategic plan'))
-            && (str_contains($resText, $planTitle) || str_contains($planTitle, 'strategic plan'))) {
-            $hasMatch = true;
-        }
+            $alreadyUsed = static::query()
+                ->where('approval_resolution_id', $resolutionId)
+                ->where('id', '!=', $lockedPlan->id)
+                ->whereIn('status', ['approved', 'active'])
+                ->exists();
 
-        if (! $hasMatch) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'resolution_id' => 'The selected resolution does not authorize approval of this strategic plan.',
-            ]);
-        }
+            if ($alreadyUsed) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'The selected resolution has already been applied to another active strategic plan.',
+                ]);
+            }
 
-        $alreadyUsed = static::query()
-            ->where('approval_resolution_id', $resolutionId)
-            ->where('id', '!=', $this->id)
-            ->whereIn('status', ['approved', 'active'])
-            ->exists();
+            try {
+                $authority->verifyAndConsume(
+                    $resolution,
+                    GovernanceResolutionBinding::SUBJECT_STRATEGIC_PLAN,
+                    (int) $lockedPlan->getKey(),
+                    $authority->strategicPlanTerms($lockedPlan),
+                    $actorId ?? auth()->id(),
+                );
+            } catch (\DomainException $exception) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'The selected resolution does not authorize approval of this strategic plan. '.$exception->getMessage(),
+                ]);
+            }
 
-        if ($alreadyUsed) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'resolution_id' => 'The selected resolution has already been applied to another active strategic plan.',
-            ]);
-        }
-
-        \Illuminate\Support\Facades\DB::transaction(function () use ($resolutionId) {
-            $this->update([
+            $lockedPlan->update([
                 'status' => 'approved',
                 'approval_resolution_id' => $resolutionId,
                 'approved_by_board_at' => now(),
             ]);
 
-            $this->captureSnapshot();
+            $lockedPlan->captureSnapshot();
 
-            if ($this->supersedes_plan_id) {
-                $superseded = static::find($this->supersedes_plan_id);
+            if ($lockedPlan->supersedes_plan_id) {
+                $superseded = static::query()->whereKey($lockedPlan->supersedes_plan_id)->lockForUpdate()->first();
                 if ($superseded && in_array($superseded->status, ['approved', 'active'])) {
                     $superseded->update(['status' => 'superseded']);
                 }
             }
-        });
+        }, 3);
+
+        $this->refresh();
     }
 
     public function archive(): void

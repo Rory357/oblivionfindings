@@ -2,11 +2,13 @@
 
 namespace App\Domain\Governance\Models;
 
+use App\Domain\Governance\Support\BoardPackContainedSources;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BoardPack extends Model
@@ -46,10 +48,14 @@ class BoardPack extends Model
         'download_tracking' => 'array',
         'read_tracking' => 'array',
         'supplementary_attachments' => 'array',
+        'contains_confidential_agenda' => 'boolean',
+        'contained_sources_indexed_at' => 'datetime',
     ];
 
     protected array $auditExcludedAttributes = [
         'document_manifest',
+        'contains_confidential_agenda',
+        'contained_sources_indexed_at',
         'file_path',
         'checksum',
         'distributed_to',
@@ -57,6 +63,33 @@ class BoardPack extends Model
         'read_tracking',
         'supplementary_attachments',
     ];
+
+    protected static function booted(): void
+    {
+        // The typed contained-source index is derived from the manifest. A new
+        // or changed manifest is marked unindexed before it is written, then
+        // re-indexed after save; until indexing succeeds the pack stays hidden
+        // from non-managers (see BoardPackAccessService::visibleQuery).
+        static::saving(function (BoardPack $pack): void {
+            if (! $pack->exists || $pack->isDirty('document_manifest')) {
+                $pack->forceFill([
+                    'contains_confidential_agenda' => BoardPackContainedSources::containsConfidentialAgenda($pack->document_manifest),
+                    'contained_sources_indexed_at' => null,
+                ]);
+            }
+        });
+
+        static::saved(function (BoardPack $pack): void {
+            if ($pack->contained_sources_indexed_at === null) {
+                BoardPackContainedSources::sync($pack);
+            }
+        });
+    }
+
+    public function containedSources(): HasMany
+    {
+        return $this->hasMany(BoardPackContainedSource::class, 'board_pack_id');
+    }
 
     public function meeting(): BelongsTo
     {

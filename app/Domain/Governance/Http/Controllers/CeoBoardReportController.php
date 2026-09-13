@@ -19,26 +19,63 @@ class CeoBoardReportController extends Controller
     {
         $this->authorize('viewAny', CeoBoardReport::class);
 
-        $reports = CeoBoardReport::with(['meeting', 'submittedBy'])
-            ->orderByDesc('created_at')
+        $overdue = fn ($query) => $query
+            ->where('status', CeoBoardReport::STATUS_DRAFT)
+            ->whereNotNull('deadline')
+            ->where('deadline', '<', now());
+
+        $query = CeoBoardReport::with(['meeting', 'submittedBy'])
+            ->orderByDesc('created_at');
+
+        $status = $request->string('status')->toString();
+        if ($status === 'overdue') {
+            $overdue($query);
+        } elseif (in_array($status, ['draft', 'submitted', 'presented'], true)) {
+            $query->where('status', $status);
+        }
+
+        if ($search = trim($request->string('search')->toString())) {
+            $query->where(function ($inner) use ($search) {
+                $inner->whereHas('meeting', fn ($meeting) => $meeting->where('title', 'like', "%{$search}%"))
+                    ->orWhereHas('submittedBy', fn ($author) => $author->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        $reports = $query
             ->paginate(15)
+            ->withQueryString()
             ->through(fn (CeoBoardReport $report) => $this->presentReport($report, brief: true));
 
-        $meetings = $this->meetingOptions();
+        $canCreate = $request->user()?->can('create', CeoBoardReport::class) ?? false;
 
         return Inertia::render('Governance/CeoReports/Index', [
             'reports' => $reports,
-            'meetings' => $meetings,
+            // New-report wizard options, only for viewers who may create.
+            'meetings' => $canCreate ? $this->meetingOptions() : [],
+            'can_create' => $canCreate,
+            'filters' => [
+                'status' => $status ?: null,
+                'search' => $request->string('search')->toString() ?: null,
+            ],
+            'summary' => [
+                'total' => CeoBoardReport::query()->count(),
+                'draft' => CeoBoardReport::query()->where('status', CeoBoardReport::STATUS_DRAFT)->count(),
+                'submitted' => CeoBoardReport::query()->where('status', CeoBoardReport::STATUS_SUBMITTED)->count(),
+                'presented' => CeoBoardReport::query()->where('status', CeoBoardReport::STATUS_PRESENTED)->count(),
+                'overdue' => $overdue(CeoBoardReport::query())->count(),
+            ],
         ]);
     }
 
+    /**
+     * Legacy deep link: the new-report wizard is a dialog on the index.
+     * Authorise exactly as the retired page did, then open it there.
+     */
     public function create(Request $request)
     {
         $this->authorize('create', CeoBoardReport::class);
 
-        return Inertia::render('Governance/CeoReports/Create', [
-            'meetings' => $this->meetingOptions(),
-        ]);
+        return redirect()->route('governance.ceo-reports.index', ['create' => 1]);
     }
 
     public function store(Request $request)

@@ -1,5 +1,7 @@
 # Implementation progress
-Current status: independent Astra post-push audit, 13 September 2026. **1 Blocked, 14 Failed, 13 Not tested**. Governance implementation is already on main in 96ae8f765. Use astra-post-push-audit-2026-09-13.md for current findings. All 24 tasks remain required; UI/UX first, then remaining controls and integrated verification.
+**Latest (14 September 2026):** implementation pass on branch `claude/audit-governance-review-7681c3` addressing every post-push finding plus the owner's 11-entry admin navigation decision — see `claude-implementation-2026-09-14.md`. State: Implemented (not yet verified in a signed-in browser); Governance + Sites calendar Pest 468/468, Vitest 66/66, tsc/eslint/build clean. Acceptance results below are unchanged until an independent browser verification runs.
+
+Previous status: independent Astra post-push audit, 13 September 2026. **1 Blocked, 14 Failed, 13 Not tested**. Governance implementation is already on main in 96ae8f765. Use astra-post-push-audit-2026-09-13.md for current findings. All 24 tasks remain required; UI/UX first, then remaining controls and integrated verification.
 
 Update after each coherent slice. Allowed task states: Not started, In progress, Implemented (not yet verified), Verified, Blocked. Acceptance result: Not run, Verified, Failed, Blocked, Not tested. Never overwrite failure history; append dated evidence/deviation entries.
 

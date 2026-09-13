@@ -434,6 +434,16 @@ before.
   point — every card/row keeps the kebab AND the right-click context
   menu with the full existing `MenuItem` set — and reintroducing
   readiness/onboarding displays (removed 2026-09-06).
+- **One sidebar link per register** (corrected 2026-09-14, Governance) —
+  a module sub-panel that lists every register as its own link (Governance
+  had 26 for chairs/secretaries). Group sibling registers into hubs: the
+  sidebar shows ONE entry per hub and the siblings become the hub's
+  connected-tab header rail, each keeping its canonical URL so deep links
+  and server authorisation are unchanged. Keep the config in one place
+  (reference: `lib/governance-sections.ts` + `GovernanceSectionRail`, with
+  the sidebar entry staying lit across the hub). Don't orphan a module
+  that has no other entry (Roadmap became a Strategy hub tab), and never
+  use hidden nav as the security boundary.
 - **A global "Live"/sync chip in the top bar** — removed from the
   approved shell (2026-09-05); live/sync status belongs on the page
   surfaces that need it, not in the global chrome.

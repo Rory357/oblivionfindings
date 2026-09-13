@@ -6,16 +6,34 @@ use App\Domain\Governance\Models\Budget;
 use App\Domain\Governance\Models\BudgetAdjustment;
 use App\Domain\Governance\Models\BudgetAllocation;
 use App\Domain\Governance\Models\BudgetLineItem;
+use App\Domain\Governance\Models\GovernanceResolutionBinding;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Domain\Governance\Services\GovernanceNestedMutationService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class BudgetController extends Controller
 {
+    /**
+     * Budget categories offered for line items.
+     *
+     * @var array<string, string>
+     */
+    private const CATEGORIES = [
+        'staffing' => 'Staffing',
+        'operations' => 'Operations',
+        'fleet' => 'Fleet',
+        'compliance' => 'Compliance',
+        'capital' => 'Capital',
+        'admin' => 'Administration',
+        'other' => 'Other',
+    ];
+
     public function __construct(
         private readonly GovernanceNestedMutationService $nestedMutations,
     ) {}
@@ -35,16 +53,25 @@ class BudgetController extends Controller
                 return $budget;
             });
 
+        $canCreate = $request->user()->can('create', Budget::class);
+
         return Inertia::render('Governance/Budgets/Index', [
             'budgets' => $budgets,
+            'canCreate' => $canCreate,
+            // New-budget wizard options, only for viewers who may create.
+            'formOptions' => $canCreate ? $this->formOptions() : null,
         ]);
     }
 
+    /**
+     * Legacy deep link: the new-budget wizard is a dialog on the index.
+     * Authorise exactly as the retired page did, then open it there.
+     */
     public function create()
     {
         $this->authorize('create', Budget::class);
 
-        return Inertia::render('Governance/Budgets/Create');
+        return redirect()->route('governance.budgets.index', ['create' => 1]);
     }
 
     public function show(Request $request, Budget $budget)
@@ -63,20 +90,20 @@ class BudgetController extends Controller
             'createdBy',
         ]);
 
-        $categories = [
-            'staffing' => 'Staffing',
-            'operations' => 'Operations',
-            'fleet' => 'Fleet',
-            'compliance' => 'Compliance',
-            'capital' => 'Capital',
-            'admin' => 'Administration',
-            'other' => 'Other',
-        ];
+        $categories = self::CATEGORIES;
 
-        $carriedResolutions = Resolution::query()
+        // Explicit authority: only carried resolutions bound (and not yet
+        // used) to one of this budget's adjustments can apply to it.
+        $adjustmentIds = $budget->adjustments->pluck('id')->all();
+        $carriedResolutions = $adjustmentIds === [] ? collect() : Resolution::query()
             ->where('outcome', 'carried')
             ->whereIn('status', ['closed', 'implemented', 'archived'])
+            ->whereHas('authorityBindings', fn ($q) => $q
+                ->where('subject_type', GovernanceResolutionBinding::SUBJECT_BUDGET_ADJUSTMENT)
+                ->whereIn('subject_id', $adjustmentIds)
+                ->whereNull('consumed_at'))
             ->select(['id', 'resolution_reference', 'title', 'outcome', 'cost_impact', 'closed_at'])
+            ->with('authorityBindings:id,resolution_id,subject_type,subject_id,amount,direction,consumed_at')
             ->orderByDesc('id')
             ->get();
 
@@ -86,6 +113,8 @@ class BudgetController extends Controller
             'budget' => $budget,
             'categories' => $categories,
             'carriedResolutions' => $carriedResolutions,
+            // Edit wizard: the same audience as the retired edit button — the
+            // budget structure (and its lines) is only editable before approval.
             'canEdit' => ($budget->isDrafting() || $budget->status === 'proposed') && $user->canDo('governance.budgets.create'),
             'canPropose' => $budget->isDrafting() && $user->canDo('governance.budgets.submit'),
             'canApprove' => $budget->isProposed() && $user->canDo('governance.budgets.approve'),
@@ -102,22 +131,45 @@ class BudgetController extends Controller
             'total_budget' => ['required', 'numeric', 'min:0'],
             'description' => ['nullable', 'string'],
             'board_approved' => ['boolean'],
+            ...$this->lineItemRules(),
         ]);
 
-        $isApproved = $data['board_approved'] ?? false;
-        $data['status'] = $isApproved ? 'approved' : 'drafting';
-        $data['created_by'] = $request->user()->id;
-        $data['version_number'] = (int) Budget::query()
-            ->where('fiscal_year', $data['fiscal_year'])
-            ->max('version_number') + 1;
-        if ($isApproved) {
-            $data['approved_by_board_at'] = now();
-        }
+        $lineItems = $data['line_items'] ?? [];
+        unset($data['line_items']);
 
-        $budget = Budget::create($data);
+        $isApproved = $data['board_approved'] ?? false;
+        unset($data['board_approved']);
+        $data['status'] = 'drafting';
+        $data['created_by'] = $request->user()->id;
+
+        $budget = DB::transaction(function () use ($request, $data, $lineItems, $isApproved): Budget {
+            $data['version_number'] = (int) Budget::query()
+                ->where('fiscal_year', $data['fiscal_year'])
+                ->max('version_number') + 1;
+
+            $budget = Budget::create($data);
+
+            // Lines are built while the budget is still drafting, through the
+            // same guarded mutation path as the budget page (recalculates the
+            // envelope to the sum of the lines).
+            foreach ($lineItems as $line) {
+                $this->nestedMutations->storeBudgetLineItem($request->user(), $budget, $this->lineItemPayload($line));
+            }
+
+            if ($isApproved) {
+                $budget->refresh()->update([
+                    'status' => 'approved',
+                    'approved_by_board_at' => now(),
+                ]);
+            }
+
+            return $budget;
+        });
 
         return redirect()->route('governance.budgets.show', $budget)
-            ->with('success', 'Budget created. Add line items to build your budget.');
+            ->with('success', $lineItems === []
+                ? 'Budget created. Add line items to build your budget.'
+                : 'Budget created with '.count($lineItems).' line item'.(count($lineItems) === 1 ? '' : 's').'.');
     }
 
     public function update(Request $request, Budget $budget)
@@ -125,15 +177,136 @@ class BudgetController extends Controller
         $this->authorize('update', $budget);
 
         $data = $request->validate([
-            'fiscal_year' => ['sometimes', 'string', 'max:20'],
-            'title' => ['sometimes', 'string', 'max:255'],
+            'fiscal_year' => [
+                'sometimes',
+                'string',
+                'max:20',
+                Rule::unique('budgets', 'fiscal_year')
+                    ->where('version_number', $budget->version_number)
+                    ->ignore($budget->id),
+            ],
+            'title' => ['sometimes', 'nullable', 'string', 'max:255'],
             'total_budget' => ['sometimes', 'numeric', 'min:0'],
             'description' => ['nullable', 'string'],
+            ...$this->lineItemRules(),
+        ], [
+            'fiscal_year.unique' => 'Another budget already uses this fiscal year and version number.',
         ]);
 
-        $budget->update($data);
+        $hasLines = array_key_exists('line_items', $data);
+        $lineItems = $data['line_items'] ?? [];
+        unset($data['line_items']);
+
+        if ($hasLines) {
+            $this->nestedMutations->assertBudgetStructureMutable($request->user(), $budget);
+            $ids = collect($lineItems)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
+            $this->nestedMutations->assertBudgetLineItemsBound($request->user(), $budget, $ids);
+        }
+
+        DB::transaction(function () use ($request, $budget, $data, $hasLines, $lineItems): void {
+            $budget->update($data);
+
+            if ($hasLines) {
+                $this->syncLineItems($request, $budget, $lineItems);
+
+                // With no lines left the envelope is the figure the editor entered,
+                // not the zero sum of removed lines.
+                if ($lineItems === [] && array_key_exists('total_budget', $data)) {
+                    $budget->refresh()->update(['total_budget' => $data['total_budget']]);
+                }
+            }
+        });
 
         return redirect()->route('governance.budgets.show', $budget)->with('success', 'Budget updated.');
+    }
+
+    /** @return array{categories: array<string, string>} */
+    private function formOptions(): array
+    {
+        return ['categories' => self::CATEGORIES];
+    }
+
+    /**
+     * The wizard's nested budget lines — the same fields and limits as the
+     * budget page's line item dialogs.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function lineItemRules(): array
+    {
+        return [
+            'line_items' => ['sometimes', 'array', 'max:200'],
+            'line_items.*.id' => ['nullable', 'integer', 'distinct'],
+            'line_items.*.category' => ['required', 'string', 'max:50'],
+            'line_items.*.description' => ['required', 'string', 'max:255'],
+            'line_items.*.account_code' => ['nullable', 'string', 'max:50'],
+            'line_items.*.budget_amount' => ['required', 'numeric', 'min:0'],
+            'line_items.*.forecast_amount' => ['nullable', 'numeric', 'min:0'],
+            'line_items.*.notes' => ['nullable', 'string'],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $line
+     * @return array<string, mixed>
+     */
+    private function lineItemPayload(array $line): array
+    {
+        return [
+            'category' => $line['category'],
+            'description' => $line['description'],
+            'account_code' => $line['account_code'] ?? null,
+            'budget_amount' => $line['budget_amount'],
+            'forecast_amount' => $line['forecast_amount'] ?? $line['budget_amount'],
+            'notes' => $line['notes'] ?? null,
+        ];
+    }
+
+    /**
+     * Apply the wizard's line list: keep and update listed lines, add new
+     * ones, remove lines the editor deleted. Actual spend and variance notes
+     * are recorded on the budget page and are left untouched here.
+     *
+     * @param  array<int, array<string, mixed>>  $lineItems
+     */
+    private function syncLineItems(Request $request, Budget $budget, array $lineItems): void
+    {
+        $existing = $budget->lineItems()->get()->keyBy('id');
+        $keptIds = [];
+
+        foreach ($lineItems as $line) {
+            $payload = $this->lineItemPayload($line);
+            $id = isset($line['id']) ? (int) $line['id'] : null;
+
+            if ($id === null) {
+                $this->nestedMutations->storeBudgetLineItem($request->user(), $budget, $payload);
+
+                continue;
+            }
+
+            $keptIds[] = $id;
+            $current = $existing->get($id);
+            if (! $current) {
+                continue;
+            }
+
+            $changed = (string) $current->category !== (string) $payload['category']
+                || (string) $current->description !== (string) $payload['description']
+                || (string) ($current->account_code ?? '') !== (string) ($payload['account_code'] ?? '')
+                || (string) ($current->notes ?? '') !== (string) ($payload['notes'] ?? '')
+                || round((float) $current->budget_amount, 2) !== round((float) $payload['budget_amount'], 2)
+                || round((float) ($current->forecast_amount ?? 0), 2) !== round((float) $payload['forecast_amount'], 2);
+
+            if ($changed) {
+                $this->nestedMutations->updateBudgetLineItem($request->user(), $budget, $current, $payload);
+            }
+        }
+
+        foreach ($existing as $id => $line) {
+            if (! in_array((int) $id, $keptIds, true)) {
+                $this->nestedMutations->destroyBudgetLineItem($request->user(), $budget, $line);
+            }
+        }
     }
 
     public function propose(Request $request, Budget $budget)
@@ -169,25 +342,33 @@ class BudgetController extends Controller
             return redirect()->back()->with('error', 'Budget is already approved.');
         }
 
-        DB::transaction(function () use ($budget, $resolution) {
-            $budget->approve($resolution->id);
-            GovernanceAuditService::log('budget.approved', 'Budget', $budget->id, [
-                'resolution_id' => $resolution->id,
-                'total_budget' => $budget->total_budget,
-            ]);
-        });
+        try {
+            DB::transaction(function () use ($request, $budget, $resolution) {
+                // Verifies and consumes the resolution's explicit binding to
+                // this exact budget version and its budgeted lines.
+                $budget->approve((int) $resolution->id, $request->user()->id);
+                GovernanceAuditService::log('budget.approved', 'Budget', $budget->id, [
+                    'resolution_id' => $resolution->id,
+                    'total_budget' => $budget->total_budget,
+                ]);
+            });
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first() ?? 'The budget could not be approved.';
+
+            return redirect()->back()
+                ->withErrors($exception->errors())
+                ->with('error', $message);
+        }
 
         return redirect()->back()->with('success', 'Budget approved by board.');
     }
 
+    /** Legacy deep link: the edit wizard is a dialog on the budget page. */
     public function edit(Budget $budget)
     {
         $this->authorize('update', $budget);
-        $budget->load('lineItems');
 
-        return Inertia::render('Governance/Budgets/Edit', [
-            'budget' => $budget,
-        ]);
+        return redirect()->route('governance.budgets.show', ['budget' => $budget->id, 'edit' => 1]);
     }
 
     // ---- Line Item CRUD ----

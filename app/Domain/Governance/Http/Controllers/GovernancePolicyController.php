@@ -16,16 +16,50 @@ class GovernancePolicyController extends Controller
     {
         $this->authorize('viewAny', GovernancePolicy::class);
 
+        $search = trim((string) $request->query('search', ''));
+        $today = now()->toDateString();
+
         $policies = GovernancePolicy::query()
             ->withCount('attestations')
             ->when($request->category, fn($q, $cat) => $q->where('category', $cat))
-            ->when($request->status, fn($q, $s) => $q->where('status', $s))
+            // Filters use the presented statuses: "active" is stored as
+            // approved and "archived" also covers superseded versions.
+            ->when($request->status, fn ($q, $s) => match ($s) {
+                'archived' => $q->whereIn('status', ['archived', 'superseded']),
+                default => $q->where('status', $this->normalizeStatus((string) $s)),
+            })
+            ->when($request->query('review') === 'overdue', fn ($q) => $q
+                ->where('status', 'approved')
+                ->whereDate('next_review_date', '<', $today))
+            ->when($search !== '', fn ($q) => $q->where(fn ($inner) => $inner
+                ->where('title', 'like', "%{$search}%")
+                ->orWhere('policy_code', 'like', "%{$search}%")))
             ->orderBy('title')
             ->paginate(20)
+            ->withQueryString()
             ->through(fn (GovernancePolicy $policy) => $this->presentPolicyListItem($policy));
 
         return Inertia::render('Governance/Policies/Index', [
             'policies' => $policies,
+            'filters' => [
+                'search' => $search !== '' ? $search : null,
+                'category' => $request->query('category'),
+                'status' => $request->query('status'),
+                'review' => $request->query('review'),
+            ],
+            'summary' => [
+                'total' => GovernancePolicy::query()->count(),
+                'active' => GovernancePolicy::query()->where('status', 'approved')->count(),
+                'draft' => GovernancePolicy::query()->where('status', 'draft')->count(),
+                'requires_attestation' => GovernancePolicy::query()
+                    ->where('status', 'approved')
+                    ->where('requires_attestation', true)
+                    ->count(),
+                'review_overdue' => GovernancePolicy::query()
+                    ->where('status', 'approved')
+                    ->whereDate('next_review_date', '<', $today)
+                    ->count(),
+            ],
             'categories' => [
                 ['value' => 'governance', 'label' => 'Governance'],
                 ['value' => 'financial', 'label' => 'Financial'],
@@ -43,7 +77,8 @@ class GovernancePolicyController extends Controller
     {
         $this->authorize('create', GovernancePolicy::class);
 
-        return Inertia::render('Governance/Policies/Create');
+        // The full-page form was retired: the register opens the policy wizard.
+        return redirect()->route('governance.policies.index', ['create' => 1]);
     }
 
     public function store(Request $request)
@@ -104,9 +139,8 @@ class GovernancePolicyController extends Controller
     {
         $this->authorize('update', $policy);
 
-        return Inertia::render('Governance/Policies/Edit', [
-            'policy' => $this->presentPolicy($policy),
-        ]);
+        // The full-page form was retired: the record opens the policy wizard.
+        return redirect()->route('governance.policies.show', ['policy' => $policy, 'edit' => 1]);
     }
 
     public function update(Request $request, GovernancePolicy $policy)

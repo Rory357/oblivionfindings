@@ -1,84 +1,64 @@
-import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
-import { Badge } from '@/components/ui/badge';
+import { DiscardDraftDialog } from '@/components/governance/DiscardDraftDialog';
+import {
+    firstErrorStep,
+    pageHasFlashError,
+} from '@/components/governance/governance-dialog-deep-link';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { TabsContent } from '@/components/ui/tabs';
+import type { StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
+import {
+    Field,
+    InfoCard,
+    SelectInput,
+    StepHead,
+} from '@/components/wizard/primitives';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+    type WizardStep,
+} from '@/components/wizard/shell';
+import { formatDateLong, formatDateOnly } from '@/lib/datetime';
 import { router, useForm } from '@inertiajs/react';
 import {
-    AlertOctagon,
-    BookOpen,
+    AlertTriangle,
     Briefcase,
-    Calendar,
-    DollarSign,
+    CalendarDays,
+    ChevronLeft,
+    ChevronRight,
+    ClipboardCheck,
     FileText,
     Gavel,
-    Layers,
     Loader2,
+    Lock,
     MessageCircleQuestion,
     Paperclip,
     Plus,
+    Save,
+    Send,
     ShieldCheck,
     Trash2,
-    Users,
-    type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AttachmentsPanel, type Attachment } from './_attachments';
 
-// ── Report type tile picker (Send-Kudos style) ────────────────────────────
-
-type ReportTypeKey = 'monthly' | 'quarterly' | 'ad_hoc';
-
-interface ReportTypeDef {
-    key: ReportTypeKey;
-    label: string;
-    description: string;
-    icon: LucideIcon;
-    accent: string;
+export function ceoReportStatusVariant(status: string): StatusVariant {
+    switch (status) {
+        case 'presented':
+            return 'success';
+        case 'submitted':
+            return 'info';
+        default:
+            return 'neutral';
+    }
 }
 
-export const CEO_REPORT_TYPES: ReportTypeDef[] = [
-    {
-        key: 'monthly',
-        label: 'Monthly update',
-        description: 'Standard monthly board update.',
-        icon: Calendar,
-        accent: 'text-status-info',
-    },
-    {
-        key: 'quarterly',
-        label: 'Quarterly summary',
-        description: 'Three-month performance review.',
-        icon: Layers,
-        accent: 'text-primary',
-    },
-    {
-        key: 'ad_hoc',
-        label: 'Ad-hoc / urgent',
-        description: 'Out-of-cycle issue or escalation.',
-        icon: AlertOctagon,
-        accent: 'text-status-warning',
-    },
-];
+export const ceoReportStatusLabel = (status: string) =>
+    status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
 
 // ── Form shape ────────────────────────────────────────────────────────────
 
@@ -101,7 +81,6 @@ export interface MatterArisingRow {
 }
 
 export type CeoReportFormValues = {
-    report_type: ReportTypeKey | string;
     governance_meeting_id: string;
     period_start: string;
     period_end: string;
@@ -116,7 +95,6 @@ export type CeoReportFormValues = {
     recommendations: string;
     decisions_sought: DecisionSoughtRow[];
     matters_arising: MatterArisingRow[];
-    submit_immediately: boolean;
 };
 
 export interface CeoReportInitialValues extends Partial<CeoReportFormValues> {
@@ -124,59 +102,106 @@ export interface CeoReportInitialValues extends Partial<CeoReportFormValues> {
     attachments?: Attachment[];
 }
 
-// ── Field error ───────────────────────────────────────────────────────────
+type SectionKey = Exclude<
+    keyof CeoReportFormValues,
+    | 'governance_meeting_id'
+    | 'period_start'
+    | 'period_end'
+    | 'deadline'
+    | 'decisions_sought'
+    | 'matters_arising'
+>;
 
-function FieldError({ message }: { message?: string }) {
-    if (!message) return null;
-    return <p className="mt-1 text-xs text-status-critical">{message}</p>;
-}
+export const CEO_REPORT_SECTIONS: Array<{ key: SectionKey; label: string }> = [
+    { key: 'executive_summary', label: 'Executive summary' },
+    { key: 'operational_summary', label: 'Operational summary' },
+    { key: 'key_achievements', label: 'Key achievements' },
+    { key: 'financial_summary', label: 'Financial summary' },
+    { key: 'challenges_and_risks', label: 'Challenges & risks' },
+    { key: 'compliance_status', label: 'Compliance status' },
+    { key: 'staffing_update', label: 'Workforce update' },
+    { key: 'recommendations', label: 'Strategic progress' },
+];
 
-// ── Type picker ───────────────────────────────────────────────────────────
+// ── Steps ─────────────────────────────────────────────────────────────────
 
-function ReportTypePicker({
-    value,
-    onChange,
-}: {
-    value: string;
-    onChange: (v: ReportTypeKey) => void;
-}) {
-    return (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {CEO_REPORT_TYPES.map((t) => {
-                const Icon = t.icon;
-                const active = value === t.key;
-                return (
-                    <Button
-                        unstyled
-                        key={t.key}
-                        type="button"
-                        onClick={() => onChange(t.key)}
-                        className={cn(
-                            'group flex items-start gap-2 rounded-xl border bg-card/40 p-3 text-left transition-all',
-                            'hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                            active
-                                ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
-                                : 'border-border',
-                        )}
-                        aria-pressed={active}
-                    >
-                        <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
-                            <Icon className={cn('h-4 w-4', t.accent)} />
-                        </span>
-                        <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium">
-                                {t.label}
-                            </span>
-                            <span className="block text-xs text-muted-foreground">
-                                {t.description}
-                            </span>
-                        </span>
-                    </Button>
-                );
-            })}
-        </div>
-    );
-}
+type StepKey =
+    | 'meeting'
+    | 'summary'
+    | 'operations'
+    | 'finance'
+    | 'strategy'
+    | 'matters'
+    | 'attachments'
+    | 'review';
+
+export const CEO_REPORT_STEPS: readonly (WizardStep & { key: StepKey })[] = [
+    {
+        key: 'meeting',
+        label: 'Meeting & period',
+        blurb: 'Board meeting, period & deadline',
+        icon: CalendarDays,
+    },
+    {
+        key: 'summary',
+        label: 'Executive summary',
+        blurb: 'Headline outcomes for the board',
+        icon: FileText,
+    },
+    {
+        key: 'operations',
+        label: 'Operations & people',
+        blurb: 'Utilisation, wins & workforce',
+        icon: Briefcase,
+    },
+    {
+        key: 'finance',
+        label: 'Finance & risk',
+        blurb: 'Financials, risks & compliance',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'strategy',
+        label: 'Strategy & decisions',
+        blurb: 'Strategic progress & decisions sought',
+        icon: Gavel,
+    },
+    {
+        key: 'matters',
+        label: 'Matters arising',
+        blurb: 'Items carried from last meeting',
+        icon: MessageCircleQuestion,
+    },
+    {
+        key: 'attachments',
+        label: 'Attachments',
+        blurb: 'Supporting documents',
+        icon: Paperclip,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Save as draft or submit',
+        icon: ClipboardCheck,
+    },
+];
+
+const FIELD_STEPS: Record<string, StepKey> = {
+    governance_meeting_id: 'meeting',
+    period_start: 'meeting',
+    period_end: 'meeting',
+    deadline: 'meeting',
+    executive_summary: 'summary',
+    operational_summary: 'operations',
+    key_achievements: 'operations',
+    staffing_update: 'operations',
+    financial_summary: 'finance',
+    challenges_and_risks: 'finance',
+    compliance_status: 'finance',
+    recommendations: 'strategy',
+    decisions_sought: 'strategy',
+    matters_arising: 'matters',
+};
 
 // ── Repeatable rows ───────────────────────────────────────────────────────
 
@@ -210,6 +235,7 @@ function DecisionsSoughtEditor({
                 >
                     <div className="flex items-start justify-between gap-2">
                         <Input
+                            aria-label={`Decision ${i + 1} title`}
                             placeholder="Decision title (e.g. Approve FY27 budget)"
                             value={row.title}
                             onChange={(e) =>
@@ -229,12 +255,14 @@ function DecisionsSoughtEditor({
                     </div>
                     <Textarea
                         rows={2}
+                        aria-label={`Decision ${i + 1} background`}
                         placeholder="Why is this decision needed? Background and context."
                         value={row.detail}
                         onChange={(e) => update(i, { detail: e.target.value })}
                     />
                     <Textarea
                         rows={2}
+                        aria-label={`Decision ${i + 1} recommendation`}
                         placeholder="CEO recommendation to the board."
                         value={row.recommendation}
                         onChange={(e) =>
@@ -280,6 +308,7 @@ function MattersArisingEditor({
                 >
                     <div className="flex items-start gap-2">
                         <Input
+                            aria-label={`Matter ${i + 1} title`}
                             placeholder="Matter title (from previous report)"
                             value={row.title}
                             onChange={(e) =>
@@ -287,21 +316,22 @@ function MattersArisingEditor({
                             }
                             className="font-medium"
                         />
-                        <Select
-                            value={row.status}
-                            onValueChange={(v) => update(i, { status: v })}
-                        >
-                            <SelectTrigger className="w-36 shrink-0">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="open">Open</SelectItem>
-                                <SelectItem value="in_progress">
-                                    In progress
-                                </SelectItem>
-                                <SelectItem value="done">Done</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <div className="w-40 shrink-0">
+                            <SelectInput
+                                value={row.status}
+                                onChange={(v) => update(i, { status: v })}
+                                placeholder="Status"
+                                ariaLabel={`Matter ${i + 1} status`}
+                                options={[
+                                    { value: 'open', label: 'Open' },
+                                    {
+                                        value: 'in_progress',
+                                        label: 'In progress',
+                                    },
+                                    { value: 'done', label: 'Done' },
+                                ]}
+                            />
+                        </div>
                         <Button
                             type="button"
                             variant="ghost"
@@ -314,6 +344,7 @@ function MattersArisingEditor({
                     </div>
                     <Textarea
                         rows={2}
+                        aria-label={`Matter ${i + 1} update`}
                         placeholder="What's happened since the previous board meeting?"
                         value={row.update}
                         onChange={(e) => update(i, { update: e.target.value })}
@@ -355,7 +386,63 @@ function defaultsFromMeeting(meeting: MeetingOption | null): {
     };
 }
 
-// ── Dialog shell ──────────────────────────────────────────────────────────
+function validateStep(
+    step: StepKey,
+    data: CeoReportFormValues,
+    isEdit: boolean,
+): Record<string, string> {
+    const errors: Record<string, string> = {};
+    if (step !== 'meeting') return errors;
+    if (!isEdit && !data.governance_meeting_id) {
+        errors.governance_meeting_id = 'Choose the board meeting.';
+    }
+    if (
+        data.period_start &&
+        data.period_end &&
+        data.period_end < data.period_start
+    ) {
+        errors.period_end = 'The period cannot end before it starts.';
+    }
+    return errors;
+}
+
+// ── Section textarea ──────────────────────────────────────────────────────
+
+function SectionTextarea({
+    id,
+    label,
+    hint,
+    value,
+    error,
+    onChange,
+    rows = 5,
+}: {
+    id: string;
+    label: string;
+    hint?: string;
+    value: string;
+    error?: string;
+    onChange: (v: string) => void;
+    rows?: number;
+}) {
+    return (
+        <Field label={label} error={error} htmlFor={id}>
+            <div className="space-y-1">
+                {hint && <p className="text-caption">{hint}</p>}
+                <Textarea
+                    id={id}
+                    aria-label={label}
+                    rows={rows}
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder="Write each paragraph on its own line. Blank lines split sections."
+                />
+            </div>
+        </Field>
+    );
+}
+
+// ── Wizard dialog ─────────────────────────────────────────────────────────
 
 export interface CeoReportDialogProps {
     isOpen: boolean;
@@ -364,60 +451,29 @@ export interface CeoReportDialogProps {
     /** When set, lock the form to this meeting (used from Meeting Show). */
     meetingId?: number | string | null;
     lockMeeting?: boolean;
-    /** When passed, dialog enters edit mode and PUTs to this report id. */
+    /** When passed, the wizard enters edit mode and PUTs to this report id. */
     initial?: CeoReportInitialValues;
     /** Called after a successful save/submit. */
     onSaved?: () => void;
 }
 
-export function CeoReportDialog({
+export function CeoReportWizardDialog(props: CeoReportDialogProps) {
+    // Re-mount the body each open so the form resets cleanly.
+    return props.isOpen ? <CeoReportWizardBody {...props} /> : null;
+}
+
+/** Backwards-compatible name for existing imports. */
+export const CeoReportDialog = CeoReportWizardDialog;
+
+function CeoReportWizardBody({
     isOpen,
     onClose,
     meetings,
-    meetingId,
+    meetingId = null,
     lockMeeting = false,
     initial,
     onSaved,
 }: CeoReportDialogProps) {
-    return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent
-                className="max-h-[90vh] overflow-y-auto"
-                style={{
-                    maxWidth: 'min(92vw, 1100px)',
-                    width: 'min(92vw, 1100px)',
-                }}
-            >
-                {isOpen && (
-                    <CeoReportBody
-                        onClose={onClose}
-                        meetings={meetings}
-                        meetingId={meetingId ?? null}
-                        lockMeeting={lockMeeting}
-                        initial={initial}
-                        onSaved={onSaved}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function CeoReportBody({
-    onClose,
-    meetings,
-    meetingId,
-    lockMeeting,
-    initial,
-    onSaved,
-}: {
-    onClose: () => void;
-    meetings: MeetingOption[];
-    meetingId: number | string | null;
-    lockMeeting: boolean;
-    initial?: CeoReportInitialValues;
-    onSaved?: () => void;
-}) {
     const isEdit = Boolean(initial?.id);
 
     const meetingMap = useMemo(
@@ -427,12 +483,11 @@ function CeoReportBody({
     const initialMeetingId = String(
         initial?.governance_meeting_id ?? meetingId ?? '',
     );
-    const initialMeeting = meetingMap.get(initialMeetingId) ?? null;
-    const meetingDefaults = defaultsFromMeeting(initialMeeting);
+    const meetingDefaults = defaultsFromMeeting(
+        meetingMap.get(initialMeetingId) ?? null,
+    );
 
     const form = useForm<CeoReportFormValues>({
-        report_type:
-            (initial?.report_type as ReportTypeKey | undefined) ?? 'monthly',
         governance_meeting_id: initialMeetingId,
         period_start: initial?.period_start ?? meetingDefaults.period_start,
         period_end: initial?.period_end ?? meetingDefaults.period_end,
@@ -447,422 +502,580 @@ function CeoReportBody({
         recommendations: initial?.recommendations ?? '',
         decisions_sought: initial?.decisions_sought ?? [],
         matters_arising: initial?.matters_arising ?? [],
-        submit_immediately: false,
     });
+    const { data, setData, processing } = form;
 
-    const [activeTab, setActiveTab] = useState<string>('overview');
+    const [stepIndex, setStepIndex] = useState(0);
+    const [clientErrors, setClientErrors] = useState<Record<string, string>>(
+        {},
+    );
+    const [submitting, setSubmitting] = useState<'draft' | 'board' | null>(
+        null,
+    );
+    const [done, setDone] = useState<'draft' | 'board' | null>(null);
+    const [confirmClose, setConfirmClose] = useState(false);
 
-    // Sync period defaults when a different meeting is picked (only in create mode).
+    // Sync period defaults when a different meeting is picked (create only).
     useEffect(() => {
         if (isEdit) return;
-        const selected =
-            meetingMap.get(form.data.governance_meeting_id) ?? null;
+        const selected = meetingMap.get(data.governance_meeting_id) ?? null;
         if (!selected) return;
         const d = defaultsFromMeeting(selected);
-        if (!form.data.period_start)
-            form.setData('period_start', d.period_start);
-        if (!form.data.period_end) form.setData('period_end', d.period_end);
-        if (!form.data.deadline) form.setData('deadline', d.deadline);
+        if (!data.period_start) setData('period_start', d.period_start);
+        if (!data.period_end) setData('period_end', d.period_end);
+        if (!data.deadline) setData('deadline', d.deadline);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [form.data.governance_meeting_id]);
+    }, [data.governance_meeting_id]);
 
-    const lockedMeeting = lockMeeting
-        ? (meetingMap.get(String(meetingId ?? '')) ?? null)
-        : null;
+    const step = CEO_REPORT_STEPS[stepIndex];
+    const err = (name: string): string | undefined =>
+        clientErrors[name] ??
+        (form.errors as Record<string, string | undefined>)[name];
+    const goTo = (key: StepKey) => {
+        const index = CEO_REPORT_STEPS.findIndex((s) => s.key === key);
+        if (index >= 0) setStepIndex(index);
+    };
 
-    const handleSave = (submitToBoard: boolean) => {
-        form.setData('submit_immediately', submitToBoard);
+    const sectionsFilled = CEO_REPORT_SECTIONS.filter(
+        (section) => data[section.key].trim().length > 0,
+    ).length;
+    const pct = useMemo(() => {
+        const filled =
+            [
+                data.governance_meeting_id,
+                data.period_start,
+                data.period_end,
+                data.deadline,
+            ].filter(Boolean).length + sectionsFilled;
+        return Math.round((filled / (4 + CEO_REPORT_SECTIONS.length)) * 100);
+    }, [data, sectionsFilled]);
 
-        const onSuccess = () => {
-            onSaved?.();
-            onClose();
+    const next = () => {
+        const errors = validateStep(step.key, data, isEdit);
+        setClientErrors(errors);
+        if (Object.keys(errors).length > 0) return;
+        setStepIndex((i) => Math.min(i + 1, CEO_REPORT_STEPS.length - 1));
+    };
+
+    const requestClose = () => {
+        if (form.isDirty && !done) {
+            setConfirmClose(true);
+            return;
+        }
+        onClose();
+    };
+
+    const finish = (mode: 'draft' | 'board', page: unknown) => {
+        setSubmitting(null);
+        if (pageHasFlashError(page)) return;
+        onSaved?.();
+        setDone(mode);
+    };
+
+    const save = (submitToBoard: boolean) => {
+        const all = validateStep('meeting', data, isEdit);
+        if (Object.keys(all).length > 0) {
+            setClientErrors(all);
+            goTo('meeting');
+            return;
+        }
+        setClientErrors({});
+        const mode = submitToBoard ? 'board' : 'draft';
+        setSubmitting(mode);
+
+        const onError = (errors: Record<string, string>) => {
+            setSubmitting(null);
+            const target = firstErrorStep(errors, FIELD_STEPS, 'review');
+            if (target) goTo(target);
         };
 
         if (isEdit && initial?.id) {
-            form.put(`/governance/ceo-reports/${initial.id}`, {
+            const reportId = initial.id;
+            form.transform((current) => current);
+            form.put(`/governance/ceo-reports/${reportId}`, {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => {
-                    if (submitToBoard) {
-                        router.post(
-                            `/governance/ceo-reports/${initial.id}/submit`,
-                            undefined,
-                            {
-                                preserveScroll: true,
-                                onSuccess,
-                            },
-                        );
-                    } else {
-                        onSuccess();
+                onError,
+                onSuccess: (page) => {
+                    if (!submitToBoard || pageHasFlashError(page)) {
+                        finish('draft', page);
+                        return;
                     }
+                    router.post(
+                        `/governance/ceo-reports/${reportId}/submit`,
+                        undefined,
+                        {
+                            preserveScroll: true,
+                            preserveState: true,
+                            onSuccess: (submitted) => finish(mode, submitted),
+                            onError: () => setSubmitting(null),
+                        },
+                    );
                 },
             });
         } else {
+            // submit_immediately travels with this request (setData is async).
+            form.transform((current) => ({
+                ...current,
+                submit_immediately: submitToBoard,
+            }));
             form.post('/governance/ceo-reports', {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess,
+                onError,
+                onSuccess: (page) => finish(mode, page),
             });
         }
     };
 
-    const tabs: PageTabItem[] = [
-        { value: 'overview', label: 'Overview', icon: FileText },
-        { value: 'operations', label: 'Operations', icon: Briefcase },
-        { value: 'financials', label: 'Financials', icon: DollarSign },
-        { value: 'risks', label: 'Risk & Compliance', icon: ShieldCheck },
-        { value: 'workforce', label: 'Workforce', icon: Users },
-        { value: 'strategy', label: 'Strategy', icon: BookOpen },
-        { value: 'decisions', label: 'Decisions', icon: Gavel },
-        {
-            value: 'matters',
-            label: 'Matters arising',
-            icon: MessageCircleQuestion,
-        },
-        {
-            value: 'attachments',
-            label: `Attachments (${initial?.attachments?.length ?? 0})`,
-            icon: Paperclip,
-            overflowable: true,
-        },
-    ];
+    const selectedMeeting = meetingMap.get(data.governance_meeting_id) ?? null;
+    const meetingLocked = isEdit || lockMeeting;
+    const isReview = step.key === 'review';
+    const busy = processing || submitting !== null;
 
-    return (
-        <form
-            onSubmit={(e) => {
-                e.preventDefault();
-                handleSave(false);
-            }}
-        >
-            <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
-                    {isEdit ? 'Edit CEO Report' : 'New CEO Report'}
-                </DialogTitle>
-                <DialogDescription>
-                    {isEdit
-                        ? 'Update the report sections. Save as draft or submit to the board.'
-                        : 'Pick the report type and meeting, then fill in each section.'}
-                </DialogDescription>
-            </DialogHeader>
+    const success = done ? (
+        <WizardSuccessPane
+            title={
+                done === 'board'
+                    ? 'Report submitted to the board'
+                    : isEdit
+                      ? 'Report saved'
+                      : 'Draft saved'
+            }
+            blurb={
+                done === 'board'
+                    ? 'A KPI snapshot was captured at submission and the report is now with the board.'
+                    : 'The report stays in draft until you submit it to the board.'
+            }
+            actions={<Button onClick={onClose}>Close</Button>}
+        />
+    ) : undefined;
 
-            <div className="mt-3 space-y-4">
-                {!isEdit && (
-                    <div>
-                        <Label className="mb-2 block">
-                            Report type{' '}
-                            <span className="text-status-critical">*</span>
-                        </Label>
-                        <ReportTypePicker
-                            value={form.data.report_type}
-                            onChange={(v) => form.setData('report_type', v)}
-                        />
-                    </div>
-                )}
-
-                {/* Meeting + period row */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                        <Label htmlFor="ceo-meeting">
-                            Board meeting{' '}
-                            <span className="text-status-critical">*</span>
-                        </Label>
-                        {lockedMeeting ? (
-                            <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3">
-                                <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
-                                    <Calendar className="h-4 w-4 text-primary" />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="truncate text-sm font-medium">
-                                            {lockedMeeting.title}
-                                        </span>
-                                        <Badge
-                                            variant="outline"
-                                            className="text-[10px]"
-                                        >
-                                            From meeting
-                                        </Badge>
-                                    </div>
-                                    <p className="mt-0.5 text-xs text-muted-foreground">
-                                        Locked from the meeting you opened.
-                                    </p>
-                                </div>
-                            </div>
-                        ) : (
-                            <Select
-                                value={
-                                    form.data.governance_meeting_id || undefined
-                                }
-                                onValueChange={(v) =>
-                                    form.setData('governance_meeting_id', v)
-                                }
-                                disabled={isEdit}
-                            >
-                                <SelectTrigger id="ceo-meeting">
-                                    <SelectValue placeholder="Select meeting…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {meetings.map((m) => (
-                                        <SelectItem
-                                            key={m.id}
-                                            value={String(m.id)}
-                                        >
-                                            {m.title}
-                                            {m.scheduled_at && (
-                                                <span className="ml-2 text-xs text-muted-foreground">
-                                                    (
-                                                    {new Date(
-                                                        m.scheduled_at,
-                                                    ).toLocaleDateString(
-                                                        'en-NZ',
-                                                    )}
-                                                    )
-                                                </span>
-                                            )}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
-                        <FieldError
-                            message={form.errors.governance_meeting_id}
-                        />
-                    </div>
-
-                    <div>
-                        <Label htmlFor="ceo-deadline">Deadline</Label>
-                        <Input
-                            id="ceo-deadline"
-                            type="datetime-local"
-                            value={form.data.deadline}
-                            onChange={(e) =>
-                                form.setData('deadline', e.target.value)
-                            }
-                        />
-                        <FieldError message={form.errors.deadline} />
-                    </div>
-
-                    <div>
-                        <Label htmlFor="ceo-period-start">Period start</Label>
-                        <Input
-                            id="ceo-period-start"
-                            type="date"
-                            value={form.data.period_start}
-                            onChange={(e) =>
-                                form.setData('period_start', e.target.value)
-                            }
-                        />
-                        <FieldError message={form.errors.period_start} />
-                    </div>
-
-                    <div>
-                        <Label htmlFor="ceo-period-end">Period end</Label>
-                        <Input
-                            id="ceo-period-end"
-                            type="date"
-                            value={form.data.period_end}
-                            onChange={(e) =>
-                                form.setData('period_end', e.target.value)
-                            }
-                        />
-                        <FieldError message={form.errors.period_end} />
-                    </div>
-                </div>
-
-                {/* Section tabs */}
-                <PageTabs
-                    value={activeTab}
-                    onValueChange={setActiveTab}
-                    items={tabs}
-                >
-                    <TabsContent value="overview" className="space-y-3">
-                        <SectionTextarea
-                            label="Executive summary"
-                            hint="3-paragraph top-line for the board. Headline outcomes only."
-                            value={form.data.executive_summary}
-                            error={form.errors.executive_summary}
-                            onChange={(v) =>
-                                form.setData('executive_summary', v)
-                            }
-                            rows={6}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="operations" className="space-y-3">
-                        <SectionTextarea
-                            label="Operational summary"
-                            hint="Service utilisation, occupancy, throughput. Use plain numbers."
-                            value={form.data.operational_summary}
-                            error={form.errors.operational_summary}
-                            onChange={(v) =>
-                                form.setData('operational_summary', v)
-                            }
-                            rows={5}
-                        />
-                        <SectionTextarea
-                            label="Key achievements"
-                            hint="Wins for the period the board should know about."
-                            value={form.data.key_achievements}
-                            error={form.errors.key_achievements}
-                            onChange={(v) =>
-                                form.setData('key_achievements', v)
-                            }
-                            rows={4}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="financials" className="space-y-3">
-                        <SectionTextarea
-                            label="Financial summary"
-                            hint="Budget vs actual, key revenue / expense items, any variance > 5%."
-                            value={form.data.financial_summary}
-                            error={form.errors.financial_summary}
-                            onChange={(v) =>
-                                form.setData('financial_summary', v)
-                            }
-                            rows={6}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="risks" className="space-y-3">
-                        <SectionTextarea
-                            label="Challenges & risks"
-                            hint="Risks above appetite, notifiable incidents, regulator engagement."
-                            value={form.data.challenges_and_risks}
-                            error={form.errors.challenges_and_risks}
-                            onChange={(v) =>
-                                form.setData('challenges_and_risks', v)
-                            }
-                            rows={5}
-                        />
-                        <SectionTextarea
-                            label="Compliance status"
-                            hint="Audits closed, evidence gaps, regulatory deadlines."
-                            value={form.data.compliance_status}
-                            error={form.errors.compliance_status}
-                            onChange={(v) =>
-                                form.setData('compliance_status', v)
-                            }
-                            rows={4}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="workforce" className="space-y-3">
-                        <SectionTextarea
-                            label="Workforce update"
-                            hint="Hires, exits, training compliance %, turnover."
-                            value={form.data.staffing_update}
-                            error={form.errors.staffing_update}
-                            onChange={(v) => form.setData('staffing_update', v)}
-                            rows={5}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="strategy" className="space-y-3">
-                        <SectionTextarea
-                            label="Strategic progress"
-                            hint="Movement against the current strategic plan and roadmap."
-                            value={form.data.recommendations}
-                            error={form.errors.recommendations}
-                            onChange={(v) => form.setData('recommendations', v)}
-                            rows={5}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="decisions" className="space-y-3">
-                        <p className="text-xs text-muted-foreground">
-                            List anything that needs the board to vote or sign
-                            off this period.
-                        </p>
-                        <DecisionsSoughtEditor
-                            rows={form.data.decisions_sought}
-                            onChange={(rows) =>
-                                form.setData('decisions_sought', rows)
-                            }
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="matters" className="space-y-3">
-                        <p className="text-xs text-muted-foreground">
-                            Update the board on items carried forward from the
-                            previous meeting.
-                        </p>
-                        <MattersArisingEditor
-                            rows={form.data.matters_arising}
-                            onChange={(rows) =>
-                                form.setData('matters_arising', rows)
-                            }
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="attachments">
-                        <AttachmentsPanel
-                            reportId={isEdit ? (initial?.id ?? null) : null}
-                            attachments={initial?.attachments ?? []}
-                            canManage
-                        />
-                    </TabsContent>
-                </PageTabs>
-            </div>
-
-            <DialogFooter className="mt-4 gap-2">
-                <Button type="button" variant="outline" onClick={onClose}>
-                    Cancel
-                </Button>
-                <Button
-                    type="submit"
-                    variant="outline"
-                    disabled={form.processing}
-                >
-                    {form.processing && !form.data.submit_immediately && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    {isEdit ? 'Save changes' : 'Save as draft'}
-                </Button>
-                <Button
-                    type="button"
-                    onClick={() => handleSave(true)}
-                    disabled={form.processing}
-                >
-                    {form.processing && form.data.submit_immediately && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Submit to board
-                </Button>
-            </DialogFooter>
-        </form>
+    const sectionField = (
+        key: SectionKey,
+        label: string,
+        hint: string,
+        rows = 5,
+    ) => (
+        <SectionTextarea
+            id={`ceo-${key}`}
+            label={label}
+            hint={hint}
+            value={data[key]}
+            error={err(key)}
+            onChange={(value) => setData(key, value)}
+            rows={rows}
+        />
     );
-}
 
-function SectionTextarea({
-    label,
-    hint,
-    value,
-    error,
-    onChange,
-    rows = 5,
-}: {
-    label: string;
-    hint?: string;
-    value: string;
-    error?: string;
-    onChange: (v: string) => void;
-    rows?: number;
-}) {
     return (
-        <div>
-            <Label>{label}</Label>
-            {hint && (
-                <p className="mb-1 text-[11px] text-muted-foreground">{hint}</p>
-            )}
-            <Textarea
-                rows={rows}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder="Write each paragraph on its own line. Blank lines split sections."
+        <>
+            <WizardShell
+                open={isOpen}
+                onClose={requestClose}
+                title={isEdit ? 'Edit CEO report' : 'New CEO report'}
+                description="A guided wizard to compose the CEO's board report section by section."
+                railIcon={FileText}
+                railTitle={isEdit ? 'Edit report' : 'New report'}
+                railSub={
+                    selectedMeeting ? selectedMeeting.title : 'CEO board report'
+                }
+                steps={CEO_REPORT_STEPS}
+                stepIndex={stepIndex}
+                onStepClick={setStepIndex}
+                pct={pct}
+                success={success}
+                maxHeight="min(88vh, 820px)"
+                footerStart={
+                    stepIndex > 0 ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() =>
+                                setStepIndex((i) => Math.max(i - 1, 0))
+                            }
+                        >
+                            <ChevronLeft className="h-4 w-4" /> Back
+                        </Button>
+                    ) : null
+                }
+                footerEnd={
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={requestClose}
+                        >
+                            Cancel
+                        </Button>
+                        {isReview ? (
+                            <>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => save(false)}
+                                    disabled={busy}
+                                >
+                                    {submitting === 'draft' ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Save className="h-4 w-4" />
+                                    )}
+                                    {isEdit ? 'Save changes' : 'Save as draft'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={() => save(true)}
+                                    disabled={busy}
+                                >
+                                    {submitting === 'board' ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Send className="h-4 w-4" />
+                                    )}
+                                    Submit to board
+                                </Button>
+                            </>
+                        ) : (
+                            <Button type="button" onClick={next}>
+                                Continue <ChevronRight className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </>
+                }
+            >
+                <WizardStepPane key={step.key}>
+                    {step.key === 'meeting' ? (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="sm:col-span-2">
+                                <StepHead
+                                    icon={CalendarDays}
+                                    title="Which meeting is this for?"
+                                    blurb="One report per meeting. The period and deadline default from the meeting date."
+                                />
+                            </div>
+                            <Field
+                                label="Board meeting"
+                                required
+                                span
+                                error={err('governance_meeting_id')}
+                            >
+                                {meetingLocked ? (
+                                    <Input
+                                        id="ceo-meeting"
+                                        value={
+                                            selectedMeeting?.title ??
+                                            'Linked meeting'
+                                        }
+                                        readOnly
+                                    />
+                                ) : (
+                                    <SelectInput
+                                        value={data.governance_meeting_id}
+                                        onChange={(value) =>
+                                            setData(
+                                                'governance_meeting_id',
+                                                value,
+                                            )
+                                        }
+                                        placeholder="Select meeting…"
+                                        ariaLabel="Board meeting"
+                                        options={meetings.map((m) => ({
+                                            value: String(m.id),
+                                            label: m.scheduled_at
+                                                ? `${m.title} (${formatDateLong(m.scheduled_at)})`
+                                                : m.title,
+                                        }))}
+                                    />
+                                )}
+                            </Field>
+                            {meetingLocked ? (
+                                <InfoCard icon={Lock}>
+                                    {isEdit
+                                        ? 'The meeting cannot be changed after the report is created.'
+                                        : 'Locked from the meeting you opened.'}
+                                </InfoCard>
+                            ) : null}
+                            <Field label="Deadline" error={err('deadline')}>
+                                <Input
+                                    id="ceo-deadline"
+                                    type="datetime-local"
+                                    value={data.deadline}
+                                    onChange={(e) =>
+                                        setData('deadline', e.target.value)
+                                    }
+                                />
+                            </Field>
+                            <div className="hidden sm:block" />
+                            <Field
+                                label="Period start"
+                                error={err('period_start')}
+                            >
+                                <Input
+                                    id="ceo-period-start"
+                                    type="date"
+                                    value={data.period_start}
+                                    onChange={(e) =>
+                                        setData('period_start', e.target.value)
+                                    }
+                                />
+                            </Field>
+                            <Field label="Period end" error={err('period_end')}>
+                                <Input
+                                    id="ceo-period-end"
+                                    type="date"
+                                    value={data.period_end}
+                                    onChange={(e) =>
+                                        setData('period_end', e.target.value)
+                                    }
+                                />
+                            </Field>
+                        </div>
+                    ) : null}
+
+                    {step.key === 'summary' ? (
+                        <div className="grid gap-4">
+                            <StepHead
+                                icon={FileText}
+                                title="Executive summary"
+                                blurb="The top-line the board reads first."
+                            />
+                            {sectionField(
+                                'executive_summary',
+                                'Executive summary',
+                                '3-paragraph top-line for the board. Headline outcomes only.',
+                                8,
+                            )}
+                        </div>
+                    ) : null}
+
+                    {step.key === 'operations' ? (
+                        <div className="grid gap-4">
+                            <StepHead
+                                icon={Briefcase}
+                                title="Operations and people"
+                                blurb="How services ran this period and what changed in the workforce."
+                            />
+                            {sectionField(
+                                'operational_summary',
+                                'Operational summary',
+                                'Service utilisation, occupancy, throughput. Use plain numbers.',
+                            )}
+                            {sectionField(
+                                'key_achievements',
+                                'Key achievements',
+                                'Wins for the period the board should know about.',
+                                4,
+                            )}
+                            {sectionField(
+                                'staffing_update',
+                                'Workforce update',
+                                'Hires, exits, training compliance %, turnover.',
+                                4,
+                            )}
+                        </div>
+                    ) : null}
+
+                    {step.key === 'finance' ? (
+                        <div className="grid gap-4">
+                            <StepHead
+                                icon={ShieldCheck}
+                                title="Finance, risk and compliance"
+                                blurb="Budget position, material risks and regulatory standing."
+                            />
+                            {sectionField(
+                                'financial_summary',
+                                'Financial summary',
+                                'Budget vs actual, key revenue / expense items, any variance > 5%.',
+                            )}
+                            {sectionField(
+                                'challenges_and_risks',
+                                'Challenges & risks',
+                                'Risks above appetite, notifiable incidents, regulator engagement.',
+                                4,
+                            )}
+                            {sectionField(
+                                'compliance_status',
+                                'Compliance status',
+                                'Audits closed, evidence gaps, regulatory deadlines.',
+                                4,
+                            )}
+                        </div>
+                    ) : null}
+
+                    {step.key === 'strategy' ? (
+                        <div className="grid gap-4">
+                            <StepHead
+                                icon={Gavel}
+                                title="Strategy and decisions sought"
+                                blurb="Progress against the plan and anything the board must vote on."
+                            />
+                            {sectionField(
+                                'recommendations',
+                                'Strategic progress',
+                                'Movement against the current strategic plan and roadmap.',
+                            )}
+                            <Field
+                                label="Decisions sought"
+                                error={err('decisions_sought')}
+                            >
+                                <DecisionsSoughtEditor
+                                    rows={data.decisions_sought}
+                                    onChange={(rows) =>
+                                        setData('decisions_sought', rows)
+                                    }
+                                />
+                            </Field>
+                        </div>
+                    ) : null}
+
+                    {step.key === 'matters' ? (
+                        <div className="grid gap-4">
+                            <StepHead
+                                icon={MessageCircleQuestion}
+                                title="Matters arising"
+                                blurb="Update the board on items carried forward from the previous meeting."
+                            />
+                            <Field error={err('matters_arising')}>
+                                <MattersArisingEditor
+                                    rows={data.matters_arising}
+                                    onChange={(rows) =>
+                                        setData('matters_arising', rows)
+                                    }
+                                />
+                            </Field>
+                        </div>
+                    ) : null}
+
+                    {step.key === 'attachments' ? (
+                        <div className="grid gap-4">
+                            <StepHead
+                                icon={Paperclip}
+                                title="Supporting documents"
+                                blurb={
+                                    isEdit
+                                        ? 'Files upload straight to the report.'
+                                        : 'Save the draft first, then attach documents from the report page.'
+                                }
+                            />
+                            <AttachmentsPanel
+                                reportId={isEdit ? (initial?.id ?? null) : null}
+                                attachments={initial?.attachments ?? []}
+                                canManage
+                            />
+                        </div>
+                    ) : null}
+
+                    {isReview ? (
+                        <div className="grid gap-4">
+                            <StepHead
+                                icon={ClipboardCheck}
+                                title="Review the report"
+                                blurb="Save it as a draft, or submit it to the board — a KPI snapshot is captured on submission."
+                            />
+                            {Object.keys(form.errors).length > 0 ? (
+                                <InfoCard icon={AlertTriangle} tone="crit">
+                                    Some details need attention — check the
+                                    highlighted steps.
+                                </InfoCard>
+                            ) : null}
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <ReviewCard
+                                    icon={CalendarDays}
+                                    title="Meeting & period"
+                                    onEdit={() => goTo('meeting')}
+                                >
+                                    <ReviewRow
+                                        label="Meeting"
+                                        value={selectedMeeting?.title}
+                                    />
+                                    <ReviewRow
+                                        label="Period"
+                                        value={
+                                            data.period_start && data.period_end
+                                                ? `${formatDateOnly(data.period_start)} – ${formatDateOnly(data.period_end)}`
+                                                : null
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Deadline"
+                                        value={
+                                            data.deadline
+                                                ? data.deadline.replace('T', ' ')
+                                                : null
+                                        }
+                                    />
+                                </ReviewCard>
+                                <ReviewCard
+                                    icon={FileText}
+                                    title="Narrative sections"
+                                    onEdit={() => goTo('summary')}
+                                >
+                                    <ReviewRow
+                                        label="Completed"
+                                        value={`${sectionsFilled} of ${CEO_REPORT_SECTIONS.length}`}
+                                    />
+                                    <ReviewRow
+                                        label="Missing"
+                                        value={
+                                            CEO_REPORT_SECTIONS.filter(
+                                                (s) => !data[s.key].trim(),
+                                            )
+                                                .map((s) => s.label)
+                                                .join(', ') || null
+                                        }
+                                    />
+                                </ReviewCard>
+                                <ReviewCard
+                                    icon={Gavel}
+                                    title="Board items"
+                                    onEdit={() => goTo('strategy')}
+                                >
+                                    <ReviewRow
+                                        label="Decisions sought"
+                                        value={String(
+                                            data.decisions_sought.length,
+                                        )}
+                                    />
+                                    <ReviewRow
+                                        label="Matters arising"
+                                        value={String(
+                                            data.matters_arising.length,
+                                        )}
+                                    />
+                                </ReviewCard>
+                                <ReviewCard
+                                    icon={Paperclip}
+                                    title="Attachments"
+                                    onEdit={() => goTo('attachments')}
+                                >
+                                    <ReviewRow
+                                        label="Files"
+                                        value={
+                                            isEdit
+                                                ? String(
+                                                      initial?.attachments
+                                                          ?.length ?? 0,
+                                                  )
+                                                : 'Added after saving'
+                                        }
+                                    />
+                                </ReviewCard>
+                            </div>
+                        </div>
+                    ) : null}
+                </WizardStepPane>
+            </WizardShell>
+
+            <DiscardDraftDialog
+                open={confirmClose}
+                onKeepEditing={() => setConfirmClose(false)}
+                onDiscard={() => {
+                    setConfirmClose(false);
+                    onClose();
+                }}
+                description="Unsaved changes to this CEO report will be lost."
             />
-            <FieldError message={error} />
-        </div>
+        </>
     );
 }

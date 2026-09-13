@@ -118,6 +118,12 @@ class GovernanceSettingController extends Controller
 
         $eligibleCount = $boardMembers->where('can_vote', true)->count();
         $quorumRequired = $profileService->calculateQuorumRequired($eligibleCount, $candidateProfile);
+        $canManage = auth()->user()?->canDo('governance.settings.manage') ?? false;
+
+        // activateRules() always targets the latest board profile, which can be
+        // a newer candidate than the active one shown above. Activation options
+        // are only built for users who may activate.
+        $activationTarget = $canManage ? $profileService->getOrCreateCandidateDefault('board') : null;
 
         return Inertia::render('Governance/Settings/Index', [
             'settings' => $settings,
@@ -136,8 +142,27 @@ class GovernanceSettingController extends Controller
                 'quorumRequired' => $quorumRequired,
                 'quorumFormula' => 'floor(N/2)+1',
                 'members' => $boardMembers,
+                'activation' => $activationTarget ? [
+                    'profile_id' => $activationTarget->id,
+                    'is_active' => (bool) $activationTarget->is_active,
+                    'governing_document_reference' => $activationTarget->governing_document_reference,
+                    'governing_document_version' => $activationTarget->governing_document_version,
+                ] : null,
+                // Only carried resolutions explicitly bound to the exact profile
+                // activation targets (and not yet used) can authorise it.
+                'approvalResolutions' => $activationTarget
+                    ? \App\Domain\Governance\Models\Resolution::query()
+                        ->where('outcome', 'carried')
+                        ->whereIn('status', ['closed', 'implemented', 'archived'])
+                        ->whereHas('authorityBindings', fn ($q) => $q
+                            ->where('subject_type', \App\Domain\Governance\Models\GovernanceResolutionBinding::SUBJECT_VOTING_PROFILE)
+                            ->where('subject_id', $activationTarget->id)
+                            ->whereNull('consumed_at'))
+                        ->orderByDesc('closed_at')
+                        ->get(['id', 'resolution_reference', 'title', 'closed_at'])
+                    : [],
             ],
-            'canManage' => auth()->user()?->hasPermissionTo('governance.settings.manage') ?? false,
+            'canManage' => $canManage,
         ]);
     }
 

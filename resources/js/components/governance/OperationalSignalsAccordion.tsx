@@ -4,7 +4,6 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -16,6 +15,10 @@ import {
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import { ArrowRight, Layers } from 'lucide-react';
+
+import { StatusBadge } from '@/components/ui/status-badge';
+
+import { CockpitCardStatus, isCardStatusKnown } from './CockpitCardStatus';
 
 interface CockpitCard {
     key: string;
@@ -49,15 +52,6 @@ const TONE_VALUE: Record<string, string> = {
     muted: 'text-muted-foreground',
 };
 
-const STATUS_BADGE: Record<string, string> = {
-    critical:
-        'border-status-critical/30 bg-status-critical-bg text-status-critical',
-    warning:
-        'border-status-warning/30 bg-status-warning-bg text-status-warning',
-    good: 'border-status-success/30 bg-status-success-bg text-status-success',
-    unknown: 'border-border bg-muted text-muted-foreground',
-};
-
 function SignalCard({ card }: { card: CockpitCard }) {
     return (
         <Card
@@ -73,14 +67,7 @@ function SignalCard({ card }: { card: CockpitCard }) {
                         {card.description}
                     </p>
                 </div>
-                <Badge
-                    className={cn(
-                        'border text-[10px] uppercase',
-                        STATUS_BADGE[card.status] ?? STATUS_BADGE.unknown,
-                    )}
-                >
-                    {card.status}
-                </Badge>
+                <CockpitCardStatus status={card.status} />
             </div>
             <div className="grid grid-cols-2 gap-2">
                 {card.metrics.slice(0, 4).map((m) => (
@@ -129,6 +116,12 @@ export function OperationalSignalsAccordion({
 
     const criticals = available.filter((c) => c.status === 'critical').length;
     const warnings = available.filter((c) => c.status === 'warning').length;
+    const unavailable = available.filter(
+        (c) => !isCardStatusKnown(c.status),
+    ).length;
+    // "All clear" only when every signal actually reported and none alert.
+    const allClear =
+        criticals === 0 && warnings === 0 && unavailable === 0;
 
     return (
         <Card data-dusk="cockpit-operational-signals">
@@ -144,7 +137,7 @@ export function OperationalSignalsAccordion({
                                     />
                                 </div>
                                 <div className="text-left">
-                                    <CardTitle className="text-base">
+                                    <CardTitle className="text-section-title">
                                         Operational Signals
                                     </CardTitle>
                                     <CardDescription>
@@ -155,19 +148,24 @@ export function OperationalSignalsAccordion({
                                 </div>
                                 <div className="ml-auto flex items-center gap-2">
                                     {criticals > 0 && (
-                                        <Badge className="border border-status-critical/30 bg-status-critical-bg text-status-critical">
+                                        <StatusBadge variant="critical">
                                             {criticals} critical
-                                        </Badge>
+                                        </StatusBadge>
                                     )}
                                     {warnings > 0 && (
-                                        <Badge className="border border-status-warning/30 bg-status-warning-bg text-status-warning">
+                                        <StatusBadge variant="warning">
                                             {warnings} warning
-                                        </Badge>
+                                        </StatusBadge>
                                     )}
-                                    {criticals === 0 && warnings === 0 && (
-                                        <Badge className="border border-status-success/30 bg-status-success-bg text-status-success">
+                                    {unavailable > 0 && (
+                                        <StatusBadge variant="neutral">
+                                            {unavailable} unavailable
+                                        </StatusBadge>
+                                    )}
+                                    {allClear && (
+                                        <StatusBadge variant="success">
                                             All clear
-                                        </Badge>
+                                        </StatusBadge>
                                     )}
                                 </div>
                             </div>

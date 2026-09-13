@@ -1,50 +1,47 @@
+import { Head } from '@inertiajs/react';
+import { FileText, Info, Plus, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import {
+    EmptyValue,
+    EntityChip,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    type EntityTableColumn,
+} from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderFilterSelect,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
-import { FileText, Plus } from 'lucide-react';
-import { useState } from 'react';
 
-interface Interest {
-    id: number;
-    interest_type: string;
-    description: string;
-    organization_name: string | null;
-    nature_of_interest: string;
-    date_from: string;
-    date_to: string | null;
-    is_active: boolean;
-    declared_at: string;
-}
-
-interface BoardMember {
-    id: number;
-}
+import {
+    DeclareInterestDialog,
+    INTEREST_TYPES,
+    interestPeriod,
+    interestTypeIcon,
+    interestTypeLabel,
+    type InterestRecord,
+} from './_dialogs';
 
 interface Props extends PageProps {
-    interests: Interest[];
-    boardMember: BoardMember | null;
+    interests: InterestRecord[];
+    boardMember: { id: number } | null;
     canDeclare: boolean;
 }
+
+type StandingFilter = 'all' | 'current' | 'ceased';
 
 export default function MyInterests({
     auth,
@@ -52,267 +49,257 @@ export default function MyInterests({
     boardMember,
     canDeclare,
 }: Props) {
-    const [showForm, setShowForm] = useState(false);
-    const { data, setData, post, processing, reset } = useForm({
-        board_member_id: boardMember ? String(boardMember.id) : '',
-        interest_type: 'professional',
-        description: '',
-        organization_name: '',
-        nature_of_interest: '',
-        date_from: new Date().toISOString().split('T')[0],
-        date_to: '',
-        is_active: true,
-    });
+    // Declaring also needs the manage permission the store route requires.
+    const declareAllowed = Boolean(
+        canDeclare && boardMember && auth.can?.governance?.interests?.manage,
+    );
+    const [declareOpen, setDeclareOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const [type, setType] = useState('all');
+    const [standing, setStanding] = useState<StandingFilter>('all');
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post('/governance/interests', {
-            onSuccess: () => {
-                reset();
-                setShowForm(false);
-            },
-        });
+    const currentCount = interests.filter((i) => i.is_active).length;
+
+    const visible = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return interests.filter(
+            (i) =>
+                (type === 'all' || i.interest_type === type) &&
+                (standing === 'all' ||
+                    (standing === 'current' ? i.is_active : !i.is_active)) &&
+                (q === '' ||
+                    i.nature_of_interest.toLowerCase().includes(q) ||
+                    (i.organization_name ?? '').toLowerCase().includes(q) ||
+                    i.description.toLowerCase().includes(q)),
+        );
+    }, [interests, search, type, standing]);
+
+    const hasFilters = search.trim() !== '' || type !== 'all' || standing !== 'all';
+    const clearFilters = () => {
+        setSearch('');
+        setType('all');
+        setStanding('all');
     };
+
+    const columns: EntityTableColumn<InterestRecord>[] = [
+        {
+            key: 'type',
+            label: 'Type',
+            width: '0.8fr',
+            cell: (i) => (
+                <EntityChip icon={interestTypeIcon(i.interest_type)}>
+                    {interestTypeLabel(i.interest_type)}
+                </EntityChip>
+            ),
+        },
+        {
+            key: 'organisation',
+            label: 'Organisation',
+            width: '1fr',
+            cell: (i) =>
+                i.organization_name ? (
+                    <span className="truncate">{i.organization_name}</span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'period',
+            label: 'Period',
+            width: '1.1fr',
+            cell: (i) => interestPeriod(i),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '0.6fr',
+            cell: (i) => (
+                <EntityStatusChip variant={i.is_active ? 'success' : 'neutral'}>
+                    {i.is_active ? 'Current' : 'Ceased'}
+                </EntityStatusChip>
+            ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            icon={FileText}
+            title="My interests"
+            subline="Your personal declarations of interest on the board register"
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search my declarations…"
+                    />
+                    {declareAllowed ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            dusk="declare-interest"
+                            onClick={() => setDeclareOpen(true)}
+                        >
+                            Declare interest
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Declarations"
+                        ariaLabel="View all my declarations"
+                        onClick={clearFilters}
+                    >
+                        <PageHeaderMeterBig>{interests.length}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            recorded on your board record
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Current"
+                        ariaLabel="View my current declarations"
+                        onClick={() => setStanding('current')}
+                    >
+                        <PageHeaderMeterBig>{currentCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {interests.length - currentCount} ceased
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Board register"
+                        ariaLabel="View the board interests register"
+                        href="/governance/interests"
+                    >
+                        <PageHeaderMeterBig>
+                            {boardMember ? 'Linked' : 'Not linked'}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {boardMember
+                                ? 'your declarations appear there'
+                                : 'no board-member record yet'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="All types"
+                        value={type}
+                        options={[
+                            { value: 'all', label: 'All types' },
+                            ...INTEREST_TYPES.map((t) => ({
+                                value: t.key,
+                                label: t.label,
+                            })),
+                        ]}
+                        onChange={setType}
+                    />
+                    <PageHeaderFilterSelect
+                        label="Current & ceased"
+                        value={standing}
+                        options={[
+                            { value: 'all', label: 'Current & ceased' },
+                            { value: 'current', label: 'Current only' },
+                            { value: 'ceased', label: 'Ceased only' },
+                        ]}
+                        onChange={(v) => setStanding(v as StandingFilter)}
+                    />
+                </>
+            }
+            rail={<GovernanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout
+            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Interests', href: '/governance/interests' },
-                { title: 'My Interests', href: '/governance/my-interests' },
+                { title: 'My interests', href: '/governance/interests/mine' },
             ]}
         >
-            <Head title="My Interests" />
-            <PageLayout
-                hero={
-                    <PageHeader
-                        icon={FileText}
-                        title="My Interests"
-                        subline="Declare and manage your personal interest declarations."
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Total"
-                                    href="/governance/my-interests"
+            <Head title="My interests" />
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {!canDeclare ? (
+                        <EmptyState
+                            variant="inline"
+                            icon={Info}
+                            title="Your account is not linked to an active board-member record yet, so personal interest declarations are unavailable."
+                        />
+                    ) : null}
+
+                    <ListCaption
+                        title="My declarations"
+                        caption={`${visible.length} of ${interests.length} shown`}
+                        right={
+                            hasFilters ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={clearFilters}
+                                    className="text-xs text-muted-foreground"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {interests.length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>All records</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Active"
-                                    href="/governance/my-interests"
-                                    tone="brand"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {interests.filter((i) => i.is_active).length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Current disclosures</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
-                        }
-                        actions={
-                            <Button
-                                onClick={() => setShowForm(!showForm)}
-                                dusk="declare-interest"
-                                disabled={!canDeclare}
-                            >
-                                <Plus className="mr-2 h-4 w-4" /> Declare
-                                Interest
-                            </Button>
+                                    <X className="h-3.5 w-3.5" />
+                                    Clear filters
+                                </Button>
+                            ) : null
                         }
                     />
-                }
-            >
-                {!canDeclare && (
-                    <Card className="mb-6">
-                        <CardContent className="p-6 text-sm text-muted-foreground">
-                            Your account is not linked to an active board-member
-                            record yet, so personal interest declarations are
-                            unavailable.
-                        </CardContent>
-                    </Card>
-                )}
 
-                {showForm && canDeclare && (
-                    <Card className="mb-6">
-                        <CardHeader>
-                            <CardTitle>New Declaration</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div>
-                                    <Label>Interest Type</Label>
-                                    <Select
-                                        value={data.interest_type}
-                                        onValueChange={(val) =>
-                                            setData('interest_type', val)
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="financial">
-                                                Financial
-                                            </SelectItem>
-                                            <SelectItem value="personal">
-                                                Personal
-                                            </SelectItem>
-                                            <SelectItem value="professional">
-                                                Professional
-                                            </SelectItem>
-                                            <SelectItem value="family">
-                                                Family
-                                            </SelectItem>
-                                            <SelectItem value="other">
-                                                Other
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div>
-                                    <Label>Organization</Label>
-                                    <Input
-                                        dusk="interest-organization"
-                                        value={data.organization_name}
-                                        onChange={(e) =>
-                                            setData(
-                                                'organization_name',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Nature of Interest</Label>
-                                    <Input
-                                        dusk="interest-nature"
-                                        value={data.nature_of_interest}
-                                        onChange={(e) =>
-                                            setData(
-                                                'nature_of_interest',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Description</Label>
-                                    <Textarea
-                                        dusk="interest-description"
-                                        value={data.description}
-                                        onChange={(e) =>
-                                            setData(
-                                                'description',
-                                                e.target.value,
-                                            )
-                                        }
-                                        rows={3}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Label>From</Label>
-                                        <Input
-                                            dusk="interest-date-from"
-                                            type="date"
-                                            value={data.date_from}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'date_from',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label>To (blank = ongoing)</Label>
-                                        <Input
-                                            dusk="interest-date-to"
-                                            type="date"
-                                            value={data.date_to}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'date_to',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex justify-end gap-3">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setShowForm(false)}
-                                    >
-                                        Cancel
+                    {visible.length === 0 ? (
+                        <EmptyState
+                            icon={FileText}
+                            title={
+                                hasFilters
+                                    ? 'No declarations match your filters'
+                                    : 'No interests declared'
+                            }
+                            description={
+                                hasFilters
+                                    ? 'Try clearing a filter or search term.'
+                                    : declareAllowed
+                                      ? 'Declare any interest that could conflict with your board duties.'
+                                      : 'No personal interest declarations are available for this account.'
+                            }
+                            action={
+                                hasFilters ? (
+                                    <Button variant="outline" size="sm" onClick={clearFilters}>
+                                        <X className="h-3.5 w-3.5" />
+                                        Clear filters
                                     </Button>
-                                    <Button
-                                        type="submit"
-                                        disabled={processing}
-                                        dusk="submit-interest"
-                                    >
-                                        Submit
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                )}
-
-                <div className="space-y-4">
-                    {interests.map((interest) => (
-                        <Card key={interest.id}>
-                            <CardContent className="p-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="outline">
-                                                {interest.interest_type}
-                                            </Badge>
-                                            <span className="font-medium">
-                                                {interest.nature_of_interest}
-                                            </span>
-                                        </div>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            {interest.description}
-                                        </p>
-                                        {interest.organization_name && (
-                                            <p className="text-sm text-muted-foreground">
-                                                {interest.organization_name}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <Badge
-                                        className={
-                                            interest.is_active
-                                                ? 'bg-status-success-bg text-status-success'
-                                                : 'bg-muted text-foreground'
-                                        }
-                                    >
-                                        {interest.is_active
-                                            ? 'Active'
-                                            : 'Inactive'}
-                                    </Badge>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                    {interests.length === 0 && (
-                        <Card>
-                            <CardContent className="p-8 text-center text-muted-foreground">
-                                {canDeclare
-                                    ? 'No interests declared. Use the button above to add one.'
-                                    : 'No personal interest declarations are available for this account.'}
-                            </CardContent>
-                        </Card>
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={visible}
+                            rowKey={(i) => i.id}
+                            identityLabel="Interest"
+                            identity={(i) => ({
+                                icon: interestTypeIcon(i.interest_type),
+                                name: i.nature_of_interest,
+                                subline: i.description,
+                            })}
+                            columns={columns}
+                            actionsFor={() => []}
+                            minWidth={760}
+                        />
                     )}
                 </div>
             </PageLayout>
+
+            {declareAllowed && boardMember ? (
+                <DeclareInterestDialog
+                    open={declareOpen}
+                    onClose={() => setDeclareOpen(false)}
+                    boardMemberId={boardMember.id}
+                />
+            ) : null}
         </AppLayout>
     );
 }

@@ -80,18 +80,18 @@ describe.each(roles)(
                     ),
                 );
 
+                // ByRole `name` strings already match the full accessible
+                // name exactly (`exact` is not a ByRoleOptions key), so
+                // "Today" never matches e.g. "Today's shifts".
                 expect(
-                    screen.getByRole('link', { name: 'My Day', exact: true }),
+                    screen.getByRole('link', { name: 'My Day' }),
                 ).toHaveAttribute('href', '/my-day');
                 expect(
-                    screen.queryByRole('link', { name: 'Today', exact: true }),
+                    screen.queryByRole('link', { name: 'Today' }),
                 ).not.toBeInTheDocument();
                 expect(document.querySelector('a[href="/today"]')).toBeNull();
                 expect(
-                    !!screen.queryByRole('link', {
-                        name: 'Overview',
-                        exact: true,
-                    }),
+                    !!screen.queryByRole('link', { name: 'Overview' }),
                 ).toBe(overview);
 
                 const catalog = buildNavSearchCatalog({ role, can });

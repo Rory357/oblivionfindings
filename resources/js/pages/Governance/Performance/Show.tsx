@@ -1,8 +1,12 @@
+import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
 import {
     PageHeader,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
@@ -17,9 +21,11 @@ import {
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
@@ -30,15 +36,31 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
+import { formatDateOnly, formatDateTimeLong } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { assess as assessReview } from '@/routes/governance/performance';
 import { PageProps } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { Award, Star, Target, TrendingUp, User } from 'lucide-react';
+import {
+    Award,
+    Pencil,
+    Star,
+    Target,
+    TrendingUp,
+    User,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
+import {
+    BOARD_DECISION_LABELS,
+    PerformanceReviewWizardDialog,
+    RATING_LABELS,
+    humanise,
+    ratingVariant,
+    reviewStatusVariant,
+} from './_dialogs';
 
 interface Goal {
     id: number;
@@ -65,10 +87,12 @@ interface Review {
     id: number;
     reviewee: { id: number; name: string };
     review_cycle: string;
+    review_type: string;
     period_start: string;
     period_end: string;
     status: string;
     overall_rating: string | null;
+    overall_assessment: string | null;
     board_decision: string | null;
     decision_notes: string | null;
     self_assessment_submitted_at: string | null;
@@ -79,10 +103,43 @@ interface Review {
 interface Props extends PageProps {
     review: Review;
     can_assess: boolean;
+    can_update?: boolean;
 }
 
-export default function PerformanceShow({ auth, review, can_assess }: Props) {
+const PILLAR_LABELS: Record<string, string> = {
+    safety: 'Safety',
+    quality: 'Quality',
+    people: 'People',
+    finance: 'Finance',
+    compliance: 'Compliance',
+    it_resilience: 'IT Resilience',
+};
+
+function goalStatusVariant(status: string) {
+    switch (status) {
+        case 'achieved':
+            return 'success' as const;
+        case 'partially_achieved':
+            return 'warning' as const;
+        case 'missed':
+            return 'critical' as const;
+        case 'in_progress':
+            return 'info' as const;
+        default:
+            return 'neutral' as const;
+    }
+}
+
+const dateOnly = (value: string | null | undefined) =>
+    formatDateOnly(value?.slice(0, 10));
+
+export default function PerformanceShow({
+    review,
+    can_assess,
+    can_update = false,
+}: Props) {
     const [assessmentOpen, setAssessmentOpen] = useState(false);
+    const [editOpen, setEditOpen] = useDialogDeepLink('edit', can_update);
 
     const initialAssessments = useMemo(() => {
         return review.goals.reduce<
@@ -103,62 +160,11 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
         decision_notes: review.decision_notes ?? '',
     });
 
-    const getPillarLabel = (pillar: string) => {
-        const labels: Record<string, string> = {
-            safety: 'Safety',
-            quality: 'Quality',
-            people: 'People',
-            finance: 'Finance',
-            compliance: 'Compliance',
-            it_resilience: 'IT Resilience',
-        };
-        return labels[pillar] || pillar;
-    };
-
-    const getStatusColor = (status: string) => {
-        return governanceStatusColor(status);
-        // legacy switch removed — see lib/governance-status.ts
-    };
+    const getPillarLabel = (pillar: string) => PILLAR_LABELS[pillar] || pillar;
 
     const getRatingLabel = (rating: string | null) => {
         if (!rating) return 'Not yet rated';
-        const labels: Record<string, string> = {
-            exceeds: 'Exceeds Expectations',
-            meets: 'Meets Expectations',
-            needs_improvement: 'Needs Improvement',
-            unsatisfactory: 'Unsatisfactory',
-        };
-        return labels[rating] || rating;
-    };
-
-    const getRatingColor = (rating: string | null) => {
-        switch (rating) {
-            case 'exceeds':
-                return 'bg-status-success-bg text-status-success';
-            case 'meets':
-                return 'bg-status-info-bg text-status-info';
-            case 'needs_improvement':
-                return 'bg-status-warning-bg text-status-warning';
-            case 'unsatisfactory':
-                return 'bg-status-critical-bg text-status-critical';
-            default:
-                return 'bg-muted text-foreground';
-        }
-    };
-
-    const getGoalStatusColor = (status: string) => {
-        switch (status) {
-            case 'achieved':
-                return 'bg-status-success-bg text-status-success';
-            case 'partially_achieved':
-                return 'bg-status-warning-bg text-status-warning';
-            case 'missed':
-                return 'bg-status-critical-bg text-status-critical';
-            case 'in_progress':
-                return 'bg-status-info-bg text-status-info';
-            default:
-                return 'bg-muted text-foreground';
-        }
+        return RATING_LABELS[rating] || rating;
     };
 
     const calculateOverallProgress = () => {
@@ -193,20 +199,46 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
         });
     };
 
+    const progress = calculateOverallProgress();
+    const isComplete = review.status === 'completed';
+    const boardStageReached = review.status === 'board_review' || isComplete;
+
+    const timeline = [
+        {
+            icon: User,
+            label: 'Self assessment',
+            done: Boolean(review.self_assessment_submitted_at),
+            detail: review.self_assessment_submitted_at
+                ? formatDateTimeLong(review.self_assessment_submitted_at)
+                : 'Pending',
+        },
+        {
+            icon: Star,
+            label: 'Board assessment',
+            done: boardStageReached,
+            detail: boardStageReached ? 'Submitted' : 'Pending',
+        },
+        {
+            icon: Award,
+            label: 'Completed',
+            done: isComplete,
+            detail: isComplete ? 'Done' : 'Pending',
+        },
+    ];
+
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Performance', href: '/governance/performance' },
+                { title: 'CEO performance', href: '/governance/performance' },
                 {
-                    title: review.reviewee.name,
+                    title: `${review.reviewee.name} · ${review.review_cycle}`,
                     href: `/governance/performance/${review.id}`,
                 },
             ]}
         >
-            <Head title={`Performance Review - ${review.reviewee.name}`} />
+            <Head title={`Performance review — ${review.reviewee.name}`} />
 
             <PageLayout
                 hero={
@@ -214,27 +246,16 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                         variant="profile"
                         backHref="/governance/performance"
                         icon={Target}
-                        title={`Performance Review - ${review.reviewee.name}`}
+                        title={`Performance review — ${review.reviewee.name}`}
                         titleDusk="performance-heading"
                         titleChip={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Badge
-                                    className={getStatusColor(review.status)}
-                                >
-                                    {review.status.replace('_', ' ')}
-                                </Badge>
-                                {review.overall_rating && (
-                                    <Badge
-                                        className={getRatingColor(
-                                            review.overall_rating,
-                                        )}
-                                    >
-                                        {getRatingLabel(review.overall_rating)}
-                                    </Badge>
-                                )}
-                            </div>
+                            <PageHeaderStatusChip
+                                variant={reviewStatusVariant(review.status)}
+                            >
+                                {humanise(review.status)}
+                            </PageHeaderStatusChip>
                         }
-                        subline={`${review.reviewee.name} · ${review.review_cycle}`}
+                        subline={`${review.review_cycle} · ${dateOnly(review.period_start)} – ${dateOnly(review.period_end)}`}
                         meters={
                             <>
                                 <PageHeaderMeterBlock
@@ -244,7 +265,9 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                                     <PageHeaderMeterBig>
                                         {review.goals.length}
                                     </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Performance goals</PageHeaderMeterCaption>
+                                    <PageHeaderMeterCaption>
+                                        {progress}% weighted progress
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
                                     label="KPIs"
@@ -253,375 +276,349 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                                     <PageHeaderMeterBig>
                                         {review.kpis.length}
                                     </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Key metrics</PageHeaderMeterCaption>
+                                    <PageHeaderMeterCaption>
+                                        Key metrics tracked
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Rating"
+                                    href={`/governance/performance/${review.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {review.overall_rating
+                                            ? getRatingLabel(
+                                                  review.overall_rating,
+                                              )
+                                            : '—'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Overall board rating
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
                                     label="Status"
                                     href={`/governance/performance?status=${review.status}`}
-                                    tone={review.status === 'completed' ? 'brand' : undefined}
+                                    tone={isComplete ? 'success' : 'brand'}
                                 >
                                     <PageHeaderMeterBig>
-                                        <span className="text-sm font-semibold uppercase">
-                                            {review.status.replace('_', ' ')}
-                                        </span>
+                                        {humanise(review.status)}
                                     </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Current</PageHeaderMeterCaption>
+                                    <PageHeaderMeterCaption>
+                                        Current stage
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                             </>
                         }
                         actions={
-                            review.status !== 'completed' &&
-                            can_assess && (
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        setAssessmentOpen(true)
-                                    }
-                                >
-                                    Continue Review
-                                </Button>
-                            )
+                            <>
+                                {can_update ? (
+                                    <PageHeaderGlassButton
+                                        icon={Pencil}
+                                        onClick={() => setEditOpen(true)}
+                                    >
+                                        Edit review
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                {!isComplete && can_assess ? (
+                                    <PageHeaderPrimaryButton
+                                        icon={Star}
+                                        onClick={() => setAssessmentOpen(true)}
+                                    >
+                                        Continue review
+                                    </PageHeaderPrimaryButton>
+                                ) : null}
+                            </>
                         }
                     />
                 }
             >
-                {/* Overview Card */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle>Review Overview</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                            <div className="rounded-lg bg-muted p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    Period
-                                </p>
-                                <p className="font-medium">
-                                    {review.period_start} to {review.period_end}
-                                </p>
-                            </div>
-                            <div className="rounded-lg bg-muted p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    Overall Progress
-                                </p>
-                                <div className="flex items-center gap-2">
-                                    <Progress
-                                        value={calculateOverallProgress()}
-                                        className="flex-1"
-                                    />
-                                    <span className="font-medium">
-                                        {calculateOverallProgress()}%
-                                    </span>
+                <div className="flex flex-col gap-5">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-section-title">
+                                Review overview
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                                <div className="rounded-lg bg-muted p-4">
+                                    <p className="text-caption">Period</p>
+                                    <p className="font-medium">
+                                        {dateOnly(review.period_start)} –{' '}
+                                        {dateOnly(review.period_end)}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg bg-muted p-4">
+                                    <p className="text-caption">
+                                        Overall progress
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <Progress
+                                            value={progress}
+                                            className="flex-1"
+                                        />
+                                        <span className="font-medium tabular-nums">
+                                            {progress}%
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="rounded-lg bg-muted p-4">
+                                    <p className="text-caption">Goals</p>
+                                    <p className="font-medium">
+                                        {review.goals.length} defined
+                                    </p>
+                                </div>
+                                <div className="rounded-lg bg-muted p-4">
+                                    <p className="text-caption">KPIs</p>
+                                    <p className="font-medium">
+                                        {review.kpis.length} tracked
+                                    </p>
                                 </div>
                             </div>
-                            <div className="rounded-lg bg-muted p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    Goals
-                                </p>
-                                <p className="font-medium">
-                                    {review.goals.length} defined
-                                </p>
-                            </div>
-                            <div className="rounded-lg bg-muted p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    KPIs
-                                </p>
-                                <p className="font-medium">
-                                    {review.kpis.length} tracked
-                                </p>
-                            </div>
-                        </div>
-                        {review.board_decision && (
-                            <div className="mt-4 rounded-lg border border-primary bg-primary/10 p-4">
-                                <p className="text-sm font-medium text-primary">
-                                    Board Decision
-                                </p>
-                                <p className="text-primary capitalize">
-                                    {review.board_decision.replace('_', ' ')}
-                                </p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    {/* Goals */}
-                    <div className="space-y-6 lg:col-span-2">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Target className="h-5 w-5" />
-                                    Performance Goals
-                                </CardTitle>
-                                <CardDescription>
-                                    Goals by strategic pillar
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                {review.goals.length > 0 ? (
-                                    <div className="space-y-4">
-                                        {review.goals.map((goal) => (
-                                            <div
-                                                key={goal.id}
-                                                className="rounded-lg border p-4"
-                                            >
-                                                <div className="mb-2 flex items-start justify-between">
-                                                    <div>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="mb-2"
-                                                        >
-                                                            {getPillarLabel(
-                                                                goal.pillar,
-                                                            )}
-                                                        </Badge>
-                                                        <p className="font-medium">
-                                                            {
-                                                                goal.goal_description
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                    <Badge
-                                                        className={getGoalStatusColor(
-                                                            goal.status,
-                                                        )}
-                                                    >
-                                                        {goal.status.replace(
-                                                            '_',
-                                                            ' ',
-                                                        )}
-                                                    </Badge>
-                                                </div>
-                                                <div className="mt-3">
-                                                    <div className="mb-1 flex items-center justify-between text-sm text-muted-foreground">
-                                                        <span>Progress</span>
-                                                        <span>
-                                                            {goal.actual_score ||
-                                                                0}{' '}
-                                                            /{' '}
-                                                            {goal.target_score}{' '}
-                                                            (Weight:{' '}
-                                                            {goal.weight}%)
-                                                        </span>
-                                                    </div>
-                                                    <Progress
-                                                        value={
-                                                            ((goal.actual_score ||
-                                                                0) /
-                                                                goal.target_score) *
-                                                            100
-                                                        }
-                                                        className={cn(
-                                                            goal.status ===
-                                                                'achieved' &&
-                                                                '[&>div]:bg-status-success',
-                                                            goal.status ===
-                                                                'missed' &&
-                                                                '[&>div]:bg-status-critical',
-                                                        )}
-                                                    />
-                                                </div>
-                                                {goal.evidence_summary && (
-                                                    <p className="mt-2 text-sm text-muted-foreground">
-                                                        {goal.evidence_summary}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">
-                                        No goals defined for this review.
+                            {review.board_decision && (
+                                <div className="rounded-lg border border-primary/40 bg-primary/10 p-4">
+                                    <p className="text-sm font-medium text-primary">
+                                        Board decision
                                     </p>
-                                )}
-                            </CardContent>
-                        </Card>
+                                    <p className="text-primary">
+                                        {BOARD_DECISION_LABELS[
+                                            review.board_decision
+                                        ] ?? humanise(review.board_decision)}
+                                    </p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
 
-                        {/* KPIs */}
-                        {review.kpis.length > 0 && (
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                        <div className="flex flex-col gap-5 lg:col-span-2">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <TrendingUp className="h-5 w-5" />
-                                        Key Performance Indicators
+                                    <CardTitle className="text-section-title flex items-center gap-2">
+                                        <Target className="h-4 w-4" />
+                                        Performance goals
                                     </CardTitle>
+                                    <CardDescription>
+                                        Goals by strategic pillar
+                                    </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="space-y-3">
-                                        {review.kpis.map((kpi) => (
-                                            <div
-                                                key={kpi.id}
-                                                className="flex items-center justify-between rounded-lg border p-3"
-                                            >
-                                                <div>
-                                                    <p className="font-medium">
-                                                        {kpi.kpi_name}
-                                                    </p>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        Target:{' '}
-                                                        {kpi.target_value}{' '}
-                                                        {kpi.unit}
-                                                        {kpi.is_automated && (
+                                    {review.goals.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {review.goals.map((goal) => (
+                                                <div
+                                                    key={goal.id}
+                                                    className="rounded-lg border p-4"
+                                                >
+                                                    <div className="mb-2 flex items-start justify-between gap-3">
+                                                        <div>
                                                             <Badge
                                                                 variant="outline"
-                                                                className="ml-2 text-xs"
+                                                                className="mb-2"
                                                             >
-                                                                Auto
+                                                                {getPillarLabel(
+                                                                    goal.pillar,
+                                                                )}
                                                             </Badge>
-                                                        )}
-                                                    </p>
+                                                            <p className="font-medium">
+                                                                {
+                                                                    goal.goal_description
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <StatusBadge
+                                                            variant={goalStatusVariant(
+                                                                goal.status,
+                                                            )}
+                                                        >
+                                                            {humanise(
+                                                                goal.status,
+                                                            )}
+                                                        </StatusBadge>
+                                                    </div>
+                                                    <div className="mt-3">
+                                                        <div className="text-subtle mb-1 flex items-center justify-between">
+                                                            <span>Progress</span>
+                                                            <span className="tabular-nums">
+                                                                {goal.actual_score ||
+                                                                    0}{' '}
+                                                                /{' '}
+                                                                {
+                                                                    goal.target_score
+                                                                }{' '}
+                                                                (Weight:{' '}
+                                                                {goal.weight}%)
+                                                            </span>
+                                                        </div>
+                                                        <Progress
+                                                            value={
+                                                                ((goal.actual_score ||
+                                                                    0) /
+                                                                    goal.target_score) *
+                                                                100
+                                                            }
+                                                            className={cn(
+                                                                goal.status ===
+                                                                    'achieved' &&
+                                                                    '[&>div]:bg-status-success',
+                                                                goal.status ===
+                                                                    'missed' &&
+                                                                    '[&>div]:bg-status-critical',
+                                                            )}
+                                                        />
+                                                    </div>
+                                                    {goal.evidence_summary && (
+                                                        <p className="text-subtle mt-2">
+                                                            {
+                                                                goal.evidence_summary
+                                                            }
+                                                        </p>
+                                                    )}
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="text-xl font-bold">
-                                                        {kpi.actual_value !==
-                                                        null
-                                                            ? kpi.actual_value
-                                                            : '-'}
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <EmptyState
+                                            variant="compact"
+                                            icon={Target}
+                                            title="No goals defined"
+                                            description="Goals for this review have not been set."
+                                        />
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {review.kpis.length > 0 && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-section-title flex items-center gap-2">
+                                            <TrendingUp className="h-4 w-4" />
+                                            Key performance indicators
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-3">
+                                            {review.kpis.map((kpi) => (
+                                                <div
+                                                    key={kpi.id}
+                                                    className="flex items-center justify-between rounded-lg border p-3"
+                                                >
+                                                    <div>
+                                                        <p className="font-medium">
+                                                            {kpi.kpi_name}
+                                                        </p>
+                                                        <p className="text-subtle">
+                                                            Target:{' '}
+                                                            {kpi.target_value}{' '}
+                                                            {kpi.unit}
+                                                            {kpi.is_automated && (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="ml-2 text-xs"
+                                                                >
+                                                                    Auto
+                                                                </Badge>
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-lg font-semibold tabular-nums">
+                                                            {kpi.actual_value !==
+                                                            null
+                                                                ? kpi.actual_value
+                                                                : '—'}
+                                                        </p>
+                                                        <p className="text-caption">
+                                                            {kpi.unit}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+
+                        <div className="flex flex-col gap-5">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-section-title">
+                                        Review timeline
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {timeline.map((stage) => {
+                                        const Icon = stage.icon;
+                                        return (
+                                            <div
+                                                key={stage.label}
+                                                className="flex items-center gap-3"
+                                            >
+                                                <div
+                                                    className={cn(
+                                                        'flex h-8 w-8 items-center justify-center rounded-full',
+                                                        stage.done
+                                                            ? 'bg-status-success-bg text-status-success'
+                                                            : 'bg-muted text-muted-foreground',
+                                                    )}
+                                                >
+                                                    <Icon className="h-4 w-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium">
+                                                        {stage.label}
                                                     </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {kpi.unit}
+                                                    <p className="text-caption">
+                                                        {stage.detail}
                                                     </p>
                                                 </div>
                                             </div>
-                                        ))}
-                                    </div>
+                                        );
+                                    })}
                                 </CardContent>
                             </Card>
-                        )}
-                    </div>
 
-                    {/* Sidebar */}
-                    <div className="space-y-6">
-                        {/* Timeline */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Review Timeline</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <div
-                                        className={cn(
-                                            'flex h-8 w-8 items-center justify-center rounded-full',
-                                            review.self_assessment_submitted_at
-                                                ? 'bg-status-success-bg text-status-success'
-                                                : 'bg-muted text-muted-foreground',
-                                        )}
-                                    >
-                                        <User className="h-4 w-4" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">
-                                            Self Assessment
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {review.self_assessment_submitted_at ||
-                                                'Pending'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div
-                                        className={cn(
-                                            'flex h-8 w-8 items-center justify-center rounded-full',
-                                            review.status === 'board_review' ||
-                                                review.status === 'completed'
-                                                ? 'bg-status-success-bg text-status-success'
-                                                : 'bg-muted text-muted-foreground',
-                                        )}
-                                    >
-                                        <Star className="h-4 w-4" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">
-                                            Board Assessment
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {review.status === 'board_review' ||
-                                            review.status === 'completed'
-                                                ? 'Submitted'
-                                                : 'Pending'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div
-                                        className={cn(
-                                            'flex h-8 w-8 items-center justify-center rounded-full',
-                                            review.status === 'completed'
-                                                ? 'bg-status-success-bg text-status-success'
-                                                : 'bg-muted text-muted-foreground',
-                                        )}
-                                    >
-                                        <Award className="h-4 w-4" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">
-                                            Completed
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {review.status === 'completed'
-                                                ? 'Done'
-                                                : 'Pending'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Rating Summary */}
-                        {review.overall_rating && (
-                            <Card
-                                className={cn(
-                                    review.overall_rating === 'exceeds' &&
-                                        'border-status-success/30 bg-status-success-bg',
-                                    review.overall_rating === 'meets' &&
-                                        'border-status-info/30 bg-status-info-bg',
-                                    review.overall_rating ===
-                                        'needs_improvement' &&
-                                        'border-status-warning/30 bg-status-warning-bg',
-                                    review.overall_rating ===
-                                        'unsatisfactory' &&
-                                        'border-status-critical/30 bg-status-critical-bg',
-                                )}
-                            >
-                                <CardHeader>
-                                    <CardTitle>Overall Rating</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-center">
-                                        <Star
-                                            className={cn(
-                                                'mx-auto mb-2 h-12 w-12',
-                                                review.overall_rating ===
-                                                    'exceeds' &&
-                                                    'text-status-success',
-                                                review.overall_rating ===
-                                                    'meets' &&
-                                                    'text-status-info',
-                                                review.overall_rating ===
-                                                    'needs_improvement' &&
-                                                    'text-status-warning',
-                                                review.overall_rating ===
-                                                    'unsatisfactory' &&
-                                                    'text-status-critical',
+                            {review.overall_rating && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-section-title">
+                                            Overall rating
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="flex flex-col items-center gap-2 text-center">
+                                        <Star className="h-10 w-10 text-primary" />
+                                        <StatusBadge
+                                            variant={ratingVariant(
+                                                review.overall_rating,
                                             )}
-                                        />
-                                        <p className="text-lg font-bold">
+                                        >
                                             {getRatingLabel(
                                                 review.overall_rating,
                                             )}
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
+                                        </StatusBadge>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
                     </div>
                 </div>
             </PageLayout>
+
             <Dialog open={assessmentOpen} onOpenChange={setAssessmentOpen}>
-                <DialogContent className="max-w-3xl">
+                <DialogContent
+                    className="max-h-[90vh] overflow-y-auto"
+                    style={{
+                        maxWidth: 'min(92vw, 900px)',
+                        width: 'min(92vw, 900px)',
+                    }}
+                >
                     <DialogHeader>
-                        <DialogTitle>Continue Review</DialogTitle>
+                        <DialogTitle>Continue review</DialogTitle>
+                        <DialogDescription>
+                            Score each goal and record the board&apos;s overall
+                            rating and decision.
+                        </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitAssessment} className="space-y-6">
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -710,8 +707,8 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                         </div>
 
                         <div className="space-y-4">
-                            <h3 className="text-lg font-semibold">
-                                Goal Assessments
+                            <h3 className="text-section-title">
+                                Goal assessments
                             </h3>
                             {review.goals.map((goal) => (
                                 <div
@@ -729,15 +726,19 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                                             <p className="font-medium">
                                                 {goal.goal_description}
                                             </p>
-                                            <p className="text-sm text-muted-foreground">
+                                            <p className="text-subtle">
                                                 Target: {goal.target_score}
                                             </p>
                                         </div>
                                         <div className="w-24">
-                                            <Label className="text-xs">
+                                            <Label
+                                                className="text-xs"
+                                                htmlFor={`goal-score-${goal.id}`}
+                                            >
                                                 Score (1-5)
                                             </Label>
                                             <Input
+                                                id={`goal-score-${goal.id}`}
                                                 type="number"
                                                 min={1}
                                                 max={5}
@@ -756,12 +757,12 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                                                 }
                                             />
                                             {errors[
-                                                `goal_assessments.${goal.id}.score`
+                                                `goal_assessments.${goal.id}.score` as keyof typeof errors
                                             ] && (
                                                 <p className="text-xs text-status-critical">
                                                     {
                                                         errors[
-                                                            `goal_assessments.${goal.id}.score`
+                                                            `goal_assessments.${goal.id}.score` as keyof typeof errors
                                                         ]
                                                     }
                                                 </p>
@@ -769,10 +770,14 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                                         </div>
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-xs">
+                                        <Label
+                                            className="text-xs"
+                                            htmlFor={`goal-comments-${goal.id}`}
+                                        >
                                             Comments
                                         </Label>
                                         <Textarea
+                                            id={`goal-comments-${goal.id}`}
                                             value={
                                                 data.goal_assessments[
                                                     String(goal.id)
@@ -788,12 +793,12 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                                             rows={2}
                                         />
                                         {errors[
-                                            `goal_assessments.${goal.id}.comments`
+                                            `goal_assessments.${goal.id}.comments` as keyof typeof errors
                                         ] && (
                                             <p className="text-xs text-status-critical">
                                                 {
                                                     errors[
-                                                        `goal_assessments.${goal.id}.comments`
+                                                        `goal_assessments.${goal.id}.comments` as keyof typeof errors
                                                     ]
                                                 }
                                             </p>
@@ -820,6 +825,25 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            {can_update ? (
+                <PerformanceReviewWizardDialog
+                    isOpen={editOpen}
+                    onClose={() => setEditOpen(false)}
+                    review={{
+                        id: review.id,
+                        reviewee: review.reviewee,
+                        review_cycle: review.review_cycle,
+                        review_type: review.review_type,
+                        period_start: review.period_start,
+                        period_end: review.period_end,
+                        overall_rating: review.overall_rating,
+                        overall_assessment: review.overall_assessment,
+                        board_decision: review.board_decision,
+                        decision_notes: review.decision_notes,
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }

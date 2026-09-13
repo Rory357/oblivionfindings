@@ -1,12 +1,33 @@
+import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import {
+    meetingWorkspaceUrl,
+    withQueryParams,
+    type MeetingWorkspaceFocus,
+} from '@/components/governance/meeting-workspace-links';
 import {
     PageHeader,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
+import {
+    TierTwoTabs,
+    type GroupedProfileNavTab,
+} from '@/components/page/grouped-profile-nav';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import {
+    formatDateLong,
+    formatDateTime,
+    formatDateTimeLong,
+    formatDurationMinutes,
+    formatTime,
+} from '@/lib/datetime';
+import { canDoGovernance } from '@/lib/governance-permissions';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -44,10 +65,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
 import { cn } from '@/lib/utils';
 import {
     generate as generatePackRoute,
@@ -82,11 +101,97 @@ import {
     Vote,
 } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
-import { NewResolutionDialog } from '../Resolutions/_dialogs';
+import {
+    type AuthoritySubjectGroup,
+    type AuthoritySubjects,
+    type CommitteeOption,
+    NewResolutionDialog,
+    type UserOption,
+} from '../Resolutions/_dialogs';
 import {
     MeetingPaperWorkspace,
     type PaperResolution,
 } from '@/components/governance/MeetingPaperWorkspace';
+import {
+    MeetingWizardDialog,
+    meetingStatusLabel,
+    meetingStatusVariant,
+    meetingTypeLabel,
+    type MeetingFormOptions,
+} from './_dialogs';
+
+const VALID_TABS = [
+    'agenda',
+    'attendance',
+    'minutes',
+    'resolutions',
+    'workflow',
+] as const;
+type MeetingTab = (typeof VALID_TABS)[number];
+
+const isMeetingTab = (value: string | null | undefined): value is MeetingTab =>
+    Boolean(value && (VALID_TABS as readonly string[]).includes(value));
+
+function readWorkspaceLocation(url: string): {
+    tab: MeetingTab;
+    paper: string | null;
+    focus: MeetingWorkspaceFocus | null;
+} {
+    const params = new URLSearchParams(url.split('#')[0]?.split('?')[1] ?? '');
+    const tab = params.get('tab');
+    const paper = params.get('paper');
+    return {
+        tab: isMeetingTab(tab) ? tab : paper ? 'resolutions' : 'agenda',
+        paper,
+        focus: params.get('focus') === 'follow-ups' ? 'follow-ups' : null,
+    };
+}
+
+const RSVP_LABEL: Record<string, string> = {
+    accepted: 'Attending',
+    declined: 'Apology',
+    tentative: 'Tentative',
+};
+
+const rsvpVariant = (response: string): StatusVariant =>
+    response === 'accepted'
+        ? 'success'
+        : response === 'declined'
+          ? 'warning'
+          : 'info';
+
+const ATTENDANCE_VARIANT: Record<string, StatusVariant> = {
+    present: 'success',
+    apology: 'warning',
+    no_show: 'critical',
+    late: 'info',
+};
+const attendanceVariant = (status: string): StatusVariant =>
+    ATTENDANCE_VARIANT[status] ?? 'neutral';
+
+const MINUTES_VARIANT: Record<string, StatusVariant> = {
+    draft: 'warning',
+    reviewed: 'info',
+    approved: 'success',
+    signed: 'success',
+    archived: 'neutral',
+};
+const minutesVariant = (status: string): StatusVariant =>
+    MINUTES_VARIANT[status] ?? 'neutral';
+
+const CHECKLIST_VARIANT: Record<string, StatusVariant> = {
+    done: 'success',
+    in_progress: 'info',
+    todo: 'warning',
+    blocked: 'critical',
+};
+const checklistVariant = (status: string): StatusVariant =>
+    CHECKLIST_VARIANT[status] ?? 'neutral';
+
+const humanStatus = (value: string) => {
+    const text = value.replace(/_/g, ' ');
+    return text.charAt(0).toUpperCase() + text.slice(1);
+};
 
 interface BoardMemberItem {
     id: number;
@@ -97,6 +202,9 @@ interface Meeting {
     id: number;
     title: string;
     meeting_type: string;
+    board_committee_id?: number | null;
+    chair_id?: number | null;
+    secretary_id?: number | null;
     scheduled_at: string;
     duration_minutes: number;
     location: string | null;
@@ -237,12 +345,15 @@ interface Props extends PageProps {
         dietary_notes: string | null;
         responded_at: string | null;
     } | null;
-    users?: Array<{
-        id: number;
-        name: string;
-        email?: string;
-    }>;
+    /** Decision-paper wizard options — empty unless the viewer authors papers. */
+    users?: UserOption[];
+    committees?: CommitteeOption[];
+    authoritySubjects?: AuthoritySubjects | null;
+    authoritySubjectGroups?: AuthoritySubjectGroup[];
+    canPublishPapers?: boolean;
     resolutions?: PaperResolution[];
+    /** Edit wizard options; null unless the viewer may edit this meeting. */
+    formOptions?: MeetingFormOptions | null;
 }
 
 export default function MeetingShow({
@@ -255,13 +366,28 @@ export default function MeetingShow({
     canApproveMinutes,
     canSignMinutes,
     workflowChecklist,
-    meetingCockpit,
     viewerCanRsvp,
     viewerRsvp,
     users = [],
+    committees = [],
+    authoritySubjects = null,
+    authoritySubjectGroups = [],
+    canPublishPapers = false,
     resolutions: propResolutions,
+    formOptions = null,
 }: Props) {
     const page = usePage();
+    const governancePermissions =
+        (auth as { can?: { governance?: Record<string, unknown> } })?.can
+            ?.governance ?? null;
+    const canCreateResolution = canDoGovernance(
+        governancePermissions,
+        'resolutions',
+        'manage',
+    );
+    const canOpenEdit = canEdit && formOptions !== null;
+    // Retired /meetings/{id}/edit deep links arrive as ?edit=1.
+    const [editOpen, setEditOpen] = useDialogDeepLink('edit', canOpenEdit);
     const [generatingPack, setGeneratingPack] = useState(false);
     const [packMessage, setPackMessage] = useState<string | null>(null);
     const [agendaDialogOpen, setAgendaDialogOpen] = useState(false);
@@ -276,62 +402,99 @@ export default function MeetingShow({
     const [historyOpen, setHistoryOpen] = useState(false);
     const [minutesError, setMinutesError] = useState<string | null>(null);
     const [newResolutionOpen, setNewResolutionOpen] = useState(false);
-    const validTabs = [
-        'agenda',
-        'attendance',
-        'minutes',
-        'resolutions',
-        'workflow',
-    ];
-    const urlParams = new URLSearchParams(page.url.split('?')[1] ?? '');
-    const parsedTab = urlParams.get('tab');
-    const parsedPaper = urlParams.get('paper');
-    const defaultTab =
-        parsedTab && validTabs.includes(parsedTab)
-            ? parsedTab
-            : parsedPaper
-              ? 'resolutions'
-              : 'agenda';
-    const [activeTab, setActiveTab] = useState(defaultTab);
-    const [selectedPaperId, setSelectedPaperId] = useState<string | null>(parsedPaper);
+    // The workspace location (tab + selected paper) lives in the URL so reload,
+    // back/forward and links from follow-up actions restore the same place.
+    const initialLocation = readWorkspaceLocation(page.url);
+    const [activeTab, setActiveTab] = useState<MeetingTab>(initialLocation.tab);
+    const [selectedPaperId, setSelectedPaperId] = useState<string | null>(
+        initialLocation.paper,
+    );
+    const [paperFocus, setPaperFocus] = useState<MeetingWorkspaceFocus | null>(
+        initialLocation.focus,
+    );
+    const [lastClosedPaperId, setLastClosedPaperId] = useState<string | null>(
+        null,
+    );
 
     const agendaItems = meeting.agenda_items ?? [];
     const attendances = meeting.attendances ?? [];
     const resolutions: PaperResolution[] = propResolutions ?? meeting.resolutions ?? [];
     const allBoardMembers = boardMembers ?? [];
 
+    const replaceLocation = (patch: Record<string, string | null>) => {
+        // router.replace keeps Inertia's history state intact, so browser Back
+        // from an opened record lands on this exact tab and paper.
+        router.replace({
+            url: withQueryParams(page.url, patch),
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
+
+    // Re-sync when the URL changes underneath us (history navigation, a
+    // `#tab-…` meter link, or a return from a follow-up action).
     useEffect(() => {
-        const checkFragmentAndParams = () => {
-            const rawHash = typeof window !== 'undefined' ? window.location.hash : '';
-            const cleanHash = rawHash.replace('#tab-', '').replace('#', '');
-            const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-            const tabParam = params.get('tab');
-            const paperParam = params.get('paper');
-
-            if (tabParam && validTabs.includes(tabParam)) {
-                setActiveTab(tabParam);
-            } else if (cleanHash && validTabs.includes(cleanHash)) {
-                setActiveTab(cleanHash);
-            } else if (paperParam) {
-                setActiveTab('resolutions');
-            }
-
-            if (paperParam) {
-                setSelectedPaperId(paperParam);
-            }
-        };
-
-        checkFragmentAndParams();
-        window.addEventListener('hashchange', checkFragmentAndParams);
-        return () => window.removeEventListener('hashchange', checkFragmentAndParams);
-    }, [defaultTab, parsedPaper]);
+        const location = readWorkspaceLocation(page.url);
+        const hashTab = window.location.hash.replace('#tab-', '').replace('#', '');
+        setActiveTab(
+            new URLSearchParams(page.url.split('?')[1] ?? '').get('tab') === null &&
+                !location.paper &&
+                isMeetingTab(hashTab)
+                ? hashTab
+                : location.tab,
+        );
+        setSelectedPaperId(location.paper);
+        if (location.focus) {
+            setPaperFocus(location.focus);
+            // Land once; a later reload should not jump to the follow-ups again.
+            router.replace({
+                url: withQueryParams(page.url, { focus: null }),
+                preserveState: true,
+                preserveScroll: true,
+            });
+        }
+    }, [page.url]);
 
     const handleTabChange = (newTab: string) => {
+        if (!isMeetingTab(newTab)) return;
         setActiveTab(newTab);
-        const url = new URL(window.location.href);
-        url.searchParams.set('tab', newTab);
-        window.history.replaceState({}, '', url.toString());
+        replaceLocation({ tab: newTab });
     };
+
+    const openPaper = (paperId: number | string) => {
+        setSelectedPaperId(String(paperId));
+        setPaperFocus(null);
+        setActiveTab('resolutions');
+        replaceLocation({ tab: 'resolutions', paper: String(paperId), focus: null });
+    };
+
+    const closePaper = () => {
+        setLastClosedPaperId(selectedPaperId);
+        setSelectedPaperId(null);
+        setPaperFocus(null);
+        replaceLocation({ paper: null, focus: null });
+    };
+
+    // Back from a paper: return the member to that paper's row in the list.
+    useEffect(() => {
+        if (!lastClosedPaperId || selectedPaperId) return;
+        const row = document.getElementById(`meeting-paper-row-${lastClosedPaperId}`);
+        if (row && typeof row.scrollIntoView === 'function') {
+            row.scrollIntoView({ block: 'center' });
+            row.focus({ preventScroll: true });
+        }
+    }, [lastClosedPaperId, selectedPaperId]);
+
+    // Papers in agenda order first, then any remaining resolutions.
+    const orderedPaperIds = [
+        ...agendaItems
+            .map((item) => item.resolution_id)
+            .filter((id): id is number => typeof id === 'number'),
+        ...resolutions.map((r) => r.id),
+    ].filter(
+        (id, index, all) =>
+            all.indexOf(id) === index && resolutions.some((r) => r.id === id),
+    );
 
     // Agenda Item Form
     const agendaForm = useForm({
@@ -435,21 +598,6 @@ export default function MeetingShow({
 
     const removeMinutesBlock = (index: number) => {
         setMinutesBlocks((prev) => prev.filter((_, i) => i !== index));
-    };
-
-    const getStatusColor = (status: string) => governanceStatusColor(status);
-
-    const getChecklistStatusColor = (
-        status: 'done' | 'in_progress' | 'todo' | 'blocked',
-    ) => {
-        return {
-            done: 'bg-status-success-bg text-status-success border-status-success/30',
-            in_progress:
-                'bg-status-info-bg text-status-info border-status-info/30',
-            todo: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-            blocked:
-                'bg-status-critical-bg text-status-critical border-status-critical/30',
-        }[status];
     };
 
     const getItemTypeIcon = (type: string) => {
@@ -668,21 +816,58 @@ export default function MeetingShow({
         });
     };
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-NZ', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        });
-    };
+    const scheduleLine = [
+        `${formatDateLong(meeting.scheduled_at)}, ${formatTime(meeting.scheduled_at)}`,
+        formatDurationMinutes(meeting.duration_minutes),
+        meeting.location,
+        meeting.virtual_link ? 'Video link available' : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+    const peopleLine = [
+        meetingTypeLabel(meeting.meeting_type),
+        meeting.chair?.user?.name ? `Chair: ${meeting.chair.user.name}` : null,
+        meeting.secretary?.user?.name
+            ? `Secretary: ${meeting.secretary.user.name}`
+            : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
 
-    const formatTime = (dateString: string) => {
-        return new Date(dateString).toLocaleTimeString('en-NZ', {
-            hour: 'numeric',
-            minute: '2-digit',
-        });
-    };
+    const workspaceTabs: GroupedProfileNavTab[] = [
+        {
+            key: 'agenda',
+            label: 'Agenda',
+            icon: FileText,
+            count: agendaItems.length,
+        },
+        { key: 'attendance', label: 'Attendance', icon: Users },
+        { key: 'minutes', label: 'Minutes', icon: Pencil },
+        {
+            key: 'resolutions',
+            label: 'Papers & resolutions',
+            icon: Vote,
+            count: resolutions.length,
+        },
+        {
+            key: 'workflow',
+            label: 'Workflow',
+            icon: ListChecks,
+            warningCount: workflowChecklist.counts.blocked,
+        },
+    ];
+
+    const selectedResolution = selectedPaperId
+        ? (resolutions.find((r) => String(r.id) === String(selectedPaperId)) ??
+          null)
+        : null;
+    const nextPaperId = selectedResolution
+        ? orderedPaperIds[orderedPaperIds.indexOf(selectedResolution.id) + 1]
+        : undefined;
+    const nextPaper =
+        nextPaperId !== undefined
+            ? (resolutions.find((r) => r.id === nextPaperId) ?? null)
+            : null;
 
     return (
         <AppLayout
@@ -692,8 +877,8 @@ export default function MeetingShow({
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Meetings', href: '/governance/meetings' },
                 {
-                    title: 'Meeting',
-                    href: `/governance/meetings/${meeting.id}`,
+                    title: meeting.title,
+                    href: meetingWorkspaceUrl(meeting.id),
                 },
             ]}
         >
@@ -710,51 +895,23 @@ export default function MeetingShow({
                         wrapTitle
                         titleChip={
                             <PageHeaderStatusChip
-                                variant={
-                                    meeting.status === 'in_progress' || meeting.status === 'scheduled'
-                                        ? 'info'
-                                        : meeting.status === 'completed'
-                                          ? 'success'
-                                          : meeting.status === 'cancelled'
-                                            ? 'critical'
-                                            : 'neutral'
-                                }
+                                variant={meetingStatusVariant(meeting.status)}
                             >
-                                {meeting.status.replace('_', ' ')}
+                                {meetingStatusLabel(meeting.status)}
                             </PageHeaderStatusChip>
                         }
                         subline={
-                            <span>
-                                <span>{formatDate(meeting.scheduled_at)}</span>
-                                <span> · </span>
-                                <span>
-                                    {formatTime(meeting.scheduled_at)} ({meeting.duration_minutes} mins)
-                                </span>
-                                {meeting.location && (
-                                    <>
-                                        <span> · </span>
-                                        <span>{meeting.location}</span>
-                                    </>
-                                )}
-                                {meeting.chair?.user?.name && (
-                                    <>
-                                        <span> · </span>
-                                        <span>Chair: {meeting.chair.user.name}</span>
-                                    </>
-                                )}
-                                {meeting.secretary?.user?.name && (
-                                    <>
-                                        <span> · </span>
-                                        <span>Secretary: {meeting.secretary.user.name}</span>
-                                    </>
-                                )}
-                            </span>
+                            <>
+                                <span className="block">{scheduleLine}</span>
+                                <span className="block">{peopleLine}</span>
+                            </>
                         }
                         meters={
                             <>
                                 <PageHeaderMeterBlock
                                     label="Workflow"
                                     href="#tab-workflow"
+                                    ariaLabel="View the meeting workflow"
                                     onClick={() => handleTabChange('workflow')}
                                 >
                                     <PageHeaderMeterBig>
@@ -768,6 +925,7 @@ export default function MeetingShow({
                                 <PageHeaderMeterBlock
                                     label="Quorum"
                                     href="#tab-attendance"
+                                    ariaLabel="View attendance and quorum"
                                     onClick={() => handleTabChange('attendance')}
                                     tone={quorum.met ? 'success' : 'warning'}
                                 >
@@ -781,6 +939,7 @@ export default function MeetingShow({
                                 <PageHeaderMeterBlock
                                     label="Agenda"
                                     href="#tab-agenda"
+                                    ariaLabel="View the agenda"
                                     onClick={() => handleTabChange('agenda')}
                                 >
                                     <PageHeaderMeterBig>{agendaItems.length}</PageHeaderMeterBig>
@@ -789,6 +948,7 @@ export default function MeetingShow({
                                 <PageHeaderMeterBlock
                                     label="Resolutions"
                                     href="#tab-resolutions"
+                                    ariaLabel="View papers and resolutions"
                                     onClick={() => handleTabChange('resolutions')}
                                 >
                                     <PageHeaderMeterBig>{resolutions.length}</PageHeaderMeterBig>
@@ -797,68 +957,101 @@ export default function MeetingShow({
                             </>
                         }
                         actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                {canEdit && (
-                                    <Button variant="outline" asChild>
-                                        <Link
-                                            href={`/governance/meetings/${meeting.id}/edit`}
-                                        >
-                                            Edit
-                                        </Link>
-                                    </Button>
-                                )}
+                            <>
+                                {canOpenEdit ? (
+                                    <PageHeaderGlassButton
+                                        icon={Pencil}
+                                        onClick={() => setEditOpen(true)}
+                                        dusk="edit-meeting"
+                                    >
+                                        Edit meeting
+                                    </PageHeaderGlassButton>
+                                ) : null}
                                 {meeting.board_pack ? (
-                                    <Button asChild>
-                                        <Link
-                                            href={showPack.url({
-                                                pack: meeting.board_pack.id,
-                                            })}
-                                            dusk="view-pack"
-                                        >
-                                            <FileDown className="mr-2 h-4 w-4" />
-                                            View Pack
-                                        </Link>
-                                    </Button>
+                                    <PageHeaderPrimaryButton
+                                        icon={FileDown}
+                                        onClick={() =>
+                                            router.visit(
+                                                showPack.url({
+                                                    pack: meeting.board_pack!.id,
+                                                }),
+                                            )
+                                        }
+                                        dusk="view-pack"
+                                    >
+                                        View pack
+                                    </PageHeaderPrimaryButton>
                                 ) : canEdit ? (
-                                    <Button
+                                    <PageHeaderPrimaryButton
+                                        icon={FileDown}
                                         onClick={generatePack}
                                         disabled={generatingPack}
                                         dusk="generate-pack"
                                     >
                                         {generatingPack
-                                            ? 'Generating...'
-                                            : 'Generate Pack'}
-                                    </Button>
+                                            ? 'Generating…'
+                                            : 'Generate pack'}
+                                    </PageHeaderPrimaryButton>
                                 ) : null}
-                            </div>
+                            </>
                         }
                     />
                 }
+                tabs={
+                    <TierTwoTabs
+                        tabs={workspaceTabs}
+                        activeTab={activeTab}
+                        onTab={handleTabChange}
+                        testIdPrefix="meeting"
+                        ariaLabel="Meeting workspace sections"
+                        panelId="meeting-workspace-panel"
+                        renderLink={() => null}
+                    />
+                }
             >
+              <div className="flex flex-col gap-5">
                 {packMessage && (
-                    <div className="mb-4 rounded-lg border border-status-info/30 bg-status-info-bg px-4 py-2 text-sm text-status-info">
+                    <div
+                        role="status"
+                        className="rounded-lg border border-status-info/30 bg-status-info-bg px-4 py-2 text-sm text-status-info"
+                    >
                         {packMessage}
                     </div>
                 )}
 
-                <NewResolutionDialog
-                    isOpen={newResolutionOpen}
-                    onClose={() => setNewResolutionOpen(false)}
-                    meetings={[
-                        {
-                            id: meeting.id,
-                            title: meeting.title,
-                            scheduled_at: meeting.scheduled_at,
-                        },
-                    ]}
-                    meetingId={meeting.id}
-                    lockMeeting
-                    users={users}
-                />
+                {canOpenEdit && formOptions ? (
+                    <MeetingWizardDialog
+                        isOpen={editOpen}
+                        onClose={() => setEditOpen(false)}
+                        options={formOptions}
+                        meeting={meeting}
+                    />
+                ) : null}
+
+                {canCreateResolution ? (
+                    <NewResolutionDialog
+                        isOpen={newResolutionOpen}
+                        onClose={() => setNewResolutionOpen(false)}
+                        meetings={[
+                            {
+                                id: meeting.id,
+                                title: meeting.title,
+                                scheduled_at: meeting.scheduled_at,
+                            },
+                        ]}
+                        meetingId={meeting.id}
+                        lockMeeting
+                        users={users}
+                        committees={committees}
+                        authoritySubjects={authoritySubjects}
+                        authoritySubjectGroups={authoritySubjectGroups}
+                        canPublish={canPublishPapers}
+                    />
+                ) : null}
 
                 {/* Member RSVP Callout */}
                 {viewerCanRsvp && (
-                    <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-primary/20 bg-primary/5 p-4" data-test="meeting-rsvp-banner">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-primary/20 bg-primary/5 p-4" data-test="meeting-rsvp-banner">
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
                                 <CheckCircle className="h-5 w-5" />
@@ -878,7 +1071,7 @@ export default function MeetingShow({
                                 </h3>
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                     {viewerRsvp
-                                        ? `Recorded on ${new Date(viewerRsvp.responded_at || '').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${viewerRsvp.decline_reason ? ` • Apology reason: ${viewerRsvp.decline_reason}` : ''}${viewerRsvp.dietary_notes ? ` • Dietary notes: ${viewerRsvp.dietary_notes}` : ''}`
+                                        ? `Recorded ${formatDateTimeLong(viewerRsvp.responded_at, 'date not recorded')}${viewerRsvp.decline_reason ? ` • Apology reason: ${viewerRsvp.decline_reason}` : ''}${viewerRsvp.dietary_notes ? ` • Dietary notes: ${viewerRsvp.dietary_notes}` : ''}`
                                         : 'Please confirm whether you will attend this meeting or send apologies.'}
                                 </p>
                             </div>
@@ -984,48 +1177,14 @@ export default function MeetingShow({
                     attendances={attendances}
                 />
 
-                <div className="space-y-6">
-                    {/* Tabs (Sites-style PageTabs) */}
-                    <PageTabs
-                        value={activeTab}
-                        onValueChange={handleTabChange}
-                        items={
-                            [
-                                {
-                                    value: 'agenda',
-                                    label: `Agenda (${agendaItems.length})`,
-                                    icon: FileText,
-                                    'data-test': 'meeting-tab-agenda',
-                                },
-                                {
-                                    value: 'attendance',
-                                    label: 'Attendance',
-                                    icon: Users,
-                                    'data-test': 'meeting-tab-attendance',
-                                },
-                                {
-                                    value: 'minutes',
-                                    label: 'Minutes',
-                                    icon: Pencil,
-                                    'data-test': 'meeting-tab-minutes',
-                                },
-                                {
-                                    value: 'resolutions',
-                                    label: `Resolutions (${resolutions.length})`,
-                                    icon: Vote,
-                                    'data-test': 'meeting-tab-resolutions',
-                                },
-                                {
-                                    value: 'workflow',
-                                    label: 'Workflow',
-                                    icon: ListChecks,
-                                    'data-test': 'meeting-tab-workflow',
-                                },
-                            ] as PageTabItem[]
-                        }
-                    >
+                <section
+                    id="meeting-workspace-panel"
+                    role="tabpanel"
+                    aria-labelledby={`meeting-tab-${activeTab}`}
+                    className="flex flex-col gap-5"
+                >
                         {/* ========== AGENDA TAB ========== */}
-                        <TabsContent value="agenda">
+                        {activeTab === 'agenda' && (
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between">
                                     <div>
@@ -1271,10 +1430,15 @@ export default function MeetingShow({
                                 <CardContent>
                                     <div className="space-y-4">
                                         {agendaItems.length === 0 && (
-                                            <p className="py-8 text-center text-muted-foreground">
-                                                No agenda items yet. Add items
-                                                to build the meeting agenda.
-                                            </p>
+                                            <EmptyState
+                                                icon={FileText}
+                                                title="No agenda items yet"
+                                                description={
+                                                    canEdit
+                                                        ? 'Add items to build the meeting agenda.'
+                                                        : 'The agenda has not been published for this meeting yet.'
+                                                }
+                                            />
                                         )}
                                         {agendaItems.map((item) => (
                                             <div
@@ -1297,15 +1461,13 @@ export default function MeetingShow({
                                                             {item.title}
                                                         </h4>
                                                         {item.is_confidential && (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="border-primary text-primary"
-                                                            >
+                                                            <StatusBadge variant="warning">
+                                                                <Lock className="size-3" aria-hidden="true" />
                                                                 Confidential
-                                                            </Badge>
+                                                            </StatusBadge>
                                                         )}
                                                         <Badge variant="outline">
-                                                            {item.item_type}
+                                                            {humanStatus(item.item_type)}
                                                         </Badge>
                                                     </div>
                                                     {item.description && (
@@ -1337,18 +1499,11 @@ export default function MeetingShow({
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            onClick={() => {
-                                                                setSelectedPaperId(String(item.resolution_id));
-                                                                setActiveTab('resolutions');
-                                                                const url = new URL(window.location.href);
-                                                                url.searchParams.set('tab', 'resolutions');
-                                                                url.searchParams.set('paper', String(item.resolution_id));
-                                                                window.history.replaceState({}, '', url.toString());
-                                                            }}
+                                                            onClick={() => openPaper(item.resolution_id!)}
                                                             className="gap-1.5 text-xs"
                                                         >
                                                             <Vote className="h-3.5 w-3.5 text-primary" />
-                                                            Read Paper & Vote
+                                                            Read paper & vote
                                                         </Button>
                                                     )}
                                                     {canEdit && (
@@ -1406,11 +1561,11 @@ export default function MeetingShow({
                                     </div>
                                 </CardContent>
                             </Card>
-                        </TabsContent>
+                        )}
 
                         {/* ========== ATTENDANCE TAB ========== */}
-                        {/* ========== ATTENDANCE TAB ========== */}
-                        <TabsContent value="attendance" className="space-y-6">
+                        {activeTab === 'attendance' && (
+                        <>
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between">
                                     <div>
@@ -1461,17 +1616,12 @@ export default function MeetingShow({
                                                                         </div>
                                                                         <div className="mt-0.5">
                                                                             {memberRsvp ? (
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className={cn(
-                                                                                        'text-[10px] uppercase tracking-wider',
-                                                                                        memberRsvp.response === 'accepted' && 'border-emerald-500 text-emerald-700 dark:text-emerald-300',
-                                                                                        memberRsvp.response === 'declined' && 'border-amber-500 text-amber-700 dark:text-amber-300',
-                                                                                        memberRsvp.response === 'tentative' && 'border-blue-500 text-blue-700 dark:text-blue-300',
-                                                                                    )}
+                                                                                <StatusBadge
+                                                                                    size="sm"
+                                                                                    variant={rsvpVariant(memberRsvp.response)}
                                                                                 >
-                                                                                    RSVP: {memberRsvp.response === 'accepted' ? 'Attending' : memberRsvp.response === 'declined' ? 'Apology' : 'Tentative'}
-                                                                                </Badge>
+                                                                                    RSVP: {RSVP_LABEL[memberRsvp.response] ?? humanStatus(memberRsvp.response)}
+                                                                                </StatusBadge>
                                                                             ) : (
                                                                                 <span className="text-[11px] text-muted-foreground">
                                                                                     No RSVP submitted
@@ -1594,11 +1744,11 @@ export default function MeetingShow({
                                 <CardContent>
                                     <div className="space-y-2">
                                         {attendances.length === 0 && (
-                                            <div className="py-8 text-center text-muted-foreground">
-                                                <Users className="mx-auto h-8 w-8 mb-2 opacity-40" />
-                                                <p className="font-medium">Attendance is unrecorded.</p>
-                                                <p className="text-sm">Awaiting board secretary or chair to record attendance.</p>
-                                            </div>
+                                            <EmptyState
+                                                icon={Users}
+                                                title="Attendance is unrecorded"
+                                                description="Awaiting the board secretary or chair to record attendance."
+                                            />
                                         )}
                                         {attendances.map((attendance) => {
                                             const memberRsvp = meeting.rsvps?.find(
@@ -1619,33 +1769,17 @@ export default function MeetingShow({
                                                         {memberRsvp && (
                                                             <div className="mt-0.5">
                                                                 <span className="text-xs text-muted-foreground">
-                                                                    RSVP: {memberRsvp.response === 'accepted' ? 'Attending' : memberRsvp.response === 'declined' ? 'Apology' : 'Tentative'}
+                                                                    RSVP: {RSVP_LABEL[memberRsvp.response] ?? humanStatus(memberRsvp.response)}
                                                                 </span>
                                                             </div>
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <Badge
-                                                            className={cn(
-                                                                attendance.status ===
-                                                                    'present' &&
-                                                                    'bg-status-success-bg text-status-success',
-                                                                attendance.status ===
-                                                                    'apology' &&
-                                                                    'bg-status-warning-bg text-status-warning',
-                                                                attendance.status ===
-                                                                    'no_show' &&
-                                                                    'bg-status-critical-bg text-status-critical',
-                                                                attendance.status ===
-                                                                    'late' &&
-                                                                    'bg-status-info-bg text-status-info',
-                                                            )}
+                                                        <StatusBadge
+                                                            variant={attendanceVariant(attendance.status)}
                                                         >
-                                                            {attendance.status.replace(
-                                                                '_',
-                                                                ' ',
-                                                            )}
-                                                        </Badge>
+                                                            {humanStatus(attendance.status)}
+                                                        </StatusBadge>
                                                         {attendance.apology_reason && (
                                                             <span className="text-sm text-muted-foreground">
                                                                 (
@@ -1686,9 +1820,11 @@ export default function MeetingShow({
                                 </CardHeader>
                                 <CardContent>
                                     {(!meeting.rsvps || meeting.rsvps.length === 0) ? (
-                                        <p className="py-6 text-center text-muted-foreground">
-                                            No RSVP responses recorded yet.
-                                        </p>
+                                        <EmptyState
+                                            icon={CheckCircle}
+                                            title="No RSVP responses yet"
+                                            description="Invited members' attendance intentions appear here."
+                                        />
                                     ) : (
                                         <div className="divide-y divide-border">
                                             {meeting.rsvps.map((rsvp) => (
@@ -1712,24 +1848,12 @@ export default function MeetingShow({
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <Badge
-                                                            variant={
-                                                                rsvp.response === 'accepted'
-                                                                    ? 'default'
-                                                                    : rsvp.response === 'declined'
-                                                                      ? 'destructive'
-                                                                      : 'secondary'
-                                                            }
-                                                        >
-                                                            {rsvp.response === 'accepted'
-                                                                ? 'Attending'
-                                                                : rsvp.response === 'declined'
-                                                                  ? 'Apology'
-                                                                  : 'Tentative'}
-                                                        </Badge>
+                                                        <StatusBadge variant={rsvpVariant(rsvp.response)}>
+                                                            {RSVP_LABEL[rsvp.response] ?? humanStatus(rsvp.response)}
+                                                        </StatusBadge>
                                                         {rsvp.responded_at && (
                                                             <span className="text-xs text-muted-foreground">
-                                                                {new Date(rsvp.responded_at).toLocaleDateString()}
+                                                                {formatDateLong(rsvp.responded_at)}
                                                             </span>
                                                         )}
                                                     </div>
@@ -1739,10 +1863,11 @@ export default function MeetingShow({
                                     )}
                                 </CardContent>
                             </Card>
-                        </TabsContent>
+                        </>
+                        )}
 
                         {/* ========== MINUTES TAB ========== */}
-                        <TabsContent value="minutes">
+                        {activeTab === 'minutes' && (
                             <Card>
                                 <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
@@ -1929,7 +2054,7 @@ export default function MeetingShow({
                                         {meeting.minutes && meeting.minutes.status === 'approved' && canSignMinutes && (
                                             <Dialog open={signDialogOpen} onOpenChange={setSignDialogOpen}>
                                                 <DialogTrigger asChild>
-                                                    <Button size="sm" className="bg-status-success text-white hover:bg-status-success/90" dusk="sign-minutes-button">
+                                                    <Button size="sm" dusk="sign-minutes-button">
                                                         <ShieldCheck className="mr-1 h-4 w-4" /> Sign Approved Version
                                                     </Button>
                                                 </DialogTrigger>
@@ -1970,7 +2095,6 @@ export default function MeetingShow({
                                                         </Button>
                                                         <Button
                                                             type="button"
-                                                            className="bg-status-success text-white hover:bg-status-success/90"
                                                             onClick={submitSignMinutes}
                                                             disabled={minutesSubmitting}
                                                             dusk="confirm-sign-minutes"
@@ -2058,7 +2182,7 @@ export default function MeetingShow({
                                     </div>
                                 </CardHeader>
 
-                                <CardContent className="space-y-6">
+                                <CardContent className="flex flex-col gap-5">
                                     {/* Error Banner */}
                                     {minutesError && (
                                         <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical flex items-center justify-between gap-2">
@@ -2079,17 +2203,9 @@ export default function MeetingShow({
                                                 <div className="space-y-1">
                                                     <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Lifecycle Status</p>
                                                     <div className="flex items-center gap-2">
-                                                        <Badge
-                                                            className={cn(
-                                                                meeting.minutes.status === 'draft' && 'bg-status-warning-bg text-status-warning',
-                                                                meeting.minutes.status === 'reviewed' && 'bg-status-info-bg text-status-info',
-                                                                meeting.minutes.status === 'approved' && 'bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300',
-                                                                meeting.minutes.status === 'signed' && 'bg-status-success-bg text-status-success',
-                                                                meeting.minutes.status === 'archived' && 'bg-muted text-muted-foreground',
-                                                            )}
-                                                        >
-                                                            {meeting.minutes.status === 'signed' ? 'Signed & Immutable' : meeting.minutes.status}
-                                                        </Badge>
+                                                        <StatusBadge variant={minutesVariant(meeting.minutes.status)}>
+                                                            {meeting.minutes.status === 'signed' ? 'Signed & immutable' : humanStatus(meeting.minutes.status)}
+                                                        </StatusBadge>
                                                         {meeting.minutes.status === 'signed' && <Lock className="h-3.5 w-3.5 text-status-success" />}
                                                     </div>
                                                 </div>
@@ -2100,7 +2216,7 @@ export default function MeetingShow({
                                                         {meeting.minutes.drafter_name || 'Recorded'}
                                                     </p>
                                                     <p className="text-[11px] text-muted-foreground">
-                                                        {meeting.minutes.drafted_at ? formatDate(meeting.minutes.drafted_at) : 'Date not recorded'}
+                                                        {meeting.minutes.drafted_at ? formatDateTimeLong(meeting.minutes.drafted_at) : 'Date not recorded'}
                                                     </p>
                                                 </div>
 
@@ -2110,7 +2226,7 @@ export default function MeetingShow({
                                                         {meeting.minutes.reviewer_name || (meeting.minutes.reviewed_at ? 'Legacy attribution unavailable' : 'Pending review')}
                                                     </p>
                                                     <p className="text-[11px] text-muted-foreground">
-                                                        {meeting.minutes.reviewed_at ? formatDate(meeting.minutes.reviewed_at) : 'Awaiting approval'}
+                                                        {meeting.minutes.reviewed_at ? formatDateTimeLong(meeting.minutes.reviewed_at) : 'Awaiting approval'}
                                                     </p>
                                                 </div>
 
@@ -2120,7 +2236,7 @@ export default function MeetingShow({
                                                         {meeting.minutes.signer_name || (meeting.minutes.signed_at ? 'Legacy attribution unavailable' : 'Unsigned')}
                                                     </p>
                                                     <p className="text-[11px] text-muted-foreground">
-                                                        {meeting.minutes.signed_at ? formatDate(meeting.minutes.signed_at) : 'Unsigned'}
+                                                        {meeting.minutes.signed_at ? formatDateTimeLong(meeting.minutes.signed_at) : 'Unsigned'}
                                                     </p>
                                                 </div>
                                             </div>
@@ -2137,10 +2253,10 @@ export default function MeetingShow({
 
                                             {/* Minutes Content Blocks */}
                                             {meeting.minutes.content_blocks && Array.isArray(meeting.minutes.content_blocks) && (
-                                                <div className="space-y-6 pt-2">
+                                                <div className="flex flex-col gap-5">
                                                     {meeting.minutes.content_blocks.map((block: { heading: string; content: string }, idx: number) => (
-                                                        <div key={idx} className="rounded-lg border bg-card p-4 space-y-2">
-                                                            <h3 className="text-base font-semibold text-foreground border-b pb-1.5">
+                                                        <Card key={idx} className="gap-2 p-4 shadow-none">
+                                                            <h3 className="text-section-title border-b pb-1.5">
                                                                 {block.heading || `Section ${idx + 1}`}
                                                             </h3>
                                                             <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
@@ -2148,7 +2264,7 @@ export default function MeetingShow({
                                                                     <span className="italic text-muted-foreground">No content recorded for this section.</span>
                                                                 )}
                                                             </p>
-                                                        </div>
+                                                        </Card>
                                                     ))}
                                                 </div>
                                             )}
@@ -2156,17 +2272,19 @@ export default function MeetingShow({
                                             {/* Version History Accordion */}
                                             {meeting.minutes.version_history && meeting.minutes.version_history.length > 0 && (
                                                 <div className="rounded-lg border border-border p-4 space-y-3">
-                                                    <button
+                                                    <Button
                                                         type="button"
+                                                        variant="ghost"
                                                         onClick={() => setHistoryOpen(!historyOpen)}
-                                                        className="flex w-full items-center justify-between text-left text-sm font-semibold text-foreground hover:text-primary transition"
+                                                        aria-expanded={historyOpen}
+                                                        className="w-full justify-between px-2 text-sm font-semibold"
                                                     >
-                                                        <div className="flex items-center gap-2">
+                                                        <span className="flex items-center gap-2">
                                                             <History className="h-4 w-4 text-muted-foreground" />
-                                                            <span>Version History & Audit Trail ({meeting.minutes.version_history.length})</span>
-                                                        </div>
+                                                            <span>Version history & audit trail ({meeting.minutes.version_history.length})</span>
+                                                        </span>
                                                         {historyOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                                                    </button>
+                                                    </Button>
 
                                                     {historyOpen && (
                                                         <div className="space-y-3 pt-2 border-t">
@@ -2180,7 +2298,7 @@ export default function MeetingShow({
                                                                             <span className="capitalize text-muted-foreground">{entry.status ?? entry.event ?? 'Snapshot'}</span>
                                                                         </div>
                                                                         <span className="text-muted-foreground">
-                                                                            {entry.updated_at || entry.archived_at || entry.timestamp || entry.created_at ? formatDate(entry.updated_at || entry.archived_at || entry.timestamp || entry.created_at!) : ''}
+                                                                            {entry.updated_at || entry.archived_at || entry.timestamp || entry.created_at ? formatDateTimeLong(entry.updated_at || entry.archived_at || entry.timestamp || entry.created_at!) : ''}
                                                                         </span>
                                                                     </div>
 
@@ -2233,57 +2351,49 @@ export default function MeetingShow({
                                             )}
                                         </>
                                     ) : (
-                                        <div className="py-12 text-center text-muted-foreground space-y-3">
-                                            <FileText className="mx-auto h-10 w-10 text-muted-foreground/50" />
-                                            <p className="text-sm">No minutes have been recorded for this meeting yet.</p>
-                                            {canManageMinutes && (
-                                                <Button size="sm" onClick={() => setMinutesDialogOpen(true)} dusk="create-first-minutes">
-                                                    <Plus className="mr-1 h-4 w-4" /> Draft Minutes Now
-                                                </Button>
-                                            )}
-                                        </div>
+                                        <EmptyState
+                                            icon={FileText}
+                                            title="No minutes recorded yet"
+                                            description="Minutes appear here once the secretary drafts them."
+                                            action={
+                                                canManageMinutes ? (
+                                                    <Button size="sm" onClick={() => setMinutesDialogOpen(true)} dusk="create-first-minutes">
+                                                        <Plus className="mr-1 h-4 w-4" /> Draft minutes now
+                                                    </Button>
+                                                ) : undefined
+                                            }
+                                        />
                                     )}
                                 </CardContent>
                             </Card>
-                        </TabsContent>
+                        )}
 
-                        {/* ========== RESOLUTIONS TAB ========== */}
-                        <TabsContent value="resolutions">
-                            {(() => {
-                                const selectedResolution = selectedPaperId
-                                    ? resolutions.find(
-                                          (r) =>
-                                              String(r.id) ===
-                                              String(selectedPaperId),
-                                      )
-                                    : null;
-
-                                if (selectedResolution) {
-                                    return (
-                                        <MeetingPaperWorkspace
-                                            resolution={selectedResolution}
-                                            meetingId={meeting.id}
-                                            meetingTitle={meeting.title}
-                                            onClose={() => {
-                                                setSelectedPaperId(null);
-                                                const url = new URL(
-                                                    window.location.href,
-                                                );
-                                                url.searchParams.delete('paper');
-                                                window.history.replaceState(
-                                                    {},
-                                                    '',
-                                                    url.toString(),
-                                                );
-                                            }}
-                                        />
-                                    );
-                                }
-
-                                return (
-                                    <Card>
-                                        <CardHeader className="flex flex-row items-center justify-between">
-                                            <CardTitle>Resolutions ({resolutions.length})</CardTitle>
+                        {/* ========== PAPERS & RESOLUTIONS TAB ========== */}
+                        {activeTab === 'resolutions' &&
+                            (selectedResolution ? (
+                                <MeetingPaperWorkspace
+                                    key={selectedResolution.id}
+                                    resolution={selectedResolution}
+                                    meetingId={meeting.id}
+                                    meetingTitle={meeting.title}
+                                    onClose={closePaper}
+                                    nextPaper={nextPaper}
+                                    onOpenPaper={openPaper}
+                                    focus={paperFocus}
+                                />
+                            ) : (
+                                <Card>
+                                    <CardHeader className="flex flex-row items-center justify-between">
+                                        <div>
+                                            <CardTitle>Papers & resolutions</CardTitle>
+                                            <CardDescription>
+                                                {resolutions.length === 1
+                                                    ? '1 decision paper'
+                                                    : `${resolutions.length} decision papers`}{' '}
+                                                for this meeting
+                                            </CardDescription>
+                                        </div>
+                                        {canCreateResolution ? (
                                             <Button
                                                 size="sm"
                                                 onClick={() =>
@@ -2292,97 +2402,89 @@ export default function MeetingShow({
                                                 dusk="new-resolution-button"
                                             >
                                                 <Plus className="mr-1 h-4 w-4" />
-                                                New Resolution
+                                                New resolution
                                             </Button>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-2">
-                                                {resolutions.length === 0 && (
-                                                    <p className="py-8 text-center text-muted-foreground">
-                                                        No resolutions for this meeting.
-                                                    </p>
-                                                )}
-                                                {resolutions.map((resolution) => {
-                                                    const isSelected =
-                                                        selectedPaperId !== null &&
-                                                        String(resolution.id) ===
-                                                            String(selectedPaperId);
-                                                    return (
-                                                        <div
-                                                            key={resolution.id}
-                                                            className={cn(
-                                                                'flex items-center justify-between rounded-lg border p-3 transition-colors',
-                                                                isSelected
-                                                                    ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                                                                    : 'hover:bg-muted',
-                                                            )}
-                                                        >
-                                                            <div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <p className="font-medium text-foreground">
-                                                                        {resolution.title}
-                                                                    </p>
-                                                                    {isSelected && (
-                                                                        <Badge
-                                                                            variant="outline"
-                                                                            className="border-primary/40 text-[10px] text-primary"
-                                                                        >
-                                                                            Selected Paper
-                                                                        </Badge>
-                                                                    )}
-                                                                </div>
-                                                                <p className="text-sm text-muted-foreground">
-                                                                    {resolution.resolution_reference}
-                                                                </p>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Badge>
-                                                                    {resolution.status}
-                                                                </Badge>
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={() => {
-                                                                        setSelectedPaperId(String(resolution.id));
-                                                                        const url = new URL(window.location.href);
-                                                                        url.searchParams.set('tab', 'resolutions');
-                                                                        url.searchParams.set('paper', String(resolution.id));
-                                                                        window.history.replaceState({}, '', url.toString());
-                                                                    }}
-                                                                >
-                                                                    Read Paper & Vote &rarr;
-                                                                </Button>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    asChild
-                                                                >
-                                                                    <Link
-                                                                        href={showResolution.url({
-                                                                            resolution: resolution.id,
-                                                                        })}
-                                                                        title="Open canonical resolution view"
-                                                                    >
-                                                                        Canonical ↗
-                                                                    </Link>
-                                                                </Button>
-                                                            </div>
+                                        ) : null}
+                                    </CardHeader>
+                                    <CardContent>
+                                        {resolutions.length === 0 ? (
+                                            <EmptyState
+                                                icon={Vote}
+                                                title="No decision papers yet"
+                                                description="Resolutions tabled for this meeting appear here."
+                                            />
+                                        ) : (
+                                            <ul className="space-y-2">
+                                                {resolutions.map((resolution) => (
+                                                    <li
+                                                        key={resolution.id}
+                                                        id={`meeting-paper-row-${resolution.id}`}
+                                                        tabIndex={-1}
+                                                        className={cn(
+                                                            'flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                                            String(resolution.id) === lastClosedPaperId
+                                                                ? 'border-primary/40 bg-primary/5'
+                                                                : 'hover:bg-muted',
+                                                        )}
+                                                        data-test="meeting-paper-row"
+                                                    >
+                                                        <div className="min-w-0">
+                                                            <p className="font-medium text-foreground">
+                                                                {resolution.title}
+                                                            </p>
+                                                            <p className="text-sm text-muted-foreground">
+                                                                {resolution.resolution_reference}
+                                                                {resolution.my_vote
+                                                                    ? ' · You voted'
+                                                                    : resolution.status === 'open' && resolution.can_vote
+                                                                      ? ' · Your vote is open'
+                                                                      : ''}
+                                                            </p>
                                                         </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })()}
-                        </TabsContent>
+                                                        <div className="flex shrink-0 items-center gap-2">
+                                                            <StatusBadge status={resolution.status} />
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={() => openPaper(resolution.id)}
+                                                                aria-label={`Read paper ${resolution.resolution_reference}: ${resolution.title}`}
+                                                            >
+                                                                Read paper
+                                                                {resolution.status === 'open' && resolution.can_vote && !resolution.my_vote
+                                                                    ? ' & vote'
+                                                                    : ''}
+                                                                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                asChild
+                                                            >
+                                                                <Link
+                                                                    href={showResolution.url({
+                                                                        resolution: resolution.id,
+                                                                    })}
+                                                                    aria-label={`Open the full resolution record ${resolution.resolution_reference}`}
+                                                                >
+                                                                    Full record
+                                                                </Link>
+                                                            </Button>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))}
+
                         {/* ========== WORKFLOW TAB ========== */}
-                        <TabsContent value="workflow">
+                        {activeTab === 'workflow' && (
                             <Card dusk="meeting-workflow-checklist-card">
                                 <CardHeader className="pb-3">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                             <CardTitle>
-                                                Meeting Workflow
+                                                Meeting workflow
                                             </CardTitle>
                                             <CardDescription>
                                                 Step-by-step checklist for this
@@ -2390,38 +2492,38 @@ export default function MeetingShow({
                                             </CardDescription>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
-                                            <Badge variant="outline">
+                                            <StatusBadge variant="success">
                                                 {workflowChecklist.counts.done}{' '}
                                                 complete
-                                            </Badge>
+                                            </StatusBadge>
                                             {workflowChecklist.counts
                                                 .remaining > 0 && (
-                                                <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
+                                                <StatusBadge variant="warning">
                                                     {
                                                         workflowChecklist.counts
                                                             .remaining
                                                     }{' '}
                                                     remaining
-                                                </Badge>
+                                                </StatusBadge>
                                             )}
                                             {workflowChecklist.counts.blocked >
                                                 0 && (
-                                                <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">
+                                                <StatusBadge variant="critical">
                                                     {
                                                         workflowChecklist.counts
                                                             .blocked
                                                     }{' '}
                                                     blocked
-                                                </Badge>
+                                                </StatusBadge>
                                             )}
                                         </div>
                                     </div>
                                 </CardHeader>
-                                <CardContent className="space-y-4">
+                                <CardContent className="flex flex-col gap-5">
                                     {workflowChecklist.next_step && (
                                         <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
                                             <p className="text-xs font-medium tracking-wide text-primary uppercase">
-                                                Next Step
+                                                Next step
                                             </p>
                                             <p className="mt-1 text-base font-semibold text-foreground">
                                                 {
@@ -2460,7 +2562,7 @@ export default function MeetingShow({
                                         </div>
                                     )}
 
-                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                                         {workflowChecklist.items.map((item) => (
                                             <div
                                                 key={item.key}
@@ -2471,20 +2573,13 @@ export default function MeetingShow({
                                                     <p className="leading-snug font-medium text-foreground">
                                                         {item.label}
                                                     </p>
-                                                    <Badge
-                                                        className={cn(
-                                                            'shrink-0',
-                                                            getChecklistStatusColor(
-                                                                item.status,
-                                                            ),
-                                                        )}
+                                                    <StatusBadge
+                                                        className="shrink-0"
+                                                        variant={checklistVariant(item.status)}
                                                         dusk={`workflow-status-${item.key}`}
                                                     >
-                                                        {item.status.replace(
-                                                            '_',
-                                                            ' ',
-                                                        )}
-                                                    </Badge>
+                                                        {humanStatus(item.status)}
+                                                    </StatusBadge>
                                                 </div>
                                                 <p className="text-sm text-muted-foreground">
                                                     {item.detail}
@@ -2502,17 +2597,10 @@ export default function MeetingShow({
                                                             item.status ===
                                                             'done'
                                                                 ? 'ghost'
-                                                                : item.status ===
-                                                                    'blocked'
-                                                                  ? 'outline'
-                                                                  : 'outline'
+                                                                : 'outline'
                                                         }
                                                         asChild
                                                         className="w-full"
-                                                        disabled={
-                                                            item.status ===
-                                                            'blocked'
-                                                        }
                                                     >
                                                         <Link
                                                             href={
@@ -2528,9 +2616,9 @@ export default function MeetingShow({
                                     </div>
                                 </CardContent>
                             </Card>
-                        </TabsContent>
-                    </PageTabs>
-                </div>
+                        )}
+                </section>
+              </div>
             </PageLayout>
         </AppLayout>
     );
@@ -2668,7 +2756,7 @@ function MeetingStatusStrip({
 
     return (
         <div
-            className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4"
+            className="grid gap-5 md:grid-cols-2 lg:grid-cols-4"
             dusk="meeting-status-strip"
         >
             {tiles.map((t) => (

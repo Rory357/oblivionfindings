@@ -11,6 +11,7 @@ use App\Domain\Governance\Models\PerformanceReview;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\RiskRegisterEntry;
 use App\Domain\Governance\Models\StrategicPlan;
+use App\Domain\Governance\Services\GovernanceResolutionAuthorityService;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -233,5 +234,32 @@ trait GovernanceTestHelpers
             'priority' => 'medium',
             'created_by' => $creator->id,
         ], $overrides));
+    }
+
+    /**
+     * A legitimately authorised decision: the paper is authored as a draft,
+     * explicitly bound (through the product authority service) to the exact
+     * subject record and revision, and then recorded as carried.
+     */
+    protected function createBoundCarriedResolution(
+        User $proposer,
+        string $subjectType,
+        int $subjectId,
+        array $overrides = [],
+    ): Resolution {
+        $resolution = $this->createResolution($proposer, array_merge(
+            $overrides,
+            ['status' => 'draft', 'outcome' => null, 'closed_at' => null],
+        ));
+
+        app(GovernanceResolutionAuthorityService::class)->bind($resolution, $subjectType, $subjectId, $proposer);
+
+        $resolution->update([
+            'status' => $overrides['status'] ?? 'closed',
+            'outcome' => $overrides['outcome'] ?? 'carried',
+            'closed_at' => now(),
+        ]);
+
+        return $resolution->fresh();
     }
 }

@@ -1,390 +1,351 @@
+import { Head } from '@inertiajs/react';
+import { ClipboardList, Plus, UserRound, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import {
+    EmptyValue,
+    EntityChip,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    PersonCell,
+    type EntityTableColumn,
+} from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBar,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
-import { ClipboardList, Plus, User } from 'lucide-react';
-import { useState } from 'react';
 
-interface Interest {
-    id: number;
-    interest_type: string;
-    description: string;
-    organization_name: string | null;
-    nature_of_interest: string;
-    date_from: string;
-    date_to: string | null;
-    is_active: boolean;
-    declared_at: string;
-}
+import {
+    DeclareInterestDialog,
+    INTEREST_TYPES,
+    interestPeriod,
+    interestTypeIcon,
+    interestTypeLabel,
+    type InterestRecord,
+} from './_dialogs';
 
 interface BoardMember {
     id: number;
-    user: { id: number; name: string };
+    user: { id: number; name: string } | null;
 }
 
 interface Props extends PageProps {
-    interestsByMember: Record<string, Interest[]>;
+    interestsByMember: Record<string, InterestRecord[]> | [];
     boardMembers: BoardMember[];
+    myBoardMemberId: number | null;
 }
 
 export default function InterestsIndex({
     auth,
     interestsByMember,
     boardMembers,
+    myBoardMemberId,
 }: Props) {
-    const [showForm, setShowForm] = useState(false);
-    const { data, setData, post, processing, reset, errors } = useForm({
-        board_member_id: '',
-        interest_type: 'professional',
-        description: '',
-        organization_name: '',
-        nature_of_interest: '',
-        date_from: new Date().toISOString().split('T')[0],
-        date_to: '',
-        is_active: true,
-    });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post('/governance/interests', {
-            onSuccess: () => {
-                reset();
-                setShowForm(false);
-            },
-        });
-    };
-
-    const getMemberName = (memberId: string) => {
-        const member = boardMembers.find((m) => String(m.id) === memberId);
-        return member?.user?.name ?? 'Unknown';
-    };
-
-    const totalInterests = Object.values(interestsByMember).reduce(
-        (sum, arr) => sum + arr.length,
-        0,
+    const canDeclare = Boolean(
+        auth.can?.governance?.interests?.manage && myBoardMemberId,
     );
-    const activeInterests = Object.values(interestsByMember).reduce(
-        (sum, arr) => sum + arr.filter((i) => i.is_active).length,
-        0,
+    const [declareOpen, setDeclareOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const [member, setMember] = useState('all');
+    const [type, setType] = useState('all');
+
+    const memberName = (memberId: string | number, fallback?: string | null) =>
+        boardMembers.find((m) => String(m.id) === String(memberId))?.user
+            ?.name ??
+        fallback ??
+        'Former board member';
+
+    const interests = useMemo(
+        () =>
+            Object.entries(interestsByMember).flatMap(([memberId, list]) =>
+                (list as InterestRecord[]).map((interest) => ({
+                    ...interest,
+                    board_member_id: Number(memberId),
+                    member_name: memberName(memberId, interest.member_name),
+                })),
+            ),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [interestsByMember, boardMembers],
+    );
+
+    const declaringMembers = new Set(interests.map((i) => i.board_member_id));
+    const financialCount = interests.filter(
+        (i) => i.interest_type === 'financial',
+    ).length;
+    const myCount = myBoardMemberId
+        ? interests.filter((i) => i.board_member_id === myBoardMemberId).length
+        : 0;
+
+    const visible = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return interests.filter(
+            (i) =>
+                (member === 'all' || String(i.board_member_id) === member) &&
+                (type === 'all' || i.interest_type === type) &&
+                (q === '' ||
+                    i.nature_of_interest.toLowerCase().includes(q) ||
+                    (i.organization_name ?? '').toLowerCase().includes(q) ||
+                    (i.member_name ?? '').toLowerCase().includes(q) ||
+                    i.description.toLowerCase().includes(q)),
+        );
+    }, [interests, search, member, type]);
+
+    const hasFilters = search.trim() !== '' || member !== 'all' || type !== 'all';
+    const clearFilters = () => {
+        setSearch('');
+        setMember('all');
+        setType('all');
+    };
+
+    const columns: EntityTableColumn<InterestRecord>[] = [
+        {
+            key: 'member',
+            label: 'Board member',
+            width: '1.1fr',
+            cell: (i) => <PersonCell name={i.member_name} />,
+        },
+        {
+            key: 'type',
+            label: 'Type',
+            width: '0.8fr',
+            cell: (i) => (
+                <EntityChip icon={interestTypeIcon(i.interest_type)}>
+                    {interestTypeLabel(i.interest_type)}
+                </EntityChip>
+            ),
+        },
+        {
+            key: 'organisation',
+            label: 'Organisation',
+            width: '1fr',
+            cell: (i) =>
+                i.organization_name ? (
+                    <span className="truncate">{i.organization_name}</span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'period',
+            label: 'Period',
+            width: '1.1fr',
+            cell: (i) => interestPeriod(i),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '0.6fr',
+            cell: (i) => (
+                <EntityStatusChip variant={i.is_active ? 'success' : 'neutral'}>
+                    {i.is_active ? 'Current' : 'Ceased'}
+                </EntityStatusChip>
+            ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            icon={ClipboardList}
+            title="Interests register"
+            subline="Current declarations of interest across the board"
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search interests, organisations, members…"
+                    />
+                    {canDeclare ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setDeclareOpen(true)}
+                        >
+                            Declare interest
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Declarations"
+                        ariaLabel="View all current declarations"
+                        onClick={clearFilters}
+                    >
+                        <PageHeaderMeterBig>{interests.length}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            current interests on the register
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Members declaring"
+                        value={`${declaringMembers.size}/${boardMembers.length}`}
+                        ariaLabel="View declarations by board member"
+                        onClick={clearFilters}
+                    >
+                        <PageHeaderMeterBar
+                            percent={
+                                boardMembers.length > 0
+                                    ? (declaringMembers.size / boardMembers.length) *
+                                      100
+                                    : 0
+                            }
+                        />
+                        <PageHeaderMeterCaption>
+                            of active board members
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Financial"
+                        ariaLabel="View financial interests"
+                        onClick={() => setType('financial')}
+                    >
+                        <PageHeaderMeterBig>{financialCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            shares, loans or paid roles
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="My declarations"
+                        ariaLabel="View my declarations"
+                        href="/governance/interests/mine"
+                    >
+                        <PageHeaderMeterBig>{myCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {myBoardMemberId
+                                ? 'current on your record'
+                                : 'no board-member record linked'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        icon={UserRound}
+                        label="All members"
+                        value={member}
+                        options={[
+                            { value: 'all', label: 'All members' },
+                            ...boardMembers.map((m) => ({
+                                value: String(m.id),
+                                label: m.user?.name ?? `Member #${m.id}`,
+                            })),
+                        ]}
+                        onChange={setMember}
+                    />
+                    <PageHeaderFilterSelect
+                        label="All types"
+                        value={type}
+                        options={[
+                            { value: 'all', label: 'All types' },
+                            ...INTEREST_TYPES.map((t) => ({
+                                value: t.key,
+                                label: t.label,
+                            })),
+                        ]}
+                        onChange={setType}
+                    />
+                </>
+            }
+            rail={<GovernanceSectionRail />}
+        />
     );
 
     return (
         <AppLayout
+            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Interests', href: '/governance/interests' },
             ]}
         >
-            <Head title="Interests Register" />
-            <PageLayout
-                hero={
-                    <PageHeader
-                        icon={ClipboardList}
-                        title="Board Interests Register"
-                        subline="Declarations of interests for all board members"
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Members"
-                                    href="/governance/interests"
+            <Head title="Interests register" />
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Current declarations"
+                        caption={`${visible.length} of ${interests.length} shown`}
+                        right={
+                            hasFilters ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={clearFilters}
+                                    className="text-xs text-muted-foreground"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {boardMembers.length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Board composition</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Total declarations"
-                                    href="/governance/interests"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {totalInterests}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>All records</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Active"
-                                    href="/governance/interests"
-                                    tone="brand"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {activeInterests}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Current disclosures</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
-                        }
-                        actions={
-                            <Button
-                                size="sm"
-                                onClick={() => setShowForm(!showForm)}
-                            >
-                                <Plus className="mr-2 h-4 w-4" /> Declare
-                                Interest
-                            </Button>
+                                    <X className="h-3.5 w-3.5" />
+                                    Clear filters
+                                </Button>
+                            ) : null
                         }
                     />
-                }
-            >
-                {showForm && (
-                    <Card className="mb-6">
-                        <CardHeader>
-                            <CardTitle>Declare New Interest</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Label>Board Member</Label>
-                                        <Select
-                                            value={
-                                                data.board_member_id ||
-                                                undefined
-                                            }
-                                            onValueChange={(val) =>
-                                                setData('board_member_id', val)
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select member..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {boardMembers.map((m) => (
-                                                    <SelectItem
-                                                        key={m.id}
-                                                        value={String(m.id)}
-                                                    >
-                                                        {m.user.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div>
-                                        <Label>Interest Type</Label>
-                                        <Select
-                                            value={data.interest_type}
-                                            onValueChange={(val) =>
-                                                setData('interest_type', val)
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="financial">
-                                                    Financial
-                                                </SelectItem>
-                                                <SelectItem value="personal">
-                                                    Personal
-                                                </SelectItem>
-                                                <SelectItem value="professional">
-                                                    Professional
-                                                </SelectItem>
-                                                <SelectItem value="family">
-                                                    Family
-                                                </SelectItem>
-                                                <SelectItem value="other">
-                                                    Other
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                                <div>
-                                    <Label>Organization Name</Label>
-                                    <Input
-                                        value={data.organization_name}
-                                        onChange={(e) =>
-                                            setData(
-                                                'organization_name',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Nature of Interest</Label>
-                                    <Input
-                                        value={data.nature_of_interest}
-                                        onChange={(e) =>
-                                            setData(
-                                                'nature_of_interest',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    {errors.nature_of_interest && (
-                                        <p className="mt-1 text-sm text-status-critical">
-                                            {errors.nature_of_interest}
-                                        </p>
-                                    )}
-                                </div>
-                                <div>
-                                    <Label>Description</Label>
-                                    <Textarea
-                                        value={data.description}
-                                        onChange={(e) =>
-                                            setData(
-                                                'description',
-                                                e.target.value,
-                                            )
-                                        }
-                                        rows={3}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Label>Date From</Label>
-                                        <Input
-                                            type="date"
-                                            value={data.date_from}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'date_from',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label>
-                                            Date To (leave blank if ongoing)
-                                        </Label>
-                                        <Input
-                                            type="date"
-                                            value={data.date_to}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'date_to',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex justify-end gap-3">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setShowForm(false)}
-                                    >
-                                        Cancel
+                    {visible.length === 0 ? (
+                        <EmptyState
+                            icon={ClipboardList}
+                            title={
+                                hasFilters
+                                    ? 'No declarations match your filters'
+                                    : 'No interests declared yet'
+                            }
+                            description={
+                                hasFilters
+                                    ? 'Try clearing a filter or search term.'
+                                    : 'Declarations made by board members appear here.'
+                            }
+                            action={
+                                hasFilters ? (
+                                    <Button variant="outline" size="sm" onClick={clearFilters}>
+                                        <X className="h-3.5 w-3.5" />
+                                        Clear filters
                                     </Button>
-                                    <Button type="submit" disabled={processing}>
-                                        Submit Declaration
+                                ) : canDeclare ? (
+                                    <Button size="sm" onClick={() => setDeclareOpen(true)}>
+                                        <Plus className="h-3.5 w-3.5" />
+                                        Declare interest
                                     </Button>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {Object.keys(interestsByMember).length === 0 ? (
-                    <Card>
-                        <CardContent className="p-8 text-center text-muted-foreground">
-                            No interests declared yet.
-                        </CardContent>
-                    </Card>
-                ) : (
-                    Object.entries(interestsByMember).map(
-                        ([memberId, interests]) => (
-                            <Card key={memberId} className="mb-4">
-                                <CardHeader>
-                                    <div className="flex items-center gap-2">
-                                        <User className="h-5 w-5 text-muted-foreground" />
-                                        <CardTitle className="text-lg">
-                                            {getMemberName(memberId)}
-                                        </CardTitle>
-                                        <Badge variant="outline">
-                                            {interests.length} interest(s)
-                                        </Badge>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3">
-                                        {interests.map((interest) => (
-                                            <div
-                                                key={interest.id}
-                                                className="rounded-lg border p-3"
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge variant="outline">
-                                                            {
-                                                                interest.interest_type
-                                                            }
-                                                        </Badge>
-                                                        <span className="font-medium">
-                                                            {
-                                                                interest.nature_of_interest
-                                                            }
-                                                        </span>
-                                                        {interest.organization_name && (
-                                                            <span className="text-muted-foreground">
-                                                                (
-                                                                {
-                                                                    interest.organization_name
-                                                                }
-                                                                )
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <Badge
-                                                        className={
-                                                            interest.is_active
-                                                                ? 'bg-status-success-bg text-status-success'
-                                                                : 'bg-muted text-foreground'
-                                                        }
-                                                    >
-                                                        {interest.is_active
-                                                            ? 'Active'
-                                                            : 'Inactive'}
-                                                    </Badge>
-                                                </div>
-                                                <p className="mt-1 text-sm text-muted-foreground">
-                                                    {interest.description}
-                                                </p>
-                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                    From{' '}
-                                                    {new Date(
-                                                        interest.date_from,
-                                                    ).toLocaleDateString(
-                                                        'en-NZ',
-                                                    )}
-                                                    {interest.date_to
-                                                        ? ` to ${new Date(interest.date_to).toLocaleDateString('en-NZ')}`
-                                                        : ' (ongoing)'}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ),
-                    )
-                )}
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={visible}
+                            rowKey={(i) => i.id}
+                            identityLabel="Interest"
+                            identity={(i) => ({
+                                icon: interestTypeIcon(i.interest_type),
+                                name: i.nature_of_interest,
+                                subline: i.description,
+                            })}
+                            columns={columns}
+                            actionsFor={() => []}
+                            minWidth={900}
+                        />
+                    )}
+                </div>
             </PageLayout>
+
+            {canDeclare && myBoardMemberId ? (
+                <DeclareInterestDialog
+                    open={declareOpen}
+                    onClose={() => setDeclareOpen(false)}
+                    boardMemberId={myBoardMemberId}
+                />
+            ) : null}
         </AppLayout>
     );
 }

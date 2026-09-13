@@ -42,6 +42,12 @@ class UpdateResolutionRequest extends FormRequest
             'voting_threshold' => 'nullable|string',
             'quorum_required' => 'nullable|boolean',
             'publish_now' => 'nullable|boolean',
+            // Explicit decision authority: the exact record this paper approves.
+            // Send null to remove it. The revision fingerprint is derived
+            // server-side, never accepted.
+            'authority_binding' => 'nullable|array',
+            'authority_binding.subject_type' => 'nullable|required_with:authority_binding.subject_id|string|in:voting_profile,strategic_plan,budget_adjustment,budget,performance_review',
+            'authority_binding.subject_id' => 'nullable|required_with:authority_binding.subject_type|integer|min:1',
         ];
     }
 }

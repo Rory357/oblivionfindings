@@ -336,13 +336,18 @@ class VotingServiceTest extends TestCase
             $this->assertStringContainsString('approval authority evidence', $e->getMessage());
         }
 
-        // Activation with document reference and approval resolution succeeds
-        $approvalRes = $this->createResolution($admin, [
-            'title' => 'Approve Constitution 2024 Adopted',
-            'exact_motion' => 'Adopt voting rules under Constitution 2024 Adopted.',
-            'status' => 'closed',
-            'outcome' => 'carried',
-        ]);
+        // Activation with document reference and a resolution explicitly bound to
+        // this exact profile, body, document and rule revision succeeds.
+        $profile->update(['governing_document_reference' => 'Constitution 2024 Adopted']);
+        $approvalRes = $this->createBoundCarriedResolution(
+            $admin,
+            \App\Domain\Governance\Models\GovernanceResolutionBinding::SUBJECT_VOTING_PROFILE,
+            $profile->id,
+            [
+                'title' => 'Approve Constitution 2024 Adopted',
+                'exact_motion' => 'Adopt voting rules under Constitution 2024 Adopted.',
+            ],
+        );
         $activated = $profileService->activateProfile($profile, $admin, $approvalRes, 'Constitution 2024 Adopted');
         $this->assertTrue($activated->is_active);
         $this->assertTrue($activated->isConfirmed());

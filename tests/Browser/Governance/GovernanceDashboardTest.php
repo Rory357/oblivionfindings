@@ -20,6 +20,6 @@ test('governance dashboard data page loads', function () {
             ->visit('/governance/dashboard-data')
             ->waitFor('@governance-cockpit-heading', 30)
             ->assertPathIs('/governance/dashboard')
-            ->assertSee('Executive & Board Cockpit');
+            ->assertSeeIn('@governance-cockpit-heading', 'Governance');
     });
 });
