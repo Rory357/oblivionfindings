@@ -99,20 +99,26 @@ describe('ShiftsIndex tab strip accessibility', () => {
         expect(tabs).toHaveLength(5);
         expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
 
+        // The rail uses manual activation (roving tabindex): arrows move
+        // focus only; click/Enter/Space selects, keeping navigation and
+        // unsaved-work guards with the explicit action.
         fireEvent.keyDown(tabs[0], { key: 'ArrowRight' });
 
-        expect(screen.getByRole('tab', { name: /Open/i })).toHaveAttribute(
-            'aria-selected',
-            'true',
-        );
+        const openTab = screen.getByRole('tab', { name: /Open/i });
+        expect(openTab).toHaveFocus();
+        expect(openTab).toHaveAttribute('tabindex', '0');
+        expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
 
-        fireEvent.keyDown(screen.getByRole('tab', { name: /Open/i }), {
-            key: 'End',
-        });
+        fireEvent.click(openTab);
+        expect(openTab).toHaveAttribute('aria-selected', 'true');
 
-        expect(screen.getByRole('tab', { name: /Completed/i })).toHaveAttribute(
-            'aria-selected',
-            'true',
-        );
+        fireEvent.keyDown(openTab, { key: 'End' });
+
+        const completedTab = screen.getByRole('tab', { name: /Completed/i });
+        expect(completedTab).toHaveFocus();
+        expect(openTab).toHaveAttribute('aria-selected', 'true');
+
+        fireEvent.click(completedTab);
+        expect(completedTab).toHaveAttribute('aria-selected', 'true');
     });
 });
