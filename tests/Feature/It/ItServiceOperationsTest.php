@@ -762,6 +762,7 @@ test('existing IT schedules are named once and their runs are recorded from Lara
         'it.dispatch-notifications',
         'it.poll-mailbox',
         'it.retry-attachment-cleanup',
+        'it.run-recurrence',
     ])->and($events->every(fn ($event) => $event->withoutOverlapping && $event->onOneServer))->toBeTrue();
 
     $task = $events->firstWhere('description', 'it.close-resolved');

@@ -196,6 +196,8 @@ Route::middleware(['auth', 'permission:it.request|it.view|it.knowledge.author|it
     Route::get('/it/reports', [ItProvisioningController::class, 'index'])->middleware('permission:it.view')->name('it.reports.index');
     Route::get('/it/provisioning', [\App\Http\Controllers\It\ItProvisioningWorkspaceController::class, 'index'])->middleware(['permission:it.view', \App\Http\Middleware\ProtectProvisioningResponses::class])->name('it.provisioning.index');
     Route::get('/it/work', [ItWorkspaceRedirectController::class, 'work'])->middleware('permission:it.view')->name('it.work.index');
+    Route::get('/it/reply-templates', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'index'])->middleware('permission:it.view')->name('it.reply-templates.index');
+    Route::get('/it/tickets/{ticket}/reply-templates/{template}/render', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'render'])->whereNumber(['ticket', 'template'])->middleware('permission:it.view')->name('it.reply-templates.render');
     Route::post('/it/kb/{article}/view', [ItKbController::class, 'view'])->name('it.kb.view');
     Route::post('/it/kb/{article}/helpful', [ItKbController::class, 'helpful'])->name('it.kb.helpful');
     Route::middleware('permission:it.knowledge.author')->group(function () {
@@ -307,6 +309,12 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::patch('/it/setup/api-identities/{identity}', [ItServiceIdentityController::class, 'update'])->whereNumber('identity')->name('it.setup.api-identities.update');
         Route::post('/it/setup/api-identities/{identity}/rotate', [ItServiceIdentityController::class, 'rotate'])->whereNumber('identity')->name('it.setup.api-identities.rotate');
         Route::post('/it/setup/api-identities/{identity}/revoke', [ItServiceIdentityController::class, 'revoke'])->whereNumber('identity')->name('it.setup.api-identities.revoke');
+        Route::post('/it/setup/recurrence-plans', [\App\Http\Controllers\It\ItRecurrencePlanController::class, 'store'])->name('it.setup.recurrence-plans.store');
+        Route::patch('/it/setup/recurrence-plans/{plan}', [\App\Http\Controllers\It\ItRecurrencePlanController::class, 'update'])->whereNumber('plan')->name('it.setup.recurrence-plans.update');
+        Route::post('/it/setup/recurrence-plans/{plan}/status', [\App\Http\Controllers\It\ItRecurrencePlanController::class, 'status'])->whereNumber('plan')->name('it.setup.recurrence-plans.status');
+        Route::post('/it/setup/reply-templates', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'store'])->name('it.setup.reply-templates.store');
+        Route::patch('/it/setup/reply-templates/{template}', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'update'])->whereNumber('template')->name('it.setup.reply-templates.update');
+        Route::post('/it/setup/reply-templates/{template}/active', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'archive'])->whereNumber('template')->name('it.setup.reply-templates.active');
         Route::post('/it/setup/provisioning-templates', [ItServiceManagementSetupController::class, 'storeProvisioningTemplate'])->name('it.setup.provisioning-templates.store');
         Route::patch('/it/setup/provisioning-templates/{template}', [ItServiceManagementSetupController::class, 'updateProvisioningTemplate'])->name('it.setup.provisioning-templates.update');
         Route::post('/it/setup/email-deliveries/{delivery}/retry', [ItServiceManagementSetupController::class, 'retryEmailDelivery'])->name('it.setup.email-deliveries.retry');

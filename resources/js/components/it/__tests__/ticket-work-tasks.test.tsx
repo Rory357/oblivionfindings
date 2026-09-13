@@ -461,7 +461,7 @@ describe('TicketWorkTasks', () => {
         render(<TicketWorkTasks {...props} />);
 
         expect(screen.getByText('Work tasks')).toBeVisible();
-        expect(screen.getByText('1 of 2 complete')).toBeVisible();
+        expect(screen.getByText('1 of 2 verified complete')).toBeVisible();
         expect(screen.getByText('1 required outstanding')).toBeVisible();
         expect(
             screen.getAllByText('Infrastructure', { exact: false }),

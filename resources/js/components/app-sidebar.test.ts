@@ -10,6 +10,7 @@ describe('app sidebar workforce navigation', () => {
         expect(catalog.map((item) => item.href)).toEqual([
             '/it',
             '/it/knowledge',
+            '/it/provisioning',
             '/it/work',
             '/it/problems',
             '/it/changes',

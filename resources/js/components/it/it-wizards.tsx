@@ -1328,6 +1328,7 @@ function CreateTicketWizard({
                         >
                             <SelectInput
                                 value={form.data.it_service_id}
+                                ariaLabel="Affected service"
                                 onChange={(v) =>
                                     form.setData('it_service_id', v)
                                 }
@@ -1402,7 +1403,7 @@ function CreateTicketWizard({
                                     },
                                     ...PRIORITY_OPTIONS.map((option) => ({
                                         value: option.key,
-                                        label: `Set ${option.label.toLowerCase()} priority`,
+                                        label: `Set ${option.label.replace(' · ', ' ')} priority`,
                                     })),
                                 ]}
                             />
@@ -1543,6 +1544,7 @@ function CreateTicketWizard({
                             >
                                 <SelectInput
                                     value={form.data.device_id}
+                                    ariaLabel="Affected Device"
                                     onChange={(v) =>
                                         form.setData('device_id', v)
                                     }

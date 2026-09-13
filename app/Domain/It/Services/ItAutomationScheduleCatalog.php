@@ -43,6 +43,16 @@ class ItAutomationScheduleCatalog
             'on_one_server' => true,
         ],
         [
+            'key' => 'it.run-recurrence',
+            'label' => 'Recurring maintenance tickets',
+            'type' => 'command',
+            'handler' => 'it:run-recurrence',
+            'expression' => '*/15 * * * *',
+            'timezone' => 'Pacific/Auckland',
+            'without_overlapping' => true,
+            'on_one_server' => true,
+        ],
+        [
             'key' => 'it.poll-mailbox',
             'label' => 'Poll support mailbox',
             'type' => 'job',
