@@ -2,7 +2,13 @@ import {
     GovernanceAttachmentsPanel,
     type GovernanceAttachment,
 } from '@/components/governance/GovernanceAttachmentsPanel';
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -128,6 +134,7 @@ export default function ShowSpendApproval({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 {
                     title: 'Spend Approvals',
@@ -143,30 +150,57 @@ export default function ShowSpendApproval({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
+                        variant="profile"
+                        backHref="/governance/spend-approvals"
                         icon={HandCoins}
-                        category="governance"
                         title={approval.title}
-                        description={`${approval.reference} · ${categories[approval.category] ?? approval.category}`}
-                        stats={[
-                            {
-                                label: 'Amount',
-                                value: formatNzd(approval.amount),
-                            },
-                            { label: 'Threshold', value: formatNzd(threshold) },
-                            { label: 'Status', value: approval.status },
-                        ]}
-                        badges={
-                            approval.requires_board
-                                ? [{ label: 'Board sign-off' }]
-                                : undefined
+                        titleDusk="spend-approval-heading"
+                        titleChip={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant="outline">{approval.reference}</Badge>
+                                <Badge className={statusColors[approval.status] ?? ''}>
+                                    {approval.status}
+                                </Badge>
+                                {approval.requires_board && (
+                                    <Badge variant="secondary">Board sign-off</Badge>
+                                )}
+                            </div>
                         }
-                        actions={
-                            <Button asChild variant="outline">
-                                <Link href="/governance/spend-approvals">
-                                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                                </Link>
-                            </Button>
+                        subline={`${categories[approval.category] ?? approval.category} · Threshold: ${formatNzd(threshold)}`}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Amount"
+                                    href={`/governance/spend-approvals/${approval.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {formatNzd(approval.amount)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Requested spend</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Threshold"
+                                    href="/governance/spend-approvals"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {formatNzd(threshold)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Policy limit</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Status"
+                                    href={`/governance/spend-approvals?status=${approval.status}`}
+                                    tone={approval.status === 'approved' ? 'brand' : approval.status === 'rejected' ? 'critical' : 'warning'}
+                                >
+                                    <PageHeaderMeterBig>
+                                        <span className="text-sm font-semibold uppercase">
+                                            {approval.status}
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Current</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
                         }
                     />
                 }

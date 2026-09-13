@@ -186,6 +186,14 @@ class GovernancePolicyController extends Controller
     {
         $this->authorize('attest', $policy);
 
+        if (! in_array($policy->status, ['approved', 'published', 'active'], true)) {
+            abort(422, 'Only approved and published policies can be attested.');
+        }
+
+        if ($policy->effective_from && $policy->effective_from->isFuture()) {
+            abort(422, 'Policy is not yet effective and cannot be attested.');
+        }
+
         $validated = $request->validate([
             'acknowledged' => 'required|accepted',
             'notes' => 'nullable|string|max:500',

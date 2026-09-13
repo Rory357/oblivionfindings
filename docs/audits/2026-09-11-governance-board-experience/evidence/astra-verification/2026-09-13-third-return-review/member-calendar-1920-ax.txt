@@ -1,0 +1,271 @@
+Browser tab: 2, Title: "Governance Calendar - Laravel", URL: "http://127.0.0.1:8783/governance/calendar".
+1 AXWebArea Governance Calendar - Laravel, URL: 127.0.0.1:8783/governance/calendar
+	2 container app
+		3 link Description: Skip to main content, Value: 127.0.0.1:8783/governance/calendar#main-content
+		4 container
+			5 text Sunday 13 September 2026
+			6 link Description: Oblivion Care — home, Value: 127.0.0.1:8783/dashboard
+			7 pop up button (collapsed) Description: Search or jump to a page, Secondary Actions: Expand
+				8 image
+				9 text Search or jump to…
+				10 text Ctrl
+				11 text K
+			12 pop up button (disabled, collapsed) Description: Ask about a client, Secondary Actions: Expand
+				13 image
+			14 pop up button (collapsed) Description: Notifications, ID: radix-_r_u_, Secondary Actions: Expand
+				15 image
+			16 pop up button (collapsed) Description: Announcements, ID: radix-_r_10_, Secondary Actions: Expand
+				17 image
+			18 pop up button (collapsed) Description: Open user menu for Review Alex Morgan, ID: radix-_r_9_, Secondary Actions: Expand
+				19 image Review Alex Morgan
+		20 container
+			21 container Description: Primary navigation, ID: app-sidebar-nav
+				22 container
+					23 link Description: My Day, Value: 127.0.0.1:8783/my-day
+					24 link Description: My Calendar, Value: 127.0.0.1:8783/my-calendar
+					25 link Description: All Tasks, Value: 127.0.0.1:8783/tasks
+					26 button (collapsed) Description: IT & Support menu, Secondary Actions: Expand
+						27 text IT & Support
+						28 image
+					29 button (expanded) Description: Governance menu, Secondary Actions: Collapse
+						30 text Governance
+						31 image
+					32 container Governance navigation
+						33 text OVERVIEW & MY WORK
+						34 link Description: Home, Value: 127.0.0.1:8783/governance/dashboard
+						35 link Description: My work, Value: 127.0.0.1:8783/governance/my-work
+						36 link Description: Calendar, Value: 127.0.0.1:8783/governance/calendar
+						37 link Description: Records, Value: 127.0.0.1:8783/governance/records
+						38 text MEETINGS & DECISIONS
+						39 link Description: Meetings, Value: 127.0.0.1:8783/governance/meetings
+						40 link Description: Board Packs, Value: 127.0.0.1:8783/governance/packs
+						41 link Description: CEO Reports, Value: 127.0.0.1:8783/governance/ceo-reports
+						42 link Description: Resolutions, Value: 127.0.0.1:8783/governance/resolutions
+						43 link Description: Action Items, Value: 127.0.0.1:8783/governance/actions
+						44 link Description: Board Evaluations, Value: 127.0.0.1:8783/governance/evaluations
+						45 text OVERSIGHT
+						46 link Description: Risk Register, Value: 127.0.0.1:8783/governance/risks
+						47 link Description: Compliance, Value: 127.0.0.1:8783/governance/compliance
+						48 link Description: Clinical Governance, Value: 127.0.0.1:8783/governance/clinical
+						49 link Description: Te Tiriti, Value: 127.0.0.1:8783/governance/te-tiriti
+						50 link Description: Budgets, Value: 127.0.0.1:8783/governance/budgets
+						51 link Description: Spend Approvals, Value: 127.0.0.1:8783/governance/spend-approvals
+						52 link Description: Strategic Plan, Value: 127.0.0.1:8783/governance/strategy
+						53 link Description: Performance, Value: 127.0.0.1:8783/governance/performance
+						54 link Description: Policies, Value: 127.0.0.1:8783/governance/policies
+						55 link Description: Documents, Value: 127.0.0.1:8783/governance/documents
+						56 link Description: Interests Register, Value: 127.0.0.1:8783/governance/interests
+						57 text BOARD ADMINISTRATION
+						58 link Description: Audit Log, Value: 127.0.0.1:8783/governance/audit-log
+					59 button (collapsed) Description: Reporting menu, Secondary Actions: Expand
+						60 text Reporting
+						61 image
+				62 link Description: Settings, Value: 127.0.0.1:8783/settings
+			63 button (expanded) Description: Collapse sidebar, Secondary Actions: Collapse
+				64 image
+		65 container main-content
+			66 container breadcrumb
+				67 content list
+					68 link Description: Home, Value: 127.0.0.1:8783/dashboard
+					69 link Description: Governance, Value: 127.0.0.1:8783/governance/dashboard
+					70 link (disabled) Calendar
+						71 text Calendar
+			72 container
+				73 image
+				74 heading Governance calendar, Value: 1
+					75 text Governance calendar
+				76 text 1  overdue Board meetings, decisions, obligations, and policy reviews
+				77 image
+				78 search text field (settable)
+				79 pop up button (collapsed) Description: Notifications (2), ID: radix-_r_i_, Secondary Actions: Expand
+					80 image
+				81 text 2
+				82 pop up button (collapsed) Description: More options, ID: radix-_r_k_, Secondary Actions: Expand
+					83 image
+				84 button View this period in the agenda
+					85 text VIEWING
+					86 text 3 entries
+					87 container
+						88 text 13 September 2026
+					89 text Sunday, 13 September 2026
+				90 button View the coming week
+					91 text NEXT 7 DAYS
+					92 text 2
+					93 text upcoming from today
+				94 button View completed entries in the agenda
+					95 text DONE / APPROVED
+					96 image
+					97 text 0
+					98 text %
+					99 text 0
+					100 text  of 
+					101 text 3
+					102 text this period
+				103 button View overdue entries in the agenda
+					104 text OVERDUE
+					105 text 1
+					106 text past their due date
+				107 button View pending entries in the agenda
+					108 text TO APPROVE
+					109 text 0
+					110 text awaiting sign-off
+				111 link Description: Open My Work, Value: 127.0.0.1:8783/governance/my-work
+				112 button Previous period
+					113 image
+				114 pop up button (collapsed) Description: Jump to date, Secondary Actions: Expand
+					115 image
+					116 text September 2026
+					117 image
+				118 button Next period
+					119 image
+				120 button Today
+				121 pop up button (collapsed) Display, Secondary Actions: Expand
+					122 image
+					123 text Display
+				124 tab group Calendar view
+					125 tab (selected, settable, boolean) Month, Value: 1
+Month
+					126 tab (selectable, settable, boolean) Week, Value: 0
+Week
+					127 tab (selectable, settable, boolean) Day, Value: 0
+Day
+					128 tab (selectable, settable, boolean) Agenda, Value: 0
+Agenda
+					129 tab (selectable, settable, boolean) Timeline, Value: 0
+Timeline
+					130 button Find a view
+						131 image
+						132 text Find
+			133 checkbox Meetings, Value: 1
+			134 checkbox Decisions, Value: 1
+			135 checkbox Obligations, Value: 1
+			136 checkbox Policies, Value: 1
+			137 text Times in NZT
+			138 container
+				139 cell Sunday
+					140 text SUN
+				141 cell Monday
+					142 text MON
+				143 cell Tuesday
+					144 text TUE
+				145 cell Wednesday
+					146 text WED
+				147 cell Thursday
+					148 text THU
+				149 cell Friday
+					150 text FRI
+				151 cell Saturday
+					152 text SAT
+				153 table September 2026
+					154 row Sunday 30 August 2026, no entries Monday 31 August 2026, no entries Tuesday 1 September 2026, no entries Wednesday 2 September 2026, no entries Thursday 3 September 2026, no entries Friday 4 September 2026, no entries Saturday 5 September 2026, no entries
+						155 cell Sunday 30 August 2026, no entries
+							156 text 30
+						157 cell Monday 31 August 2026, no entries
+							158 text 31
+						159 cell Tuesday 1 September 2026, no entries
+							160 text 1
+						161 cell Wednesday 2 September 2026, no entries
+							162 text 2
+						163 cell Thursday 3 September 2026, no entries
+							164 text 3
+						165 cell Friday 4 September 2026, no entries
+							166 text 4
+						167 cell Saturday 5 September 2026, no entries
+							168 text 5
+					169 row Sunday 6 September 2026, no entries Monday 7 September 2026, no entries Tuesday 8 September 2026, no entries Wednesday 9 September 2026, no entries Thursday 10 September 2026, no entries Friday 11 September 2026, no entries Saturday 12 September 2026, 1 entry
+						170 cell Sunday 6 September 2026, no entries
+							171 text 6
+						172 cell Monday 7 September 2026, no entries
+							173 text 7
+						174 cell Tuesday 8 September 2026, no entries
+							175 text 8
+						176 cell Wednesday 9 September 2026, no entries
+							177 text 9
+						178 cell Thursday 10 September 2026, no entries
+							179 text 10
+						180 cell Friday 11 September 2026, no entries
+							181 text 11
+						182 cell Saturday 12 September 2026, 1 entry
+							183 text 12
+							184 button Review annual assurance
+					185 row Sunday 13 September 2026, no entries Monday 14 September 2026, no entries Tuesday 15 September 2026, no entries Wednesday 16 September 2026, 1 entry Thursday 17 September 2026, no entries Friday 18 September 2026, 1 entry Saturday 19 September 2026, no entries
+						186 cell Sunday 13 September 2026, no entries
+							187 text 13
+						188 cell Monday 14 September 2026, no entries
+							189 text 14
+						190 cell Tuesday 15 September 2026, no entries
+							191 text 15
+						192 cell Wednesday 16 September 2026, 1 entry
+							193 text 16
+							194 button 4:45pm [Vote deadline] Review equipment renewal
+								195 text 4:45pm
+								196 text [Vote deadline] Review equipment renewal
+						197 cell Thursday 17 September 2026, no entries
+							198 text 17
+						199 cell Friday 18 September 2026, 1 entry
+							200 text 18
+							201 button 10am Review September Board
+								202 text 10am
+								203 text Review September Board
+						204 cell Saturday 19 September 2026, no entries
+							205 text 19
+					206 row Sunday 20 September 2026, no entries Monday 21 September 2026, no entries Tuesday 22 September 2026, no entries Wednesday 23 September 2026, no entries Thursday 24 September 2026, no entries Friday 25 September 2026, no entries Saturday 26 September 2026, no entries
+						207 cell Sunday 20 September 2026, no entries
+							208 text 20
+						209 cell Monday 21 September 2026, no entries
+							210 text 21
+						211 cell Tuesday 22 September 2026, no entries
+							212 text 22
+						213 cell Wednesday 23 September 2026, no entries
+							214 text 23
+						215 cell Thursday 24 September 2026, no entries
+							216 text 24
+						217 cell Friday 25 September 2026, no entries
+							218 text 25
+						219 cell Saturday 26 September 2026, no entries
+							220 text 26
+					221 row Sunday 27 September 2026, no entries Monday 28 September 2026, no entries Tuesday 29 September 2026, no entries Wednesday 30 September 2026, no entries Thursday 1 October 2026, no entries Friday 2 October 2026, no entries Saturday 3 October 2026, no entries
+						222 cell Sunday 27 September 2026, no entries
+							223 text 27
+						224 cell Monday 28 September 2026, no entries
+							225 text 28
+						226 cell Tuesday 29 September 2026, no entries
+							227 text 29
+						228 cell Wednesday 30 September 2026, no entries
+							229 text 30
+						230 cell Thursday 1 October 2026, no entries
+							231 text 1
+						232 cell Friday 2 October 2026, no entries
+							233 text 2
+						234 cell Saturday 3 October 2026, no entries
+							235 text 3
+			236 container
+				237 text SUNDAY 13 September 2026
+				238 image
+				239 text No more entries scheduled today.
+				240 image
+				241 text Needs attention 1
+				242 button Review annual assurance Overdue · 1d
+					243 image
+					244 text Review annual assurance
+					245 text Overdue · 
+					246 text 1
+					247 text d
+					248 image
+				249 text Today's schedule 0 entries
+				250 image
+				251 text Nothing on today. UP NEXT
+				252 button Wed 4:45pm [Vote deadline] Review equipment renewal Decisions
+					253 text Wed 
+					254 text 4:45pm
+					255 text [Vote deadline] Review equipment renewal
+					256 text Decisions
+				257 button Fri 10am Review September Board Meetings RC
+					258 text Fri 
+					259 text 10am
+					260 text Review September Board
+					261 text Meetings
+					262 text RC
+		263 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea Governance Calendar - Laravel, URL: 127.0.0.1:8783/governance/calendar

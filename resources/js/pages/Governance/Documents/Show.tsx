@@ -1,4 +1,11 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +49,7 @@ export default function DocumentShow({ auth, document }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Documents', href: '/governance/documents' },
                 {
@@ -54,34 +62,53 @@ export default function DocumentShow({ auth, document }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
+                        variant="profile"
+                        backHref="/governance/documents"
                         icon={FolderOpen}
-                        category="governance"
                         title={document.title}
-                        description={
-                            document.description ?? 'Governance document'
+                        titleChip={
+                            <div className="flex items-center gap-1.5">
+                                <Badge variant="outline" className="capitalize text-xs">
+                                    {document.category}
+                                </Badge>
+                                <Badge
+                                    className={cn(
+                                        'border text-xs uppercase',
+                                        document.is_current
+                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                            : 'border-status-neutral/30 bg-muted text-muted-foreground',
+                                    )}
+                                >
+                                    {document.is_current ? 'Current' : 'Archived'}
+                                </Badge>
+                            </div>
                         }
-                        badges={[
-                            { label: document.category },
-                            ...(document.is_current
-                                ? [{ label: 'Current' }]
-                                : [{ label: 'Archived' }]),
-                        ]}
-                        stats={[
-                            { label: 'Version', value: `v${document.version}` },
-                            {
-                                label: 'Size',
-                                value: formatBytes(document.file_size),
-                            },
-                        ]}
+                        subline={document.description ?? 'Governance document'}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Version"
+                                    href={`/governance/documents/${document.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        v{document.version}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Document edition</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Size"
+                                    href={`/governance/documents/${document.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {formatBytes(document.file_size)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>File payload</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <div className="flex gap-2">
-                                <Button asChild variant="outline">
-                                    <Link href="/governance/documents">
-                                        <ArrowLeft className="mr-2 h-4 w-4" />{' '}
-                                        Back
-                                    </Link>
-                                </Button>
                                 <Button asChild>
                                     <a
                                         href={`/governance/documents/${document.id}/download`}

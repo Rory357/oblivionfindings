@@ -83,6 +83,18 @@ class ComplianceEvidence extends Model
 
     public function verify(int $userId, ?string $notes = null): void
     {
+        if ($this->valid_from && $this->valid_from->isFuture()) {
+            throw new \DomainException("Compliance evidence with future valid_from date cannot be verified.");
+        }
+
+        if ($this->valid_until && $this->valid_until->isPast()) {
+            throw new \DomainException("Compliance evidence with expired valid_until date cannot be verified.");
+        }
+
+        if ($this->file_path && ! \Illuminate\Support\Facades\Storage::disk('local')->exists($this->file_path) && ! \Illuminate\Support\Facades\Storage::disk('public')->exists($this->file_path)) {
+            throw new \DomainException("Compliance evidence file does not exist in storage and cannot be verified.");
+        }
+
         $this->update([
             'verified' => true,
             'verified_by' => $userId,

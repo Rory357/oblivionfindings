@@ -62,7 +62,7 @@ class SyncSiteRiskReviewsCommand extends Command
 
         foreach ($sites as $site) {
             $reviewDate = $hasReviewColumn ? $site->risk_review_date : null;
-            $sourceKey = "SITE-RISK-REVIEW-{$site->id}-" . ($reviewDate ?? 'undated');
+            $sourceKey = "SITE-RISK-REVIEW-{$site->id}-".($reviewDate ?? 'undated');
 
             $existing = ActionItem::query()
                 ->where('source_type', 'site_risk_review')
@@ -102,7 +102,7 @@ class SyncSiteRiskReviewsCommand extends Command
                 );
                 $created++;
             } catch (\Throwable $e) {
-                $this->error("Failed for site #{$site->id}: " . $e->getMessage());
+                $this->error("Failed for site #{$site->id}: ".$e->getMessage());
             }
         }
 

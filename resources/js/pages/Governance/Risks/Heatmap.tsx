@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -56,6 +62,7 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Risks', href: '/governance/risks' },
                 { title: 'Heatmap', href: '/governance/risks/heatmap' },
@@ -65,19 +72,32 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={AlertTriangle}
                         title="Risk Heatmap"
-                        description="Visual representation of risk distribution across likelihood and impact."
-                        stats={[
-                            {
-                                label: 'Total Risks',
-                                value: heatmap
-                                    .flat()
-                                    .reduce((sum, c) => sum + c.count, 0),
-                            },
-                            { label: 'Period', value: '12 mo' },
-                        ]}
+                        subline="Visual representation of risk distribution across likelihood and impact matrices"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total Risks"
+                                    href="/governance/risks"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {heatmap
+                                            .flat()
+                                            .reduce((sum, c) => sum + c.count, 0)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Matrix population</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Period"
+                                    href="/governance/risks/heatmap"
+                                >
+                                    <PageHeaderMeterBig>12 mo</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Window</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

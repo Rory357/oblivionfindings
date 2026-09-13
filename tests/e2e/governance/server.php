@@ -28,9 +28,25 @@ if (empty($state['dbName']) || ! str_starts_with($state['dbName'], 'oblivion_gov
     exit(1);
 }
 
+$disposableConfigCache = sys_get_temp_dir().'/oblivion_gov_server_config_'.$state['dbName'].'.php';
 putenv("DB_DATABASE={$state['dbName']}");
 $_ENV['DB_DATABASE'] = $state['dbName'];
 $_SERVER['DB_DATABASE'] = $state['dbName'];
+putenv("APP_CONFIG_CACHE={$disposableConfigCache}");
+$_ENV['APP_CONFIG_CACHE'] = $disposableConfigCache;
+$_SERVER['APP_CONFIG_CACHE'] = $disposableConfigCache;
+putenv("MAIL_MAILER=array");
+$_ENV['MAIL_MAILER'] = 'array';
+$_SERVER['MAIL_MAILER'] = 'array';
+putenv("QUEUE_CONNECTION=sync");
+$_ENV['QUEUE_CONNECTION'] = 'sync';
+$_SERVER['QUEUE_CONNECTION'] = 'sync';
+putenv("CACHE_STORE=array");
+$_ENV['CACHE_STORE'] = 'array';
+$_SERVER['CACHE_STORE'] = 'array';
+putenv("SESSION_DRIVER=file");
+$_ENV['SESSION_DRIVER'] = 'file';
+$_SERVER['SESSION_DRIVER'] = 'file';
 
 $root = dirname(__DIR__, 3);
 

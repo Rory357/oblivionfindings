@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -113,6 +119,7 @@ export default function PolicyAttestations({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Policies', href: '/governance/policies' },
                 {
@@ -125,25 +132,43 @@ export default function PolicyAttestations({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={BookOpen}
-                        category="governance"
                         title="Policy Attestations"
-                        description="Record that you have read and understood each approved governance policy."
-                        stats={[
-                            {
-                                label: 'Outstanding',
-                                value: summary.outstanding_count,
-                            },
-                            {
-                                label: 'Completed',
-                                value: summary.completed_count,
-                            },
-                            {
-                                label: 'Active board members',
-                                value: summary.board_member_count,
-                            },
-                        ]}
+                        subline="Record that you have read and understood each approved governance policy."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Outstanding"
+                                    href="/governance/policies/attestations"
+                                    tone={summary.outstanding_count > 0 ? 'warning' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.outstanding_count}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Pending sign-off</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Completed"
+                                    href="/governance/policies/attestations"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.completed_count}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Acknowledged</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Active board members"
+                                    href="/governance/admin/board-members"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.board_member_count}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>In scope</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

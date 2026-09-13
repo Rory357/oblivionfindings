@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -174,19 +180,29 @@ export default function ActionsIndex({ auth, items, summary, filters, assignees 
 
             <PageLayout
                 hero={
-                    <PageHero
-                        icon={CheckSquare}
+                    <PageHeader
                         title="Actions"
-                        description="Track board decisions and follow-ups through to completion."
-                        stats={[
-                            { label: 'Open', value: summary.total_open },
-                            { label: 'Overdue', value: summary.overdue },
-                            { label: 'My open', value: summary.my_open },
-                            {
-                                label: 'High priority',
-                                value: summary.high_priority,
-                            },
-                        ]}
+                        subline="Track board decisions and follow-ups through to completion."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock label="Open">
+                                    <PageHeaderMeterBig>{summary.total_open}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Active items</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock label="Overdue" tone={summary.overdue > 0 ? 'critical' : 'brand'}>
+                                    <PageHeaderMeterBig>{summary.overdue}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Needs attention</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock label="My Open">
+                                    <PageHeaderMeterBig>{summary.my_open}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Assigned to you</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock label="High Priority" tone={summary.high_priority > 0 ? 'warning' : 'brand'}>
+                                    <PageHeaderMeterBig>{summary.high_priority}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Escalated items</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >
@@ -221,6 +237,7 @@ export default function ActionsIndex({ auth, items, summary, filters, assignees 
                             <option value="all">All Statuses</option>
                             <option value="open">Open</option>
                             <option value="in_progress">In Progress</option>
+                            <option value="overdue">Overdue</option>
                             <option value="blocked">Blocked</option>
                             <option value="complete">Completed</option>
                         </select>

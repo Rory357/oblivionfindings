@@ -9,15 +9,18 @@ use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\MeetingAgendaItem;
 use App\Domain\Governance\Models\MeetingAttendance;
-use App\Domain\Governance\Models\MeetingMinute;
 use App\Domain\Governance\Models\MeetingRsvp;
+use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\Governance\Services\ExecutiveMeetingAccessService;
 use App\Domain\Governance\Services\GovernanceNestedMutationService;
+use App\Domain\Governance\Services\GovernanceRecordAccessService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Domain\Governance\Services\MeetingMinuteService;
+use App\Domain\Governance\Services\VotingService;
 use App\Domain\Governance\Support\GovernancePresenter;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Http\Request;
@@ -32,6 +35,8 @@ class GovernanceMeetingController extends Controller
         protected BoardPackAccessService $boardPackAccess,
         protected ExecutiveMeetingAccessService $executiveAccess,
         protected MeetingMinuteService $minuteService,
+        protected VotingService $votingService,
+        protected GovernanceRecordAccessService $recordAccess,
     ) {}
 
     public function create(Request $request)
@@ -158,7 +163,11 @@ class GovernanceMeetingController extends Controller
             'minutes.reviewedBy.user',
             'minutes.signedBy.user',
             'boardPack',
-            'resolutions',
+            'resolutions.proposedBy',
+            'resolutions.votes.boardMember.user',
+            'resolutions.conflictDeclarations.boardMember.user',
+            'resolutions.committee',
+            'resolutions.actionItems.assignee',
         ]);
 
         $viewer = $request->user();
@@ -172,6 +181,35 @@ class GovernanceMeetingController extends Controller
         $visiblePack = $this->boardPackAccess->visiblePack($viewer, $meeting->boardPack);
         $meeting->setRelation('boardPack', $visiblePack);
 
+        // Scope resolutions for viewer
+        $visibleResolutions = $meeting->resolutions->filter(
+            fn (Resolution $r) => $this->recordAccess->canViewResolution($viewer, $r)
+        )->values();
+        $meeting->setRelation('resolutions', $visibleResolutions);
+
+        $viewerBoardMember = $viewer->boardMember;
+
+        $enrichedResolutions = $visibleResolutions->map(function (Resolution $r) use ($viewer, $viewerBoardMember, $meeting) {
+            $myVote = $viewerBoardMember ? $r->getBoardMemberVote($viewerBoardMember->id) : null;
+            $myConflict = $viewerBoardMember
+                ? $r->conflictDeclarations->firstWhere('board_member_id', $viewerBoardMember->id)
+                : null;
+            $results = in_array($r->status, ['closed', 'implemented', 'archived'], true)
+                ? $this->votingService->getVotingResults($r)
+                : null;
+            $canVote = $viewer->can('vote', $r) && (! $myConflict || ! $myConflict->withdrew_from_voting);
+
+            $arr = $r->toArray();
+            $arr['my_vote'] = $myVote;
+            $arr['my_conflict'] = $myConflict;
+            $arr['can_vote'] = $canVote;
+            $arr['can_manage'] = $viewer->can('update', $r);
+            $arr['results'] = $results;
+            $arr['quorum'] = $this->votingService->calculateQuorum($meeting->id, $r);
+
+            return $arr;
+        })->values();
+
         $quorum = $meeting->calculateQuorum();
         $boardMembers = BoardMember::with('user')->active()->get();
         $workflowChecklist = $this->workflowService->meetingChecklist($meeting, $viewer);
@@ -180,12 +218,18 @@ class GovernanceMeetingController extends Controller
         // The meeting payload needs only a linkable pack summary, never the raw model fields.
         $visiblePack?->setVisible(['id', 'distributed_at']);
 
-        $viewerBoardMember = $viewer->boardMember;
         $viewerCanRsvp = $viewerBoardMember !== null && $meeting->isInvited($viewerBoardMember);
         $viewerRsvp = $viewerCanRsvp ? $meeting->rsvps->firstWhere('board_member_id', $viewerBoardMember->id) : null;
 
+        $users = User::query()
+            ->whereNotNull('approved_at')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
         return Inertia::render('Governance/Meetings/Show', [
             'meeting' => $meeting,
+            'resolutions' => $enrichedResolutions,
+            'users' => $users,
             'quorum' => $quorum,
             'boardMembers' => $boardMembers,
             'canEdit' => $meeting->isEditable() && $viewer->can('update', $meeting),
@@ -327,6 +371,7 @@ class GovernanceMeetingController extends Controller
 
         try {
             $this->minuteService->storeMinutes($meeting, $validated['content_blocks'] ?? null, $request->user());
+
             return redirect()->back()->with('success', 'Minutes drafted.');
         } catch (DomainException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -345,6 +390,7 @@ class GovernanceMeetingController extends Controller
             if ($request->wantsJson()) {
                 return response()->json(['error' => "Minutes in status '{$meeting->minutes->status}' cannot be edited in place. Approved and signed minutes are immutable."], 422);
             }
+
             return redirect()->back()->with('error', "Minutes in status '{$meeting->minutes->status}' cannot be edited in place. Approved and signed minutes are immutable. Create a correction draft to propose revisions.");
         }
 
@@ -365,8 +411,10 @@ class GovernanceMeetingController extends Controller
         } catch (DomainException $e) {
             if ($request->wantsJson()) {
                 $status = str_contains($e->getMessage(), 'Stale edit') ? 409 : 422;
+
                 return response()->json(['error' => $e->getMessage()], $status);
             }
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -377,6 +425,7 @@ class GovernanceMeetingController extends Controller
 
         try {
             $this->minuteService->submitForReview($meeting, $request->user());
+
             return redirect()->back()->with('success', 'Minutes submitted for review.');
         } catch (DomainException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -401,12 +450,14 @@ class GovernanceMeetingController extends Controller
                 (int) $validated['expected_version'],
                 $validated['expected_hash'] ?? null
             );
+
             return redirect()->back()->with('success', 'Minutes approved.');
         } catch (DomainException $e) {
             $status = str_contains($e->getMessage(), 'conflict') ? 409 : 422;
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], $status);
             }
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -427,6 +478,7 @@ class GovernanceMeetingController extends Controller
                 MeetingAttendance::where('governance_meeting_id', $meeting->id)
                     ->where('board_member_id', $record['board_member_id'])
                     ->delete();
+
                 continue;
             }
 
@@ -476,12 +528,14 @@ class GovernanceMeetingController extends Controller
                 (int) $validated['expected_version'],
                 $validated['expected_hash'] ?? null
             );
+
             return redirect()->back()->with('success', 'Minutes signed successfully.');
         } catch (DomainException $e) {
             $status = str_contains($e->getMessage(), 'conflict') ? 409 : 422;
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], $status);
             }
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -492,11 +546,13 @@ class GovernanceMeetingController extends Controller
 
         try {
             $this->minuteService->archiveMinutes($meeting, $request->user());
+
             return redirect()->back()->with('success', 'Minutes archived.');
         } catch (DomainException $e) {
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 422);
             }
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -511,11 +567,13 @@ class GovernanceMeetingController extends Controller
 
         try {
             $this->minuteService->createCorrection($meeting, $request->user(), $validated['reason']);
+
             return redirect()->back()->with('success', 'Correction draft created. Prior approved version is preserved in version history.');
         } catch (DomainException $e) {
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 422);
             }
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }

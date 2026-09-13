@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -55,15 +61,43 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
             <Head title="Governance Policies" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={BookOpen}
                         title="Governance Policies"
-                        description="Board policies, procedures, and attestation tracking"
-                        stats={[
-                            { label: 'Total', value: policies.data.length },
-                            { label: 'Active', value: activeCount },
-                            { label: 'Attestation', value: needsAttestation },
-                        ]}
+                        subline="Board policies, compliance procedures, and member attestation tracking"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total policies"
+                                    href="/governance/policies"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {policies.data.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Policy library</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Active"
+                                    href="/governance/policies?status=active"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {activeCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>In effect</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Attestations required"
+                                    href="/governance/policies/attestations"
+                                    tone={needsAttestation > 0 ? 'warning' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {needsAttestation}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Pending sign-off</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <Link href="/governance/policies/create">
                                 <Button size="sm">

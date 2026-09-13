@@ -2,8 +2,8 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
-use App\Domain\Governance\Models\BoardMemberInterest;
 use App\Domain\Governance\Models\BoardMember;
+use App\Domain\Governance\Models\BoardMemberInterest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;

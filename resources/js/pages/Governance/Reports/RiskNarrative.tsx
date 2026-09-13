@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -69,28 +75,64 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Reports', href: '/governance/reports' },
-                { title: 'Risk Narrative', href: '#' },
+                { title: 'Reports', href: '/governance/reports/board-monthly' },
+                { title: 'Risk Narrative', href: '/governance/reports/risk-narrative' },
             ]}
         >
             <Head title="Risk Narrative Report" />
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={AlertTriangle}
                         title="Risk Narrative Report"
-                        description="Detailed narrative view of all active risks."
-                        stats={[
-                            { label: 'Critical', value: summary.critical },
-                            { label: 'High', value: summary.high },
-                            {
-                                label: 'Above Appetite',
-                                value: summary.above_appetite,
-                            },
-                            { label: 'Total', value: summary.total_active },
-                        ]}
+                        subline="Detailed narrative view of all active risks."
+                        backHref="/governance/risks"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Critical"
+                                    href="/governance/risks?severity=critical"
+                                    tone={summary.critical > 0 ? 'critical' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.critical}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Immediate escalation</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="High"
+                                    href="/governance/risks?severity=high"
+                                    tone={summary.high > 0 ? 'warning' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.high}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Elevated exposure</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Above appetite"
+                                    href="/governance/risks?appetite=above"
+                                    tone={summary.above_appetite > 0 ? 'critical' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.above_appetite}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Tolerance breached</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Active risks"
+                                    href="/governance/risks"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.total_active}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Register total</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

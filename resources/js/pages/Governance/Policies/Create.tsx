@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -37,15 +37,23 @@ export default function PolicyCreate({ auth }: PageProps) {
     };
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Policies', href: '/governance/policies' },
+                { title: 'Create Policy', href: '/governance/policies/create' },
+            ]}
+        >
             <Head title="Create Policy" />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/policies"
                         icon={BookOpen}
                         title="Create Governance Policy"
+                        subline="Define a new board policy, governance framework, or compliance guideline"
                     />
                 }
             >

@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -102,37 +108,53 @@ export default function ClinicalTrends({
         ) ?? null;
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Clinical Governance', href: '/governance/clinical' },
+                { title: 'Trends', href: '/governance/clinical/trends' },
+            ]}
+        >
             <Head title="Clinical Governance Trends" />
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
+                        variant="profile"
+                        backHref="/governance/clinical"
                         icon={Activity}
                         title="Clinical Governance Trends"
-                        description="Recent automated snapshot history for the Governance clinical indicators."
-                        stats={[
-                            { label: 'Snapshots', value: snapshots.length },
-                            {
-                                label: 'Indicators',
-                                value: activeIndicators.length,
-                            },
-                            {
-                                label: 'Period',
-                                value: formatColumnDate(
-                                    latestSnapshot?.period_end ?? null,
-                                ),
-                            },
-                        ]}
-                        actions={
-                            <Link href="/governance/clinical">
-                                <Button
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                        subline="Recent automated snapshot history for the Governance clinical indicators."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Snapshots"
+                                    href="/governance/clinical/trends"
                                 >
-                                    Dashboard
-                                </Button>
-                            </Link>
+                                    <PageHeaderMeterBig>{snapshots.length}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Recorded history</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Indicators"
+                                    href="/governance/clinical"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>{activeIndicators.length}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Tracked metrics</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Period"
+                                    href="/governance/clinical/trends"
+                                >
+                                    <PageHeaderMeterBig>
+                                        <span className="text-sm font-semibold">
+                                            {formatColumnDate(latestSnapshot?.period_end ?? null)}
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Latest snapshot</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
                         }
                     />
                 }

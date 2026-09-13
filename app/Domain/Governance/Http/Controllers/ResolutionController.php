@@ -65,10 +65,16 @@ class ResolutionController extends Controller
         $recordAccess->scopeMeetings($meetingsQuery, $user);
         $meetings = $meetingsQuery->get(['id', 'title', 'scheduled_at']);
 
+        $users = \App\Models\User::query()
+            ->whereNotNull('approved_at')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
         return Inertia::render('Governance/Resolutions/Index', [
             'resolutions' => $resolutions,
             'my_pending_votes' => $this->getMyPendingVotes(),
             'meetings' => $meetings,
+            'users' => $users,
         ]);
     }
 
@@ -92,8 +98,8 @@ class ResolutionController extends Controller
 
         $myConflict = $boardMember
             ? $resolution->conflictDeclarations()
-                ->where('board_member_id', $boardMember->id)
-                ->first()
+            ->where('board_member_id', $boardMember->id)
+            ->first()
             : null;
 
         $recordAccess = app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class);
@@ -106,6 +112,11 @@ class ResolutionController extends Controller
         $committees = \App\Domain\Governance\Models\BoardCommittee::query()
             ->orderBy('name')
             ->get(['id', 'name']);
+
+        $users = \App\Models\User::query()
+            ->whereNotNull('approved_at')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
 
         return Inertia::render('Governance/Resolutions/Show', [
             'resolution' => $resolution,
@@ -122,6 +133,7 @@ class ResolutionController extends Controller
             'validation_errors' => $resolution->isDraft() ? $resolution->validateForPublication() : [],
             'meetings' => $meetings,
             'committees' => $committees,
+            'users' => $users,
         ]);
     }
 

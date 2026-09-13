@@ -145,7 +145,7 @@ class ActionItem extends Model
             $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status === 'complete') {
-                throw new \DomainException('Completed actions are closed and cannot be updated. Create a follow-up action if further work is required.');
+                throw new \DomainException('A completed action item is in a terminal state and cannot be modified.');
             }
 
             $currentVersion = (int) ($locked->version_number ?? 1);
@@ -172,6 +172,10 @@ class ActionItem extends Model
         \Illuminate\Support\Facades\DB::transaction(function () use ($reason, $expectedVersion) {
             $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
 
+            if ($locked->status === 'complete') {
+                throw new \DomainException('A completed action item is in a terminal state and cannot be marked as blocked.');
+            }
+
             $currentVersion = (int) ($locked->version_number ?? 1);
             if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
                 throw new \DomainException('Action item was modified by another user. Please reload and review the latest changes.');
@@ -196,6 +200,10 @@ class ActionItem extends Model
     {
         \Illuminate\Support\Facades\DB::transaction(function () use ($expectedVersion) {
             $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status === 'complete') {
+                throw new \DomainException('A completed action item is in a terminal state and cannot be unblocked.');
+            }
 
             $currentVersion = (int) ($locked->version_number ?? 1);
             if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
@@ -247,15 +255,32 @@ class ActionItem extends Model
             }
 
             foreach ($normalizedFiles as $filePath) {
-                $exists = \Illuminate\Support\Facades\Storage::disk('local')->exists($filePath)
-                    || \Illuminate\Support\Facades\Storage::disk('public')->exists($filePath)
-                    || \Illuminate\Support\Facades\Storage::exists($filePath)
-                    || file_exists(storage_path('app/' . $filePath))
-                    || file_exists(storage_path('app/public/' . $filePath))
-                    || file_exists(public_path($filePath));
+                if (file_exists(public_path($filePath)) && ! \Illuminate\Support\Facades\Storage::disk('local')->exists($filePath)) {
+                    throw new \DomainException("Public website assets cannot be used as action completion evidence.");
+                }
+
+                $diskLocal = \Illuminate\Support\Facades\Storage::disk('local');
+                $diskPublic = \Illuminate\Support\Facades\Storage::disk('public');
+                $exists = false;
+                if ($diskLocal->exists($filePath) && (int) $diskLocal->size($filePath) > 0) {
+                    $exists = true;
+                } elseif ($diskPublic->exists($filePath) && (int) $diskPublic->size($filePath) > 0) {
+                    $exists = true;
+                }
 
                 if (! $exists) {
-                    throw new \DomainException("Evidence file '{$filePath}' does not exist or has not been uploaded.");
+                    throw new \DomainException("Evidence file '{$filePath}' does not exist or has not been uploaded to managed storage.");
+                }
+
+                $otherAction = static::where('id', '!=', $locked->id)
+                    ->whereJsonContains('evidence_attachments', $filePath)
+                    ->first();
+                if ($otherAction) {
+                    $completingUser = \App\Models\User::find($userId);
+                    if (! $completingUser || ! app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)->canViewActionItem($completingUser, $otherAction)) {
+                        throw new \DomainException("Evidence file '{$filePath}' belongs to an inaccessible or restricted record.");
+                    }
+                    throw new \DomainException("Evidence file '{$filePath}' is already associated with another action item.");
                 }
             }
 

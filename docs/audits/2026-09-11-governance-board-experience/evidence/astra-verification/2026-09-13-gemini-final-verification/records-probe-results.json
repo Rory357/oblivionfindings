@@ -1,0 +1,13 @@
+{
+    "checked_at": "2026-09-13T07:32:02+00:00",
+    "database": "oblivion_gov_gemini_verify_20260913_31676",
+    "cases": {
+        "records_ignores_explicit_document_capability_denial": {
+            "home_permission": true,
+            "documents_permission": false,
+            "records_status": 200,
+            "title_disclosed": false,
+            "direct_status": 403
+        }
+    }
+}

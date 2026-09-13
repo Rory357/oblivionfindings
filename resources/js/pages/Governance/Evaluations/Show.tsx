@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -76,48 +82,68 @@ export default function EvaluationShow({
     const getStatusColor = (status: string) => governanceStatusColor(status);
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Evaluations', href: '/governance/evaluations' },
+                { title: evaluation.title, href: `/governance/evaluations/${evaluation.id}` },
+            ]}
+        >
             <Head title={evaluation.title} />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/evaluations"
                         icon={Star}
-                        title={
-                            <span
-                                className="flex flex-wrap items-center gap-3"
-                                dusk="evaluation-title"
+                        title={evaluation.title}
+                        titleDusk="evaluation-title"
+                        titleChip={
+                            <Badge
+                                className={cn(
+                                    'text-xs',
+                                    getStatusColor(evaluation.status),
+                                )}
                             >
-                                {evaluation.title}
-                                <Badge
-                                    className={cn(
-                                        'text-xs',
-                                        getStatusColor(evaluation.status),
-                                    )}
-                                >
-                                    {evaluation.status}
-                                </Badge>
-                            </span>
+                                {evaluation.status}
+                            </Badge>
                         }
-                        description={`Period: ${new Date(evaluation.period_start).toLocaleDateString('en-NZ')} - ${new Date(evaluation.period_end).toLocaleDateString('en-NZ')}`}
-                        stats={[
-                            { label: 'Status', value: evaluation.status },
-                            {
-                                label: 'Responses',
-                                value: `${responseRate.completed}/${responseRate.total}`,
-                            },
-                            {
-                                label: 'Questions',
-                                value: evaluation.questions.length,
-                            },
-                            {
-                                label: 'Due',
-                                value: new Date(
-                                    evaluation.due_date,
-                                ).toLocaleDateString('en-NZ'),
-                            },
-                        ]}
+                        subline={`Period: ${new Date(evaluation.period_start).toLocaleDateString('en-NZ')} - ${new Date(evaluation.period_end).toLocaleDateString('en-NZ')} · Due ${new Date(evaluation.due_date).toLocaleDateString('en-NZ')}`}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Responses"
+                                    href={`/governance/evaluations/${evaluation.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {responseRate.completed}/{responseRate.total}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Submitted</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Questions"
+                                    href={`/governance/evaluations/${evaluation.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {evaluation.questions.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Items</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Status"
+                                    href={`/governance/evaluations?status=${evaluation.status}`}
+                                    tone={evaluation.status === 'active' ? 'brand' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        <span className="text-sm font-semibold uppercase">
+                                            {evaluation.status}
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Current</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <>
                                 {evaluation.status === 'draft' && (

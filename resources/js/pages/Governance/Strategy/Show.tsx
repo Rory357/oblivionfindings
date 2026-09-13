@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -195,32 +201,13 @@ export default function StrategyShow({ auth, plan, carriedResolutions = [] }: Pr
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/strategy"
                         icon={Compass}
-                        title={
-                            <span
-                                className="flex flex-wrap items-center gap-3"
-                                dusk="strategy-heading"
-                            >
-                                {plan.title}
-                            </span>
-                        }
-                        description={`${plan.period_start} to ${plan.period_end}`}
-                        stats={[
-                            { label: 'Status', value: plan.status },
-                            { label: 'Goals', value: plan.goals.length },
-                            {
-                                label: 'Horizon',
-                                value: plan.planning_horizon.replace('_', ' '),
-                            },
-                            {
-                                label: 'Version',
-                                value: `v${plan.version_number}`,
-                            },
-                        ]}
-                        actions={
+                        title={plan.title}
+                        titleDusk="strategy-heading"
+                        titleChip={
                             <div className="flex flex-wrap items-center gap-2">
                                 <Badge variant="outline">
                                     {plan.planning_horizon.replace('_', ' ')}{' '}
@@ -232,6 +219,47 @@ export default function StrategyShow({ auth, plan, carriedResolutions = [] }: Pr
                                 <Badge variant="outline">
                                     v{plan.version_number}
                                 </Badge>
+                            </div>
+                        }
+                        subline={`${plan.period_start} to ${plan.period_end}`}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Goals"
+                                    href={`/governance/strategy/${plan.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {plan.goals.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Strategic goals</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Horizon"
+                                    href="/governance/strategy"
+                                >
+                                    <PageHeaderMeterBig>
+                                        <span className="text-sm font-semibold capitalize">
+                                            {plan.planning_horizon.replace('_', ' ')}
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Timeframe</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Status"
+                                    href={`/governance/strategy?status=${plan.status}`}
+                                    tone={plan.status === 'approved' ? 'brand' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        <span className="text-sm font-semibold uppercase">
+                                            {plan.status}
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Current</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
                                 <Link href={`/governance/strategy/${plan.id}/changes`}>
                                     <Button variant="outline" size="sm">
                                         <History className="mr-1.5 h-4 w-4" />

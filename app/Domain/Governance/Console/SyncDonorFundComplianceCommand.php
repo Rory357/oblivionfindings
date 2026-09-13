@@ -41,7 +41,7 @@ class SyncDonorFundComplianceCommand extends Command
 
         $created = 0;
         foreach ($funds as $fund) {
-            $obligationCode = "DONOR-FUND-{$fund->id}-" . $fund->next_report_due;
+            $obligationCode = "DONOR-FUND-{$fund->id}-".$fund->next_report_due;
 
             $existing = ComplianceObligation::query()
                 ->where('obligation_code', $obligationCode)
@@ -81,7 +81,7 @@ class SyncDonorFundComplianceCommand extends Command
                 );
                 $created++;
             } catch (\Throwable $e) {
-                $this->error("Failed for fund #{$fund->id}: " . $e->getMessage());
+                $this->error("Failed for fund #{$fund->id}: ".$e->getMessage());
             }
         }
 

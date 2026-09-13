@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -95,20 +101,58 @@ export default function PacksIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={FolderOpen}
-                        category="governance"
                         title="Board Packs"
-                        description="Immutable, audience-safe board packs assembled for meetings. Each version preserves exact decision papers, snapshots, and reading receipts."
-                        stats={[
-                            { label: 'Total', value: summary.total },
-                            {
-                                label: 'Current',
-                                value: summary.distributed,
-                            },
-                            { label: 'Draft', value: summary.draft },
-                            { label: 'Superseded', value: summary.superseded ?? 0 },
-                        ]}
+                        subline="Immutable, audience-safe board packs assembled for meetings · Decision papers, snapshots, and reading receipts"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total packs"
+                                    href="/governance/packs"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.total}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        All editions
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Current"
+                                    href="/governance/packs?status=distributed"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.distributed}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Distributed
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Draft"
+                                    href="/governance/packs?status=draft"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.draft}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        In preparation
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Superseded"
+                                    href="/governance/packs?status=superseded"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.superseded ?? 0}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Archived editions
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             canManagePacks ? (
                                 <Button

@@ -337,7 +337,12 @@ class VotingServiceTest extends TestCase
         }
 
         // Activation with document reference and approval resolution succeeds
-        $approvalRes = $this->createResolution($admin, ['status' => 'closed', 'outcome' => 'carried']);
+        $approvalRes = $this->createResolution($admin, [
+            'title' => 'Approve Constitution 2024 Adopted',
+            'exact_motion' => 'Adopt voting rules under Constitution 2024 Adopted.',
+            'status' => 'closed',
+            'outcome' => 'carried',
+        ]);
         $activated = $profileService->activateProfile($profile, $admin, $approvalRes, 'Constitution 2024 Adopted');
         $this->assertTrue($activated->is_active);
         $this->assertTrue($activated->isConfirmed());

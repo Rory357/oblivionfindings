@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -529,20 +535,26 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
     ];
 
     return (
-        <AppLayout user={auth.user}>
+        <AppLayout
+            user={auth.user}
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'CEO Reports', href: '/governance/ceo-reports' },
+                { title: report.title, href: `/governance/ceo-reports/${report.id}` },
+            ]}
+        >
             <Head title={report.title} />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/ceo-reports"
                         icon={FileText}
-                        title={
-                            <span
-                                className="flex flex-wrap items-center gap-3"
-                                dusk="ceo-report-title"
-                            >
-                                {report.title}
+                        title={report.title}
+                        titleDusk="ceo-report-title"
+                        titleChip={
+                            <div className="flex flex-wrap items-center gap-2">
                                 <Badge
                                     className={cn(
                                         'text-xs',
@@ -557,47 +569,40 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
                                         Overdue
                                     </Badge>
                                 )}
-                            </span>
-                        }
-                        description={
-                            <div className="flex flex-wrap items-center gap-3 text-sm">
-                                {report.period_label && (
-                                    <span className="inline-flex items-center gap-1">
-                                        <CalendarDays className="h-4 w-4" />
-                                        {report.period_label}
-                                    </span>
-                                )}
-                                {report.author && (
-                                    <span>By {report.author.name}</span>
-                                )}
-                                {report.meeting && (
-                                    <span>For {report.meeting.title}</span>
-                                )}
                             </div>
                         }
-                        stats={[
-                            {
-                                label: 'Period',
-                                value: report.period_label ?? '—',
-                            },
-                            {
-                                label: 'Sections',
-                                value: `${report.sections_complete}/${SECTION_LIST.length}`,
-                            },
-                            {
-                                label: 'Decisions',
-                                value: report.decisions_sought.length,
-                            },
-                            {
-                                label: 'Matters',
-                                value: report.matters_arising.length,
-                            },
-                        ]}
+                        subline={`${report.period_label ? `${report.period_label} · ` : ''}${report.author ? `By ${report.author.name}` : ''}${report.meeting ? ` · For ${report.meeting.title}` : ''}`}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Sections"
+                                    href={`/governance/ceo-reports/${report.id}`}
+                                >
+                                    <PageHeaderMeterBig>{report.sections_complete}/{SECTION_LIST.length}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Completed</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Decisions"
+                                    href={`/governance/ceo-reports/${report.id}#decisions`}
+                                >
+                                    <PageHeaderMeterBig>{report.decisions_sought.length}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Decisions sought</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Matters"
+                                    href={`/governance/ceo-reports/${report.id}#matters`}
+                                >
+                                    <PageHeaderMeterBig>{report.matters_arising.length}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Matters arising</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 {can && report.status === 'draft' && (
                                     <Button
                                         variant="outline"
+                                        size="sm"
                                         onClick={() => setEditOpen(true)}
                                     >
                                         <Pencil className="mr-1.5 h-4 w-4" />
@@ -605,18 +610,18 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
                                     </Button>
                                 )}
                                 {can && report.status === 'draft' && (
-                                    <Button onClick={handleSubmit}>
+                                    <Button size="sm" onClick={handleSubmit}>
                                         <Send className="mr-1.5 h-4 w-4" />
                                         Submit to board
                                     </Button>
                                 )}
                                 {can && report.status === 'submitted' && (
-                                    <Button onClick={handlePresent}>
+                                    <Button size="sm" onClick={handlePresent}>
                                         <CheckCircle2 className="mr-1.5 h-4 w-4" />
                                         Mark as presented
                                     </Button>
                                 )}
-                                <Button variant="outline" onClick={handlePrint}>
+                                <Button variant="outline" size="sm" onClick={handlePrint}>
                                     <Printer className="mr-1.5 h-4 w-4" />
                                     Print / PDF
                                 </Button>

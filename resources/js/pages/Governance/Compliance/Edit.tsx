@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -49,6 +49,7 @@ export default function EditCompliance({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Compliance', href: '/governance/compliance' },
                 {
@@ -64,12 +65,12 @@ export default function EditCompliance({
             <Head title={`Edit: ${obligation.obligation_title}`} />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref={`/governance/compliance/${obligation.id}`}
                         icon={Shield}
-                        title="Edit Obligation"
-                        description={obligation.obligation_title}
+                        title={`Edit: ${obligation.obligation_title}`}
+                        subline="Update obligation requirements, dates, or review schedule"
                     />
                 }
             >

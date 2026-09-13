@@ -1,0 +1,127 @@
+Browser tab: 2, Title: "Review equipment renewal - Laravel", URL: "http://127.0.0.1:8783/governance/resolutions/1".
+1 AXWebArea Review equipment renewal - Laravel, URL: 127.0.0.1:8783/governance/resolutions/1
+	2 container app
+		116 link Description: Skip to main content, Value: 127.0.0.1:8783/governance/resolutions/1#main-content
+		117 container
+			118 text Sunday 13 September 2026
+			119 link Description: Oblivion Care — home, Value: 127.0.0.1:8783/dashboard
+			120 pop up button (collapsed) Description: Search or jump to a page, Secondary Actions: Expand
+				121 image
+				122 text Search or jump to…
+				123 text Ctrl
+				124 text K
+			125 pop up button (disabled, collapsed) Description: Ask about a client, Secondary Actions: Expand
+				126 image
+			127 pop up button (collapsed) Description: Notifications, ID: radix-_r_2v_, Secondary Actions: Expand
+				128 image
+			129 pop up button (collapsed) Description: Announcements, ID: radix-_r_31_, Secondary Actions: Expand
+				130 image
+			131 pop up button (collapsed) Description: Open user menu for Review Alex Morgan, ID: radix-_r_2j_, Secondary Actions: Expand
+				132 image Review Alex Morgan
+		133 container
+			134 container Description: Primary navigation, ID: app-sidebar-nav
+				135 container
+					136 link Description: My Day, Value: 127.0.0.1:8783/my-day
+					137 link Description: My Calendar, Value: 127.0.0.1:8783/my-calendar
+					138 link Description: All Tasks, Value: 127.0.0.1:8783/tasks
+					139 button (collapsed) Description: IT & Support menu, Secondary Actions: Expand
+						140 text IT & Support
+						141 image
+					142 button (expanded) Description: Governance menu, Secondary Actions: Collapse
+						143 text Governance
+						144 image
+					145 container Governance navigation
+						146 text OVERVIEW & MY WORK
+						147 link Description: Home, Value: 127.0.0.1:8783/governance/dashboard
+						148 link Description: My work, Value: 127.0.0.1:8783/governance/my-work
+						149 link Description: Calendar, Value: 127.0.0.1:8783/governance/calendar
+						150 link Description: Records, Value: 127.0.0.1:8783/governance/records
+						151 text MEETINGS & DECISIONS
+						152 link Description: Meetings, Value: 127.0.0.1:8783/governance/meetings
+						153 link Description: Board Packs, Value: 127.0.0.1:8783/governance/packs
+						154 link Description: CEO Reports, Value: 127.0.0.1:8783/governance/ceo-reports
+						155 link Description: Resolutions, Value: 127.0.0.1:8783/governance/resolutions
+						156 link Description: Action Items, Value: 127.0.0.1:8783/governance/actions
+						157 link Description: Board Evaluations, Value: 127.0.0.1:8783/governance/evaluations
+						158 text OVERSIGHT
+						159 link Description: Risk Register, Value: 127.0.0.1:8783/governance/risks
+						160 link Description: Compliance, Value: 127.0.0.1:8783/governance/compliance
+						161 link Description: Clinical Governance, Value: 127.0.0.1:8783/governance/clinical
+						162 link Description: Te Tiriti, Value: 127.0.0.1:8783/governance/te-tiriti
+						163 link Description: Budgets, Value: 127.0.0.1:8783/governance/budgets
+						164 link Description: Spend Approvals, Value: 127.0.0.1:8783/governance/spend-approvals
+						165 link Description: Strategic Plan, Value: 127.0.0.1:8783/governance/strategy
+						166 link Description: Performance, Value: 127.0.0.1:8783/governance/performance
+						167 link Description: Policies, Value: 127.0.0.1:8783/governance/policies
+						168 link Description: Documents, Value: 127.0.0.1:8783/governance/documents
+						169 link Description: Interests Register, Value: 127.0.0.1:8783/governance/interests
+						170 text BOARD ADMINISTRATION
+						171 link Description: Audit Log, Value: 127.0.0.1:8783/governance/audit-log
+					172 button (collapsed) Description: Reporting menu, Secondary Actions: Expand
+						173 text Reporting
+						174 image
+				175 link Description: Settings, Value: 127.0.0.1:8783/settings
+			176 button (expanded) Description: Collapse sidebar, Secondary Actions: Collapse
+				177 image
+		178 container main-content
+			179 container breadcrumb
+				180 content list
+					181 link Description: Home, Value: 127.0.0.1:8783/dashboard
+					182 link Description: Governance, Value: 127.0.0.1:8783/governance/dashboard
+					183 link Description: Resolutions, Value: 127.0.0.1:8783/governance/resolutions
+					184 link (disabled) Resolution
+						185 text Resolution
+			186 container
+				187 link Description: Back, Value: 127.0.0.1:8783/governance/meetings/1?tab=resolutions&paper=1
+				188 image
+				189 heading Review equipment renewal, Value: 1
+					190 text Review equipment renewal
+				191 text V 1 draft RES-5FZ0CX  ·  Meeting:  Review September Board
+			192 image
+			193 text Paper Publication Readiness: Complete
+			194 text All mandatory decision paper elements (exact motion, context, options/reason, recommendation, financial, service-user, risk) are verified.
+			195 image
+			196 text Exact Motion
+			197 text Decision  Paper Resolution
+			198 text That the Board approves the proposal as presented.
+			199 text Context & Background (Why now?)
+			200 text Test resolution context providing background and rationale for the decision.
+			201 container
+				202 text Alternatives Evaluated ( 2 )
+			203 text Consequential decisions evaluate alternatives with explicit benefits and drawbacks.
+			204 heading Approve, Value: 4
+				205 text Approve
+			206 text Option  1
+			207 text Proceed with implementation
+			208 text Benefits & Opportunities:
+			209 text Immediate rollout
+			210 text Drawbacks, Costs & Risks:
+			211 text Capital outlay
+			212 heading Defer, Value: 4
+				213 text Defer
+			214 text Option  2
+			215 text Defer to next financial year
+			216 text Benefits & Opportunities:
+			217 text Preserves cash
+			218 text Drawbacks, Costs & Risks:
+			219 text Delays benefits
+			220 text MANAGEMENT RECOMMENDATION & STRATEGIC RATIONALE
+			221 text Management recommends Option 1 (Approve) based on service continuity.
+			222 image
+			223 text Impact & Governance Assessments
+			224 image
+			225 text FINANCIAL COST
+			226 text Explicitly confirmed: No direct financial cost.
+			227 image
+			228 text SERVICE-USER & SAFETY
+			229 text None specified.
+			230 image
+			231 text RISK & EQUITY
+			232 text None specified.
+			233 image
+			234 text Supporting documents ( 0 )
+			235 text Background analyses, draft contracts, legal opinions and other papers the board should review alongside this resolution.
+			236 text No supporting documents have been attached to this resolution.
+		115 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea Review equipment renewal - Laravel, URL: 127.0.0.1:8783/governance/resolutions/1

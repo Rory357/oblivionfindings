@@ -4,6 +4,7 @@ namespace App\Domain\Governance\Services;
 
 use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\BoardPack;
+use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Notifications\BoardPackPublishedNotification;
 use App\Domain\Governance\Notifications\PreReadReminderNotification;
 use App\Models\User;
@@ -50,12 +51,75 @@ final class BoardPackAccessService
             return $query->whereRaw('1 = 0');
         }
 
-        return $query
-            ->whereNotNull('distributed_at')
+        $query->whereNotNull('distributed_at')
             ->where(function ($q) {
                 $q->whereNull('build_status')->orWhere('build_status', 'published');
             })
             ->whereJsonContains('distributed_to', $boardMemberId);
+
+        $execAccess = app(ExecutiveMeetingAccessService::class);
+        if (! $execAccess->hasExecutiveAuthority($viewer)) {
+            $today = today()->toDateString();
+            $query->where(function (Builder $q) use ($boardMemberId, $today) {
+                $q->where(function (Builder $manifestCheck) {
+                    $manifestCheck->whereNull('document_manifest')
+                        ->orWhere(function (Builder $noConf) {
+                            $noConf->where('document_manifest', 'not like', '%"is_confidential":true%')
+                                ->where('document_manifest', 'not like', '%"is_confidential": true%')
+                                ->where('document_manifest', 'not like', '%"is_confidential":1%')
+                                ->where('document_manifest', 'not like', '%"is_confidential": 1%');
+                        });
+                })->orWhereHas('meeting', function (Builder $mq) use ($boardMemberId, $today) {
+                    $mq->where(function (Builder $mSub) use ($boardMemberId, $today) {
+                        $mSub->where('chair_id', $boardMemberId)
+                            ->orWhere('secretary_id', $boardMemberId)
+                            ->orWhere(function (Builder $comm) use ($boardMemberId, $today) {
+                                $comm->whereNotNull('board_committee_id')
+                                    ->whereHas('committee.members', function (Builder $cm) use ($boardMemberId, $today) {
+                                        $cm->where('board_members.id', $boardMemberId)
+                                            ->where('committee_memberships.is_active', true)
+                                            ->where(function ($term) use ($today) {
+                                                $term->whereNull('committee_memberships.appointed_at')
+                                                    ->orWhereDate('committee_memberships.appointed_at', '<=', $today);
+                                            })
+                                            ->where(function ($term) use ($today) {
+                                                $term->whereNull('committee_memberships.term_end')
+                                                    ->orWhereDate('committee_memberships.term_end', '>=', $today);
+                                            });
+                                    });
+                            });
+                    });
+                });
+            });
+
+            $visibleMeetingIds = app(ExecutiveMeetingAccessService::class)
+                ->applyMeetingVisibilityScope(
+                    \App\Domain\Governance\Models\GovernanceMeeting::query(),
+                    $viewer
+                )
+                ->pluck('id');
+
+            $hiddenMeetingIds = \App\Domain\Governance\Models\GovernanceMeeting::query()
+                ->whereNotIn('id', $visibleMeetingIds)
+                ->pluck('id');
+
+            if ($hiddenMeetingIds->isNotEmpty()) {
+                $inaccessibleResolutionIds = Resolution::query()
+                    ->whereIn('governance_meeting_id', $hiddenMeetingIds)
+                    ->pluck('id');
+
+                if ($inaccessibleResolutionIds->isNotEmpty()) {
+                    $query->where(function (Builder $q) use ($inaccessibleResolutionIds) {
+                        foreach ($inaccessibleResolutionIds as $hiddenId) {
+                            $q->where('document_manifest', 'not like', '%"id":'.$hiddenId.'%')
+                                ->where('document_manifest', 'not like', '%"id": '.$hiddenId.'%');
+                        }
+                    });
+                }
+            }
+        }
+
+        return $query;
     }
 
     public function canView(User $viewer, BoardPack $pack): bool
@@ -102,13 +166,56 @@ final class BoardPackAccessService
                     (int) $meeting->chair_id === (int) $boardMember->id ||
                     (int) $meeting->secretary_id === (int) $boardMember->id
                 );
+                $today = today()->toDateString();
                 $isCommitteeMember = $meeting && $meeting->board_committee_id && $boardMember?->committeeMemberships()
                     ->where('board_committee_id', $meeting->board_committee_id)
                     ->where('is_active', true)
+                    ->where(function ($q) use ($today) {
+                        $q->whereNull('appointed_at')->orWhereDate('appointed_at', '<=', $today);
+                    })
+                    ->where(function ($q) use ($today) {
+                        $q->whereNull('term_end')->orWhereDate('term_end', '>=', $today);
+                    })
                     ->exists();
 
                 if (! $isChairOrSec && ! $isCommitteeMember) {
                     return false;
+                }
+            }
+        }
+
+        // Recheck all resolutions in manifest against record access (traverse both items and flat)
+        $resolutions = $contentSections['resolutions'] ?? [];
+        if (isset($resolutions['items']) && is_array($resolutions['items'])) {
+            $resolutions = $resolutions['items'];
+        }
+        if (is_array($resolutions) && ! empty($resolutions)) {
+            $recordAccess = app(GovernanceRecordAccessService::class);
+            foreach ($resolutions as $resData) {
+                $resId = is_array($resData) ? ($resData['id'] ?? null) : ($resData->id ?? null);
+                if ($resId) {
+                    $resolution = Resolution::find($resId);
+                    if (! $resolution || ! $recordAccess->canViewResolution($viewer, $resolution)) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // Supporting documents check
+        $supportingDocs = $contentSections['supporting_documents'] ?? [];
+        if (isset($supportingDocs['items']) && is_array($supportingDocs['items'])) {
+            $supportingDocs = $supportingDocs['items'];
+        }
+        if (is_array($supportingDocs) && ! empty($supportingDocs)) {
+            $recordAccess = app(GovernanceRecordAccessService::class);
+            foreach ($supportingDocs as $docData) {
+                $docId = is_array($docData) ? ($docData['id'] ?? null) : ($docData->id ?? null);
+                if ($docId) {
+                    $doc = \App\Domain\Governance\Models\GovernanceDocument::find($docId);
+                    if (! $doc || ! $recordAccess->canViewDocument($viewer, $doc)) {
+                        return false;
+                    }
                 }
             }
         }

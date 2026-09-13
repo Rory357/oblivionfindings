@@ -7,8 +7,8 @@ use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Services\DashboardAggregatorService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class CeoBoardReportController extends Controller
@@ -141,7 +141,7 @@ class CeoBoardReportController extends Controller
         foreach ($request->file('files') as $file) {
             $directory = "governance/ceo-reports/{$report->id}";
             $extension = $file->getClientOriginalExtension() ?: $file->extension();
-            $storedName = Str::uuid()->toString() . ($extension ? ".{$extension}" : '');
+            $storedName = Str::uuid()->toString().($extension ? ".{$extension}" : '');
             $path = $file->storeAs($directory, $storedName, 'local');
 
             $existing[] = [
@@ -216,7 +216,7 @@ class CeoBoardReportController extends Controller
     protected function validateReport(Request $request, bool $creating): array
     {
         $rules = [
-            'governance_meeting_id' => ($creating ? 'required' : 'sometimes') . '|exists:governance_meetings,id',
+            'governance_meeting_id' => ($creating ? 'required' : 'sometimes').'|exists:governance_meetings,id',
             'period_start' => 'nullable|date',
             'period_end' => 'nullable|date|after_or_equal:period_start',
             'deadline' => 'nullable|date',
@@ -310,8 +310,8 @@ class CeoBoardReportController extends Controller
         $report->loadMissing(['meeting', 'submittedBy', 'presentedBy']);
 
         $title = $report->meeting
-            ? 'CEO Report — ' . $report->meeting->title
-            : 'CEO Report #' . $report->id;
+            ? 'CEO Report — '.$report->meeting->title
+            : 'CEO Report #'.$report->id;
 
         $base = [
             'id' => $report->id,

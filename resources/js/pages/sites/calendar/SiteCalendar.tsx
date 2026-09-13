@@ -707,8 +707,12 @@ export default function SiteCalendar({
                 if ((err as Error)?.name === 'AbortError') return;
                 if (generation === fetchGenerationRef.current) {
                     const status = (err as any)?.response?.status ?? (err as any)?.status ?? (err as any)?.statusCode;
-                    setEvents([]);
-                    setFetchError(status === 403 ? 'forbidden' : 'network');
+                    if (status === 403 || status === 401) {
+                        setEvents([]);
+                        setFetchError('forbidden');
+                    } else {
+                        setFetchError('network');
+                    }
                 }
             } finally {
                 if (generation === fetchGenerationRef.current) {
@@ -733,8 +737,12 @@ export default function SiteCalendar({
             });
             if (!res.ok) {
                 if (generation === fetchGenerationRef.current) {
-                    setEvents([]);
-                    setFetchError(res.status === 403 ? 'forbidden' : 'network');
+                    if (res.status === 403 || res.status === 401) {
+                        setEvents([]);
+                        setFetchError('forbidden');
+                    } else {
+                        setFetchError('network');
+                    }
                 }
                 return;
             }
@@ -747,8 +755,12 @@ export default function SiteCalendar({
             if ((err as Error)?.name === 'AbortError') return;
             if (generation === fetchGenerationRef.current) {
                 const status = (err as any)?.response?.status ?? (err as any)?.status ?? (err as any)?.statusCode;
-                setEvents([]);
-                setFetchError(status === 403 ? 'forbidden' : 'network');
+                if (status === 403 || status === 401) {
+                    setEvents([]);
+                    setFetchError('forbidden');
+                } else {
+                    setFetchError('network');
+                }
             }
         } finally {
             if (generation === fetchGenerationRef.current) {

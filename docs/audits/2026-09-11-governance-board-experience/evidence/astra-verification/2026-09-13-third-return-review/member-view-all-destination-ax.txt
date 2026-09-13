@@ -1,0 +1,171 @@
+Browser tab: 2, Title: "My work - Laravel", URL: "http://127.0.0.1:8783/governance/my-work".
+1 AXWebArea My work - Laravel, URL: 127.0.0.1:8783/governance/my-work
+	2 container app
+		3 link Description: Skip to main content, Value: 127.0.0.1:8783/governance/my-work#main-content
+		4 container
+			5 text Sunday 13 September 2026
+			6 link Description: Oblivion Care — home, Value: 127.0.0.1:8783/dashboard
+			7 pop up button (collapsed) Description: Search or jump to a page, Secondary Actions: Expand
+				8 image
+				9 text Search or jump to…
+				10 text Ctrl
+				11 text K
+			12 pop up button (disabled, collapsed) Description: Ask about a client, Secondary Actions: Expand
+				13 image
+			14 pop up button (collapsed) Description: Notifications, ID: radix-_r_4q_, Secondary Actions: Expand
+				15 image
+			16 pop up button (collapsed) Description: Announcements, ID: radix-_r_4s_, Secondary Actions: Expand
+				17 image
+			18 pop up button (collapsed) Description: Open user menu for Review Alex Morgan, ID: radix-_r_43_, Secondary Actions: Expand
+				19 image Review Alex Morgan
+		20 container
+			21 container Description: Primary navigation, ID: app-sidebar-nav
+				22 container
+					23 link Description: My Day, Value: 127.0.0.1:8783/my-day
+					24 link Description: My Calendar, Value: 127.0.0.1:8783/my-calendar
+					25 link Description: All Tasks, Value: 127.0.0.1:8783/tasks
+					26 button (collapsed) Description: IT & Support menu, Secondary Actions: Expand
+						27 text IT & Support
+						28 image
+					29 button (expanded) Description: Governance menu, Secondary Actions: Collapse
+						30 text Governance
+						31 image
+					32 container Governance navigation
+						33 text OVERVIEW & MY WORK
+						34 link Description: Home, Value: 127.0.0.1:8783/governance/dashboard
+						35 link Description: My work, Value: 127.0.0.1:8783/governance/my-work
+						36 link Description: Calendar, Value: 127.0.0.1:8783/governance/calendar
+						37 link Description: Records, Value: 127.0.0.1:8783/governance/records
+						38 text MEETINGS & DECISIONS
+						39 link Description: Meetings, Value: 127.0.0.1:8783/governance/meetings
+						40 link Description: Board Packs, Value: 127.0.0.1:8783/governance/packs
+						41 link Description: CEO Reports, Value: 127.0.0.1:8783/governance/ceo-reports
+						42 link Description: Resolutions, Value: 127.0.0.1:8783/governance/resolutions
+						43 link Description: Action Items, Value: 127.0.0.1:8783/governance/actions
+						44 link Description: Board Evaluations, Value: 127.0.0.1:8783/governance/evaluations
+						45 text OVERSIGHT
+						46 link Description: Risk Register, Value: 127.0.0.1:8783/governance/risks
+						47 link Description: Compliance, Value: 127.0.0.1:8783/governance/compliance
+						48 link Description: Clinical Governance, Value: 127.0.0.1:8783/governance/clinical
+						49 link Description: Te Tiriti, Value: 127.0.0.1:8783/governance/te-tiriti
+						50 link Description: Budgets, Value: 127.0.0.1:8783/governance/budgets
+						51 link Description: Spend Approvals, Value: 127.0.0.1:8783/governance/spend-approvals
+						52 link Description: Strategic Plan, Value: 127.0.0.1:8783/governance/strategy
+						53 link Description: Performance, Value: 127.0.0.1:8783/governance/performance
+						54 link Description: Policies, Value: 127.0.0.1:8783/governance/policies
+						55 link Description: Documents, Value: 127.0.0.1:8783/governance/documents
+						56 link Description: Interests Register, Value: 127.0.0.1:8783/governance/interests
+						57 text BOARD ADMINISTRATION
+						58 link Description: Audit Log, Value: 127.0.0.1:8783/governance/audit-log
+					59 button (collapsed) Description: Reporting menu, Secondary Actions: Expand
+						60 text Reporting
+						61 image
+				62 link Description: Settings, Value: 127.0.0.1:8783/settings
+			63 button (expanded) Description: Collapse sidebar, Secondary Actions: Collapse
+				64 image
+		65 container main-content
+			66 container breadcrumb
+				67 content list
+					68 link Description: Home, Value: 127.0.0.1:8783/dashboard
+					69 link Description: Governance, Value: 127.0.0.1:8783/governance/dashboard
+					70 link (disabled) My work
+						71 text My work
+			72 container
+				73 image
+				74 heading My work, Value: 1
+					75 text My work
+				76 text Your board decisions, reading and follow-up
+				77 container
+					78 image
+					79 search text field (settable)
+				80 link Description: View decisions to vote, Value: 127.0.0.1:8783/governance/my-work?kind=vote
+				81 link Description: View reading & packs, Value: 127.0.0.1:8783/governance/my-work?kind=read
+				82 link Description: View assigned actions, Value: 127.0.0.1:8783/governance/my-work?kind=act
+				83 link Description: View awareness & updates, Value: 127.0.0.1:8783/governance/my-work?kind=know
+				84 pop up button (collapsed) Pending, Secondary Actions: Expand
+				85 button Clear Status
+					86 image
+				87 pop up button (collapsed) Due, Secondary Actions: Expand
+					88 text Due
+					89 image
+				90 tab group Views
+					91 tab (selected, settable, boolean) All work 3, Value: 1
+					92 tab (selectable, settable, boolean) Vote 0, Value: 0
+					93 tab (selectable, settable, boolean) Read 0, Value: 0
+					94 tab (selectable, settable, boolean) Act 2, Value: 0
+					95 tab (selectable, settable, boolean) Know 1, Value: 0
+					96 button Find a view
+						97 image
+						98 text Find
+			99 table
+				100 row
+					101 cell
+						102 text OBLIGATION
+					103 cell
+						104 text KIND
+					105 cell
+						106 text DUE
+					107 cell
+						108 text STATUS / BLOCKER
+					109 cell
+						110 text OWNER
+					111 cell
+						112 text ACTION
+					113 cell Actions
+				114 row
+					115 cell
+						116 image
+						117 link Description: ACT-V6HS9P: Review ordinary follow-up 39, Value: 127.0.0.1:8783/governance/actions/41
+						118 text ACT-V6HS9P · Action item was due on 4 Aug 2026.
+					119 cell
+						120 text ACT
+					121 cell
+						122 text Overdue (40d)
+					123 cell
+						124 text overdue
+					125 cell
+						126 text You
+					127 cell
+						128 button Open Action
+					129 cell
+						130 pop up button (collapsed) Description: Actions for ACT-V6HS9P: Review ordinary follow-up 39, ID: radix-_r_4h_, Secondary Actions: Expand
+							131 image
+				132 row
+					133 cell
+						134 image
+						135 link Description: ACT-IRGCBG: Return review evidence-required action, Value: 127.0.0.1:8783/governance/actions/43
+						136 text ACT-IRGCBG · Action item due on 20 Sep 2026.
+					137 cell
+						138 text ACT
+					139 cell
+						140 text Due in 7d
+					141 cell
+						142 text due soon
+					143 cell
+						144 text You
+					145 cell
+						146 button Open Action
+					147 cell
+						148 pop up button (collapsed) Description: Actions for ACT-IRGCBG: Return review evidence-required action, ID: radix-_r_4j_, Secondary Actions: Expand
+							149 image
+				150 row
+					151 cell
+						152 image
+						153 link Description: Upcoming: Review September Board, Value: 127.0.0.1:8783/governance/meetings/1
+						154 text Meeting #1 · Scheduled in 4 day(s).
+					155 cell
+						156 text KNOW
+					157 cell
+						158 text Due in 4d
+					159 cell
+						160 text pending
+					161 cell
+						162 text You
+					163 cell
+						164 button View Meeting
+					165 cell
+						166 pop up button (collapsed) Description: Actions for Upcoming: Review September Board, ID: radix-_r_4l_, Secondary Actions: Expand
+							167 image
+		168 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea My work - Laravel, URL: 127.0.0.1:8783/governance/my-work

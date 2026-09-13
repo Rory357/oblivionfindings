@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -65,33 +71,55 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Evaluations', href: '/governance/evaluations' },
-                { title: 'Results', href: '#' },
+                { title: evaluation.title, href: `/governance/evaluations/${evaluation.id}` },
+                { title: 'Results', href: `/governance/evaluations/${evaluation.id}/results` },
             ]}
         >
             <Head title={`${evaluation.title} - Results`} />
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
-                        backHref="/governance/evaluations"
+                    <PageHeader
+                        variant="profile"
+                        backHref={`/governance/evaluations/${evaluation.id}`}
                         icon={Star}
                         title={`${evaluation.title} Results`}
-                        description="Evaluation outcome summary and analysis."
-                        stats={[
-                            { label: 'Status', value: evaluation.status },
-                            {
-                                label: 'Completion',
-                                value: `${completionRate}%`,
-                            },
-                            {
-                                label: 'Responses',
-                                value: `${completedResponses.length}/${responses.length}`,
-                            },
-                            { label: 'Questions', value: questions.length },
-                        ]}
+                        subline="Evaluation outcome summary and analysis."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Completion rate"
+                                    href={`/governance/evaluations/${evaluation.id}/results`}
+                                    tone={completionRate >= 80 ? 'brand' : 'warning'}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {completionRate}%
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Completed</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Responses"
+                                    href={`/governance/evaluations/${evaluation.id}/results`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {completedResponses.length}/{responses.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Submitted</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Questions"
+                                    href={`/governance/evaluations/${evaluation.id}/results`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {questions.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Total items</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

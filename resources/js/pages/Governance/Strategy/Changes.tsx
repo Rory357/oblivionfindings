@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -68,41 +74,60 @@ export default function StrategyChanges({ auth, plan, changes }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Strategy', href: '/governance/strategy' },
                 {
                     title: plan?.title ?? 'Plan',
                     href: plan?.id ? `/governance/strategy/${plan.id}` : '/governance/strategy',
                 },
-                { title: 'Changes', href: '#' },
+                { title: 'Changes', href: plan?.id ? `/governance/strategy/${plan.id}/changes` : '#' },
             ]}
         >
             <Head title={`Changes - ${plan?.title ?? 'Strategic Plan'}`} />
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
+                        variant="profile"
+                        backHref={plan?.id ? `/governance/strategy/${plan.id}` : '/governance/strategy'}
                         icon={History}
                         title="Strategic Plan Changes"
-                        description={changes.baseline_label ?? 'Changes since last snapshot.'}
-                        stats={[
-                            {
-                                label: 'Baseline',
-                                value: changes.has_snapshot ? (changes.baseline_label ?? 'Snapshot') : 'None',
-                            },
-                            {
-                                label: 'Added',
-                                value: grouped.added?.length ?? 0,
-                            },
-                            {
-                                label: 'Updated',
-                                value: grouped.updated?.length ?? 0,
-                            },
-                            {
-                                label: 'Removed',
-                                value: grouped.removed?.length ?? 0,
-                            },
-                        ]}
+                        subline={changes.baseline_label ?? 'Changes since last snapshot.'}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Added"
+                                    href={plan?.id ? `/governance/strategy/${plan.id}/changes` : '/governance/strategy'}
+                                    tone={grouped.added?.length ? 'brand' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {grouped.added?.length ?? 0}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>New goals</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Updated"
+                                    href={plan?.id ? `/governance/strategy/${plan.id}/changes` : '/governance/strategy'}
+                                    tone={grouped.updated?.length ? 'warning' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {grouped.updated?.length ?? 0}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Modified</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Removed"
+                                    href={plan?.id ? `/governance/strategy/${plan.id}/changes` : '/governance/strategy'}
+                                    tone={grouped.removed?.length ? 'critical' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {grouped.removed?.length ?? 0}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Removed</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

@@ -1,0 +1,109 @@
+Browser tab: 2, Title: "My work - Laravel", URL: "http://127.0.0.1:8783/governance/my-work".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 183-198
+~1 AXWebArea My work - Laravel, URL: 127.0.0.1:8783/governance/my-work
+~		116 link Description: Skip to main content, Value: 127.0.0.1:8783/governance/my-work#main-content
+~			127 pop up button (collapsed) Description: Notifications, ID: radix-_r_jd_, Secondary Actions: Expand
+~			129 pop up button (collapsed) Description: Announcements, ID: radix-_r_jf_, Secondary Actions: Expand
+~			131 pop up button (collapsed) Description: Open user menu for Review Alex Morgan, ID: radix-_r_im_, Secondary Actions: Expand
+~					181 link Description: Home, Value: 127.0.0.1:8783/dashboard
+~					182 link Description: Governance, Value: 127.0.0.1:8783/governance/dashboard
++					183 link (disabled) My work
++						184 text My work
++			185 container
++				186 image
++				187 heading My work, Value: 1
++					188 text My work
++				189 text Your board decisions, reading and follow-up
++				190 container
++					191 image
++					192 search text field (settable)
++				193 link Description: View decisions to vote, Value: 127.0.0.1:8783/governance/my-work?kind=vote
++				194 link Description: View reading & packs, Value: 127.0.0.1:8783/governance/my-work?kind=read
++				195 link Description: View assigned actions, Value: 127.0.0.1:8783/governance/my-work?kind=act
++				196 link Description: View awareness & updates, Value: 127.0.0.1:8783/governance/my-work?kind=know
++				197 pop up button (collapsed) Pending, Secondary Actions: Expand
++				198 button Clear Status
++					199 image
++				200 pop up button (collapsed) Due, Secondary Actions: Expand
++					201 text Due
++					202 image
++				203 tab group Views
++					204 tab (selected, settable, boolean) All work 3, Value: 1
++					205 tab (selectable, settable, boolean) Vote 0, Value: 0
++					206 tab (selectable, settable, boolean) Read 0, Value: 0
++					207 tab (selectable, settable, boolean) Act 2, Value: 0
++					208 tab (selectable, settable, boolean) Know 1, Value: 0
++					209 button Find a view
++						210 image
++						211 text Find
++			212 table
++				213 row
++					214 cell
++						215 text OBLIGATION
++					216 cell
++						217 text KIND
++					218 cell
++						219 text DUE
++					220 cell
++						221 text STATUS / BLOCKER
++					222 cell
++						223 text OWNER
++					224 cell
++						225 text ACTION
++					226 cell Actions
++				227 row
++					228 cell
++						229 image
++						230 link Description: ACT-V6HS9P: Review ordinary follow-up 39, Value: 127.0.0.1:8783/governance/actions/41
++						231 text ACT-V6HS9P · Action item was due on 4 Aug 2026.
++					232 cell
++						233 text ACT
++					234 cell
++						235 text Overdue (40d)
++					236 cell
++						237 text overdue
++					238 cell
++						239 text You
++					240 cell
++						241 button Open Action
++					242 cell
++						243 pop up button (collapsed) Description: Actions for ACT-V6HS9P: Review ordinary follow-up 39, ID: radix-_r_j4_, Secondary Actions: Expand
++							244 image
++				245 row
++					246 cell
++						247 image
++						248 link Description: ACT-IRGCBG: Return review evidence-required action, Value: 127.0.0.1:8783/governance/actions/43
++						249 text ACT-IRGCBG · Action item due on 20 Sep 2026.
++					250 cell
++						251 text ACT
++					252 cell
++						253 text Due in 7d
++					254 cell
++						255 text due soon
++					256 cell
++						257 text You
++					258 cell
++						259 button Open Action
++					260 cell
++						261 pop up button (collapsed) Description: Actions for ACT-IRGCBG: Return review evidence-required action, ID: radix-_r_j6_, Secondary Actions: Expand
++							262 image
++				263 row
++					264 cell
++						265 image
++						266 link Description: Upcoming: Review September Board, Value: 127.0.0.1:8783/governance/meetings/1
++						267 text Meeting #1 · Scheduled in 4 day(s).
++					268 cell
++						269 text KNOW
++					270 cell
++						271 text Due in 4d
++					272 cell
++						273 text pending
++					274 cell
++						275 text You
++					276 cell
++						277 button View Meeting
++					278 cell
++						279 pop up button (collapsed) Description: Actions for Upcoming: Review September Board, ID: radix-_r_j8_, Secondary Actions: Expand
++							280 image
+The focused UI element is 1 AXWebArea My work - Laravel, URL: 127.0.0.1:8783/governance/my-work

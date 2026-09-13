@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,18 +86,10 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={Users}
                         title="Board Meetings"
-                        description="Schedule and manage governance meetings."
-                        stats={[
-                            { label: 'Total', value: meetings.data.length },
-                            {
-                                label: 'Quorum met',
-                                value: meetings.data.filter((m) => m.quorum_met)
-                                    .length,
-                            },
-                        ]}
+                        subline={`Schedule and manage governance meetings · ${meetings.data.length} total meetings`}
                         actions={
                             <div className="flex items-center gap-2">
                                 <Button
@@ -110,6 +108,36 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
                                     </Link>
                                 </Button>
                             </div>
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total meetings"
+                                    href="/governance/meetings"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {meetings.data.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Scheduled & past
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Quorum met"
+                                    href="/governance/meetings"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {
+                                            meetings.data.filter(
+                                                (m) => m.quorum_met,
+                                            ).length
+                                        }
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Sessions with legal quorum
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
                         }
                     />
                 }

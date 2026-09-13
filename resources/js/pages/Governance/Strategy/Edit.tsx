@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -52,6 +52,7 @@ export default function EditStrategy({ plan }: { plan: Plan }) {
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Strategy', href: '/governance/strategy' },
                 { title: plan.title, href: `/governance/strategy/${plan.id}` },
@@ -61,12 +62,12 @@ export default function EditStrategy({ plan }: { plan: Plan }) {
             <Head title={`Edit: ${plan.title}`} />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
-                        backHref="/governance/strategy"
+                    <PageHeader
+                        variant="profile"
+                        backHref={`/governance/strategy/${plan.id}`}
                         icon={Compass}
-                        title="Edit Strategic Plan"
-                        description={plan.title}
+                        title={`Edit: ${plan.title}`}
+                        subline="Update plan horizon, vision, mission, or core values"
                     />
                 }
             >

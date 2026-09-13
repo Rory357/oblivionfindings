@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -54,6 +54,7 @@ export default function EditPerformance({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Performance', href: '/governance/performance' },
                 {
@@ -69,12 +70,12 @@ export default function EditPerformance({
             <Head title={`Edit: ${review.review_cycle} Review`} />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref={`/governance/performance/${review.id}`}
                         icon={Target}
                         title="Edit Performance Review"
-                        description={`${review.review_cycle} Review`}
+                        subline={`${review.review_cycle} Review · ${review.period_start} to ${review.period_end}`}
                     />
                 }
             >

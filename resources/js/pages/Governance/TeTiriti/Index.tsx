@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -111,19 +117,46 @@ export default function TeTiritiIndex({
     );
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Te Tiriti o Waitangi', href: '/governance/te-tiriti' },
+            ]}
+        >
             <Head title="Te Tiriti o Waitangi" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={Landmark}
                         title="Te Tiriti o Waitangi Framework"
-                        description="Obligations and implementation tracking across Te Tiriti principles"
-                        stats={[
-                            { label: 'Principles', value: principles.length },
-                            { label: 'Obligations', value: totalObligations },
-                            { label: 'Embedded', value: embeddedCount },
-                        ]}
+                        subline="Obligations and implementation tracking across Te Tiriti principles"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Principles"
+                                    href="/governance/te-tiriti"
+                                >
+                                    <PageHeaderMeterBig>{principles.length}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Core articles</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Obligations"
+                                    href="/governance/te-tiriti"
+                                >
+                                    <PageHeaderMeterBig>{totalObligations}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Tracked items</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Embedded"
+                                    href="/governance/te-tiriti"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>{embeddedCount}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Fully integrated</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <Button
                                 size="sm"

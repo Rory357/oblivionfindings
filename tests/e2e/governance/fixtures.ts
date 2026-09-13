@@ -89,34 +89,61 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const stateFile = resolve(here, '.governance-e2e-db.json');
-if (existsSync(stateFile)) {
-    try {
-        const { dbName } = JSON.parse(readFileSync(stateFile, 'utf8'));
-        if (dbName) {
-            process.env.DB_DATABASE = dbName;
-        }
-    } catch {
-        // Ignore if state file is unreadable
+
+function getVerifiedDisposableDbName(): string {
+    if (!existsSync(stateFile)) {
+        throw new Error(
+            'Governance E2E fail-closed: State file .governance-e2e-db.json is missing. Setup must create a guarded disposable database before fixtures run.',
+        );
     }
+    let dbName = '';
+    try {
+        const parsed = JSON.parse(readFileSync(stateFile, 'utf8'));
+        dbName = parsed?.dbName ?? '';
+    } catch (e) {
+        throw new Error(
+            `Governance E2E fail-closed: Failed to read state file ${stateFile}: ${(e as Error).message}`,
+        );
+    }
+    if (
+        !dbName ||
+        !dbName.startsWith('oblivion_gov_e2e_') ||
+        dbName === 'oblivionfindings' ||
+        dbName === 'oblivion_findings'
+    ) {
+        throw new Error(
+            `Governance E2E fail-closed: Refusing to run fixtures against non-disposable database: ${dbName}`,
+        );
+    }
+    return dbName;
 }
 
 export function runGovernanceLaravelJson<T>(code: string): T {
-    let dbPrefix = '';
-    if (existsSync(stateFile)) {
-        try {
-            const { dbName } = JSON.parse(readFileSync(stateFile, 'utf8'));
-            if (dbName) {
-                dbPrefix = `
+    const dbName = getVerifiedDisposableDbName();
+    process.env.DB_DATABASE = dbName;
+    const dbPrefix = `
 putenv("DB_DATABASE=${dbName}");
 $_ENV['DB_DATABASE'] = '${dbName}';
 $_SERVER['DB_DATABASE'] = '${dbName}';
+putenv("APP_CONFIG_CACHE=".__DIR__."/unused-config.php");
+$_ENV['APP_CONFIG_CACHE'] = __DIR__."/unused-config.php";
+$_SERVER['APP_CONFIG_CACHE'] = __DIR__."/unused-config.php";
+putenv("MAIL_MAILER=array");
+$_ENV['MAIL_MAILER'] = 'array';
+$_SERVER['MAIL_MAILER'] = 'array';
+putenv("QUEUE_CONNECTION=sync");
+$_ENV['QUEUE_CONNECTION'] = 'sync';
+$_SERVER['QUEUE_CONNECTION'] = 'sync';
+putenv("CACHE_STORE=array");
+$_ENV['CACHE_STORE'] = 'array';
+$_SERVER['CACHE_STORE'] = 'array';
 config(['database.connections.mysql.database' => '${dbName}']);
+config(['mail.default' => 'array']);
+config(['queue.default' => 'sync']);
+config(['cache.default' => 'array']);
 \\Illuminate\\Support\\Facades\\DB::purge('mysql');
 \\Illuminate\\Support\\Facades\\DB::reconnect('mysql');
 `;
-            }
-        } catch {}
-    }
     return runLaravelJson<T>(dbPrefix + code);
 }
 

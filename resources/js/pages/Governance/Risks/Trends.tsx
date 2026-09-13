@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -65,6 +71,7 @@ export default function RiskTrends({ auth, snapshots }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Risks', href: '/governance/risks' },
                 { title: 'Trends', href: '/governance/risks/trends' },
@@ -74,22 +81,53 @@ export default function RiskTrends({ auth, snapshots }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={TrendingUp}
                         title="Risk Trends"
-                        description="Historical risk snapshot analysis."
-                        stats={[
-                            { label: 'Snapshots', value: snapshots.length },
-                            {
-                                label: 'Critical',
-                                value: latest?.summary.critical ?? 0,
-                            },
-                            { label: 'High', value: latest?.summary.high ?? 0 },
-                            {
-                                label: 'Above Appetite',
-                                value: latest?.summary.above_appetite ?? 0,
-                            },
-                        ]}
+                        subline="Historical risk profile evolution and trajectory across reporting snapshots"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Snapshots"
+                                    href="/governance/risks/trends"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {snapshots.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Historical intervals</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Critical"
+                                    href="/governance/risks?severity=critical"
+                                    tone="critical"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {latest?.summary.critical ?? 0}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Latest snapshot</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="High"
+                                    href="/governance/risks?severity=high"
+                                    tone="warning"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {latest?.summary.high ?? 0}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Score 12–19</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Above Appetite"
+                                    href="/governance/risks?above_appetite=1"
+                                    tone={latest?.summary.above_appetite ? 'critical' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {latest?.summary.above_appetite ?? 0}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Action required</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

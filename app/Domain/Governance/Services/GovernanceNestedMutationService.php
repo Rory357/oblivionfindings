@@ -356,39 +356,39 @@ class GovernanceNestedMutationService
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $resText = strtolower($resolution->title . ' ' . ($resolution->exact_motion ?? '') . ' ' . ($resolution->purpose ?? ''));
-                $adjReason = strtolower($lockedAdjustment->reason ?? '');
-                $lineDesc = strtolower($lockedLine->description ?? '');
-                $lineCategory = strtolower($lockedLine->category ?? '');
-                $fundingSource = strtolower($resolution->cost_impact['funding_source'] ?? '');
-
-                $isUnrelated = str_contains($resText, 'catering')
-                    || str_contains($resText, 'hospitality')
-                    || str_contains($resText, 'dinner')
-                    || str_contains($resText, 'lunch')
-                    || str_contains($resText, 'event');
-
                 $hasSubjectMatch = false;
-                if (! $isUnrelated) {
-                    if (!empty($resolution->cost_impact['budget_adjustment_id']) && (int) $resolution->cost_impact['budget_adjustment_id'] === (int) $lockedAdjustment->id) {
-                        $hasSubjectMatch = true;
-                    } elseif (!empty($resolution->cost_impact['budget_id']) && (int) $resolution->cost_impact['budget_id'] === (int) $lockedBudget->id) {
-                        $hasSubjectMatch = true;
-                    } elseif (!empty($fundingSource) && $fundingSource === $lineCategory) {
-                        $hasSubjectMatch = true;
-                    } else {
-                        $reasonWords = array_filter(explode(' ', preg_replace('/[^a-z0-9 ]/', '', $adjReason)), fn($w) => strlen($w) >= 4);
-                        $lineWords = array_filter(explode(' ', preg_replace('/[^a-z0-9 ]/', '', $lineDesc)), fn($w) => strlen($w) >= 4);
-                        foreach (array_merge($reasonWords, $lineWords) as $word) {
-                            if (str_contains($resText, $word)) {
-                                $hasSubjectMatch = true;
-                                break;
-                            }
-                        }
-                        if (! $hasSubjectMatch && (str_contains($resText, 'single use') || str_contains($resText, 'budget') || str_contains($resText, 'adjustment') || str_contains($resText, 'capital') || str_contains($resText, 'capex'))) {
-                            $hasSubjectMatch = true;
-                        }
-                    }
+
+                // 1. Explicit budget_adjustment_id binding in resolution cost_impact or paper_snapshot
+                if (!empty($resolution->cost_impact['budget_adjustment_id']) && (int) $resolution->cost_impact['budget_adjustment_id'] === (int) $lockedAdjustment->id) {
+                    $hasSubjectMatch = true;
+                } elseif (!empty($resolution->paper_snapshot['cost_impact']['budget_adjustment_id']) && (int) $resolution->paper_snapshot['cost_impact']['budget_adjustment_id'] === (int) $lockedAdjustment->id) {
+                    $hasSubjectMatch = true;
+                }
+                // 2. Explicit budget_id AND budget_line_item_id binding
+                elseif (!empty($resolution->cost_impact['budget_id']) 
+                    && (int) $resolution->cost_impact['budget_id'] === (int) $lockedBudget->id 
+                    && !empty($resolution->cost_impact['budget_line_item_id']) 
+                    && (int) $resolution->cost_impact['budget_line_item_id'] === (int) $lockedAdjustment->budget_line_item_id) {
+                    $hasSubjectMatch = true;
+                }
+                // 3. Exact adjustment reference in motion or title
+                elseif (!empty($lockedAdjustment->adjustment_reference) && (
+                    str_contains($resolution->exact_motion ?? '', $lockedAdjustment->adjustment_reference) ||
+                    str_contains($resolution->title, $lockedAdjustment->adjustment_reference)
+                )) {
+                    $hasSubjectMatch = true;
+                }
+                // 4. Exact match of adjustment reason or line item description within motion or title
+                elseif (
+                    (!empty($lockedAdjustment->reason) && (
+                        str_contains(strtolower($resolution->exact_motion ?? ''), strtolower($lockedAdjustment->reason)) ||
+                        str_contains(strtolower($resolution->title), strtolower($lockedAdjustment->reason))
+                    )) ||
+                    (!empty($lockedLine->description) && (
+                        str_contains(strtolower($resolution->exact_motion ?? ''), strtolower($lockedLine->description)) ||
+                        str_contains(strtolower($resolution->title), strtolower($lockedLine->description))
+                    ))
+                ) {
                 }
 
                 if (! $hasSubjectMatch) {

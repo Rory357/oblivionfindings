@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,6 +86,7 @@ export default function ComplianceIndex({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Compliance', href: '/governance/compliance' },
             ]}
@@ -88,37 +95,65 @@ export default function ComplianceIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={ShieldCheck}
                         title="Compliance"
-                        description="Track regulatory obligations, deadlines, and evidence across compliance frameworks."
-                        stats={[
-                            { label: 'Overdue', value: summary.total_overdue },
-                            {
-                                label: 'Due soon',
-                                value: summary.total_due_soon,
-                            },
-                            {
-                                label: 'Next 30 days',
-                                value: summary.next_30_days.length,
-                            },
-                            {
-                                label: 'Compliance rate',
-                                value: `${(() => {
-                                    const total = Object.values(
-                                        summary.by_framework,
-                                    ).reduce((a, f) => a + f.total, 0);
-                                    const complete = Object.values(
-                                        summary.by_framework,
-                                    ).reduce((a, f) => a + f.complete, 0);
-                                    return total > 0
-                                        ? Math.round((complete / total) * 100)
-                                        : 0;
-                                })()}%`,
-                            },
-                        ]}
+                        subline="Track regulatory obligations, deadlines, and evidence across compliance frameworks."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Overdue"
+                                    href="/governance/compliance?status=overdue"
+                                    tone={summary.total_overdue > 0 ? 'critical' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.total_overdue}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Requires attention</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Due soon"
+                                    href="/governance/compliance?status=due_soon"
+                                    tone={summary.total_due_soon > 0 ? 'warning' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.total_due_soon}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Due in 30 days</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Next 30 days"
+                                    href="/governance/compliance/calendar"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.next_30_days.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Upcoming items</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Compliance rate"
+                                    href="/governance/compliance"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {(() => {
+                                            const total = Object.values(
+                                                summary.by_framework,
+                                            ).reduce((a, f) => a + f.total, 0);
+                                            const complete = Object.values(
+                                                summary.by_framework,
+                                            ).reduce((a, f) => a + f.complete, 0);
+                                            return total > 0
+                                                ? Math.round((complete / total) * 100)
+                                                : 0;
+                                        })()}%
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Overall rate</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
                                 {(
                                     auth.can?.compliance as
                                         | { view?: boolean }
@@ -126,8 +161,8 @@ export default function ComplianceIndex({
                                 )?.view && (
                                     <Button
                                         variant="outline"
+                                        size="sm"
                                         asChild
-                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                     >
                                         <Link href="/compliance">
                                             Compliance Centre
@@ -136,15 +171,15 @@ export default function ComplianceIndex({
                                 )}
                                 <Button
                                     variant="outline"
+                                    size="sm"
                                     asChild
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 >
                                     <Link href={complianceCalendar.url()}>
                                         Calendar View
                                     </Link>
                                 </Button>
                                 {auth.can?.governance?.compliance?.create && (
-                                    <Button asChild>
+                                    <Button size="sm" asChild>
                                         <Link href={createCompliance.url()}>
                                             New Obligation
                                         </Link>

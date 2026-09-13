@@ -1,0 +1,131 @@
+{
+    "checked_at": "2026-09-13T04:50:18+00:00",
+    "database": "oblivion_gov_review3_runtime_20260913_22816",
+    "cases": {
+        "completed_private_action_still_leaks": {
+            "can_view": false,
+            "private_title_in_completed_feed": false
+        },
+        "present_attendance_still_invites": {
+            "can_view_without_explicit_invitation": false
+        },
+        "expired_committee_still_grants_access": {
+            "expired_member_can_view": false
+        },
+        "rules_change_after_open_changes_outcome": {
+            "opening_written_unanimity": true,
+            "profile_changed_after_open": true,
+            "outcome": "defeated",
+            "frozen_rule_payload": {
+                "id": 1,
+                "metadata": {
+                    "status_note": "Candidate D1 default profile. Live voting requires recording actual constitution/trust deed authority and approval."
+                },
+                "is_active": true,
+                "created_at": "2026-09-13T04:45:40.000000Z",
+                "created_by": null,
+                "legal_form": "charitable_trust",
+                "updated_at": "2026-09-13T04:50:18.000000Z",
+                "approved_at": "2026-09-13T04:45:41.000000Z",
+                "quorum_mode": "majority_floor_plus_one",
+                "effective_to": null,
+                "effective_from": null,
+                "governing_body": "board",
+                "quorum_formula": "floor(N/2)+1",
+                "recusal_policy": "exclude_from_presence_and_tally_without_reducing_N",
+                "board_committee_id": null,
+                "approved_by_user_id": null,
+                "written_voting_permitted": true,
+                "approved_by_resolution_id": null,
+                "governing_document_version": "v1.0",
+                "ordinary_threshold_formula": "for > against of valid votes cast",
+                "written_unanimity_required": true,
+                "governing_document_reference": "Trust Deed 2024 (Test Authority)",
+                "unanimous_denominator_formula": "assent from all entitled voters"
+            }
+        },
+        "quorum_denominator_changes_after_open": {
+            "opening_electorate_count": 4,
+            "before": {
+                "present": 0,
+                "apologies": 0,
+                "total_eligible": 4,
+                "required": 3,
+                "met": false,
+                "percentage_present": 0,
+                "resolution_mode": "out_of_session"
+            },
+            "after": {
+                "present": 0,
+                "apologies": 0,
+                "total_eligible": 4,
+                "required": 3,
+                "met": false,
+                "percentage_present": 0,
+                "resolution_mode": "out_of_session"
+            }
+        },
+        "rules_authority_keyword_bypass": {
+            "exception": "InvalidArgumentException",
+            "message": "Profile activation rejected: resolution does not authorize voting rules or governance profile approval."
+        },
+        "strategy_authority_keyword_bypass": {
+            "exception": "Illuminate\\Validation\\ValidationException",
+            "message": "The selected resolution does not authorize approval of this strategic plan."
+        },
+        "budget_authority_keyword_bypass": {
+            "exception": "Illuminate\\Validation\\ValidationException",
+            "message": "The board resolution does not authorize this specific budget adjustment subject. (and 1 more error)"
+        },
+        "legitimate_catering_authority_rejected": {
+            "motion": "Approve catering equipment budget adjustment",
+            "explicit_adjustment_id": 3,
+            "adjustment_status": "approved",
+            "budget_total": "106000.00"
+        },
+        "action_public_asset_is_accepted_evidence": {
+            "exception": "DomainException",
+            "message": "Evidence file 'robots.txt' does not exist or has not been uploaded to managed storage."
+        },
+        "completed_action_can_be_blocked_again": {
+            "exception": "DomainException",
+            "message": "A completed action item is in a terminal state and cannot be marked as blocked."
+        },
+        "duplicate_name_followup_wrong_owner": {
+            "intended_user_id": 5,
+            "same_name_users": [
+                3,
+                5
+            ],
+            "actual_assigned_to": 1
+        },
+        "draft_policy_can_be_attested": {
+            "http_status": 403,
+            "policy_status": "draft",
+            "receipt_count": 0
+        },
+        "evaluation_accepts_missing_and_wrong_type_answers": {
+            "http_status": 403,
+            "stored_audience": "chair_only",
+            "responses": []
+        },
+        "future_unverified_compliance_evidence_passes": {
+            "exception": "Illuminate\\Validation\\ValidationException",
+            "message": "Evidence 'Future evidence' is not valid until 2027-01-01 and cannot satisfy compliance."
+        },
+        "settings_partial_write_on_validation_failure": {
+            "http_status": 422,
+            "capex_before": null,
+            "capex_after_failed_request": null
+        },
+        "settings_negative_threshold_saved": {
+            "http_status": 422,
+            "saved": null
+        },
+        "reminder_duplicates_across_hour_boundary": {
+            "elapsed_minutes": 2,
+            "claimed_window_hours": 4,
+            "notifications": 1
+        }
+    }
+}

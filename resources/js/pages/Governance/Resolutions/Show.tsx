@@ -172,6 +172,7 @@ interface Props extends PageProps {
     validation_errors?: string[];
     meetings?: Array<{ id: number; title: string; scheduled_at: string }>;
     committees?: Array<{ id: number; name: string }>;
+    users?: Array<{ id: number; name: string; email?: string }>;
 }
 
 export default function ResolutionShow({
@@ -187,6 +188,7 @@ export default function ResolutionShow({
     validation_errors = [],
     meetings = [],
     committees = [],
+    users = [],
 }: Props) {
     const [selectedVote, setSelectedVote] = useState<string>('');
     const [conflictNote, setConflictNote] = useState('');
@@ -1294,6 +1296,7 @@ export default function ResolutionShow({
                     onClose={() => setEditDialogOpen(false)}
                     meetings={meetings}
                     committees={committees}
+                    users={users}
                     resolution={resolution as any}
                     onCreated={() => router.reload()}
                 />

@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -277,13 +283,14 @@ export default function ActionItemShow({ auth, action, source_details, assignees
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/actions"
                         icon={ClipboardList}
-                        title={
-                            <span className="flex flex-wrap items-center gap-3" dusk="action-heading">
-                                {action.action_reference}
+                        title={action.title || action.action_reference}
+                        titleDusk="action-heading"
+                        titleChip={
+                            <div className="flex items-center gap-1.5">
                                 <Badge className={cn('capitalize', getStatusColor(action.status))}>
                                     {isCompleted ? 'Completed' : action.status.replace('_', ' ')}
                                 </Badge>
@@ -295,15 +302,53 @@ export default function ActionItemShow({ auth, action, source_details, assignees
                                         v{action.version_number}
                                     </span>
                                 )}
-                            </span>
+                            </div>
                         }
-                        description={action.title || action.description}
-                        stats={[
-                            { label: 'Status', value: isCompleted ? 'Completed' : action.status.replace('_', ' ') },
-                            { label: 'Priority', value: action.priority },
-                            { label: 'Due Date', value: formatDate(action.due_date) },
-                            { label: 'Assignee', value: action.assigned_to?.name ?? 'Unassigned' },
-                        ]}
+                        subline={`${action.action_reference} · Assigned to ${action.assigned_to?.name ?? 'Unassigned'} · Due ${formatDate(action.due_date)}`}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Status"
+                                    href={`/governance/actions/${action.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        <span className="capitalize">
+                                            {isCompleted ? 'Completed' : action.status.replace('_', ' ')}
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Lifecycle state</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Priority"
+                                    href={`/governance/actions/${action.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        <span className="capitalize">
+                                            {action.priority}
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Urgency rank</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Due Date"
+                                    href={`/governance/actions/${action.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {formatDate(action.due_date)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Target completion</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Assignee"
+                                    href={`/governance/actions/${action.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {action.assigned_to?.name ?? 'Unassigned'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Action owner</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

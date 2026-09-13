@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageHeaderMeterBlock, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -75,35 +75,50 @@ export default function DocumentsIndex({ auth, documents, categories }: Props) {
     const confidentialCount = documents.data.filter(
         (d) => d.is_confidential,
     ).length;
+    const canManage = Boolean(auth?.can?.governance?.documents?.manage);
 
     return (
         <AppLayout
             user={auth.user}
             breadcrumbs={[
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Documents', href: '/governance/documents' },
+                { title: 'Records & Documents', href: '/governance/records' },
             ]}
         >
-            <Head title="Governance Documents" />
+            <Head title="Governance Documents & Records" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={FolderOpen}
-                        title="Governance Documents"
-                        description="Board documents, templates, and archives"
-                        stats={[
-                            { label: 'Total', value: documents.data.length },
-                            { label: 'Categories', value: categories.length },
-                            { label: 'Confidential', value: confidentialCount },
-                        ]}
+                        title="Governance Documents & Records"
+                        subline="Board documents, charter, templates, and archives"
                         actions={
-                            <Button
-                                size="sm"
-                                onClick={() => setShowUpload(!showUpload)}
-                            >
-                                <Upload className="mr-2 h-4 w-4" /> Upload
-                                Document
-                            </Button>
+                            canManage ? (
+                                <Button
+                                    size="sm"
+                                    onClick={() => setShowUpload(!showUpload)}
+                                >
+                                    <Upload className="mr-2 h-4 w-4" /> Upload
+                                    Document
+                                </Button>
+                            ) : undefined
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total"
+                                    value={documents.data.length}
+                                />
+                                <PageHeaderMeterBlock
+                                    label="Categories"
+                                    value={categories.length}
+                                />
+                                <PageHeaderMeterBlock
+                                    label="Confidential"
+                                    value={confidentialCount}
+                                    tone={confidentialCount > 0 ? 'warning' : 'brand'}
+                                />
+                            </>
                         }
                     />
                 }

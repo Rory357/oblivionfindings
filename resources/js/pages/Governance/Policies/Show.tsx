@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -78,16 +84,14 @@ export default function PolicyShow({
             <Head title={policy.title} />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/policies"
                         icon={BookOpen}
-                        title={
-                            <span
-                                className="flex flex-wrap items-center gap-3"
-                                dusk="policy-heading"
-                            >
-                                {policy.title}
+                        title={policy.title}
+                        titleDusk="policy-heading"
+                        titleChip={
+                            <div className="flex items-center gap-1.5">
                                 <Badge variant="outline">
                                     v{policy.version}
                                 </Badge>
@@ -99,26 +103,51 @@ export default function PolicyShow({
                                 >
                                     {policy.status.replace('_', ' ')}
                                 </Badge>
-                            </span>
+                            </div>
                         }
-                        description={`${policy.category} policy`}
-                        stats={[
-                            {
-                                label: 'Status',
-                                value: policy.status.replace('_', ' '),
-                            },
-                            { label: 'Version', value: `v${policy.version}` },
-                            {
-                                label: 'Attestations',
-                                value: `${attestationStats.completed}/${attestationStats.total_required}`,
-                            },
-                            {
-                                label: 'Review',
-                                value: new Date(
-                                    policy.review_date,
-                                ).toLocaleDateString('en-NZ'),
-                            },
-                        ]}
+                        subline={`${policy.category} policy · Review: ${new Date(policy.review_date).toLocaleDateString('en-NZ')}`}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Status"
+                                    href={`/governance/policies/${policy.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        <span className="capitalize">
+                                            {policy.status.replace('_', ' ')}
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Lifecycle</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Version"
+                                    href={`/governance/policies/${policy.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        v{policy.version}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Current release</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Attestations"
+                                    href={`/governance/policies/${policy.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {attestationStats.completed}/{attestationStats.total_required}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Sign-offs</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Review"
+                                    href={`/governance/policies/${policy.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {new Date(policy.review_date).toLocaleDateString('en-NZ')}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Scheduled review</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <div className="flex gap-2">
                                 {canEdit && policy.status === 'draft' && (

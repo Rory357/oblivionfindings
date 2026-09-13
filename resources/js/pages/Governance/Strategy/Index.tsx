@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,12 +28,14 @@ interface StrategicPlan {
     period_end: string;
     status: string;
     progress_pct: number;
+    goals_count: number;
     version_number: number;
 }
 
 interface Props extends PageProps {
     plans: {
         data: StrategicPlan[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
     };
 }
 
@@ -37,46 +45,70 @@ export default function StrategyIndex({ auth, plans }: Props) {
     const getHorizonLabel = (horizon: string) => {
         return (
             {
-                '3_year': '3-Year Plan',
-                '5_year': '5-Year Plan',
-            }[horizon] || horizon
+                '1_year': '1 Year (Annual)',
+                '3_year': '3 Year (Medium)',
+                '5_year': '5 Year (Long)',
+                '10_year': '10 Year (Vision)',
+            }[horizon] ?? horizon
         );
     };
 
+    const activePlans = plans.data.filter((p) => p.status === 'active');
+    const consultationCount = plans.data.filter((p) =>
+        ['draft', 'consultation'].includes(p.status),
+    ).length;
+
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Strategy', href: '/governance/strategy' },
             ]}
         >
-            <Head title="Strategic Plans" />
+            <Head title="Strategic Planning" />
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={Compass}
-                        title="Strategic Planning"
-                        description="Set long-term direction with multi-year plans, goals, and initiatives."
-                        stats={[
-                            { label: 'Plans', value: plans.data.length },
-                            {
-                                label: 'Approved',
-                                value: plans.data.filter(
-                                    (p) => p.status === 'approved',
-                                ).length,
-                            },
-                            {
-                                label: 'In consultation',
-                                value: plans.data.filter(
-                                    (p) => p.status === 'consultation',
-                                ).length,
-                            },
-                        ]}
+                        title="Strategic Plans"
+                        subline="Long-term strategy, operational horizons, and delivery milestones"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total plans"
+                                    href="/governance/strategy"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {plans.data.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>All horizons</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Active"
+                                    href="/governance/strategy?status=active"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {activePlans.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>In execution</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="In consultation"
+                                    href="/governance/strategy?status=consultation"
+                                    tone={consultationCount > 0 ? 'warning' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {consultationCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Drafting</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
-                            <Button asChild>
+                            <Button size="sm" asChild>
                                 <Link href={createStrategy.url()}>
                                     New Strategic Plan
                                 </Link>

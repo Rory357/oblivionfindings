@@ -281,8 +281,9 @@ class Resolution extends Model
 
     public function openForVoting(?\DateTime $deadline = null): void
     {
-        if (empty($this->paper_snapshot)) {
-            $this->freezePaperSnapshot();
+        $snapshot = $this->paper_snapshot;
+        if (empty($snapshot)) {
+            $snapshot = $this->freezePaperSnapshot();
         }
 
         $electorate = $this->captureElectorateSnapshot();
@@ -292,6 +293,7 @@ class Resolution extends Model
             'opened_at' => now(),
             'deadline' => $deadline ?? $this->deadline,
             'electorate_at_open' => $electorate,
+            'paper_snapshot' => $snapshot,
         ]);
     }
 
@@ -381,18 +383,23 @@ class Resolution extends Model
                 continue;
             }
 
-            // Resolve valid assignee user
+            // Resolve valid assignee user: prefer stable ID, and only resolve by name if exactly one user matches
             $assigneeId = $action['assigned_to'] ?? $action['assignee_id'] ?? null;
-            if (! $assigneeId || ! \App\Models\User::where('id', $assigneeId)->exists()) {
-                if (! empty($action['assignee_name'])) {
-                    $matchedUser = \App\Models\User::where('name', $action['assignee_name'])->first();
-                    if ($matchedUser) {
-                        $assigneeId = $matchedUser->id;
-                    }
+            if ($assigneeId && ! \App\Models\User::where('id', $assigneeId)->exists()) {
+                $assigneeId = null;
+            }
+
+            if (! $assigneeId && ! empty($action['assignee_name'])) {
+                $matchedUsers = \App\Models\User::where('name', $action['assignee_name'])->get();
+                if ($matchedUsers->count() === 1) {
+                    $assigneeId = $matchedUsers->first()->id;
+                } elseif ($matchedUsers->count() > 1) {
+                    throw new \DomainException("Ambiguous assignee name '{$action['assignee_name']}' matches multiple users. Explicit user ID is required.");
                 }
             }
+
             if (! $assigneeId || ! \App\Models\User::where('id', $assigneeId)->exists()) {
-                $assigneeId = $this->proposed_by ?? auth()->id() ?? 1;
+                throw new \DomainException("Follow-up action requires an explicit, valid assigned user ID. Silent fallback to proposer is prohibited.");
             }
 
             $title = $action['title'] ?? ('Follow-up from ' . ($this->resolution_reference ?: "Resolution #{$this->id}"));
@@ -487,13 +494,17 @@ class Resolution extends Model
 
         $isWrittenUnanimityRequired = false;
         if ($this->isOutOfSession()) {
-            $profile = $this->voting_profile_id ? GovernanceVotingProfile::find($this->voting_profile_id) : null;
-            if (! $profile) {
-                $committeeId = $this->board_committee_id ?? $this->meeting?->board_committee_id;
-                $profile = app(GovernanceVotingProfileService::class)->getActiveProfile($committeeId ? 'committee' : 'board', $committeeId);
-            }
-            if ($profile && $profile->written_unanimity_required) {
-                $isWrittenUnanimityRequired = true;
+            if (isset($this->paper_snapshot['voting_profile']) && is_array($this->paper_snapshot['voting_profile'])) {
+                $isWrittenUnanimityRequired = ! empty($this->paper_snapshot['voting_profile']['written_unanimity_required']);
+            } else {
+                $profile = $this->voting_profile_id ? GovernanceVotingProfile::find($this->voting_profile_id) : null;
+                if (! $profile) {
+                    $committeeId = $this->board_committee_id ?? $this->meeting?->board_committee_id;
+                    $profile = app(GovernanceVotingProfileService::class)->getActiveProfile($committeeId ? 'committee' : 'board', $committeeId);
+                }
+                if ($profile && $profile->written_unanimity_required) {
+                    $isWrittenUnanimityRequired = true;
+                }
             }
         }
 

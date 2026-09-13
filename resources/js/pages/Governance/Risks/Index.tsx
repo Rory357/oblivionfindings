@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -92,19 +98,53 @@ export default function RiskIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={ShieldAlert}
                         title="Risk Register"
-                        description="Track enterprise risks, residual scores, and treatments across the organisation."
-                        stats={[
-                            { label: 'Total risks', value: totalStats.total },
-                            { label: 'Critical', value: totalStats.critical },
-                            { label: 'High', value: totalStats.high },
-                            {
-                                label: 'Above appetite',
-                                value: totalStats.above_appetite,
-                            },
-                        ]}
+                        subline="Track enterprise risks, residual scores, and treatments across the organisation"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total risks"
+                                    href="/governance/risks"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {totalStats.total}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Tracked risks</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Critical"
+                                    href="/governance/risks?severity=critical"
+                                    tone="critical"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {totalStats.critical}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Score ≥ 20</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="High"
+                                    href="/governance/risks?severity=high"
+                                    tone="warning"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {totalStats.high}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Score 12–19</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Above appetite"
+                                    href="/governance/risks?above_appetite=1"
+                                    tone={totalStats.above_appetite > 0 ? 'critical' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {totalStats.above_appetite}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Action required</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <div className="flex items-center gap-2">
                                 <Button

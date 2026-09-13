@@ -130,21 +130,28 @@ class StrategicPlan extends Model
             ]);
         }
 
-        $resText = strtolower($resolution->title . ' ' . ($resolution->exact_motion ?? '') . ' ' . ($resolution->purpose ?? ''));
-        $planTitle = strtolower($this->title);
-        $isUnrelated = str_contains($resText, 'catering')
-            || str_contains($resText, 'hospitality')
-            || str_contains($resText, 'dinner')
-            || str_contains($resText, 'lunch')
-            || str_contains($resText, 'event');
+        $resText = strtolower($resolution->title . ' ' . ($resolution->exact_motion ?? ''));
+        $planTitle = strtolower(trim($this->title));
 
-        $hasMatch = ! $isUnrelated && (
-            str_contains($resText, 'strateg')
-            || str_contains($resText, 'plan')
-            || str_contains($resText, 'proposal')
-            || str_contains($resText, 'resolution')
-            || (! empty($planTitle) && str_contains($resText, $planTitle))
-        );
+        $hasMatch = false;
+
+        // 1. Explicit strategic_plan_id binding in resolution
+        if (!empty($resolution->strategic_plan_id) && (int) $resolution->strategic_plan_id === (int) $this->id) {
+            $hasMatch = true;
+        } elseif (!empty($resolution->cost_impact['strategic_plan_id']) && (int) $resolution->cost_impact['strategic_plan_id'] === (int) $this->id) {
+            $hasMatch = true;
+        } elseif (!empty($resolution->paper_snapshot['strategic_plan_id']) && (int) $resolution->paper_snapshot['strategic_plan_id'] === (int) $this->id) {
+            $hasMatch = true;
+        }
+        // 2. Exact plan title contained in motion or title
+        elseif (!empty($planTitle) && (str_contains(strtolower($resolution->title), $planTitle) || str_contains(strtolower($resolution->exact_motion ?? ''), $planTitle))) {
+            $hasMatch = true;
+        }
+        // 3. Explicit motion specifying approval of strategic plan matching plan title or reference
+        elseif ((str_contains($resText, 'approve strategic plan') || str_contains($resText, 'adopt strategic plan'))
+            && (str_contains($resText, $planTitle) || str_contains($planTitle, 'strategic plan'))) {
+            $hasMatch = true;
+        }
 
         if (! $hasMatch) {
             throw \Illuminate\Validation\ValidationException::withMessages([

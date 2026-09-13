@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -29,11 +35,11 @@ interface Props extends PageProps {
             items: Array<{
                 id: number;
                 title: string;
-                code: string;
-                owner: string | null;
-                due_date: string | null;
+                code?: string;
+                owner?: string | null;
+                due_date?: string | null;
                 status: string;
-                days_remaining: number | null;
+                days_remaining?: number | null;
             }>;
         }>;
     };
@@ -54,31 +60,64 @@ export default function ComplianceStatus({ auth, report }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Reports', href: '/governance/reports' },
-                { title: 'Compliance', href: '#' },
+                { title: 'Reports', href: '/governance/reports/board-monthly' },
+                { title: 'Compliance Status', href: '/governance/reports/compliance-status' },
             ]}
         >
             <Head title="Compliance Status Report" />
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={ShieldCheck}
                         title="Compliance Status Report"
-                        description="A framework-by-framework view of obligations due, overdue, and complete."
-                        stats={[
-                            { label: 'Total', value: report.summary.total },
-                            {
-                                label: 'Complete',
-                                value: report.summary.complete,
-                            },
-                            { label: 'Overdue', value: report.summary.overdue },
-                            {
-                                label: 'Completion',
-                                value: `${report.summary.completion_rate}%`,
-                            },
-                        ]}
+                        subline="A framework-by-framework view of obligations due, overdue, and complete."
+                        backHref="/governance/compliance"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total"
+                                    href="/governance/compliance"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {report.summary.total}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>All obligations</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Complete"
+                                    href="/governance/compliance?status=compliant"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {report.summary.complete}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Satisfied</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Overdue"
+                                    href="/governance/compliance?status=overdue"
+                                    tone={report.summary.overdue > 0 ? 'critical' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {report.summary.overdue}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Action required</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Completion rate"
+                                    href="/governance/compliance"
+                                    tone={report.summary.completion_rate >= 80 ? 'brand' : 'warning'}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {`${report.summary.completion_rate}%`}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Target coverage</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >
@@ -178,11 +217,9 @@ export default function ComplianceStatus({ auth, report }: Props) {
                                                             Due: {item.due_date}
                                                         </span>
                                                     )}
-                                                    {item.days_remaining !==
-                                                        null && (
+                                                    {item.days_remaining != null && (
                                                         <span>
-                                                            {item.days_remaining <
-                                                            0
+                                                            {item.days_remaining < 0
                                                                 ? `${Math.abs(item.days_remaining)} day(s) overdue`
                                                                 : `${item.days_remaining} day(s) remaining`}
                                                         </span>

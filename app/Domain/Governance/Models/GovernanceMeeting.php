@@ -252,9 +252,16 @@ class GovernanceMeeting extends Model
                 return true;
             }
 
+            $today = today()->toDateString();
             return $member->committeeMemberships()
                 ->where('board_committee_id', $this->board_committee_id)
                 ->where('is_active', true)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('appointed_at')->orWhereDate('appointed_at', '<=', $today);
+                })
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('term_end')->orWhereDate('term_end', '>=', $today);
+                })
                 ->exists();
         }
 

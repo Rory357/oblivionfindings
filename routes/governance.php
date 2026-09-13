@@ -56,6 +56,11 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         ->name('calendar.items')
         ->middleware('permission:governance.view');
 
+    // Governance Records / Document Discovery (L5)
+    Route::get('/records', [\App\Domain\Governance\Http\Controllers\GovernanceRecordsController::class, 'index'])
+        ->name('records.index')
+        ->middleware('permission:governance.view');
+
     // Reports & Exports
     Route::middleware('permission:governance.view')->group(function () {
         Route::get('/reports/board-monthly', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'boardMonthly'])->name('reports.board-monthly');

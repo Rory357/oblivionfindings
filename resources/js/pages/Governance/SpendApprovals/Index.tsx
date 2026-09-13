@@ -1,5 +1,11 @@
 import { FilterBar, FilterField } from '@/components/filter-bar';
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -120,6 +126,7 @@ export default function SpendApprovalsIndex({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 {
                     title: 'Spend Approvals',
@@ -131,27 +138,48 @@ export default function SpendApprovalsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={HandCoins}
-                        category="governance"
                         title="Spend Approvals"
-                        description="Board / finance committee sign-off for spend above configured thresholds."
-                        stats={[
-                            { label: 'Pending', value: summary.pending },
-                            {
-                                label: 'Approved YTD',
-                                value: formatNzd(summary.approved_ytd),
-                            },
-                            {
-                                label: 'Rejected YTD',
-                                value: formatNzd(summary.rejected_ytd),
-                            },
-                        ]}
+                        subline="Board and finance committee sign-off for spend above configured thresholds."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Pending"
+                                    href="/governance/spend-approvals?status=pending"
+                                    tone={summary.pending > 0 ? 'warning' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.pending}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Requires sign-off</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Approved YTD"
+                                    href="/governance/spend-approvals?status=approved"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {formatNzd(summary.approved_ytd)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Authorized spend</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Rejected YTD"
+                                    href="/governance/spend-approvals?status=rejected"
+                                    tone={summary.rejected_ytd > 0 ? 'critical' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {formatNzd(summary.rejected_ytd)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Declined spend</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
-                            <Button asChild>
+                            <Button size="sm" asChild>
                                 <Link href="/governance/spend-approvals/create">
-                                    <Plus className="mr-2 h-4 w-4" /> New
-                                    Request
+                                    <Plus className="mr-2 h-4 w-4" /> New Request
                                 </Link>
                             </Button>
                         }

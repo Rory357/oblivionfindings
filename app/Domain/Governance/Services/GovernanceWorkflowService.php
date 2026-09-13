@@ -31,7 +31,7 @@ class GovernanceWorkflowService
         return $this->workQuery;
     }
 
-    public function dashboardWorkflow(User|int|null $user = null, int $limit = 15): array
+    public function dashboardWorkflow(User|int|null $user = null, int $limit = 100): array
     {
         if (is_int($user)) {
             $user = User::find($user);
@@ -54,12 +54,22 @@ class GovernanceWorkflowService
             ->sortByDesc(fn (array $action) => $this->actionRank($action))
             ->values();
 
+        $byTab = [
+            'all' => $total,
+            'meetings' => $actions->filter(fn (array $a) => ($a['area_key'] ?? null) === 'meetings' || ($a['area'] ?? null) === 'Meetings')->count(),
+            'actions' => $actions->filter(fn (array $a) => in_array(($a['area_key'] ?? null), ['action_items', 'actions'], true) || ($a['area'] ?? null) === 'Action Items')->count(),
+            'risks' => $actions->filter(fn (array $a) => ($a['area_key'] ?? null) === 'risks' || in_array(($a['area'] ?? null), ['Risks', 'Risk Register'], true))->count(),
+            'compliance' => $actions->filter(fn (array $a) => ($a['area_key'] ?? null) === 'compliance' || ($a['area'] ?? null) === 'Compliance')->count(),
+            'policies' => $actions->filter(fn (array $a) => ($a['area_key'] ?? null) === 'policies' || ($a['area'] ?? null) === 'Policies')->count(),
+        ];
+
         return [
             'summary' => [
                 'total' => $total,
                 'critical' => $critical,
                 'overdue' => $overdue,
                 'action_items_overdue' => $actionItemsOverdue,
+                'by_tab' => $byTab,
             ],
             'actions' => $ranked->take($limit)->values()->all(),
         ];

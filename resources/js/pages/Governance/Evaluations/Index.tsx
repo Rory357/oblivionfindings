@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -47,24 +53,56 @@ export default function EvaluationsIndex({ auth, evaluations }: Props) {
     ).length;
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Evaluations', href: '/governance/evaluations' },
+            ]}
+        >
             <Head title="Board Evaluations" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={Star}
                         title="Board Evaluations"
-                        description="Board and committee performance evaluations"
-                        stats={[
-                            { label: 'Total', value: evaluations.data.length },
-                            { label: 'Active', value: activeCount },
-                            { label: 'Closed', value: closedCount },
-                        ]}
+                        subline="Board and committee performance evaluations"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total evaluations"
+                                    href="/governance/evaluations"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {evaluations.data.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Reviews conducted</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Active"
+                                    href="/governance/evaluations?status=active"
+                                    tone={activeCount > 0 ? 'brand' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {activeCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Open for responses</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Closed"
+                                    href="/governance/evaluations?status=closed"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {closedCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Finalized</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <Link href="/governance/evaluations/create">
                                 <Button size="sm">
-                                    <Plus className="mr-2 h-4 w-4" /> New
-                                    Evaluation
+                                    <Plus className="mr-2 h-4 w-4" /> New Evaluation
                                 </Button>
                             </Link>
                         }

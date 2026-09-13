@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -191,10 +197,11 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Performance', href: '/governance/performance' },
                 {
-                    title: 'Review',
+                    title: review.reviewee.name,
                     href: `/governance/performance/${review.id}`,
                 },
             ]}
@@ -203,32 +210,13 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/performance"
                         icon={Target}
-                        title={
-                            <span
-                                className="flex flex-wrap items-center gap-3"
-                                dusk="performance-heading"
-                            >
-                                Performance Review
-                            </span>
-                        }
-                        description={`${review.reviewee.name} - ${review.review_cycle}`}
-                        stats={[
-                            {
-                                label: 'Status',
-                                value: review.status.replace('_', ' '),
-                            },
-                            {
-                                label: 'Rating',
-                                value: getRatingLabel(review.overall_rating),
-                            },
-                            { label: 'Goals', value: review.goals.length },
-                            { label: 'KPIs', value: review.kpis.length },
-                        ]}
-                        actions={
+                        title={`Performance Review - ${review.reviewee.name}`}
+                        titleDusk="performance-heading"
+                        titleChip={
                             <div className="flex flex-wrap items-center gap-2">
                                 <Badge
                                     className={getStatusColor(review.status)}
@@ -244,17 +232,55 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                                         {getRatingLabel(review.overall_rating)}
                                     </Badge>
                                 )}
-                                {review.status !== 'completed' &&
-                                    can_assess && (
-                                        <Button
-                                            onClick={() =>
-                                                setAssessmentOpen(true)
-                                            }
-                                        >
-                                            Continue Review
-                                        </Button>
-                                    )}
                             </div>
+                        }
+                        subline={`${review.reviewee.name} · ${review.review_cycle}`}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Goals"
+                                    href={`/governance/performance/${review.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {review.goals.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Performance goals</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="KPIs"
+                                    href={`/governance/performance/${review.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {review.kpis.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Key metrics</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Status"
+                                    href={`/governance/performance?status=${review.status}`}
+                                    tone={review.status === 'completed' ? 'brand' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        <span className="text-sm font-semibold uppercase">
+                                            {review.status.replace('_', ' ')}
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Current</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
+                        actions={
+                            review.status !== 'completed' &&
+                            can_assess && (
+                                <Button
+                                    size="sm"
+                                    onClick={() =>
+                                        setAssessmentOpen(true)
+                                    }
+                                >
+                                    Continue Review
+                                </Button>
+                            )
                         }
                     />
                 }

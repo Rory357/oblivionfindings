@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -53,16 +53,23 @@ export default function EvaluationCreate({ auth }: PageProps) {
     };
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Evaluations', href: '/governance/evaluations' },
+                { title: 'Create Evaluation', href: '/governance/evaluations/create' },
+            ]}
+        >
             <Head title="Create Evaluation" />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/evaluations"
                         icon={Star}
                         title="Create Board Evaluation"
-                        description="Configure questions and the evaluation period"
+                        subline="Configure questions and the evaluation period"
                     />
                 }
             >

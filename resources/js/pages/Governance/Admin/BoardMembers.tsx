@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,6 +86,7 @@ export default function ManageBoardMembers({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 {
                     title: 'Board Members',
@@ -91,25 +98,42 @@ export default function ManageBoardMembers({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={Users}
                         title="Board Member Management"
-                        description="Appoint, manage, and track board members and their terms."
-                        stats={[
-                            {
-                                label: 'Total Members',
-                                value: boardMembers.length,
-                            },
-                            {
-                                label: 'Active',
-                                value: boardMembers.filter((m) => m.is_active)
-                                    .length,
-                            },
-                            {
-                                label: 'Available',
-                                value: availableUsers.length,
-                            },
-                        ]}
+                        subline="Appoint, manage, and track board members and their terms."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total Members"
+                                    href="/governance/admin/board-members"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {boardMembers.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>All appointments</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Active"
+                                    href="/governance/admin/board-members"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {boardMembers.filter((m) => m.is_active).length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Current seats</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Available"
+                                    href="/governance/admin/board-members"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {availableUsers.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Eligible users</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

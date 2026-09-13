@@ -56,6 +56,17 @@ class VotingService
             }
 
             $lockedRes->voting_profile_id = $profile->id;
+            $snapshot = $lockedRes->paper_snapshot;
+            if (empty($snapshot)) {
+                $snapshot = $lockedRes->freezePaperSnapshot();
+            }
+            $snapshot['voting_profile'] = $profile->toArray();
+            if ($lockedRes->governance_meeting_id && $lockedRes->meeting) {
+                $snapshot['meeting_quorum_required'] = (int) ($lockedRes->meeting->quorum_required ?? 50);
+            }
+            $lockedRes->paper_snapshot = $snapshot;
+            $lockedRes->save();
+
             $effectiveDeadline = $deadline ?? $lockedRes->deadline;
             $lockedRes->openForVoting($effectiveDeadline);
         });
@@ -268,8 +279,18 @@ class VotingService
             $committeeId = $meeting?->board_committee_id;
         }
 
-        // 1. Resolve entitled electorate IDs (committee voting members or board eligible voters)
-        if ($committeeId) {
+        // 1. Resolve entitled electorate IDs (frozen electorate at open, or committee voting members, or board eligible voters)
+        if ($resolution && !empty($resolution->electorate_at_open)) {
+            $eligibleVoterIds = collect($resolution->electorate_at_open)->map(function ($item) {
+                if (is_array($item)) {
+                    return $item['board_member_id'] ?? null;
+                }
+                if (is_object($item)) {
+                    return $item->board_member_id ?? null;
+                }
+                return $item;
+            })->filter()->map(fn ($id) => (int) $id)->unique()->values()->all();
+        } elseif ($committeeId) {
             $eligibleVoterIds = CommitteeMembership::where('board_committee_id', $committeeId)
                 ->active()
                 ->whereNotIn('role', ['adviser', 'observer'])
@@ -289,23 +310,17 @@ class VotingService
 
         // 2. Determine quorum requirement from active profile or standard majority floor(N/2) + 1
         $profile = null;
-        if ($resolution?->voting_profile_id) {
+        if ($resolution && isset($resolution->paper_snapshot['voting_profile']) && is_array($resolution->paper_snapshot['voting_profile'])) {
+            $profile = new \App\Domain\Governance\Models\GovernanceVotingProfile();
+            $profile->forceFill($resolution->paper_snapshot['voting_profile']);
+        } elseif ($resolution?->voting_profile_id) {
             $profile = \App\Domain\Governance\Models\GovernanceVotingProfile::find($resolution->voting_profile_id);
         }
         if (!$profile) {
             $profile = $this->profileService->getActiveProfile($committeeId ? 'committee' : 'board', $committeeId);
         }
 
-        if ($totalEligible <= 0) {
-            $required = 0;
-        } elseif ($profile && $profile->quorum_mode === 'fixed_count' && is_numeric($profile->quorum_formula)) {
-            $required = (int) $profile->quorum_formula;
-        } elseif ($profile && $profile->quorum_mode === 'percentage' && is_numeric(rtrim($profile->quorum_formula, '%'))) {
-            $pct = (float) rtrim($profile->quorum_formula, '%');
-            $required = (int) ceil(($totalEligible * $pct) / 100);
-        } else {
-            $required = (int) floor($totalEligible / 2) + 1;
-        }
+        $required = $this->profileService->calculateQuorumRequired($totalEligible, $profile);
 
         // 3. Participating / present count (recused members excluded from presence, never double-counted)
         $recusedMemberIds = [];
@@ -363,7 +378,14 @@ class VotingService
         $apologies = $attendances->where('status', 'apology')->count();
         
         // If meeting specifies higher quorum percentage above 50%, calculate higher requirement
-        $quorumPct = $meeting->quorum_required ?? 50;
+        // Priority: frozen meeting_quorum_required from paper_snapshot if resolution was opened
+        $quorumPct = 50;
+        if ($resolution && isset($resolution->paper_snapshot['meeting_quorum_required'])) {
+            $quorumPct = (int) $resolution->paper_snapshot['meeting_quorum_required'];
+        } elseif ($meeting->quorum_required) {
+            $quorumPct = (int) $meeting->quorum_required;
+        }
+
         if ($quorumPct > 50 && $totalEligible > 0) {
             $pctRequired = (int) ceil($totalEligible * ($quorumPct / 100));
             if ($pctRequired > $required) {

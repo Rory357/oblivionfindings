@@ -204,10 +204,6 @@ class GovernancePermissionsSeeder extends Seeder
                 'governance.evaluations.view',
                 'governance.documents.view',
                 'governance.clinical.view',
-                'governance.te-tiriti.view',
-                'governance.evidence.view',
-                'governance.audit.view',
-                'governance.spend.view',
             ];
             foreach ($memberPerms as $key) {
                 $perm = Permission::where('key', $key)->first();

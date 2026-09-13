@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,7 @@ export default function CreateRisk({ auth }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Risks', href: '/governance/risks' },
                 { title: 'Create', href: '/governance/risks/create' },
@@ -52,11 +53,12 @@ export default function CreateRisk({ auth }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/risks"
                         icon={ShieldAlert}
                         title="New Risk"
+                        subline="Log a new enterprise risk with initial likelihood, impact, and controls"
                     />
                 }
             >

@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -416,17 +422,14 @@ export default function BudgetShow({
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref={budgetsIndex.url()}
                         icon={Wallet}
-                        title={
-                            <span
-                                className="flex flex-wrap items-center gap-3"
-                                dusk="budget-heading"
-                            >
-                                {budget.title ||
-                                    `FY${budget.fiscal_year} Budget`}
+                        title={budget.title || `FY${budget.fiscal_year} Budget`}
+                        titleDusk="budget-heading"
+                        titleChip={
+                            <div className="flex flex-wrap items-center gap-2">
                                 <Badge
                                     className={getStatusColor(budget.status)}
                                 >
@@ -435,35 +438,41 @@ export default function BudgetShow({
                                 <Badge variant="outline">
                                     v{budget.version_number}
                                 </Badge>
-                            </span>
+                            </div>
                         }
-                        description={
+                        subline={`Fiscal Year ${budget.fiscal_year}${budget.created_by ? ` · Created by ${budget.created_by.name}` : ''}`}
+                        meters={
                             <>
-                                Fiscal Year {budget.fiscal_year}
-                                {budget.created_by &&
-                                    ` · Created by ${budget.created_by.name}`}
-                                {budget.description && (
-                                    <span className="mt-2 block text-sm">
-                                        {budget.description}
-                                    </span>
-                                )}
+                                <PageHeaderMeterBlock
+                                    label="Allocated"
+                                    href={`/governance/budgets/${budget.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {formatCurrency(totals.allocated)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Allocated spend</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Actual"
+                                    href={`/governance/budgets/${budget.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {formatCurrency(totals.actual)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Actual spend</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Variance"
+                                    href={`/governance/budgets/${budget.id}`}
+                                    tone={totals.budget - totals.actual < 0 ? 'critical' : 'brand'}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {formatCurrency(totals.budget - totals.actual)}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Remaining</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
                             </>
                         }
-                        stats={[
-                            { label: 'Fiscal year', value: budget.fiscal_year },
-                            {
-                                label: 'Allocated',
-                                value: formatCurrency(totals.allocated),
-                            },
-                            {
-                                label: 'Actual',
-                                value: formatCurrency(totals.actual),
-                            },
-                            {
-                                label: 'Status',
-                                value: budget.status.replace('_', ' '),
-                            },
-                        ]}
                         actions={
                             <>
                                 {canEdit && (

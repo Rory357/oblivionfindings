@@ -57,6 +57,8 @@ class GovernanceStrategyTest extends TestCase
         ]);
 
         $resolution = $this->createResolution($admin, [
+            'strategic_plan_id' => $plan->id,
+            'title' => 'Approve Strategic Plan',
             'status' => 'closed',
             'outcome' => 'carried',
         ]);
@@ -113,6 +115,8 @@ class GovernanceStrategyTest extends TestCase
         $planB = $this->createStrategicPlan($admin, ['title' => 'Second Plan']);
 
         $resolution = $this->createResolution($admin, [
+            'strategic_plan_id' => $planA->id,
+            'title' => 'Approve Strategic Plan',
             'status' => 'closed',
             'outcome' => 'carried',
         ]);
@@ -139,6 +143,8 @@ class GovernanceStrategyTest extends TestCase
         $planA = $this->createStrategicPlan($admin, ['version_number' => 1]);
 
         $res1 = $this->createResolution($admin, [
+            'strategic_plan_id' => $planA->id,
+            'title' => 'Approve Strategic Plan',
             'status' => 'closed',
             'outcome' => 'carried',
         ]);
@@ -154,6 +160,8 @@ class GovernanceStrategyTest extends TestCase
         $this->assertEquals('draft', $planB->status);
 
         $res2 = $this->createResolution($admin, [
+            'strategic_plan_id' => $planB->id,
+            'title' => 'Approve Strategic Plan Refresh',
             'status' => 'closed',
             'outcome' => 'carried',
         ]);
@@ -183,6 +191,8 @@ class GovernanceStrategyTest extends TestCase
         ]);
 
         $res1 = $this->createResolution($admin, [
+            'strategic_plan_id' => $planA->id,
+            'title' => 'Approve Strategic Plan',
             'status' => 'closed',
             'outcome' => 'carried',
         ]);

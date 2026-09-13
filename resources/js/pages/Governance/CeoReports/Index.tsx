@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -135,34 +141,51 @@ export default function CeoReportsIndex({ auth, reports, meetings }: Props) {
     ];
 
     return (
-        <AppLayout user={auth.user}>
+        <AppLayout
+            user={auth.user}
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'CEO Reports', href: '/governance/ceo-reports' },
+            ]}
+        >
             <Head title="CEO Board Reports" />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
                         icon={FileText}
                         title="CEO Board Reports"
-                        description="Monthly CEO updates for the board — narrative, KPIs, decisions sought, and matters arising."
-                        stats={[
-                            { label: 'Total', value: counts.total },
-                            { label: 'Draft', value: counts.draft },
-                            { label: 'Submitted', value: counts.submitted },
-                            { label: 'Presented', value: counts.presented },
-                        ]}
-                        badges={
-                            counts.overdue > 0
-                                ? [
-                                      {
-                                          label: `${counts.overdue} overdue`,
-                                          tone: 'critical' as const,
-                                          icon: AlertCircle,
-                                      },
-                                  ]
-                                : undefined
+                        subline="Monthly CEO updates for the board — narrative, KPIs, decisions sought, and matters arising."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total reports"
+                                    href="/governance/ceo-reports"
+                                >
+                                    <PageHeaderMeterBig>{counts.total}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Board updates</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Submitted"
+                                    href="/governance/ceo-reports?tab=submitted"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>{counts.submitted}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Ready for review</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Overdue"
+                                    href="/governance/ceo-reports?tab=overdue"
+                                    tone={counts.overdue > 0 ? 'critical' : undefined}
+                                >
+                                    <PageHeaderMeterBig>{counts.overdue}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Requires action</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
                         }
                         actions={
                             <Button
+                                size="sm"
                                 onClick={() => setNewOpen(true)}
                                 dusk="new-ceo-report-button"
                             >

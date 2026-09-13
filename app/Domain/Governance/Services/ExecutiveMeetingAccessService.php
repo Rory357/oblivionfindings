@@ -51,19 +51,17 @@ final class ExecutiveMeetingAccessService
             return true;
         }
 
-        $hasPresentAttendance = $meeting->attendances()
-            ->where('board_member_id', $boardMember->id)
-            ->where('status', 'present')
-            ->whereNotNull('marked_by')
-            ->exists();
-        if ($hasPresentAttendance) {
-            return true;
-        }
-
         if ($meeting->board_committee_id) {
+            $today = today()->toDateString();
             if ($boardMember->committeeMemberships()
                 ->where('board_committee_id', $meeting->board_committee_id)
                 ->where('is_active', true)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('appointed_at')->orWhereDate('appointed_at', '<=', $today);
+                })
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('term_end')->orWhereDate('term_end', '>=', $today);
+                })
                 ->exists()) {
                 return true;
             }
@@ -155,14 +153,17 @@ final class ExecutiveMeetingAccessService
                             if ($boardMemberId !== null && $isActive) {
                                 $allowed->orWhere('chair_id', $boardMemberId)
                                     ->orWhere('secretary_id', $boardMemberId)
-                                    ->orWhereHas('attendances', fn (Builder $att) => $att
-                                        ->where('board_member_id', $boardMemberId)
-                                        ->where('status', 'present')
-                                        ->whereNotNull('marked_by')
-                                    )
                                     ->orWhereHas('committee.members', fn (Builder $cm) => $cm
                                         ->where('board_members.id', $boardMemberId)
                                         ->where('committee_memberships.is_active', true)
+                                        ->where(function ($term) {
+                                            $term->whereNull('committee_memberships.appointed_at')
+                                                ->orWhereDate('committee_memberships.appointed_at', '<=', today());
+                                        })
+                                        ->where(function ($term) {
+                                            $term->whereNull('committee_memberships.term_end')
+                                                ->orWhereDate('committee_memberships.term_end', '>=', today());
+                                        })
                                     );
                             }
                         });

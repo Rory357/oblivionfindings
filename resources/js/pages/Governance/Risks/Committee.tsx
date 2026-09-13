@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
@@ -55,28 +61,45 @@ export default function CommitteeRisks({ auth, committee, risks }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Risks', href: '/governance/risks' },
-                { title: 'Committee', href: '#' },
+                { title: `${title} Committee`, href: `/governance/risks/committee/${committee}` },
             ]}
         >
             <Head title={`${title} Committee Risks`} />
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
+                        variant="profile"
+                        backHref="/governance/risks"
                         icon={AlertTriangle}
-                        title={title}
-                        description="Committee risk oversight."
-                        stats={[
-                            { label: 'Total Risks', value: sorted.length },
-                            {
-                                label: 'Above Appetite',
-                                value: sorted.filter(
-                                    (r) => r.within_appetite === false,
-                                ).length,
-                            },
-                        ]}
+                        title={`${title} Committee Risks`}
+                        subline="Committee risk oversight and residual score monitoring"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total Risks"
+                                    href="/governance/risks"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {sorted.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Assigned to committee</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Above Appetite"
+                                    href="/governance/risks?above_appetite=1"
+                                    tone={sorted.some((r) => r.within_appetite === false) ? 'critical' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {sorted.filter((r) => r.within_appetite === false).length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Action required</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

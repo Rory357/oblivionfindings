@@ -573,7 +573,10 @@ class GovernanceWorkQuery
                     ->whereIn('status', ['complete', 'completed'])
                     ->orderByDesc('completed_at')
                     ->limit(50)
-                    ->get();
+                    ->get()
+                    ->filter(function (ActionItem $action) use ($viewer) {
+                        return $this->recordAccess->canViewActionItem($viewer, $action);
+                    });
 
                 foreach ($actions as $action) {
                     $items->push(new GovernanceWorkItem(

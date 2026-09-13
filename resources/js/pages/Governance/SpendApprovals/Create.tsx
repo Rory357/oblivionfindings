@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -52,6 +52,7 @@ export default function CreateSpendApproval({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 {
                     title: 'Spend Approvals',
@@ -67,18 +68,12 @@ export default function CreateSpendApproval({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
+                        variant="profile"
+                        backHref="/governance/spend-approvals"
                         icon={HandCoins}
-                        category="governance"
                         title="Request Spend Approval"
-                        description="Submit a spend item for board or finance-committee sign-off."
-                        actions={
-                            <Button asChild variant="outline">
-                                <Link href="/governance/spend-approvals">
-                                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                                </Link>
-                            </Button>
-                        }
+                        subline="Submit a spend item for board or finance-committee sign-off."
                     />
                 }
             >

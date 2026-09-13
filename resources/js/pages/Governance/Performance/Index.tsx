@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,6 +60,7 @@ export default function PerformanceIndex({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Performance', href: '/governance/performance' },
             ]}
@@ -62,37 +69,46 @@ export default function PerformanceIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={Target}
                         title="Performance Reviews"
-                        description="Manage CEO and executive review cycles, goals, and ratings."
-                        stats={[
-                            {
-                                label: 'Active reviews',
-                                value: reviews.data.filter(
-                                    (r) => r.status !== 'completed',
-                                ).length,
-                            },
-                            {
-                                label: 'Completed',
-                                value: reviews.data.filter(
-                                    (r) => r.status === 'completed',
-                                ).length,
-                            },
-                            {
-                                label: 'Pending board review',
-                                value: reviews.data.filter(
-                                    (r) => r.status === 'board_review',
-                                ).length,
-                            },
-                            {
-                                label: 'Current cycle',
-                                value: review_cycles[0]?.label ?? '—',
-                            },
-                        ]}
+                        subline="Manage CEO and executive review cycles, goals, and ratings."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Active reviews"
+                                    href="/governance/performance"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {reviews.data.filter((r) => r.status !== 'completed').length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>In progress</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Completed"
+                                    href="/governance/performance?status=completed"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {reviews.data.filter((r) => r.status === 'completed').length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Finalized</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Pending board review"
+                                    href="/governance/performance?status=board_review"
+                                    tone={reviews.data.some((r) => r.status === 'board_review') ? 'warning' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {reviews.data.filter((r) => r.status === 'board_review').length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Awaiting sign-off</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             auth.can?.governance?.performance?.create ? (
-                                <Button asChild>
+                                <Button size="sm" asChild>
                                     <Link href={createPerformance.url()}>
                                         New Review
                                     </Link>

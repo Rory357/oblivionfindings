@@ -2,7 +2,13 @@ import {
     GovernanceAttachmentsPanel,
     type GovernanceAttachment,
 } from '@/components/governance/GovernanceAttachmentsPanel';
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -185,61 +191,74 @@ export default function RiskShow({
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Risks', href: '/governance/risks' },
-                { title: 'Risk', href: `/governance/risks/${risk.id}` },
+                { title: risk.risk_reference, href: `/governance/risks/${risk.id}` },
             ]}
         >
             <Head title={risk.title} />
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/risks"
                         icon={ShieldAlert}
-                        title={
-                            <span
-                                className="flex flex-wrap items-center gap-3"
-                                dusk="risk-heading"
-                            >
-                                {risk.title}
+                        title={risk.title}
+                        titleDusk="risk-heading"
+                        titleChip={
+                            <div className="flex items-center gap-1.5">
                                 <Badge variant="outline">
                                     {risk.risk_reference}
                                 </Badge>
-                            </span>
-                        }
-                        description={
-                            <span className="flex flex-wrap items-center gap-2 text-sm">
-                                <span
-                                    className={cn(
-                                        'rounded-full px-2 py-0.5 text-xs font-semibold text-white',
-                                        getRiskColor(risk.residual_score),
-                                    )}
-                                >
-                                    {getRiskLevel(risk.residual_score)}
-                                </span>
-                                <span className="opacity-90">
-                                    {getCategoryLabel(risk.category)}
-                                </span>
                                 {!risk.within_appetite && (
                                     <Badge className="border border-status-critical/30 bg-status-critical-bg text-status-critical">
                                         Above appetite
                                     </Badge>
                                 )}
                                 <Badge variant="outline">{risk.status}</Badge>
-                            </span>
+                            </div>
                         }
-                        stats={[
-                            { label: 'Residual', value: risk.residual_score },
-                            { label: 'Inherent', value: risk.inherent_score },
-                            {
-                                label: 'Appetite',
-                                value: risk.appetite_threshold,
-                            },
-                            {
-                                label: 'Treatments',
-                                value: risk.treatments.length,
-                            },
-                        ]}
+                        subline={`${getCategoryLabel(risk.category)} · ${getRiskLevel(risk.residual_score)} residual risk (${risk.residual_score})`}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Residual"
+                                    href={`/governance/risks/${risk.id}`}
+                                    tone={risk.residual_score >= 20 ? 'critical' : risk.residual_score >= 12 ? 'warning' : 'brand'}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {risk.residual_score}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Current score</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Inherent"
+                                    href={`/governance/risks/${risk.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {risk.inherent_score}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Raw score</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Appetite"
+                                    href={`/governance/risks/${risk.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {risk.appetite_threshold}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Threshold</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Treatments"
+                                    href={`/governance/risks/${risk.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {risk.treatments.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Active actions</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             canEdit ? (
                                 <div className="flex gap-2">

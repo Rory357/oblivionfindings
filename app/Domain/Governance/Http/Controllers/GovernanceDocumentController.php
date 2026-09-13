@@ -15,8 +15,8 @@ class GovernanceDocumentController extends Controller
         $this->authorize('viewAny', GovernanceDocument::class);
 
         $documents = GovernanceDocument::query()
-            ->when($request->document_type, fn($q, $type) => $q->where('document_type', $type))
-            ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
+            ->when($request->document_type, fn ($q, $type) => $q->where('document_type', $type))
+            ->when($request->search, fn ($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->orderByDesc('updated_at')
             ->paginate(20)
             ->through(fn (GovernanceDocument $document) => [
@@ -55,7 +55,7 @@ class GovernanceDocumentController extends Controller
             'file' => 'required|file|max:20480',
         ]);
 
-        $path = $request->file('file')->store('governance/documents/' . $validated['category'], 'local');
+        $path = $request->file('file')->store('governance/documents/'.$validated['category'], 'local');
 
         GovernanceDocument::create([
             'title' => $validated['title'],
@@ -105,10 +105,11 @@ class GovernanceDocumentController extends Controller
         $this->authorize('download', $document);
 
         if (! Storage::disk('local')->exists($document->file_path)) {
-            $legacyPath = storage_path('app/' . $document->file_path);
+            $legacyPath = storage_path('app/'.$document->file_path);
             if (! is_file($legacyPath)) {
                 abort(404, 'Document not found.');
             }
+
             return response()->download($legacyPath, basename($document->file_path));
         }
 

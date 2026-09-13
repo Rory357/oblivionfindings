@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -134,11 +140,33 @@ export default function GovernanceSettingsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={SettingsIcon}
-                        category="governance"
                         title="Governance Settings"
-                        description="Configure escalation paths, spend approval thresholds, and variance alert rules."
+                        subline="Configure escalation paths, spend approval thresholds, and variance alert rules."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Configuration items"
+                                    href="/governance/settings"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {settings.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Parameters defined</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Rules profile"
+                                    href="/governance/settings"
+                                    tone={rulesProfile?.isConfirmed ? 'brand' : 'warning'}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {rulesProfile ? (rulesProfile.isConfirmed ? 'Confirmed' : 'Draft') : 'Active'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Electorate authority</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -48,6 +48,7 @@ export default function EditRisk({ auth, risk }: { auth: any; risk: Risk }) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Risks', href: '/governance/risks' },
                 { title: risk.title, href: `/governance/risks/${risk.id}` },
@@ -57,12 +58,12 @@ export default function EditRisk({ auth, risk }: { auth: any; risk: Risk }) {
             <Head title={`Edit: ${risk.title}`} />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
-                        backHref="/governance/risks"
+                    <PageHeader
+                        variant="profile"
+                        backHref={`/governance/risks/${risk.id}`}
                         icon={ShieldAlert}
-                        title="Edit Risk"
-                        description={risk.title}
+                        title={`Edit: ${risk.title}`}
+                        subline="Update assessment parameters, control effectiveness, and review schedule"
                     />
                 }
             >

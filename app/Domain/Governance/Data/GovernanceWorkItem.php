@@ -9,13 +9,15 @@ use JsonSerializable;
 
 class GovernanceWorkItem implements Arrayable, JsonSerializable
 {
+    public string $kind;
+
     /**
      * @param  array{type: string, id: int, reference: string, href: string}  $source
      * @param  array{key: string, label: string, href: string, allowed: bool, blocked_reason: ?string}  $requiredAction
      */
     public function __construct(
         public string $id,
-        public GovernanceWorkKind|string $kind,
+        GovernanceWorkKind|string $kind,
         public array $source,
         public string $title,
         public string $reason,
@@ -32,6 +34,7 @@ class GovernanceWorkItem implements Arrayable, JsonSerializable
         public ?string $ownerName = null,
         public ?array $receipt = null,
     ) {
+        $this->kind = $kind instanceof GovernanceWorkKind ? $kind->value : (string) $kind;
         $this->availableAsOf ??= now()->toIso8601String();
     }
 

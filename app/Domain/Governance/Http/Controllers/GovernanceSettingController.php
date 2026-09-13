@@ -149,7 +149,8 @@ class GovernanceSettingController extends Controller
         }
 
         $allowedKeys = collect($this->definitions)->pluck('key')->toArray();
-        $changes = 0;
+        $validatedEntries = [];
+        $errors = [];
 
         foreach ($payload as $key => $value) {
             if (! in_array($key, $allowedKeys, true)) {
@@ -161,27 +162,62 @@ class GovernanceSettingController extends Controller
             $description = $def['description'] ?? null;
             $type = $def['type'] ?? 'string';
 
-            if ($type === 'number' && $value !== null && $value !== '') {
-                if (! is_numeric($value)) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        "settings.{$key}" => "The setting '{$def['label']}' must be a valid number.",
-                    ]);
+            if ($key === 'compliance.escalation.final_notify_user_id') {
+                if ($value !== null && $value !== '') {
+                    if (! is_numeric($value) || (string) (int) $value !== (string) $value) {
+                        $errors["settings.{$key}"] = "The setting '{$def['label']}' must be a valid user ID integer.";
+                        continue;
+                    }
+                    $userId = (int) $value;
+                    if (! \App\Models\User::where('id', $userId)->exists()) {
+                        $errors["settings.{$key}"] = "The selected user for '{$def['label']}' does not exist.";
+                        continue;
+                    }
+                    $value = $userId;
+                } else {
+                    $value = null;
                 }
-                $value = is_float($value + 0) ? (float) $value : (int) $value;
+            } elseif ($type === 'number' && $value !== null && $value !== '') {
+                if (! is_numeric($value)) {
+                    $errors["settings.{$key}"] = "The setting '{$def['label']}' must be a valid number.";
+                    continue;
+                }
+                $num = is_float($value + 0) ? (float) $value : (int) $value;
+                if ($num < 0) {
+                    $errors["settings.{$key}"] = "The setting '{$def['label']}' cannot be negative.";
+                    continue;
+                }
+                $value = $num;
             } elseif ($type === 'boolean' && $value !== null) {
                 $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
             }
 
-            GovernanceSetting::set($key, $value, $category, $description);
-            $changes++;
+            $validatedEntries[] = [
+                'key' => $key,
+                'value' => $value,
+                'category' => $category,
+                'description' => $description,
+            ];
         }
 
-        if ($changes > 0) {
-            GovernanceAuditService::log('settings.updated', 'GovernanceSetting', 0, [
-                'changed_keys' => array_keys($payload),
-                'change_count' => $changes,
-            ]);
+        if (! empty($errors)) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
         }
+
+        $changes = 0;
+        \Illuminate\Support\Facades\DB::transaction(function () use ($validatedEntries, $payload, &$changes) {
+            foreach ($validatedEntries as $entry) {
+                GovernanceSetting::set($entry['key'], $entry['value'], $entry['category'], $entry['description']);
+                $changes++;
+            }
+
+            if ($changes > 0) {
+                GovernanceAuditService::log('settings.updated', 'GovernanceSetting', 0, [
+                    'changed_keys' => array_keys($payload),
+                    'change_count' => $changes,
+                ]);
+            }
+        });
 
         return back()->with('success', "Updated {$changes} setting(s).");
     }

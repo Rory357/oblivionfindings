@@ -2,7 +2,13 @@ import {
     GovernanceAttachmentsPanel,
     type GovernanceAttachment,
 } from '@/components/governance/GovernanceAttachmentsPanel';
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -215,16 +221,14 @@ export default function PackShow({
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/packs"
                         icon={FolderOpen}
-                        title={
-                            <span
-                                className="flex flex-wrap items-center gap-3"
-                                dusk="pack-heading"
-                            >
-                                Board Pack
+                        title={`Board Pack · Revision ${revisionNumber}`}
+                        titleDusk="pack-heading"
+                        titleChip={
+                            <div className="flex items-center gap-1.5">
                                 <Badge variant="outline" className="border-border text-xs">
                                     Revision {revisionNumber}
                                 </Badge>
@@ -253,41 +257,48 @@ export default function PackShow({
                                         Failed
                                     </Badge>
                                 )}
-                            </span>
+                            </div>
                         }
-                        description={
-                            <span className="flex flex-col gap-1">
-                                <span className="font-medium">
-                                    {pack.meeting.title}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                    Generated {formatNZDate(pack.generated_at)}
-                                    {pack.checksum && ` · SHA-256: ${pack.checksum.slice(0, 12)}…`}
-                                </span>
-                            </span>
+                        subline={`${pack.meeting.title} · Generated ${formatNZDate(pack.generated_at)}${pack.checksum ? ` · SHA-256: ${pack.checksum.slice(0, 12)}…` : ''}`}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Revision"
+                                    href={`/governance/packs/${pack.id}`}
+                                >
+                                    <PageHeaderMeterBig>v{revisionNumber}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Edition</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Papers & Docs"
+                                    href={`/governance/packs/${pack.id}`}
+                                >
+                                    <PageHeaderMeterBig>{pack.actual_document_count ?? manifestSections.length}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Included items</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Recipients"
+                                    href={`/governance/packs/${pack.id}`}
+                                >
+                                    <PageHeaderMeterBig>{distributionStats.intended_recipients}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Board audience</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Read"
+                                    href={`/governance/packs/${pack.id}`}
+                                >
+                                    <PageHeaderMeterBig>{distributionStats.read_count}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Confirmations</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Downloads"
+                                    href={`/governance/packs/${pack.id}`}
+                                >
+                                    <PageHeaderMeterBig>{distributionStats.download_count}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>PDF retrievals</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
                         }
-                        stats={[
-                            {
-                                label: 'Revision',
-                                value: `v${revisionNumber}`,
-                            },
-                            {
-                                label: 'Papers & Docs',
-                                value: pack.actual_document_count ?? manifestSections.length,
-                            },
-                            {
-                                label: 'Recipients',
-                                value: distributionStats.intended_recipients,
-                            },
-                            {
-                                label: 'Read',
-                                value: distributionStats.read_count,
-                            },
-                            {
-                                label: 'Downloads',
-                                value: distributionStats.download_count,
-                            },
-                        ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 {can_mark_read && (

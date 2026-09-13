@@ -24,7 +24,7 @@ import {
     Vote,
 } from 'lucide-react';
 import { useState } from 'react';
-import { ResolutionWizardDialog, type MeetingOption } from './_dialogs';
+import { ResolutionWizardDialog, type MeetingOption, type UserOption } from './_dialogs';
 
 interface Resolution {
     id: number;
@@ -46,6 +46,7 @@ interface Props extends PageProps {
     };
     my_pending_votes: Resolution[];
     meetings: MeetingOption[];
+    users?: UserOption[];
 }
 
 export default function ResolutionsIndex({
@@ -53,6 +54,7 @@ export default function ResolutionsIndex({
     resolutions,
     my_pending_votes,
     meetings,
+    users = [],
 }: Props) {
     const [newResolutionOpen, setNewResolutionOpen] = useState(false);
     const getStatusColor = (status: string) => governanceStatusColor(status);
@@ -178,6 +180,7 @@ export default function ResolutionsIndex({
                     isOpen={newResolutionOpen}
                     onClose={() => setNewResolutionOpen(false)}
                     meetings={meetings ?? []}
+                    users={users}
                 />
                 {/* Pending Votes Alert */}
                 {my_pending_votes.length > 0 && (

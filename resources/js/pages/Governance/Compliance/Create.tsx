@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -42,6 +42,7 @@ export default function CreateCompliance({ auth }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Compliance', href: '/governance/compliance' },
                 { title: 'Create', href: '/governance/compliance/create' },
@@ -51,12 +52,12 @@ export default function CreateCompliance({ auth }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/compliance"
                         icon={Shield}
                         title="New Compliance Obligation"
-                        description="Register a regulatory or framework obligation"
+                        subline="Register a regulatory or framework obligation"
                     />
                 }
             >

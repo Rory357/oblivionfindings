@@ -1,0 +1,351 @@
+Browser tab: 2, Title: "Board overview - Laravel", URL: "http://127.0.0.1:8783/governance/dashboard".
+1 AXWebArea Board overview - Laravel, URL: 127.0.0.1:8783/governance/dashboard
+	2 container app
+		125 link Description: Skip to main content, Value: 127.0.0.1:8783/governance/dashboard#main-content
+		126 container
+			127 text Sunday 13 September 2026
+			128 link Description: Oblivion Care — home, Value: 127.0.0.1:8783/dashboard
+			129 pop up button (collapsed) Description: Search or jump to a page, Secondary Actions: Expand
+				130 image
+				131 text Search or jump to…
+				132 text Ctrl
+				133 text K
+			134 pop up button (disabled, collapsed) Description: Ask about a client, Secondary Actions: Expand
+				135 image
+			136 pop up button (collapsed) Description: Notifications, ID: radix-_r_2n_, Secondary Actions: Expand
+				137 image
+			138 pop up button (collapsed) Description: Announcements, ID: radix-_r_2p_, Secondary Actions: Expand
+				139 image
+			140 pop up button (collapsed) Description: Open user menu for Review Alex Morgan, ID: radix-_r_2a_, Secondary Actions: Expand
+				141 image Review Alex Morgan
+		142 container
+			143 container Description: Primary navigation, ID: app-sidebar-nav
+				144 container
+					145 link Description: My Day, Value: 127.0.0.1:8783/my-day
+					146 link Description: My Calendar, Value: 127.0.0.1:8783/my-calendar
+					147 link Description: All Tasks, Value: 127.0.0.1:8783/tasks
+					148 button (collapsed) Description: IT & Support menu, Secondary Actions: Expand
+						149 text IT & Support
+						150 image
+					151 button (expanded) Description: Governance menu, Secondary Actions: Collapse
+						152 text Governance
+						153 image
+					154 container Governance navigation
+						155 text OVERVIEW & MY WORK
+						156 link Description: Home, Value: 127.0.0.1:8783/governance/dashboard
+						157 link Description: My work, Value: 127.0.0.1:8783/governance/my-work
+						158 link Description: Calendar, Value: 127.0.0.1:8783/governance/calendar
+						159 link Description: Records, Value: 127.0.0.1:8783/governance/records
+						160 text MEETINGS & DECISIONS
+						161 link Description: Meetings, Value: 127.0.0.1:8783/governance/meetings
+						162 link Description: Board Packs, Value: 127.0.0.1:8783/governance/packs
+						163 link Description: CEO Reports, Value: 127.0.0.1:8783/governance/ceo-reports
+						164 link Description: Resolutions, Value: 127.0.0.1:8783/governance/resolutions
+						165 link Description: Action Items, Value: 127.0.0.1:8783/governance/actions
+						166 link Description: Board Evaluations, Value: 127.0.0.1:8783/governance/evaluations
+						167 text OVERSIGHT
+						168 link Description: Risk Register, Value: 127.0.0.1:8783/governance/risks
+						169 link Description: Compliance, Value: 127.0.0.1:8783/governance/compliance
+						170 link Description: Clinical Governance, Value: 127.0.0.1:8783/governance/clinical
+						171 link Description: Te Tiriti, Value: 127.0.0.1:8783/governance/te-tiriti
+						172 link Description: Budgets, Value: 127.0.0.1:8783/governance/budgets
+						173 link Description: Spend Approvals, Value: 127.0.0.1:8783/governance/spend-approvals
+						174 link Description: Strategic Plan, Value: 127.0.0.1:8783/governance/strategy
+						175 link Description: Performance, Value: 127.0.0.1:8783/governance/performance
+						176 link Description: Policies, Value: 127.0.0.1:8783/governance/policies
+						177 link Description: Documents, Value: 127.0.0.1:8783/governance/documents
+						178 link Description: Interests Register, Value: 127.0.0.1:8783/governance/interests
+						179 text BOARD ADMINISTRATION
+						180 link Description: Audit Log, Value: 127.0.0.1:8783/governance/audit-log
+					181 button (collapsed) Description: Reporting menu, Secondary Actions: Expand
+						182 text Reporting
+						183 image
+				184 link Description: Settings, Value: 127.0.0.1:8783/settings
+			185 button (expanded) Description: Collapse sidebar, Secondary Actions: Collapse
+				186 image
+		187 container main-content
+			188 container breadcrumb
+				189 content list
+					190 link Description: Home, Value: 127.0.0.1:8783/dashboard
+					191 link (disabled) Governance
+						192 text Governance
+			193 container
+				194 image
+				195 heading Board overview, Value: 1
+					196 text Board overview
+				197 text Reporting period:  month  · Last captured
+				198 text 04:51 PM
+				199 image
+				200 search text field (settable)
+				201 button Prepare meeting
+				202 button Refresh dashboard
+					203 image
+					204 text Refresh
+				205 link Description: View my pending work, Value: 127.0.0.1:8783/governance/my-work
+				206 link Description: View overdue board actions, Value: 127.0.0.1:8783/governance/actions?status=overdue
+				207 link Description: View risks above appetite, Value: 127.0.0.1:8783/governance/risks
+				208 link Description: View obligations overdue, Value: 127.0.0.1:8783/governance/compliance?status=overdue
+				209 pop up button (collapsed) This Month, Secondary Actions: Expand
+				210 button Clear Period
+					211 image
+				212 tab group Views
+					213 tab (selected, settable, boolean) Overview, Value: 1
+					214 tab (selectable, settable, boolean) My work 3, Value: 0
+					215 tab (selectable, settable, boolean) Calendar, Value: 0
+					216 tab (selectable, settable, boolean) Decisions, Value: 0
+					217 button Find a view
+						218 image
+						219 text Find
+			220 text Next Meeting Readiness
+			221 container
+				222 link Description: Review September Board, Value: 127.0.0.1:8783/governance/meetings/1
+				223 text  · 18 Sep 2026, 10:00 AM
+			224 text 4 days to go 5  of  8  steps complete 63 %
+			225 container Meeting readiness progress
+			226 text NEXT STEP
+			227 text Submit meeting RSVP
+			228 text Confirm your attendance or send apologies for this meeting.
+			229 text Agenda prepared
+			230 text DONE
+			231 text 1 agenda item(s) ready for board pre-read.
+			232 text Attendance and quorum confirmed
+			233 text PENDING
+			234 text Attendance is unrecorded. Will be marked when meeting commences.
+			235 link Description: View Attendance, Value: 127.0.0.1:8783/governance/meetings/1?tab=attendance
+			236 text CEO report ready
+			237 text PENDING
+			238 text CEO report is pending for this meeting.
+			239 link Description: Open CEO Report, Value: 127.0.0.1:8783/governance/ceo-reports
+			240 text Decision resolutions prepared
+			241 text DONE
+			242 text 1 resolution(s) ready/open.
+			243 text Minutes drafted
+			244 text DONE
+			245 text Minutes currently approved.
+			246 text Minutes approved
+			247 text DONE
+			248 text Minutes approved by chair/delegate.
+			249 text Minutes signed and archived
+			250 text PENDING
+			251 text Sign approved minutes to close the meeting cycle.
+			252 link Description: Finalize Minutes, Value: 127.0.0.1:8783/governance/meetings/1?tab=minutes
+			253 text Previous meeting follow-through reviewed
+			254 text DONE
+			255 text No previous meeting in this committee/cycle.
+			256 text Needs my attention
+			257 text Your pending votes, reading and follow-up.
+			258 link Description: View all, Value: 127.0.0.1:8783/governance/my-work
+			259 link Description: RA ACTION ITEMS Priority: Critical Complete ACT-V6HS9P Due 2026-08-04 Open Action, Value: 127.0.0.1:8783/governance/actions/41
+			260 text Board priorities
+			261 text Top priorities (showing 8 of 58)
+			262 text 58  open 13  critical 42  overdue
+			263 tab group
+				264 tab (selected, settable, boolean) All 58, ID: radix-_r_31_-trigger-all, Value: 1
+All
+58
+				265 tab (selectable, settable, boolean) Meetings 2, ID: radix-_r_31_-trigger-meetings, Value: 0
+Meetings
+2
+				266 tab (selectable, settable, boolean) Actions 42, ID: radix-_r_31_-trigger-actions, Value: 0
+Actions
+42
+				267 tab (selectable, settable, boolean) Risks, ID: radix-_r_31_-trigger-risks, Value: 0
+Risks
+				268 tab (selectable, settable, boolean) Compliance 1, ID: radix-_r_31_-trigger-compliance, Value: 0
+Compliance
+1
+				269 tab (selectable, settable, boolean) Policies, ID: radix-_r_31_-trigger-policies, Value: 0
+Policies
+			270 container Description: All 58, ID: radix-_r_31_-content-all
+				271 text RC
+				272 text COMPLIANCE
+				273 container Priority: Critical
+					274 text Critical
+				275 text Due 
+				276 text 2026-09-12
+				277 text Complete obligation PRIV-001
+				278 text Review annual assurance (Privacy Act 2020)
+				279 text Owner:
+				280 text Review Chair
+				281 text Why this matters
+				282 link Description: Open Obligation, Value: 127.0.0.1:8783/governance/compliance/1
+				283 text RC
+				284 text RISK REGISTER
+				285 container Priority: Critical
+					286 text Critical
+				287 text Due 
+				288 text 2026-12-13
+				289 text Review risk R-3VKEIA
+				290 text Above appetite (score 20): Review risk 0
+				291 text Owner:
+				292 text Review Chair
+				293 text Why this matters
+				294 link Description: Open Risk, Value: 127.0.0.1:8783/governance/risks/1
+				295 text RC
+				296 text RISK REGISTER
+				297 container Priority: Critical
+					298 text Critical
+				299 text Due 
+				300 text 2026-12-13
+				301 text Review risk R-CJ9ZRR
+				302 text Above appetite (score 20): Review risk 1
+				303 text Owner:
+				304 text Review Chair
+				305 text Why this matters
+				306 link Description: Open Risk, Value: 127.0.0.1:8783/governance/risks/2
+				307 text RC
+				308 text RISK REGISTER
+				309 container Priority: Critical
+					310 text Critical
+				311 text Due 
+				312 text 2026-12-13
+				313 text Review risk R-SGDV0H
+				314 text Above appetite (score 20): Review risk 2
+				315 text Owner:
+				316 text Review Chair
+				317 text Why this matters
+				318 link Description: Open Risk, Value: 127.0.0.1:8783/governance/risks/3
+				319 text RC
+				320 text RISK REGISTER
+				321 container Priority: Critical
+					322 text Critical
+				323 text Due 
+				324 text 2026-12-13
+				325 text Review risk R-RMU0NW
+				326 text Above appetite (score 20): Review risk 3
+				327 text Owner:
+				328 text Review Chair
+				329 text Why this matters
+				330 link Description: Open Risk, Value: 127.0.0.1:8783/governance/risks/4
+				331 text RC
+				332 text RISK REGISTER
+				333 container Priority: Critical
+					334 text Critical
+				335 text Due 
+				336 text 2026-12-13
+				337 text Review risk R-U6CR1O
+				338 text Above appetite (score 20): Review risk 4
+				339 text Owner:
+				340 text Review Chair
+				341 text Why this matters
+				342 link Description: Open Risk, Value: 127.0.0.1:8783/governance/risks/5
+				343 text RC
+				344 text RISK REGISTER
+				345 container Priority: Critical
+					346 text Critical
+				347 text Due 
+				348 text 2026-12-13
+				349 text Review risk R-3HI5CJ
+				350 text Above appetite (score 20): Review risk 5
+				351 text Owner:
+				352 text Review Chair
+				353 text Why this matters
+				354 link Description: Open Risk, Value: 127.0.0.1:8783/governance/risks/6
+				355 text RC
+				356 text RISK REGISTER
+				357 container Priority: Critical
+					358 text Critical
+				359 text Due 
+				360 text 2026-12-13
+				361 text Review risk R-5GCXDP
+				362 text Above appetite (score 20): Review risk 6
+				363 text Owner:
+				364 text Review Chair
+				365 text Why this matters
+				366 link Description: Open Risk, Value: 127.0.0.1:8783/governance/risks/7
+				367 link Description: View all 58 priorities, Value: 127.0.0.1:8783/governance/my-work
+			368 text Governance Timeline
+			369 text Recent governance activity across the organisation.
+			370 container
+				371 text Nothing has changed  recently .
+			372 text New governance activity will appear here automatically.
+			373 text Risk & Compliance Watchlist
+			374 text Critical risks, overdue obligations and privacy gaps the board needs to be aware of.
+			375 text Risk posture
+			376 text Active risks, critical exposure, and items outside appetite.
+			377 text CRITICAL
+			378 text CRITICAL
+			379 text 12
+			380 text HIGH
+			381 text 0
+			382 text ABOVE APPETITE
+			383 text 12
+			384 text TRACKED
+			385 text 12
+			386 content list
+				387 text R-3VKEIA Review risk 0
+				388 text R-CJ9ZRR Review risk 1
+			389 link Description: Open risk register, Value: 127.0.0.1:8783/governance/risks
+			390 text Compliance calendar
+			391 text Upcoming and overdue governance obligations.
+			392 text CRITICAL
+			393 text UPCOMING OBLIGATIONS
+			394 text 1
+			395 text OVERDUE
+			396 text 1
+			397 text DUE THIS WEEK
+			398 text 0
+			399 content list
+				400 text Review annual assurance (2026-09-12)
+			401 link Description: Open obligations, Value: 127.0.0.1:8783/governance/compliance/calendar
+			402 text Privacy & data
+			403 text Breaches, PIAs, and privacy request backlog.
+			404 text GOOD
+			405 text BREACHES (90D)
+			406 text 0
+			407 text OPEN BREACHES
+			408 text 0
+			409 text OPEN PIAS
+			410 text 0
+			411 text DSR BACKLOG
+			412 text 0
+			413 link Description: Open privacy register, Value: 127.0.0.1:8783/privacy
+			414 text Incident closure
+			415 text Incident volume, severity mix, and close-out pace.
+			416 text GOOD
+			417 text TOTAL THIS PERIOD
+			418 text 0
+			419 text OPEN
+			420 text 0
+			421 text CRITICAL
+			422 text 0
+			423 text AVG CLOSE
+			424 text 0.0 h
+			425 link Description: Open incidents, Value: 127.0.0.1:8783/incidents
+			426 text Financial Governance
+			427 text Budget posture, spend approvals, and items requiring board sign-off.
+			428 text Financial governance
+			429 text Approved budget, actuals, variance, sites over budget, and pending spend approvals.
+			430 text UNKNOWN
+			431 text UTILISATION
+			432 text —
+			433 text VARIANCE
+			434 text —
+			435 text BUDGET TOTAL
+			436 text —
+			437 text ACTUALS
+			438 text —
+			439 link Description: Review budget, Value: 127.0.0.1:8783/governance/budgets
+			440 text Sites over budget
+			441 text Operational site/house budgets exceeding allocation this month (sourced from Finance variance).
+			442 text UNKNOWN
+			443 text SITES
+			444 text Unavailable
+			445 text OVERSPEND
+			446 text Unavailable
+			447 content list
+				448 container
+					449 text •  Site budget variance data is not available for this period.
+			450 link Description: Open variance, Value: 127.0.0.1:8783/finance/budget-actuals
+			451 heading Value: 3, Operational Signals Service safety, workforce, controls, fleet and H&S backbone — for context. All clear
+				452 button (collapsed) ID: radix-_r_3g_, Secondary Actions: Expand, Operational Signals Service safety, workforce, controls, fleet and H&S backbone — for context. All clear
+					453 text Operational Signals
+					454 text Service safety, workforce, controls, fleet and H&S backbone — for context.
+					455 text All clear
+					456 image
+			457 text Recently Completed
+			458 text Closed in the last 14 days — these no longer need board action.
+			459 link Description: MINUTES APPROVED Minutes approved for Review September Board — 6 MINUTES AGO, Value: 127.0.0.1:8783/governance/meetings/1?tab=minutes
+		124 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea Board overview - Laravel, URL: 127.0.0.1:8783/governance/dashboard

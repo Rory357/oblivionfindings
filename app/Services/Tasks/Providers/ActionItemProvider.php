@@ -85,6 +85,8 @@ class ActionItemProvider implements AssignableTaskProvider, ExplicitlyGlobalTask
             $query->whereIn('status', ['open', 'in_progress', 'blocked']);
         }
 
+        app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)->scopeActionItems($query, $user);
+
         return app(TaskProviderAuthorization::class)->explicitlyGlobal(
             $user,
             $this->globalViewPermissions(),

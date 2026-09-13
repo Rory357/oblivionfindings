@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -82,29 +88,47 @@ export default function CommitteeReport({ auth, report, generatedAt }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Reports', href: '/governance/reports' },
-                { title: 'Committee', href: '#' },
+                { title: 'Reports', href: '/governance/reports/board-monthly' },
+                { title: `${report.committee.name} Report`, href: '/governance/reports/board-monthly' },
             ]}
         >
             <Head title={`${report.committee.name} Report`} />
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={BarChart3}
                         title={`${report.committee.name} Report`}
-                        description={
+                        subline={
                             report.committee.description ||
                             'Committee-level assurance, delivery, and decision support.'
                         }
-                        stats={[
-                            {
-                                label: 'Sections',
-                                value: report.sections.length,
-                            },
-                            { label: 'Risks', value: report.risks.length },
-                        ]}
+                        backHref="/governance/reports/board-monthly"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Sections"
+                                    href="/governance/reports/board-monthly"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {report.sections.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Reporting domains</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Risks"
+                                    href="/governance/risks"
+                                    tone={report.risks.length > 0 ? 'warning' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {report.risks.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Assigned risks</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -47,6 +47,7 @@ export default function CreatePerformance({ auth, boardMembers }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Performance', href: '/governance/performance' },
                 { title: 'Create', href: '/governance/performance/create' },
@@ -56,12 +57,12 @@ export default function CreatePerformance({ auth, boardMembers }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/performance"
                         icon={Target}
                         title="New Performance Review"
-                        description="Set up a performance review cycle"
+                        subline="Set up a performance review cycle for executive staff"
                     />
                 }
             >

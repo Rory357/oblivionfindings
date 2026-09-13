@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -79,33 +85,52 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={DollarSign}
                         title="Budgets"
-                        description="Plan, approve, and monitor financial budgets across fiscal years."
-                        stats={[
-                            {
-                                label: 'Total budgets',
-                                value: budgetItems.length,
-                            },
-                            {
-                                label: 'Approved',
-                                value: budgetItems.filter(
-                                    (b) => b.status === 'approved',
-                                ).length,
-                            },
-                            {
-                                label: 'Pending review',
-                                value: budgetItems.filter((b) =>
-                                    ['proposed', 'under_review'].includes(
-                                        b.status,
-                                    ),
-                                ).length,
-                            },
-                        ]}
+                        subline="Plan, approve, and monitor financial budgets across fiscal years."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total budgets"
+                                    href="/governance/budgets"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {budgetItems.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Fiscal years</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Approved"
+                                    href="/governance/budgets?status=approved"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {budgetItems.filter(
+                                            (b) => b.status === 'approved',
+                                        ).length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>In effect</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Pending review"
+                                    href="/governance/budgets"
+                                    tone={budgetItems.some((b) => ['proposed', 'under_review'].includes(b.status)) ? 'warning' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {budgetItems.filter((b) =>
+                                            ['proposed', 'under_review'].includes(
+                                                b.status,
+                                            ),
+                                        ).length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Under review</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             (auth.can as any)?.governance?.budgets?.create ? (
-                                <Button asChild>
+                                <Button size="sm" asChild>
                                     <Link href="/governance/budgets/create">
                                         New Budget
                                     </Link>

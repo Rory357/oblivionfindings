@@ -232,7 +232,7 @@ class ExecutiveMeetingVisibilityTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_designated_attendee_can_view_executive_session_meeting(): void
+    public function test_attendance_alone_does_not_grant_access_to_executive_session_meeting(): void
     {
         $admin = $this->createAdminUser();
         $execMeeting = $this->createExecutiveMeeting($admin);
@@ -249,14 +249,27 @@ class ExecutiveMeetingVisibilityTest extends TestCase
         ]);
 
         $response = $this->actingAs($attendeeUser)->get("/governance/meetings/{$execMeeting->id}");
-        $response->assertOk();
+        $response->assertForbidden();
 
         $indexResponse = $this->actingAs($attendeeUser)->get('/governance/meetings');
         $indexResponse->assertOk();
         $indexResponse->assertInertia(fn ($page) => $page
-            ->has('meetings.data', 1)
-            ->where('meetings.data.0.id', $execMeeting->id)
+            ->where('meetings.data', [])
         );
+    }
+
+    public function test_designated_secretary_can_view_executive_session_meeting(): void
+    {
+        $admin = $this->createAdminUser();
+        $secretaryUser = $this->createNonExecutiveViewer();
+        $secretaryMember = $secretaryUser->boardMember;
+
+        $execMeeting = $this->createExecutiveMeeting($admin, [
+            'secretary_id' => $secretaryMember->id,
+        ]);
+
+        $response = $this->actingAs($secretaryUser)->get("/governance/meetings/{$execMeeting->id}");
+        $response->assertOk();
     }
 
     public function test_executive_committee_member_can_view_executive_session_meeting(): void

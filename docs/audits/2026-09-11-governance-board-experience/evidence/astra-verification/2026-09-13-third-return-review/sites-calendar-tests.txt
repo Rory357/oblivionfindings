@@ -1,0 +1,40 @@
+
+  [90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[31;1m⨯[39;22m[31;1m⨯[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Sites\Calendar\SiteCalendarAggregatorTest[22m [90m>[39m credential rotation reminders deep-link to the…    
+[39;1m  Expecting null not to be null .[39;22m
+
+  at [32mtests\Feature\Sites\Calendar\SiteCalendarAggregatorTest.php[39m:[32m147[39m
+    143▕         Carbon::parse('2026-05-31'),
+    144▕     ));
+    145▕ 
+    146▕     $credential = $items->firstWhere('source', 'credential');
+  ➜ 147▕     expect($credential)->not->toBeNull();
+    148▕     expect($credential->link)->toBe("/vendors?site_id={$site->id}&tab=credentials");
+    149▕     // Must never point back at the retired per-site index page.
+    150▕     expect($credential->link)->not->toContain("/sites/{$site->id}/credentials");
+    151▕ });
+
+  [33m1   [39m[39;1mtests\Feature\Sites\Calendar\SiteCalendarAggregatorTest.php[39;22m:[39;1m147[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Sites\Calendar\SiteCalendarAggregatorTest[22m [90m>[39m vendor insurance reminders deep-link to the uni…   
+[39;1m  Expecting null not to be null .[39;22m
+
+  at [32mtests\Feature\Sites\Calendar\SiteCalendarAggregatorTest.php[39m:[32m172[39m
+    168▕         Carbon::parse('2026-05-31'),
+    169▕     ));
+    170▕ 
+    171▕     $vendor = $items->firstWhere('source', 'vendor');
+  ➜ 172▕     expect($vendor)->not->toBeNull();
+    173▕     expect($vendor->link)->toBe("/vendors?site_id={$site->id}&tab=vendors");
+    174▕     expect($vendor->link)->not->toContain("/sites/{$site->id}/vendors");
+    175▕ });
+    176▕
+
+  [33m1   [39m[39;1mtests\Feature\Sites\Calendar\SiteCalendarAggregatorTest.php[39;22m:[39;1m172[39;22m
+
+
+  [90mTests:[39m    [31;1m2 failed[39;22m[90m,[39m[39m [39m[32;1m14 passed[39;22m[90m (86 assertions)[39m
+  [90mDuration:[39m [39m348.30s[39m
+

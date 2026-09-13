@@ -1,0 +1,27 @@
+Browser tab: 2, Title: "Governance Documents & Records - Laravel", URL: "http://127.0.0.1:8783/governance/records".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 183-197, 199-236
+~1 AXWebArea Governance Documents & Records - Laravel, URL: 127.0.0.1:8783/governance/records
+~		116 link Description: Skip to main content, Value: 127.0.0.1:8783/governance/records#main-content
+~			127 pop up button (collapsed) Description: Notifications, ID: radix-_r_4d_, Secondary Actions: Expand
+~			129 pop up button (collapsed) Description: Announcements, ID: radix-_r_4f_, Secondary Actions: Expand
+~			131 pop up button (collapsed) Description: Open user menu for Review Alex Morgan, ID: radix-_r_44_, Secondary Actions: Expand
+~					181 link Description: Governance, Value: 127.0.0.1:8783/governance/dashboard
+~					182 link (disabled) Records & Documents
++						183 text Records & Documents
++			184 container
++				185 image
++				186 heading Governance Documents & Records, Value: 1
++					187 text Governance Documents & Records
++				188 text Board documents, charter, templates, and archives
++				189 button View total
++					190 text TOTAL
++					191 text 0
++				192 button View categories
++					193 text CATEGORIES
++					194 text 7
++				195 button View confidential
++					196 text CONFIDENTIAL
++					197 text 0
+~			198 text No documents uploaded yet.
+The focused UI element is 1 AXWebArea Governance Documents & Records - Laravel, URL: 127.0.0.1:8783/governance/records

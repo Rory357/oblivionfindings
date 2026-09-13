@@ -102,25 +102,45 @@ class GovernanceVotingProfileService
             }
 
             // The resolution must actually authorize voting rules or the governance profile
-            $resText = strtolower($approvedByResolution->title . ' ' . ($approvedByResolution->exact_motion ?? '') . ' ' . ($approvedByResolution->purpose ?? ''));
-            $docRef = strtolower($reference);
-            $isUnrelated = str_contains($resText, 'catering')
-                || str_contains($resText, 'hospitality')
-                || str_contains($resText, 'dinner')
-                || str_contains($resText, 'lunch')
-                || str_contains($resText, 'event');
+            $resText = strtolower($approvedByResolution->title . ' ' . ($approvedByResolution->exact_motion ?? ''));
+            $docRef = strtolower(trim($reference));
+            $profileName = strtolower(trim($profile->name ?? ''));
 
-            $hasAuthorityMatch = ! $isUnrelated && (
-                str_contains($resText, 'voting')
-                || str_contains($resText, 'rules')
-                || str_contains($resText, 'constitution')
-                || str_contains($resText, 'charter')
-                || str_contains($resText, 'standing orders')
-                || str_contains($resText, 'governance profile')
-                || str_contains($resText, 'profile')
-                || str_contains($resText, 'resolution')
-                || (! empty($docRef) && str_contains($resText, $docRef))
-            );
+            $hasAuthorityMatch = false;
+
+            // 1. Explicit approved_voting_profile_id binding
+            if (!empty($approvedByResolution->cost_impact['approved_voting_profile_id']) && (int) $approvedByResolution->cost_impact['approved_voting_profile_id'] === (int) $profile->id) {
+                $hasAuthorityMatch = true;
+            } elseif (!empty($approvedByResolution->paper_snapshot['approved_voting_profile_id']) && (int) $approvedByResolution->paper_snapshot['approved_voting_profile_id'] === (int) $profile->id) {
+                $hasAuthorityMatch = true;
+            }
+            // 2. Exact governing document reference in motion or title
+            elseif (!empty($docRef) && (str_contains(strtolower($approvedByResolution->title), $docRef) || str_contains(strtolower($approvedByResolution->exact_motion ?? ''), $docRef))) {
+                $hasAuthorityMatch = true;
+            }
+            // 3. Exact profile name in motion or title
+            elseif (!empty($profileName) && (str_contains(strtolower($approvedByResolution->title), $profileName) || str_contains(strtolower($approvedByResolution->exact_motion ?? ''), $profileName))) {
+                $hasAuthorityMatch = true;
+            }
+            // 4. Explicit motion to approve voting rules or profile
+            elseif (
+                (
+                    str_contains($resText, 'adopt voting profile')
+                    || str_contains($resText, 'approve voting profile')
+                    || str_contains($resText, 'adopt voting rules')
+                    || str_contains($resText, 'approve voting rules')
+                    || str_contains($resText, 'amend voting profile')
+                    || str_contains($resText, 'amend voting rules')
+                ) && ! (
+                    str_contains($resText, 'catering')
+                    || str_contains($resText, 'hospitality')
+                    || str_contains($resText, 'dinner')
+                    || str_contains($resText, 'lunch')
+                    || str_contains($resText, 'event')
+                )
+            ) {
+                $hasAuthorityMatch = true;
+            }
 
             if (! $hasAuthorityMatch) {
                 throw new \InvalidArgumentException(
@@ -168,13 +188,15 @@ class GovernanceVotingProfileService
             return 0;
         }
 
-        $formula = $profile?->quorum_mode ?? $profile?->quorum_formula ?? 'majority_floor_plus_one';
+        if ($profile && $profile->quorum_mode === 'fixed_count' && is_numeric($profile->quorum_formula)) {
+            return min($totalEligible, max(1, (int) $profile->quorum_formula));
+        }
 
-        return match ($formula) {
-            'majority_floor_plus_one' => (int) floor($totalEligible / 2) + 1,
-            'percentage' => max(1, (int) ceil(($totalEligible * ($profile->quorum_percentage ?? 50)) / 100)),
-            'fixed_count' => min($totalEligible, max(1, (int) ($profile->quorum_fixed_count ?? ceil($totalEligible / 2)))),
-            default => (int) floor($totalEligible / 2) + 1,
-        };
+        if ($profile && $profile->quorum_mode === 'percentage' && is_numeric(rtrim($profile->quorum_formula, '%'))) {
+            $pct = (float) rtrim($profile->quorum_formula, '%');
+            return max(1, (int) ceil(($totalEligible * $pct) / 100));
+        }
+
+        return (int) floor($totalEligible / 2) + 1;
     }
 }

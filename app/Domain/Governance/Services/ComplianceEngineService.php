@@ -159,27 +159,32 @@ class ComplianceEngineService
                         ]);
                     }
 
-                    // Check for expired evidence
+                    // Check for future-dated or expired evidence
+                    if ($ev->valid_from && $ev->valid_from->gt(today())) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'evidence_ids' => "Evidence '{$ev->title}' is not valid until {$ev->valid_from->toDateString()} and cannot satisfy compliance.",
+                        ]);
+                    }
+
                     if ($ev->valid_until && $ev->valid_until->lt(today())) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
                             'evidence_ids' => "Evidence '{$ev->title}' expired on {$ev->valid_until->toDateString()} and cannot satisfy compliance.",
                         ]);
                     }
 
-                    // Check that document evidence has real file bytes on disk
+                    // Check that document evidence has real non-empty file bytes on disk
                     if ($ev->evidence_type === 'document') {
                         $filePath = $ev->file_path ?? '';
-                        $exists = ! empty($filePath) && (
-                            \Illuminate\Support\Facades\Storage::disk('local')->exists($filePath)
-                            || \Illuminate\Support\Facades\Storage::disk('public')->exists($filePath)
-                            || \Illuminate\Support\Facades\Storage::exists($filePath)
-                            || file_exists(storage_path('app/' . $filePath))
-                            || file_exists(storage_path('app/public/' . $filePath))
+                        $diskLocal = \Illuminate\Support\Facades\Storage::disk('local');
+                        $diskPublic = \Illuminate\Support\Facades\Storage::disk('public');
+                        $hasBytes = ! empty($filePath) && (
+                            ($diskLocal->exists($filePath) && (int) $diskLocal->size($filePath) > 0)
+                            || ($diskPublic->exists($filePath) && (int) $diskPublic->size($filePath) > 0)
                         );
 
-                        if (! $exists) {
+                        if (! $hasBytes) {
                             throw \Illuminate\Validation\ValidationException::withMessages([
-                                'evidence_ids' => "Evidence file '{$ev->title}' does not exist on disk and cannot satisfy compliance.",
+                                'evidence_ids' => "Evidence file '{$ev->title}' does not exist on disk or is empty and cannot satisfy compliance.",
                             ]);
                         }
                     }
@@ -194,19 +199,21 @@ class ComplianceEngineService
 
             $hasValidEvidence = false;
             foreach ($evidenceQuery->get() as $ev) {
+                if ($ev->valid_from && $ev->valid_from->gt(today())) {
+                    continue;
+                }
                 if ($ev->valid_until && $ev->valid_until->lt(today())) {
                     continue;
                 }
                 if ($ev->evidence_type === 'document') {
                     $filePath = $ev->file_path ?? '';
-                    $exists = ! empty($filePath) && (
-                        \Illuminate\Support\Facades\Storage::disk('local')->exists($filePath)
-                        || \Illuminate\Support\Facades\Storage::disk('public')->exists($filePath)
-                        || \Illuminate\Support\Facades\Storage::exists($filePath)
-                        || file_exists(storage_path('app/' . $filePath))
-                        || file_exists(storage_path('app/public/' . $filePath))
+                    $diskLocal = \Illuminate\Support\Facades\Storage::disk('local');
+                    $diskPublic = \Illuminate\Support\Facades\Storage::disk('public');
+                    $hasBytes = ! empty($filePath) && (
+                        ($diskLocal->exists($filePath) && (int) $diskLocal->size($filePath) > 0)
+                        || ($diskPublic->exists($filePath) && (int) $diskPublic->size($filePath) > 0)
                     );
-                    if (! $exists) {
+                    if (! $hasBytes) {
                         continue;
                     }
                 }

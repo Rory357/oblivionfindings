@@ -139,9 +139,14 @@ class BoardEvaluationController extends Controller
 
     public function respond(Request $request, BoardEvaluation $evaluation)
     {
-        $boardMember = auth()->user()->boardMember;
-        if (!$boardMember) {
-            return redirect()->back()->with('error', 'You are not a board member.');
+        $user = auth()->user();
+        $boardMember = $user?->boardMember;
+        if (! $boardMember || ! $boardMember->is_active) {
+            abort(403, 'Only active board members may respond to evaluations.');
+        }
+
+        if ($evaluation->audience === 'chair_only' && $boardMember->role !== 'chair' && ! $user->hasRole('board_chair')) {
+            abort(403, 'This evaluation is restricted to the Board Chair.');
         }
 
         if ($evaluation->status !== 'open') {
@@ -161,9 +166,24 @@ class BoardEvaluationController extends Controller
         foreach ($questions as $index => $q) {
             $val = $validated['answers'][(string) $index] ?? $validated['answers'][$index] ?? null;
             $qType = $q['type'] ?? 'text';
-            if ($qType === 'rating' && $val !== null) {
-                if (!is_numeric($val) || (int) $val < 1 || (int) $val > 5) {
-                    abort(422, 'Rating answers must be between 1 and 5.');
+            $qId = $q['id'] ?? ($index + 1);
+
+            if ($val === null) {
+                abort(422, "Answer for question {$qId} is required.");
+            }
+
+            if ($qType === 'rating') {
+                if (! is_numeric($val) || (string) (int) $val !== (string) $val || (int) $val < 1 || (int) $val > 5) {
+                    abort(422, "Rating answer for question {$qId} must be an integer between 1 and 5.");
+                }
+            } elseif ($qType === 'yes_no') {
+                $validYesNo = [0, 1, '0', '1', 'true', 'false', true, false, 'yes', 'no', 'Yes', 'No'];
+                if (! in_array($val, $validYesNo, true)) {
+                    abort(422, "Answer for question {$qId} must be a boolean yes/no value.");
+                }
+            } else {
+                if (is_array($val)) {
+                    abort(422, "Answer for question {$qId} must not be an array.");
                 }
             }
         }
@@ -243,6 +263,7 @@ class BoardEvaluationController extends Controller
         foreach ($response->answers ?? [] as $index => $answer) {
             if (($answer['question_id'] ?? null) === 'overall_comments') {
                 $overallComments = (string) ($answer['answer'] ?? '');
+
                 continue;
             }
 

@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -97,34 +103,56 @@ export default function ClinicalDashboard({
     );
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Clinical Governance', href: '/governance/clinical' },
+            ]}
+        >
             <Head title="Clinical Governance" />
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={HeartPulse}
                         title="Clinical Governance"
-                        description="Automated clinical indicator snapshot for Governance oversight."
-                        stats={[
-                            { label: 'Indicators', value: indicators.length },
-                            {
-                                label: 'Active',
-                                value: indicators.filter((i) => i.is_active)
-                                    .length,
-                            },
-                            {
-                                label: 'Automated',
-                                value: indicators.filter((i) => i.is_automated)
-                                    .length,
-                            },
-                        ]}
+                        subline="Automated clinical indicator snapshot for Governance oversight."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Indicators"
+                                    href="/governance/clinical"
+                                >
+                                    <PageHeaderMeterBig>{indicators.length}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Tracked metrics</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Active"
+                                    href="/governance/clinical"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {indicators.filter((i) => i.is_active).length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Active monitoring</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Automated"
+                                    href="/governance/clinical"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {indicators.filter((i) => i.is_automated).length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Direct telemetry</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <Button
                                 size="sm"
                                 variant="outline"
                                 asChild
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                             >
                                 <Link href="/governance/clinical/trends">
                                     Trends

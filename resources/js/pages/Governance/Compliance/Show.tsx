@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -239,16 +245,14 @@ export default function ComplianceShow({ auth, obligation }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref={complianceIndex.url()}
                         icon={FileCheck}
-                        title={
-                            <span
-                                className="flex flex-wrap items-center gap-3"
-                                dusk="compliance-heading"
-                            >
-                                {obligation.obligation_title}
+                        title={obligation.obligation_title}
+                        titleDusk="compliance-heading"
+                        titleChip={
+                            <div className="flex flex-wrap items-center gap-2">
                                 <Badge variant="outline">
                                     {getFrameworkLabel(obligation.framework)}
                                 </Badge>
@@ -264,17 +268,44 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                                 >
                                     {obligation.status}
                                 </Badge>
-                            </span>
+                            </div>
                         }
-                        stats={[
-                            {
-                                label: 'Framework',
-                                value: getFrameworkLabel(obligation.framework),
-                            },
-                            { label: 'Due', value: obligation.due_date },
-                            { label: 'Status', value: obligation.status },
-                            { label: 'Evidence', value: evidenceItems.length },
-                        ]}
+                        subline={`${getFrameworkLabel(obligation.framework)} · Due ${obligation.due_date}`}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Due date"
+                                    href={`/governance/compliance/${obligation.id}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {obligation.due_date}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Deadline</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Evidence items"
+                                    href={`/governance/compliance/${obligation.id}`}
+                                    tone={evidenceItems.length > 0 ? 'brand' : undefined}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {evidenceItems.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Attached</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Status"
+                                    href={`/governance/compliance?status=${obligation.status}`}
+                                    tone={obligation.status === 'complete' ? 'brand' : obligation.status === 'overdue' ? 'critical' : 'warning'}
+                                >
+                                    <PageHeaderMeterBig>
+                                        <span className="text-sm font-semibold uppercase">
+                                            {obligation.status}
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Current</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <div className="flex gap-2">
                                 <Dialog

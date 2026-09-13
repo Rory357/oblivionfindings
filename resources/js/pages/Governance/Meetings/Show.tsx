@@ -83,6 +83,10 @@ import {
 } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 import { NewResolutionDialog } from '../Resolutions/_dialogs';
+import {
+    MeetingPaperWorkspace,
+    type PaperResolution,
+} from '@/components/governance/MeetingPaperWorkspace';
 
 interface BoardMemberItem {
     id: number;
@@ -112,6 +116,7 @@ interface Meeting {
         duration_minutes: number;
         item_type: string;
         is_confidential: boolean;
+        resolution_id?: number | null;
     }>;
     attendances: Array<{
         id: number;
@@ -232,6 +237,12 @@ interface Props extends PageProps {
         dietary_notes: string | null;
         responded_at: string | null;
     } | null;
+    users?: Array<{
+        id: number;
+        name: string;
+        email?: string;
+    }>;
+    resolutions?: PaperResolution[];
 }
 
 export default function MeetingShow({
@@ -247,6 +258,8 @@ export default function MeetingShow({
     meetingCockpit,
     viewerCanRsvp,
     viewerRsvp,
+    users = [],
+    resolutions: propResolutions,
 }: Props) {
     const page = usePage();
     const [generatingPack, setGeneratingPack] = useState(false);
@@ -284,12 +297,33 @@ export default function MeetingShow({
 
     const agendaItems = meeting.agenda_items ?? [];
     const attendances = meeting.attendances ?? [];
-    const resolutions = meeting.resolutions ?? [];
+    const resolutions: PaperResolution[] = propResolutions ?? meeting.resolutions ?? [];
     const allBoardMembers = boardMembers ?? [];
 
     useEffect(() => {
-        setActiveTab(defaultTab);
-        if (parsedPaper) setSelectedPaperId(parsedPaper);
+        const checkFragmentAndParams = () => {
+            const rawHash = typeof window !== 'undefined' ? window.location.hash : '';
+            const cleanHash = rawHash.replace('#tab-', '').replace('#', '');
+            const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+            const tabParam = params.get('tab');
+            const paperParam = params.get('paper');
+
+            if (tabParam && validTabs.includes(tabParam)) {
+                setActiveTab(tabParam);
+            } else if (cleanHash && validTabs.includes(cleanHash)) {
+                setActiveTab(cleanHash);
+            } else if (paperParam) {
+                setActiveTab('resolutions');
+            }
+
+            if (paperParam) {
+                setSelectedPaperId(paperParam);
+            }
+        };
+
+        checkFragmentAndParams();
+        window.addEventListener('hashchange', checkFragmentAndParams);
+        return () => window.removeEventListener('hashchange', checkFragmentAndParams);
     }, [defaultTab, parsedPaper]);
 
     const handleTabChange = (newTab: string) => {
@@ -819,6 +853,7 @@ export default function MeetingShow({
                     ]}
                     meetingId={meeting.id}
                     lockMeeting
+                    users={users}
                 />
 
                 {/* Member RSVP Callout */}
@@ -1297,7 +1332,26 @@ export default function MeetingShow({
                                                         </span>
                                                     </div>
                                                 </div>
-                                                {canEdit && (
+                                                <div className="flex items-center gap-2">
+                                                    {item.resolution_id && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setSelectedPaperId(String(item.resolution_id));
+                                                                setActiveTab('resolutions');
+                                                                const url = new URL(window.location.href);
+                                                                url.searchParams.set('tab', 'resolutions');
+                                                                url.searchParams.set('paper', String(item.resolution_id));
+                                                                window.history.replaceState({}, '', url.toString());
+                                                            }}
+                                                            className="gap-1.5 text-xs"
+                                                        >
+                                                            <Vote className="h-3.5 w-3.5 text-primary" />
+                                                            Read Paper & Vote
+                                                        </Button>
+                                                    )}
+                                                    {canEdit && (
                                                     <AlertDialog>
                                                         <AlertDialogTrigger
                                                             asChild
@@ -1346,6 +1400,7 @@ export default function MeetingShow({
                                                         </AlertDialogContent>
                                                     </AlertDialog>
                                                 )}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -2194,88 +2249,131 @@ export default function MeetingShow({
 
                         {/* ========== RESOLUTIONS TAB ========== */}
                         <TabsContent value="resolutions">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <CardTitle>Resolutions</CardTitle>
-                                    <Button
-                                        size="sm"
-                                        onClick={() =>
-                                            setNewResolutionOpen(true)
-                                        }
-                                        dusk="new-resolution-button"
-                                    >
-                                        <Plus className="mr-1 h-4 w-4" />
-                                        New Resolution
-                                    </Button>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-2">
-                                        {resolutions.length === 0 && (
-                                            <p className="py-8 text-center text-muted-foreground">
-                                                No resolutions for this meeting.
-                                            </p>
-                                        )}
-                                        {resolutions.map((resolution) => {
-                                            const isSelected =
-                                                selectedPaperId !== null &&
-                                                String(resolution.id) === String(selectedPaperId);
-                                            return (
-                                                <div
-                                                    key={resolution.id}
-                                                    className={cn(
-                                                        'flex items-center justify-between rounded-lg border p-3 transition-colors',
-                                                        isSelected
-                                                            ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                                                            : 'hover:bg-muted',
-                                                    )}
-                                                >
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <p className="font-medium text-foreground">
-                                                                {resolution.title}
-                                                            </p>
-                                                            {isSelected && (
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="border-primary/40 text-[10px] text-primary"
-                                                                >
-                                                                    Selected Paper
-                                                                </Badge>
+                            {(() => {
+                                const selectedResolution = selectedPaperId
+                                    ? resolutions.find(
+                                          (r) =>
+                                              String(r.id) ===
+                                              String(selectedPaperId),
+                                      )
+                                    : null;
+
+                                if (selectedResolution) {
+                                    return (
+                                        <MeetingPaperWorkspace
+                                            resolution={selectedResolution}
+                                            meetingId={meeting.id}
+                                            meetingTitle={meeting.title}
+                                            onClose={() => {
+                                                setSelectedPaperId(null);
+                                                const url = new URL(
+                                                    window.location.href,
+                                                );
+                                                url.searchParams.delete('paper');
+                                                window.history.replaceState(
+                                                    {},
+                                                    '',
+                                                    url.toString(),
+                                                );
+                                            }}
+                                        />
+                                    );
+                                }
+
+                                return (
+                                    <Card>
+                                        <CardHeader className="flex flex-row items-center justify-between">
+                                            <CardTitle>Resolutions ({resolutions.length})</CardTitle>
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    setNewResolutionOpen(true)
+                                                }
+                                                dusk="new-resolution-button"
+                                            >
+                                                <Plus className="mr-1 h-4 w-4" />
+                                                New Resolution
+                                            </Button>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-2">
+                                                {resolutions.length === 0 && (
+                                                    <p className="py-8 text-center text-muted-foreground">
+                                                        No resolutions for this meeting.
+                                                    </p>
+                                                )}
+                                                {resolutions.map((resolution) => {
+                                                    const isSelected =
+                                                        selectedPaperId !== null &&
+                                                        String(resolution.id) ===
+                                                            String(selectedPaperId);
+                                                    return (
+                                                        <div
+                                                            key={resolution.id}
+                                                            className={cn(
+                                                                'flex items-center justify-between rounded-lg border p-3 transition-colors',
+                                                                isSelected
+                                                                    ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                                                                    : 'hover:bg-muted',
                                                             )}
-                                                        </div>
-                                                        <p className="text-sm text-muted-foreground">
-                                                            {
-                                                                resolution.resolution_reference
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge>
-                                                            {resolution.status}
-                                                        </Badge>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            asChild
                                                         >
-                                                            <Link
-                                                                href={showResolution.url(
-                                                                    {
-                                                                        resolution:
-                                                                            resolution.id,
-                                                                    },
-                                                                )}
-                                                            >
-                                                                View &rarr;
-                                                            </Link>
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="font-medium text-foreground">
+                                                                        {resolution.title}
+                                                                    </p>
+                                                                    {isSelected && (
+                                                                        <Badge
+                                                                            variant="outline"
+                                                                            className="border-primary/40 text-[10px] text-primary"
+                                                                        >
+                                                                            Selected Paper
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    {resolution.resolution_reference}
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge>
+                                                                    {resolution.status}
+                                                                </Badge>
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        setSelectedPaperId(String(resolution.id));
+                                                                        const url = new URL(window.location.href);
+                                                                        url.searchParams.set('tab', 'resolutions');
+                                                                        url.searchParams.set('paper', String(resolution.id));
+                                                                        window.history.replaceState({}, '', url.toString());
+                                                                    }}
+                                                                >
+                                                                    Read Paper & Vote &rarr;
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    asChild
+                                                                >
+                                                                    <Link
+                                                                        href={showResolution.url({
+                                                                            resolution: resolution.id,
+                                                                        })}
+                                                                        title="Open canonical resolution view"
+                                                                    >
+                                                                        Canonical ↗
+                                                                    </Link>
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })()}
                         </TabsContent>
                         {/* ========== WORKFLOW TAB ========== */}
                         <TabsContent value="workflow">

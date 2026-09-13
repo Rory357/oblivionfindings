@@ -1772,15 +1772,29 @@ function buildGovernanceSubPanelGroups({
 }: {
     can?: any;
 }): SubPanelGroup[] {
-    // Permission-gated builders for each group. Every entry preserves its
-    // existing route — this only changes how items are grouped in the sidebar.
+    // Permission-gated builders for each group. Ordinary board members
+    // receive a focused 4-destination navigation (Home, My work, Calendar,
+    // Records). Chairs, secretaries, and managers retain access to the
+    // administration sections (Meetings & decisions, Oversight, Board admin).
     const groups: SubPanelGroup[] = [];
 
-    // 1. Overview & My work
+    const isGovernanceAdmin = Boolean(
+        can?.governance?.meetings?.manage ||
+        can?.governance?.actions?.manage ||
+        can?.governance?.settings?.manage ||
+        can?.governance?.performance?.manage ||
+        can?.governance?.policies?.manage ||
+        can?.governance?.documents?.manage ||
+        can?.governance?.evaluations?.manage ||
+        can?.governance?.packs?.manage ||
+        can?.governance?.resolutions?.manage,
+    );
+
+    // 1. Primary Member destinations
     const overview: NavItem[] = [];
     if (can?.governance?.view) {
         overview.push({
-            title: 'Overview',
+            title: 'Home',
             href: '/governance/dashboard',
             icon: Landmark,
         });
@@ -1791,10 +1805,24 @@ function buildGovernanceSubPanelGroups({
         });
         overview.push({
             title: 'Calendar',
-            href: '/governance/meetings/calendar',
+            href: '/governance/calendar',
             icon: CalendarDays,
         });
+        overview.push({
+            title: 'Records',
+            href: '/governance/records',
+            icon: FileText,
+        });
     }
+
+    // For ordinary members (non-admins), provide only the clean 4-destination group
+    if (!isGovernanceAdmin) {
+        if (overview.length > 0) {
+            groups.push({ label: 'Governance', items: overview });
+        }
+        return groups;
+    }
+
     if (overview.length > 0) {
         groups.push({ label: 'Overview & My work', items: overview });
     }
@@ -1844,7 +1872,10 @@ function buildGovernanceSubPanelGroups({
         });
     }
     if (meetingsDecisions.length > 0) {
-        groups.push({ label: 'Meetings & decisions', items: meetingsDecisions });
+        groups.push({
+            label: 'Meetings & decisions',
+            items: meetingsDecisions,
+        });
     }
 
     // 3. Oversight — risks, compliance, financial, strategy, policies, evidence

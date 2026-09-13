@@ -39,8 +39,10 @@ class GovernancePolicyPolicy
 
     public function attest(User $user, GovernancePolicy $policy): bool
     {
-        // Any user with view permission may attest to a policy applicable to them.
-        return $user->canDo('governance.policies.view');
+        // Only approved or published policies that are currently effective may be attested.
+        return $user->canDo('governance.policies.view')
+            && in_array($policy->status, ['approved', 'published', 'active'], true)
+            && (! $policy->effective_from || ! $policy->effective_from->isFuture());
     }
 
     public function newVersion(User $user, GovernancePolicy $policy): bool

@@ -10,6 +10,7 @@ use App\Domain\Governance\Services\GovernanceRecordAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class ActionItemController extends Controller
@@ -48,7 +49,7 @@ class ActionItemController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search = '%' . $request->search . '%';
+            $search = '%'.$request->search.'%';
             $query->where(function ($q) use ($search) {
                 $q->where('action_reference', 'like', $search)
                     ->orWhere('title', 'like', $search)
@@ -154,7 +155,7 @@ class ActionItemController extends Controller
         $validated = $request->validate([
             'completion_notes' => 'required|string|min:3|max:2000',
             'evidence_files' => 'nullable|array',
-            'expected_version' => 'nullable|integer',
+            'expected_version' => 'required|integer',
         ]);
 
         if ($action->evidence_required && empty($validated['evidence_files']) && empty($action->evidence_attachments)) {
@@ -166,7 +167,7 @@ class ActionItemController extends Controller
                 auth()->id(),
                 $validated['completion_notes'],
                 $validated['evidence_files'] ?? null,
-                $validated['expected_version'] ?? null,
+                $validated['expected_version'],
             );
 
             return redirect()->back()->with('success', "Action item completed. Receipt: {$receipt}");
@@ -177,6 +178,7 @@ class ActionItemController extends Controller
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 422);
             }
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -187,7 +189,7 @@ class ActionItemController extends Controller
 
         ActionItem::create([
             ...$validated,
-            'title' => $validated['title'] ?? ($validated['description'] ? \Illuminate\Support\Str::limit($validated['description'], 60) : null),
+            'title' => $validated['title'] ?? ($validated['description'] ? Str::limit($validated['description'], 60) : null),
             'created_by' => auth()->id(),
             'status' => 'open',
             'version_number' => 1,
@@ -203,14 +205,14 @@ class ActionItemController extends Controller
         $validated = $request->validate([
             'progress_pct' => 'required|integer|min:0|max:100',
             'progress_notes' => 'nullable|string|max:1000',
-            'expected_version' => 'nullable|integer',
+            'expected_version' => 'required|integer',
         ]);
 
         try {
             $action->updateProgress(
                 $validated['progress_pct'],
                 $validated['progress_notes'] ?? null,
-                $validated['expected_version'] ?? null,
+                $validated['expected_version'],
             );
 
             return redirect()->back()->with('success', 'Progress updated.');
@@ -221,6 +223,7 @@ class ActionItemController extends Controller
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 422);
             }
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -231,17 +234,18 @@ class ActionItemController extends Controller
 
         $validated = $request->validate([
             'blocked_reason' => 'required|string|max:500',
-            'expected_version' => 'nullable|integer',
+            'expected_version' => 'required|integer',
         ]);
 
         try {
-            $action->block($validated['blocked_reason'], $validated['expected_version'] ?? null);
+            $action->block($validated['blocked_reason'], $validated['expected_version']);
 
             return redirect()->back()->with('success', 'Action item marked as blocked.');
         } catch (\DomainException $e) {
             if (str_contains($e->getMessage(), 'modified by another user')) {
                 abort(409, $e->getMessage());
             }
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -251,17 +255,18 @@ class ActionItemController extends Controller
         $this->authorize('update', $action);
 
         $validated = $request->validate([
-            'expected_version' => 'nullable|integer',
+            'expected_version' => 'required|integer',
         ]);
 
         try {
-            $action->unblock($validated['expected_version'] ?? null);
+            $action->unblock($validated['expected_version']);
 
             return redirect()->back()->with('success', 'Action item unblocked.');
         } catch (\DomainException $e) {
             if (str_contains($e->getMessage(), 'modified by another user')) {
                 abort(409, $e->getMessage());
             }
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -272,17 +277,18 @@ class ActionItemController extends Controller
 
         $validated = $request->validate([
             'escalation_reason' => 'required|string|max:500',
-            'expected_version' => 'nullable|integer',
+            'expected_version' => 'required|integer',
         ]);
 
         try {
-            $action->escalate(auth()->id(), $validated['escalation_reason'], $validated['expected_version'] ?? null);
+            $action->escalate(auth()->id(), $validated['escalation_reason'], $validated['expected_version']);
 
             return redirect()->back()->with('success', 'Action item escalated.');
         } catch (\DomainException $e) {
             if (str_contains($e->getMessage(), 'modified by another user')) {
                 abort(409, $e->getMessage());
             }
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -293,10 +299,10 @@ class ActionItemController extends Controller
 
         $validated = $request->validate([
             'assigned_to' => 'required|exists:users,id',
-            'expected_version' => 'nullable|integer',
+            'expected_version' => 'required|integer',
         ]);
 
-        if (isset($validated['expected_version']) && (int) ($action->version_number ?? 1) !== (int) $validated['expected_version']) {
+        if ((int) ($action->version_number ?? 1) !== (int) $validated['expected_version']) {
             abort(409, 'Action item was modified by another user. Please reload and review the latest changes.');
         }
 

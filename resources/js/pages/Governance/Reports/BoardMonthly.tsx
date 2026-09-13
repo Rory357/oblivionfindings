@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -66,29 +72,44 @@ export default function BoardMonthly({ auth, report, generatedAt }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Reports', href: '/governance/reports' },
-                { title: 'Board Monthly', href: '#' },
+                { title: 'Reports', href: '/governance/reports/board-monthly' },
+                { title: 'Board Monthly', href: '/governance/reports/board-monthly' },
             ]}
         >
             <Head title="Board Monthly Report" />
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={BarChart3}
                         title="Board Monthly Report"
-                        description="A board-ready summary of decisions, delivery, assurance, and organisational controls."
-                        stats={[
-                            {
-                                label: 'Sections',
-                                value: report.sections.length,
-                            },
-                            {
-                                label: 'Headline KPIs',
-                                value: report.headline.length,
-                            },
-                        ]}
+                        subline="A board-ready summary of decisions, delivery, assurance, and organisational controls."
+                        backHref="/governance/dashboard"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Sections"
+                                    href="/governance/reports/board-monthly"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {report.sections.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Reporting domains</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Headline KPIs"
+                                    href="/governance/reports/board-monthly"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {report.headline.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Monitored metrics</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >

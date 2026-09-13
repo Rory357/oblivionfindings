@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -82,22 +88,52 @@ export default function InterestsIndex({
     );
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Interests', href: '/governance/interests' },
+            ]}
+        >
             <Head title="Interests Register" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={ClipboardList}
                         title="Board Interests Register"
-                        description="Declarations of interests for all board members"
-                        stats={[
-                            { label: 'Members', value: boardMembers.length },
-                            {
-                                label: 'Total declarations',
-                                value: totalInterests,
-                            },
-                            { label: 'Active', value: activeInterests },
-                        ]}
+                        subline="Declarations of interests for all board members"
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Members"
+                                    href="/governance/interests"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {boardMembers.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Board composition</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Total declarations"
+                                    href="/governance/interests"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {totalInterests}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>All records</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Active"
+                                    href="/governance/interests"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {activeInterests}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Current disclosures</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <Button
                                 size="sm"

@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -50,16 +50,24 @@ export default function PolicyEdit({ auth, policy }: Props) {
     };
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Policies', href: '/governance/policies' },
+                { title: policy.title, href: `/governance/policies/${policy.id}` },
+                { title: 'Edit', href: `/governance/policies/${policy.id}/edit` },
+            ]}
+        >
             <Head title={`Edit: ${policy.title}`} />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
-                        backHref="/governance/policies"
+                    <PageHeader
+                        variant="profile"
+                        backHref={`/governance/policies/${policy.id}`}
                         icon={BookOpen}
-                        title="Edit Policy"
-                        description={policy.title}
+                        title={`Edit Policy: ${policy.title}`}
+                        subline={`Update policy content, review dates, or attestation requirements`}
                     />
                 }
             >

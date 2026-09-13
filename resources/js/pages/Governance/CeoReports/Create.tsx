@@ -1,4 +1,4 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,16 +38,23 @@ export default function CeoReportCreate({ auth, meetings }: Props) {
     };
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'CEO Reports', href: '/governance/ceo-reports' },
+                { title: 'Create Report', href: '/governance/ceo-reports/create' },
+            ]}
+        >
             <Head title="Create CEO Report" />
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
                         backHref="/governance/ceo-reports"
                         icon={FileText}
                         title="Create CEO Board Report"
-                        description="Compose a new CEO update for the board"
+                        subline="Compose a new CEO update for the board"
                     />
                 }
             >

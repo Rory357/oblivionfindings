@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,22 +75,44 @@ export default function MyInterests({
     };
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Interests', href: '/governance/interests' },
+                { title: 'My Interests', href: '/governance/my-interests' },
+            ]}
+        >
             <Head title="My Interests" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={FileText}
                         title="My Interests"
-                        description="Declare and manage your personal interest declarations."
-                        stats={[
-                            { label: 'Total', value: interests.length },
-                            {
-                                label: 'Active',
-                                value: interests.filter((i) => i.is_active)
-                                    .length,
-                            },
-                        ]}
+                        subline="Declare and manage your personal interest declarations."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total"
+                                    href="/governance/my-interests"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {interests.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>All records</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Active"
+                                    href="/governance/my-interests"
+                                    tone="brand"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {interests.filter((i) => i.is_active).length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Current disclosures</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <Button
                                 onClick={() => setShowForm(!showForm)}

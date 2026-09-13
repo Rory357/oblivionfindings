@@ -1,5 +1,11 @@
 import { FilterBar, FilterField } from '@/components/filter-bar';
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -129,18 +135,32 @@ export default function GovernanceAuditLogIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={History}
-                        category="governance"
                         title="Governance Audit Log"
-                        description="Cross-module changes and action events on governance entities. Filter, scroll, or export."
-                        stats={[
-                            { label: 'Total events', value: entries.total },
-                            {
-                                label: 'Page',
-                                value: `${entries.current_page} / ${entries.last_page}`,
-                            },
-                        ]}
+                        subline="Cross-module changes and action events on governance entities. Filter, scroll, or export."
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total events"
+                                    href="/governance/audit-log"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {entries.total}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Recorded actions</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Page"
+                                    href="/governance/audit-log"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {`${entries.current_page} / ${entries.last_page}`}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>Pagination</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                         actions={
                             <Button asChild variant="outline">
                                 <a href={exportUrl} download>
