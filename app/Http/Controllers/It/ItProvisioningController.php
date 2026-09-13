@@ -1480,6 +1480,7 @@ class ItProvisioningController extends Controller
 
         return [
             'avg_first_response_mins' => $avg !== null ? (int) round((float) $avg) : null,
+            'workboard' => app(\App\Domain\It\Presenters\ItOverviewWorkboardPresenter::class)->present($user),
             'conversation_ready' => $conversationReady,
             'sla_lane' => $slaLane,
             'awaiting_lane' => $awaitingLane,

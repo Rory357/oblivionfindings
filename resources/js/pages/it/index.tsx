@@ -1651,7 +1651,18 @@ export default function ItIndex({
                 }
                 onClose={() => setModal(null)}
             />
-            <TicketDrawer ticketId={peekId} onClose={() => setPeekId(null)} />
+            <TicketDrawer
+                ticketId={peekId}
+                onClose={() => {
+                    setPeekId(null);
+                    if (tab === 'overview') {
+                        router.reload({
+                            only: ['overview', 'summary'],
+                            preserveScroll: true,
+                        });
+                    }
+                }}
+            />
 
             {/* KB reader (requester browse) */}
             <Dialog
@@ -2414,6 +2425,17 @@ export default function ItIndex({
                                         : overviewPriority
                                 }
                                 onOpenTicket={(id) => setPeekId(id)}
+                                actorId={actorId}
+                                canManage={can.manage}
+                                assignmentBusy={propertyMutation.busy}
+                                onClearPriority={() => setOverviewPriority(ALL)}
+                                onAssign={(ticket) => {
+                                    if (can.manage && ticket.can_manage && actorId) {
+                                        propertyMutation.submit(ticket.id, ticket.lock_version,
+                                            {assigned_to_user_id: actorId},
+                                            {assigned_to_user_id: 'You'});
+                                    }
+                                }}
                             />
                         )}
 
