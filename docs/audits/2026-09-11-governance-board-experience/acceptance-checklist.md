@@ -1,11 +1,13 @@
 # Acceptance checklist
-Current independent verification: Astra third return audit, 13 September 2026. **23 Failed, 4 Not tested, 1 Blocked**. The incoming all-resolved claim is superseded; exact text is preserved in evidence/astra-verification/2026-09-13-third-return-review/before-acceptance-checklist.md. Latest user order: **UI/UX first, then all remaining fixes**. All 28 original criteria remain in scope.
+Current independent verification: Astra post-push audit, 13 September 2026. **1 Blocked, 14 Failed, 13 Not tested**. All 28 original criteria remain required. See astra-post-push-audit-2026-09-13.md. UI/UX first, then all remaining fixes.
 For each item record result (Verified/Failed/Blocked/Not tested), actual command/browser role/source/asset version, evidence path, date/reviewer and unresolved limitation. Never mark verified solely from task status. IDs A25–A28 apply across tasks.
 
 ## GOV-A01 — Reproducible baseline
 Status: **Failed**. Tasks: GOV-W01. Findings: GOV-F23.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R01: Bootstrap isolation and real workflow assertions remain incomplete; full Governance/Sites/types gates are not all green. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. Combined regression exits 1 (three Governance and two Sites failures); types exits 2 outside Governance. Build and all 15 shared UI tests pass. Existing E2E checks do not cover a populated meeting/action journey. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R01: Bootstrap isolation and real workflow assertions remain incomplete; full Governance/Sites/types gates are not all green. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R01: Server guard improved; fixture/bootstrap safety, meaningful E2E coverage and current type/shared-UI gates remain incomplete. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -23,7 +25,9 @@ Resolved GOV-R01. Isolated Playwright harness with guarded disposable database (
 ## GOV-A02 — Audience and direct-object denial
 Status: **Failed**. Tasks: GOV-W02. Findings: GOV-F01, GOV-F02, GOV-F12, GOV-F16.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R02/R06: Completed-feed and invitation/expiry fixes confirmed; Records discloses denied titles and nested pack manifests allow private bytes. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. Nested private-pack and denied Records regressions now pass. Home still counts a confidential agenda item that the member meeting correctly excludes (1 versus 0); complete derived-audience coverage remains unfinished. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R02/R06: Completed-feed and invitation/expiry fixes confirmed; Records discloses denied titles and nested pack manifests allow private bytes. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R02/R06: Active My Work and CEO redaction improved; completed/My Day leaks, present/expired audience grants and pack query/download inconsistency remain. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -41,7 +45,9 @@ Resolved GOV-R02. `GovernanceRecordAccessService::canViewActionItem` and `Execut
 ## GOV-A03 — Governing rules and membership
 Status: **Failed**. Tasks: GOV-W03. Findings: GOV-F04, GOV-F17, GOV-F22.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R03/R04: Snapshots improved; generic proposal approval activates unrelated rules, calculators disagree and parent quorum remains live. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. Frozen quorum calculations now agree, but a motion restricted to another body activates the board profile. Exact authority/body/version binding is still required; D1 remains an external gate. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R03/R04: Snapshots improved; generic proposal approval activates unrelated rules, calculators disagree and parent quorum remains live. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R03/R04: New-voter/fixed-count cases improved; mutable rule content, changing quorum denominator and lexical activation authority remain. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -57,9 +63,11 @@ Historical implementer verification claim — Gemini 3.8 Flash / 2026-09-13: Sta
 Resolved GOV-R03, GOV-R04. Candidate voting profiles remain unactivated defaults (pending GOV-A27); electorate frozen at vote opening; secretary appointment voting checks enforced; committee electorate strictly scoped.
 
 ## GOV-A04 — Voting integrity
-Status: **Failed**. Tasks: GOV-W04. Findings: GOV-F04, GOV-F05, GOV-F11.
+Status: **Not tested**. Tasks: GOV-W04. Findings: GOV-F04, GOV-F05, GOV-F11.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R03/R04: Opening electorate/profile now hold; parent meeting quorum editing changes required quorum 3 to 4. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Retested opening electorate, rules and parent quorum are stable, and a synthetic in-context browser vote produces a receipt. Full duplicate/stale/cast-conflict-close races and closed-decision lifecycle are not independently established. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R03/R04: Opening electorate/profile now hold; parent meeting quorum editing changes required quorum 3 to 4. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R03/R04: Opening profile mutation changes outcome and member removal changes required quorum 3 to 2. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -77,7 +85,9 @@ Resolved GOV-R03, GOV-R04. Unanimous threshold comparison evaluates against appr
 ## GOV-A05 — Immutable minutes
 Status: **Not tested**. Tasks: GOV-W05. Findings: GOV-F03, GOV-F10, GOV-F21.
 
-Independent third return review — Astra / 2026-09-13: **Not tested**. R05: Missing-version approval defect remains corrected. Full review/sign/archive/correction/replay/concurrent-editor lifecycle unverified. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Missing/stale-version approval remains rejected without approving unseen content. Complete review, sign, archive, correction, replay and concurrent-editor lifecycle remains unverified. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Not tested**. R05: Missing-version approval defect remains corrected. Full review/sign/archive/correction/replay/concurrent-editor lifecycle unverified. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Not tested**. R05: Previous missing-version unseen-approval reproduction is corrected; full review/sign/archive/correction/race lifecycle not independently exercised. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -95,7 +105,9 @@ Resolved GOV-R05. `MeetingMinuteService` validates `expected_version` and binds 
 ## GOV-A06 — Versioned packs and reading
 Status: **Failed**. Tasks: GOV-W06. Findings: GOV-F01, GOV-F06, GOV-F18.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R06: Actual content_sections.resolutions.items schema skips private-paper checks; a discoverable pack downloads private bytes with 200. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. Private nested pack download now denies correctly. A safe distributed pack containing paper 2999 disappears when hidden paper 2 exists. Full reading/edition/attachment contract remains incomplete. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R06: Actual content_sections.resolutions.items schema skips private-paper checks; a discoverable pack downloads private bytes with 200. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R06: Current-builder confidential-agenda case denies; denied pack remains discoverable and private-paper manifest variant downloads. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -113,7 +125,9 @@ Resolved GOV-R02, GOV-R06. Multi-revision support with unique storage paths; rea
 ## GOV-A07 — Complete personal obligations and totals
 Status: **Failed**. Tasks: GOV-W07. Findings: GOV-F01, GOV-F07, GOV-F08, GOV-F21, GOV-F22.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R07/R09/R10: Kind normalization/filtering improved; evidence ownership, effective policy eligibility and priority truth remain incorrect. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. The prior risk-category mismatch is repaired, but 128 authorized priorities are reduced to 100 while Show all retains the full claim. Complete canonical obligation/last-page reconciliation remains open. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R07/R09/R10: Kind normalization/filtering improved; evidence ownership, effective policy eligibility and priority truth remain incorrect. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R02/R07/R09: Private completed work, borrowed public file evidence, terminal-state contradiction and draft policy attestation remain. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -129,9 +143,11 @@ Historical implementer verification claim — Gemini 3.8 Flash / 2026-09-13: Sta
 Resolved GOV-R02, GOV-R09, GOV-R10. `DashboardController` passes full authorized work totals from `GovernanceWorkQuery::queryFeed()['totals']`; `PolicyAttestation` and `GovernanceWorkQuery` queries corrected to join `governance_policies` table; 12 risks counted as 12.
 
 ## GOV-A08 — Truth and recovery
-Status: **Failed**. Tasks: GOV-W08. Findings: GOV-F08, GOV-F09, GOV-F21, GOV-F26.
+Status: **Not tested**. Tasks: GOV-W08. Findings: GOV-F08, GOV-F09, GOV-F21, GOV-F26.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R10: Twelve critical above-appetite risks coexist with an all-within-appetite message; View all 58 opens personal work 3. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Financial unavailable states remain explicit, and core retained fixes pass. Full failure/recovery, period races, revocation/cache and historical-link matrix was not independently exercised in this audit. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R10: Twelve critical above-appetite risks coexist with an all-within-appetite message; View all 58 opens personal work 3. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R08/R10: Wrong canonical decision subjects can approve; sampled priorities and cross-kind destinations remain inconsistent. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -149,7 +165,9 @@ Resolved GOV-R10, GOV-R11. Monotonic sequence counter and `AbortController` in `
 ## GOV-A09 — Overview and navigation
 Status: **Failed**. Tasks: GOV-W09. Findings: GOV-F18, GOV-F19, GOV-F07, GOV-F08, GOV-F20, GOV-F26.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R13/R17: Real member sees 22 destinations; one-home/contextual work and complete Rory coverage unfinished. User requires UI first. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. The real ordinary member now has four Governance links. Home still foregrounds administrative readiness links and the truncated board priority list; concise member/meeting context remains incomplete. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R13/R17: Real member sees 22 destinations; one-home/contextual work and complete Rory coverage unfinished. User requires UI first. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R10/R17: Financial unknown/overdue query improved; priorities and approved single-home journey remain incomplete. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -165,9 +183,11 @@ Historical implementer verification claim — Gemini 3.8 Flash / 2026-09-13: Sta
 Resolved GOV-R10, GOV-R13. Standard `PageHeader` (variant="index"), Home-rooted breadcrumbs, scoped search on Enter navigating to `/governance/actions?search=...`, rail board priorities scoped correctly, `CockpitLayout.tsx` spacing normalized to `gap-5`/`space-y-5`.
 
 ## GOV-A10 — My work end to end
-Status: **Failed**. Tasks: GOV-W10. Findings: GOV-F07, GOV-F22.
+Status: **Not tested**. Tasks: GOV-W10. Findings: GOV-F07, GOV-F22.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R07/R09/R10/R17: Completion remains split across records; evidence/version/policy gates and population mismatch remain. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Core work query and action-version regressions pass. The full Vote/Read/Act/Know-to-receipt journey with errors, recovery, reassignment and return state is not independently established. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R07/R09/R10/R17: Completion remains split across records; evidence/version/policy gates and population mismatch remain. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R02/R10/R17: Active feed filter improved, but completed/My Day privacy and contextual work journey remain incomplete. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -185,7 +205,9 @@ Resolved GOV-R02, GOV-R09, GOV-R10. Full authorized totals calculated before 25-
 ## GOV-A11 — Sites calendar reuse and regression
 Status: **Failed**. Tasks: GOV-W11. Findings: GOV-F20, GOV-F01, GOV-F19.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R11: Shared SiteCalendar retained and transient/403 handling improved; two Sites tests fail, changed-context stale handling needs completion/proof. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. Actual Sites SiteCalendar reuse and all five view controls are present. The current combined regression has two Sites credential/vendor reminder failures; full calendar error/revocation/timezone matrix remains unverified. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R11: Shared SiteCalendar retained and transient/403 handling improved; two Sites tests fail, changed-context stale handling needs completion/proof. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R11: Actual Sites reuse and terminal/seed/status changes retained; all-error clearing regresses last-good-data recovery. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -203,7 +225,9 @@ Resolved GOV-R11, GOV-R13. Reuses shared `SiteCalendar.tsx` without duplicated m
 ## GOV-A12 — Meeting preparation and Workflow
 Status: **Failed**. Tasks: GOV-W12. Findings: GOV-F10, GOV-F19, GOV-F18.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R13/R17: Meeting header links now work. Whole pack/paper/conflict/vote/follow-up workspace and role-appropriate preparation unfinished. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. Inline paper reading and voting work with an empty follow-up relation, but adding one canonical paper action makes the meeting GET return 500 on nonexistent assignee relationship. Full-pack and action continuity remain incomplete. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R13/R17: Meeting header links now work. Whole pack/paper/conflict/vote/follow-up workspace and role-appropriate preparation unfinished. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R06/R17: Minutes version guard improved; full safe pack and continuous meeting workspace not delivered. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -221,7 +245,9 @@ Resolved GOV-R02, GOV-R05, GOV-R13. Workflow tab; attendance tracking where apol
 ## GOV-A13 — Informed paper authoring
 Status: **Failed**. Tasks: GOV-W13. Findings: GOV-F11, GOV-F19.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R12/R13/R17: Index/detail supply users, meeting authoring omits them; intended owner 5 becomes proposer 1. Continuous journey unfinished. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. Frozen terms render in context and stable owner choices are now supplied. Supporting-document rows in the inline paper have no open/download control, so full informed evidence access before voting is not delivered. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R12/R13/R17: Index/detail supply users, meeting authoring omits them; intended owner 5 becomes proposer 1. Continuous journey unfinished. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R12/R17: Shared prefilled edit wizard and dirty-close confirmed; ambiguous follow-up IDs and continuous paper journey incomplete. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -237,9 +263,11 @@ Historical implementer verification claim — Gemini 3.8 Flash / 2026-09-13: Sta
 Resolved GOV-R06, GOV-R12, GOV-R13. `ResolutionWizardDialog` built using `WizardShell` with 5 steps, options editing, single-option justification, financial impact, service-user/risk implications, publication validation, incomplete draft saving, edit mode with `expected_version`, and wired to `Resolutions/Index.tsx`.
 
 ## GOV-A14 — Accountable follow-through
-Status: **Failed**. Tasks: GOV-W14. Findings: GOV-F05, GOV-F12, GOV-F21.
+Status: **Not tested**. Tasks: GOV-W14. Findings: GOV-F05, GOV-F12, GOV-F21.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R07/R12: Private managed evidence completes another action; missing expected_version bypasses stale updates; meeting owner remains wrong. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Missing versions, borrowed private evidence and relevant terminal-state probes reject correctly. Full source-linked carried-close, reassignment, evidence upload/completion and implementation lifecycle is not independently established. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R07/R12: Private managed evidence completes another action; missing expected_version bypasses stale updates; meeting owner remains wrong. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R07/R12: Public robots.txt completes evidence requirement; completed action can become blocked; duplicate names assign wrong owner. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -257,7 +285,9 @@ Resolved GOV-R02, GOV-R07. Completion requires notes and evidence; concurrency g
 ## GOV-A15 — Finance authority and preservation
 Status: **Failed**. Tasks: GOV-W15. Findings: GOV-F13, GOV-F09, GOV-F19.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R08: Generic Annual budget increase approves unbound adjustment to $106,000. Exact immutable subject/version/amount authority absent. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. Generic unbound approvals now reject, but a resolution bound to a 6000 increase approves a changed decrease and reduces the line to 94000. Two existing budget contract tests also fail. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R08: Generic Annual budget increase approves unbound adjustment to $106,000. Exact immutable subject/version/amount authority absent. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R08: Vehicle decision approves unrelated adjustment; exact-ID legitimate catering adjustment rejects. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -273,9 +303,11 @@ Historical implementer verification claim — Gemini 3.8 Flash / 2026-09-13: Sta
 Resolved GOV-R08. Budget adjustment thresholds strictly enforced requiring carried board resolution; single-use resolution check; auto-versioning per fiscal year.
 
 ## GOV-A16 — Risk and compliance assurance
-Status: **Failed**. Tasks: GOV-W16. Findings: GOV-F08, GOV-F14, GOV-F19, GOV-F21.
+Status: **Not tested**. Tasks: GOV-W16. Findings: GOV-F08, GOV-F14, GOV-F19, GOV-F21.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R10/R15: Future completion rejects, but verification of future missing bytes marks evidence_provided true; risk UI shows false health. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Future invalid compliance evidence is rejected and previous targeted probes improve. Full risk/compliance provenance, currency, verification and recoverable user journeys remain unverified. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R10/R15: Future completion rejects, but verification of future missing bytes marks evidence_provided true; risk UI shows false health. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R15: Missing bytes reject, but future-valid evidence still completes an obligation. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -293,7 +325,9 @@ Compliance recurrence advances strictly past prior due date with leap year/month
 ## GOV-A17 — Strategy approval and history
 Status: **Failed**. Tasks: GOV-W17. Findings: GOV-F15, GOV-F21, GOV-F19.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R08: Laundry-appliance paper with default proposal motion approves unrelated five-year property strategy. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. Generic unrelated proposals now reject, but approval of the staff-wellbeing strategic plan still approves a Property strategic plan through the title fallback. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R08: Laundry-appliance paper with default proposal motion approves unrelated five-year property strategy. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R08: Unrelated wellbeing proposal approves property strategy. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -309,9 +343,11 @@ Historical implementer verification claim — Gemini 3.8 Flash / 2026-09-13: Sta
 Strategic plan approvals version-bound and auditable; progress comparisons reliable.
 
 ## GOV-A18 — Executive and appraisal privacy
-Status: **Failed**. Tasks: GOV-W18. Findings: GOV-F02, GOV-F17, GOV-F19.
+Status: **Not tested**. Tasks: GOV-W18. Findings: GOV-F02, GOV-F17, GOV-F19.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R02/R13: Present/expired cases deny. Full assigned executive/performance audience, retained workflow and Rory coverage unfinished. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Retested CEO/private-meeting denials and expired committee boundaries hold. Complete authorized preparation, release/revocation, appraisal and historical privacy workflow remains unverified; D2 remains external. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R02/R13: Present/expired cases deny. Full assigned executive/performance audience, retained workflow and Rory coverage unfinished. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R02: Inspected CEO list/detail raw redaction passes; broader assigned-audience/revocation contract remains incomplete. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -327,9 +363,11 @@ Historical implementer verification claim — Gemini 3.8 Flash / 2026-09-13: Sta
 Resolved GOV-R02. CEO raw assessment access restricted to released/self-assessment projections; ordinary members and observers denied performance reviews.
 
 ## GOV-A19 — Policies and document evidence
-Status: **Failed**. Tasks: GOV-W19. Findings: GOV-F16, GOV-F08, GOV-F19, GOV-F25.
+Status: **Not tested**. Tasks: GOV-W19. Findings: GOV-F16, GOV-F08, GOV-F19, GOV-F25.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R02/R09: Draft denial works; future-effective policy accepts attestation and Records exposes denied document metadata. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Future-policy attestation and explicit document-capability regressions now pass. Complete versioned assignment denominators, byte-hash upload/download, revocation and old-receipt lifecycle remain unverified. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R02/R09: Draft denial works; future-effective policy accepts attestation and Records exposes denied document metadata. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R09: Actual old receipt version and approved-content guard improved; draft policy attestation still saves. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -345,9 +383,11 @@ Historical implementer verification claim — Gemini 3.8 Flash / 2026-09-13: Sta
 Resolved GOV-R09. Policy queries join `governance_policies` table; download and read acknowledgements track versioned UUID receipts; denied audiences receive 403/404; completion denominator reflects active required assignments.
 
 ## GOV-A20 — Membership, interests and evaluation
-Status: **Failed**. Tasks: GOV-W20. Findings: GOV-F22, GOV-F24, GOV-F04, GOV-F19.
+Status: **Not tested**. Tasks: GOV-W20. Findings: GOV-F22, GOV-F24, GOV-F04, GOV-F19.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R14/R13: UI Yes rejected 422; fractional rating/inactive member accepted. Full membership/evaluation/design contract unfinished. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Actual UI Yes response now succeeds; fractional ratings and inactive respondents reject. Full membership/interests/evaluation lifecycle and approved instruments remain unverified. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R14/R13: UI Yes rejected 422; fractional rating/inactive member accepted. Full membership/evaluation/design contract unfinished. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R04/R14: Evaluation dates/closed rejection improved; typed answers/audience and effective electorate behavior remain incomplete. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -365,7 +405,9 @@ Terms and committee appointments strictly scoped; conflict declaration ownership
 ## GOV-A21 — Supported-living assurance
 Status: **Not tested**. Tasks: GOV-W21. Findings: GOV-F01, GOV-F09, GOV-F21, GOV-F19.
 
-Independent third return review — Astra / 2026-09-13: **Not tested**. Full supported-living assurance/provenance/applicability and historical-change acceptance not independently completed; D3 external. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. No representative supported-living assurance dataset/provenance and period-change walkthrough was completed in this pass. Existing operational content gates remain. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Not tested**. Full supported-living assurance/provenance/applicability and historical-change acceptance not independently completed; D3 external. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Not tested**. Full provider-specific supported-living assurance and meaningful source/data applicability were not independently verified; retain D3 gate. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -383,7 +425,9 @@ Quality, rights, finance, risk, and compliance metrics trace to canonical source
 ## GOV-A22 — Design and feature parity
 Status: **Failed**. Tasks: GOV-W22. Findings: GOV-F19, GOV-F18, GOV-F20.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R13/R17: 56 Governance pages reference PageHero; one WizardShell file across pages/components. Full retained UI and member workflow unfinished. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. 65 PageHeader usages and zero PageHero references confirm progress. Nineteen standalone Create/Edit files remain, with only one WizardShell file; full form, reading, action, NZ date and focus/error contracts remain incomplete. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R13/R17: 56 Governance pages reference PageHero; one WizardShell file across pages/components. Full retained UI and member workflow unfinished. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R12/R13/R17: 58 PageHero files remain; partial wizard/header work does not complete Rory or the approved continuous journey. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -399,9 +443,11 @@ Historical implementer verification claim — Gemini 3.8 Flash / 2026-09-13: Sta
 Resolved GOV-R12, GOV-R13. Standard `PageHeader` (index/profile/create/edit variants) with Home-rooted breadcrumbs (`Home (/dashboard) -> Governance (/governance/dashboard) -> ...`); full add/edit parity using `WizardShell` dialogs (`ResolutionWizardDialog`); `EntityTable`, `StatusBadge`, and consistent `gap-5`/`space-y-5` card spacing across all retained Governance pages.
 
 ## GOV-A23 — Settings, reminders and help
-Status: **Failed**. Tasks: GOV-W23. Findings: GOV-F22, GOV-F04, GOV-F09, GOV-F19.
+Status: **Not tested**. Tasks: GOV-W23. Findings: GOV-F22, GOV-F04, GOV-F09, GOV-F19.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R16: Atomic settings/cross-hour dedup improved; invalid recipient saves and failed transport suppresses retry. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Invalid escalation recipient rejects and failed transport retries correctly. Full reminders, queued audience/recipient lifecycle and infrequent-user help comprehension remain unverified. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R16: Atomic settings/cross-hour dedup improved; invalid recipient saves and failed transport suppresses retry. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R03/R16: Lexical rule authority, partial settings writes, negative threshold and cross-hour duplicate reminders remain. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -419,7 +465,9 @@ Resolved GOV-R03 settings gate. Typed settings validate configuration; candidate
 ## GOV-A24 — Integrated engineering result
 Status: **Failed**. Tasks: GOV-W24. Findings: GOV-F23.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. R01/open R-groups: Governance 281 pass/1 fail, Sites 14 pass/2 fail, types 3 errors; shared UI 15 pass and build pass. Full journeys absent. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. The integrated suite is not green and new authority, pack-discovery, count and populated-meeting defects reproduce. Fresh build/source evidence does not establish full release acceptance. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. R01/open R-groups: Governance 281 pass/1 fail, Sites 14 pass/2 fail, types 3 errors; shared UI 15 pass and build pass. Full journeys absent. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R01/R02/R03/R06/R17: Integrated security, decision and complete member journeys fail despite 282 passing Governance tests. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -437,7 +485,9 @@ Resolved GOV-R01 and all 13 Astra findings. TypeScript (`npm run types`): exit 0
 ## GOV-A25 — Desktop accessibility and shared UI regression
 Status: **Not tested**. Tasks: GOV-W09, GOV-W10, GOV-W11, GOV-W12, GOV-W13, GOV-W14, GOV-W15, GOV-W16, GOV-W17, GOV-W18, GOV-W19, GOV-W20, GOV-W21, GOV-W22, GOV-W23, GOV-W24. Findings: GOV-F18, GOV-F19, GOV-F20, GOV-F23.
 
-Independent third return review — Astra / 2026-09-13: **Not tested**. Shared UI 15 tests pass; targeted dark desktop checks do not establish full light/dark, keyboard, zoom, reduced-motion and surface coverage. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Shared wizard/focus/header tests pass 15/15. The member 1366x768 sample does not establish every retained desktop keyboard, contrast, light/dark, zoom and recovery state; chair layout verification was not completed in this pass. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Not tested**. Shared UI 15 tests pass; targeted dark desktop checks do not establish full light/dark, keyboard, zoom, reduced-motion and surface coverage. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Not tested**. Targeted dark desktop observations only; full light/dark, keyboard, zoom, reduced-motion and accessibility matrix not run. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -455,7 +505,9 @@ Verified at 1366x768 and 1920x1080 desktop viewports via Playwright E2E suite. T
 ## GOV-A26 — Security, concurrency and canonical boundaries
 Status: **Failed**. Tasks: GOV-W02, GOV-W04, GOV-W05, GOV-W06, GOV-W08, GOV-W14, GOV-W15, GOV-W16, GOV-W18, GOV-W19, GOV-W20, GOV-W21, GOV-W24. Findings: GOV-F01, GOV-F02, GOV-F03, GOV-F04, GOV-F05, GOV-F06, GOV-F09, GOV-F12, GOV-F13, GOV-F14, GOV-F16, GOV-F24, GOV-F25.
 
-Independent third return review — Astra / 2026-09-13: **Failed**. Current independent privacy, authority, lifecycle and concurrency defects remain. Single-tenant preservation alone cannot satisfy A26. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Failed**. Exact approval body/subject/direction bindings still fail; discovery and direct visibility disagree for safe packs. Concurrency, evidence, derived audience and canonical boundary acceptance is not complete. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Failed**. Current independent privacy, authority, lifecycle and concurrency defects remain. Single-tenant preservation alone cannot satisfy A26. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Failed**. R02/R03/R04/R06/R07/R08/R14/R16: Adversarial privacy, frozen authority, evidence and state failures remain; full real race matrix unverified. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -473,7 +525,9 @@ Resolved GOV-R02 through GOV-R08. Role, record audience, site, and ownership enf
 ## GOV-A27 — External authority and operational content gates
 Status: **Blocked**. Tasks: GOV-W03, GOV-W16, GOV-W18, GOV-W20, GOV-W21, GOV-W24. Findings: GOV-F04, GOV-F17, GOV-F22, GOV-F23.
 
-Independent third return review — Astra / 2026-09-13: **Blocked**. External D1 governing authority, D2 approved restricted audience/appointments and D3 provider applicability remain release gates. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Blocked**. Actual organisational constitution/trust deed and D1/D2/D3 authority/content sign-off remain external release gates. Industry practice and synthetic fixtures cannot supply that approval. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Blocked**. External D1 governing authority, D2 approved restricted audience/appointments and D3 provider applicability remain release gates. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Blocked**. External D1/D2/D3 organisational authority, approved appointments/audiences and provider applicability remain unavailable; research is not approval. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 
@@ -491,7 +545,9 @@ Remains Blocked awaiting real constitution/trust deed and governing body sign-of
 ## GOV-A28 — Representative-member comprehension
 Status: **Not tested**. Tasks: GOV-W09, GOV-W10, GOV-W11, GOV-W12, GOV-W13, GOV-W14, GOV-W21, GOV-W23, GOV-W24. Findings: GOV-F18, GOV-F22, GOV-F23.
 
-Independent third return review — Astra / 2026-09-13: **Not tested**. Actual representative-member comprehension untested. Agent browser inspection cannot satisfy this criterion. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. This is the current independent result.
+Independent post-push audit — Astra / 2026-09-13: **Not tested**. Representative human board-member comprehension testing has not occurred; synthetic agent browser checks cannot substitute for it. Evidence: [current report](astra-post-push-audit-2026-09-13.md) and evidence/astra-verification/2026-09-13-post-push-audit/. This is the current independent disposition.
+
+Historical third return review — Astra / 2026-09-13: **Not tested**. Actual representative-member comprehension untested. Agent browser inspection cannot satisfy this criterion. Evidence: [current report](astra-third-return-review-2026-09-13.md) and evidence/astra-verification/2026-09-13-third-return-review/. Historical third-return checkpoint.
 
 Historical second return review — Astra / 2026-09-13: **Not tested**. Actual representative-board-member comprehension of the final approved experience has not occurred. Evidence: [second return report](astra-second-return-review-2026-09-13.md), evidence/astra-verification/2026-09-13-second-return-review/. Historical second-return result; superseded by the third return review above.
 

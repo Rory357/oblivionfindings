@@ -1,0 +1,45 @@
+{
+    "checked_at": "2026-09-13T08:08:06+00:00",
+    "database": "oblivion_gov_review4_runtime_20260913_37384",
+    "cases": {
+        "different_body_rules_motion_activates_board_profile": {
+            "expected": "Reject unrelated authority",
+            "actual_active": true,
+            "motion": "Approve voting rules exclusively for the gardening working group. No change to the governing board rules.",
+            "profile_body": "board"
+        },
+        "different_strategic_plan_motion_approves_property_plan": {
+            "expected": "Reject different plan",
+            "actual_status": "approved",
+            "motion": "Approve strategic plan for staff wellbeing only. Property planning is deferred.",
+            "plan_title": "Property strategic plan"
+        },
+        "safe_pack_resolution_id_prefix_collision": {
+            "expected": "Safe distributed pack is both visible and discoverable",
+            "hidden_resolution_id": 2,
+            "safe_resolution_id": 2999,
+            "can_view": true,
+            "discoverable": false
+        },
+        "budget_direction_changed_after_bound_authority": {
+            "expected": "Reject changed direction",
+            "actual_status": "approved",
+            "authorized_direction": "increase",
+            "actual_direction": "decrease",
+            "line_amount": "94000.00"
+        },
+        "show_all_priorities_still_truncates_above_100": {
+            "expected": "Show all offers every item in its claimed total",
+            "total": 128,
+            "returned": 100,
+            "by_tab": {
+                "all": 128,
+                "meetings": 2,
+                "actions": 112,
+                "risks": 12,
+                "compliance": 1,
+                "policies": 0
+            }
+        }
+    }
+}

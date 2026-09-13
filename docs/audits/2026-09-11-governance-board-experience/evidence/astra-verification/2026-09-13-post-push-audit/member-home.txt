@@ -1,0 +1,392 @@
+- link "Skip to main content":
+  - /url: "#main-content"
+- banner:
+  - generic: Sunday
+  - generic: 13 September 2026
+  - link "Oblivion Care — home":
+    - /url: /dashboard
+    - generic: Oblivion Care
+    - generic: blivionCare
+  - button "Search or jump to a page":
+    - generic: Search or jump to…
+    - generic: Ctrl
+    - text: K
+  - button "Ask about a client" [disabled]:
+  - button "Notifications":
+  - button "Announcements":
+  - button "Open user menu for Review Alex Morgan":
+    - img "Review Alex Morgan"
+- navigation "Primary navigation":
+  - link "My Day":
+    - /url: /my-day
+    - generic: My Day
+  - link "My Calendar":
+    - /url: /my-calendar
+    - generic: My Calendar
+  - link "All Tasks":
+    - /url: /tasks
+    - generic: All Tasks
+    - generic: 9+
+  - button "IT & Support menu":
+    - generic: IT & Support
+  - button "Governance menu" [expanded]:
+    - generic: Governance
+  - group "Governance navigation":
+    - link "Home":
+      - /url: /governance/dashboard
+      - generic: Home
+    - link "My work":
+      - /url: /governance/my-work
+      - generic: My work
+    - link "Calendar":
+      - /url: /governance/calendar
+      - generic: Calendar
+    - link "Records":
+      - /url: /governance/records
+      - generic: Records
+  - button "Reporting menu":
+    - generic: Reporting
+  - link "Settings":
+    - /url: /settings
+    - generic: Settings
+- button "Collapse sidebar" [expanded]:
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - link "Home":
+        - /url: /dashboard
+      - link "Governance" [disabled]
+  - heading "Board overview" [level=1]
+  - paragraph:
+    - text: "Reporting period: month · Last captured"
+    - time: 08:04 PM
+  - searchbox "Search governance..."
+  - generic: /
+  - button "Prepare meeting"
+  - button "Refresh dashboard":
+    - generic: Refresh
+  - link "View my pending work":
+    - /url: /governance/my-work
+    - generic: My pending work
+    - generic: "3"
+    - generic: 3 items requiring you
+  - link "View overdue board actions":
+    - /url: /governance/actions?status=overdue
+    - generic: Overdue board actions
+    - generic: "41"
+    - generic: 41 actions overdue
+  - link "View risks above appetite":
+    - /url: /governance/risks
+    - generic: Risks above appetite
+    - generic: "12"
+    - generic: Outside tolerance
+  - link "View obligations overdue":
+    - /url: /governance/compliance?status=overdue
+    - generic: Obligations overdue
+    - generic: "1"
+    - generic: Statutory & compliance
+  - button "This Month":
+    - generic: This Month
+  - button "Clear Period":
+  - tablist "Views":
+    - tab "Overview" [selected]:
+      - generic: Overview
+    - tab "My work 3":
+      - generic: My work
+      - generic: "3"
+    - tab "Calendar":
+      - generic: Calendar
+    - tab "Decisions":
+      - generic: Decisions
+    - button "Find a view":
+      - generic: Find
+  - generic: Next Meeting Readiness
+  - link "Review September Board":
+    - /url: /governance/meetings/1
+  - text: · 18 Sep 2026, 10:00 AM
+  - generic: 4 days to go
+  - generic: 5 of 8 steps complete
+  - generic: 63%
+  - generic "Meeting readiness progress"
+  - paragraph: Next step
+  - paragraph: Submit meeting RSVP
+  - paragraph: Confirm your attendance or send apologies for this meeting.
+  - paragraph: Agenda prepared
+  - generic: Done
+  - paragraph: 1 agenda item(s) ready for board pre-read.
+  - paragraph: Attendance and quorum confirmed
+  - generic: Pending
+  - paragraph: Attendance is unrecorded. Will be marked when meeting commences.
+  - link "View Attendance":
+    - /url: /governance/meetings/1?tab=attendance
+  - paragraph: CEO report ready
+  - generic: Pending
+  - paragraph: CEO report is pending for this meeting.
+  - link "Open CEO Report":
+    - /url: /governance/ceo-reports
+  - paragraph: Decision resolutions prepared
+  - generic: Done
+  - paragraph: 1 resolution(s) ready/open.
+  - paragraph: Minutes drafted
+  - generic: Done
+  - paragraph: Minutes currently approved.
+  - paragraph: Minutes approved
+  - generic: Done
+  - paragraph: Minutes approved by chair/delegate.
+  - paragraph: Minutes signed and archived
+  - generic: Pending
+  - paragraph: Sign approved minutes to close the meeting cycle.
+  - link "Finalize Minutes":
+    - /url: /governance/meetings/1?tab=minutes
+  - paragraph: Previous meeting follow-through reviewed
+  - generic: Done
+  - paragraph: No previous meeting in this committee/cycle.
+  - generic: Needs my attention
+  - generic: Your pending votes, reading and follow-up.
+  - link "View all":
+    - /url: /governance/my-work
+  - 'link "RA Action Items Priority: Critical Complete ACT-ZZHDNR Due 2026-08-04 Open Action"':
+    - /url: /governance/actions/41
+    - generic: RA
+    - generic: Action Items
+    - 'generic "Priority: Critical"':
+    - paragraph: Complete ACT-ZZHDNR
+    - generic: Due 2026-08-04
+    - text: Open Action
+  - 'link "RA Action Items Priority: Medium Complete ACT-M0ITN6 Due 2026-09-20 Open Action"':
+    - /url: /governance/actions/43
+    - generic: RA
+    - generic: Action Items
+    - 'generic "Priority: Medium"':
+    - paragraph: Complete ACT-M0ITN6
+    - generic: Due 2026-09-20
+    - text: Open Action
+  - generic: Priorities Requiring Board Attention
+  - generic: Ranked by urgency across meetings, risks, compliance, and assigned actions
+  - generic: 58 total
+  - generic: 13 critical
+  - generic: 42 overdue
+  - tablist:
+    - tab "All" [selected]:
+      - generic: All
+    - tab "Meetings":
+      - generic: Meetings
+    - tab "Actions":
+      - generic: Actions
+    - tab "Risks":
+      - generic: Risks
+    - tab "Compliance":
+      - generic: Compliance
+    - tab "Policies":
+      - generic: Policies
+  - tabpanel "All":
+    - generic "Review Chair":
+      - generic: RC
+    - generic: Compliance
+    - 'generic "Priority: Critical"':
+      - generic: Critical
+    - text: Due 2026-09-12
+    - paragraph: Complete obligation PRIV-001
+    - paragraph: Review annual assurance (Privacy Act 2020)
+    - generic: "Owner: Review Chair"
+    - text: Why this matters
+    - link "Open Obligation":
+      - /url: /governance/compliance/1
+      - generic: Open Obligation
+    - generic "Review Chair":
+      - generic: RC
+    - generic: Risk Register
+    - 'generic "Priority: Critical"':
+      - generic: Critical
+    - text: Due 2026-12-13
+    - paragraph: Review risk R-IUXU3L
+    - paragraph: "Above appetite (score 20): Review risk 0"
+    - generic: "Owner: Review Chair"
+    - text: Why this matters
+    - link "Open Risk":
+      - /url: /governance/risks/1
+      - generic: Open Risk
+    - generic "Review Chair":
+      - generic: RC
+    - generic: Risk Register
+    - 'generic "Priority: Critical"':
+      - generic: Critical
+    - text: Due 2026-12-13
+    - paragraph: Review risk R-AQX7R3
+    - paragraph: "Above appetite (score 20): Review risk 1"
+    - generic: "Owner: Review Chair"
+    - text: Why this matters
+    - link "Open Risk":
+      - /url: /governance/risks/2
+      - generic: Open Risk
+    - generic "Review Chair":
+      - generic: RC
+    - generic: Risk Register
+    - 'generic "Priority: Critical"':
+      - generic: Critical
+    - text: Due 2026-12-13
+    - paragraph: Review risk R-CRJAZ5
+    - paragraph: "Above appetite (score 20): Review risk 2"
+    - generic: "Owner: Review Chair"
+    - text: Why this matters
+    - link "Open Risk":
+      - /url: /governance/risks/3
+      - generic: Open Risk
+    - generic "Review Chair":
+      - generic: RC
+    - generic: Risk Register
+    - 'generic "Priority: Critical"':
+      - generic: Critical
+    - text: Due 2026-12-13
+    - paragraph: Review risk R-HXYLVQ
+    - paragraph: "Above appetite (score 20): Review risk 3"
+    - generic: "Owner: Review Chair"
+    - text: Why this matters
+    - link "Open Risk":
+      - /url: /governance/risks/4
+      - generic: Open Risk
+    - generic "Review Chair":
+      - generic: RC
+    - generic: Risk Register
+    - 'generic "Priority: Critical"':
+      - generic: Critical
+    - text: Due 2026-12-13
+    - paragraph: Review risk R-HLGUXW
+    - paragraph: "Above appetite (score 20): Review risk 4"
+    - generic: "Owner: Review Chair"
+    - text: Why this matters
+    - link "Open Risk":
+      - /url: /governance/risks/5
+      - generic: Open Risk
+    - generic "Review Chair":
+      - generic: RC
+    - generic: Risk Register
+    - 'generic "Priority: Critical"':
+      - generic: Critical
+    - text: Due 2026-12-13
+    - paragraph: Review risk R-BQWF3R
+    - paragraph: "Above appetite (score 20): Review risk 5"
+    - generic: "Owner: Review Chair"
+    - text: Why this matters
+    - link "Open Risk":
+      - /url: /governance/risks/6
+      - generic: Open Risk
+    - generic "Review Chair":
+      - generic: RC
+    - generic: Risk Register
+    - 'generic "Priority: Critical"':
+      - generic: Critical
+    - text: Due 2026-12-13
+    - paragraph: Review risk R-WCZBOX
+    - paragraph: "Above appetite (score 20): Review risk 6"
+    - generic: "Owner: Review Chair"
+    - text: Why this matters
+    - link "Open Risk":
+      - /url: /governance/risks/7
+      - generic: Open Risk
+    - button "Show all 58 priorities"
+    - link "Explore Records & Archives →":
+      - /url: /governance/records
+  - generic: Risk & Compliance Watchlist
+  - generic: Critical risks, overdue obligations and privacy gaps the board needs to be aware of.
+  - paragraph: Risk posture
+  - paragraph: Active risks, critical exposure, and items outside appetite.
+  - generic: critical
+  - paragraph: Critical
+  - paragraph: "12"
+  - paragraph: High
+  - paragraph: "0"
+  - paragraph: Above appetite
+  - paragraph: "12"
+  - paragraph: Tracked
+  - paragraph: "12"
+  - list:
+    - generic: R-IUXU3L Review risk 0
+    - generic: R-AQX7R3 Review risk 1
+  - link "Open risk register":
+    - /url: /governance/risks
+    - generic: Open risk register
+  - paragraph: Compliance calendar
+  - paragraph: Upcoming and overdue governance obligations.
+  - generic: critical
+  - paragraph: Upcoming obligations
+  - paragraph: "1"
+  - paragraph: Overdue
+  - paragraph: "1"
+  - paragraph: Due this week
+  - paragraph: "0"
+  - list:
+    - generic: Review annual assurance (2026-09-12)
+  - link "Open obligations":
+    - /url: /governance/compliance/calendar
+    - generic: Open obligations
+  - paragraph: Privacy & data
+  - paragraph: Breaches, PIAs, and privacy request backlog.
+  - generic: good
+  - paragraph: Breaches (90d)
+  - paragraph: "0"
+  - paragraph: Open breaches
+  - paragraph: "0"
+  - paragraph: Open PIAs
+  - paragraph: "0"
+  - paragraph: DSR backlog
+  - paragraph: "0"
+  - link "Open privacy register":
+    - /url: /privacy
+    - generic: Open privacy register
+  - paragraph: Incident closure
+  - paragraph: Incident volume, severity mix, and close-out pace.
+  - generic: good
+  - paragraph: Total this period
+  - paragraph: "0"
+  - paragraph: Open
+  - paragraph: "0"
+  - paragraph: Critical
+  - paragraph: "0"
+  - paragraph: Avg close
+  - paragraph: 0.0 h
+  - link "Open incidents":
+    - /url: /incidents
+    - generic: Open incidents
+  - generic: Financial Governance
+  - generic: Budget posture, spend approvals, and items requiring board sign-off.
+  - paragraph: Financial governance
+  - paragraph: Approved budget, actuals, variance, sites over budget, and pending spend approvals.
+  - generic: unknown
+  - paragraph: Utilisation
+  - paragraph: —
+  - paragraph: Variance
+  - paragraph: —
+  - paragraph: Budget total
+  - paragraph: —
+  - paragraph: Actuals
+  - paragraph: —
+  - link "Review budget":
+    - /url: /governance/budgets
+    - generic: Review budget
+  - paragraph: Sites over budget
+  - paragraph: Operational site/house budgets exceeding allocation this month (sourced from Finance variance).
+  - generic: unknown
+  - paragraph: Sites
+  - paragraph: Unavailable
+  - paragraph: Overspend
+  - paragraph: Unavailable
+  - list:
+    - listitem: • Site budget variance data is not available for this period.
+  - link "Open variance":
+    - /url: /finance/budget-actuals
+    - generic: Open variance
+  - heading "Operational Signals Service safety, workforce, controls, fleet and H&S backbone — for context. All clear" [level=3]:
+    - button "Operational Signals Service safety, workforce, controls, fleet and H&S backbone — for context. All clear":
+      - generic: Operational Signals
+      - generic: Service safety, workforce, controls, fleet and H&S backbone — for context.
+      - generic: All clear
+  - generic: Recently Completed
+  - generic: Closed in the last 14 days — these no longer need board action.
+  - link "Minutes approved Minutes approved for Review September Board — 4 minutes ago":
+    - /url: /governance/meetings/1?tab=minutes
+    - paragraph: Minutes approved
+    - paragraph: Minutes approved for Review September Board
+    - generic: —
+    - generic: 4 minutes ago
+- region "Notifications alt+T"

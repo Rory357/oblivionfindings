@@ -1,9 +1,5 @@
 # Latest independent Governance audit
 
-**Third return audit, 13 September 2026: useful progress, still not ready.**
+Read [the post-push audit](astra-post-push-audit-2026-09-13.md). Governance application changes are already in main at 96ae8f765. All 17 targeted return/Records cases now give expected outcomes, but new authority, populated-meeting, pack-discovery and priority-count failures remain. Full acceptance: **1 Blocked, 14 Failed, 13 Not tested**.
 
-Read [the complete current report](astra-third-return-review-2026-09-13.md). It distinguishes corrected cases from remaining defects and regressions, with current tests and browser evidence. Original acceptance: **23 Failed, 4 Not tested, 1 Blocked**. R05's specific unseen-minute-approval reproduction is corrected; full A05 remains Not tested.
-
-Use [the updated fresh-session Gemini prompt](gemini-fresh-context-prompt.md). **Latest user order: UI/UX first, then all remaining fixes.** The approved one-home/one-meeting journey, Rory rules, actual Sites calendar reuse and all 24 tasks/28 criteria remain mandatory.
-
-History: [second return audit](astra-second-return-review-2026-09-13.md), [12 September review](astra-progress-review-2026-09-12.md). Current raw evidence: evidence/astra-verification/2026-09-13-third-return-review/. No application fixes, commits or pushes were made by this third audit.
+Use [the current handoff](gemini-fresh-context-prompt.md). All 24 original tasks/28 criteria remain required, UI/UX first. Historical reports and evidence are preserved.

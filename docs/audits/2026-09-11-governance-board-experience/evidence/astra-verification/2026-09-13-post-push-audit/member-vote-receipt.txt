@@ -1,0 +1,169 @@
+- link "Skip to main content":
+  - /url: "#main-content"
+- banner:
+  - generic: Sunday
+  - generic: 13 September 2026
+  - link "Oblivion Care — home":
+    - /url: /dashboard
+    - generic: Oblivion Care
+    - generic: blivionCare
+  - button "Search or jump to a page":
+    - generic: Search or jump to…
+    - generic: Ctrl
+    - text: K
+  - button "Ask about a client" [disabled]:
+  - button "Notifications":
+  - button "Announcements":
+  - button "Open user menu for Review Alex Morgan":
+    - img "Review Alex Morgan"
+- navigation "Primary navigation":
+  - link "My Day":
+    - /url: /my-day
+    - generic: My Day
+  - link "My Calendar":
+    - /url: /my-calendar
+    - generic: My Calendar
+  - link "All Tasks":
+    - /url: /tasks
+    - generic: All Tasks
+    - generic: 9+
+  - button "IT & Support menu":
+    - generic: IT & Support
+  - button "Governance menu" [expanded]:
+    - generic: Governance
+  - group "Governance navigation":
+    - link "Home":
+      - /url: /governance/dashboard
+      - generic: Home
+    - link "My work":
+      - /url: /governance/my-work
+      - generic: My work
+    - link "Calendar":
+      - /url: /governance/calendar
+      - generic: Calendar
+    - link "Records":
+      - /url: /governance/records
+      - generic: Records
+  - button "Reporting menu":
+    - generic: Reporting
+  - link "Settings":
+    - /url: /settings
+    - generic: Settings
+- button "Collapse sidebar" [expanded]:
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - link "Home":
+        - /url: /dashboard
+      - link "Governance":
+        - /url: /governance/dashboard
+      - link "Meetings":
+        - /url: /governance/meetings
+      - link "Meeting" [disabled]
+  - link "Back":
+    - /url: /governance/meetings
+  - heading "Review September Board" [level=1]
+  - generic: scheduled
+  - paragraph:
+    - text: Friday, 18 September 2026 ·
+    - generic: 10:00 am (60 mins)
+    - text: ·
+    - generic: "Chair: Review Chair"
+    - text: ·
+    - generic: "Secretary: Review Secretary"
+  - link "View workflow":
+    - /url: "#tab-workflow"
+    - generic: Workflow
+    - generic: 4/8
+    - generic: Tasks complete
+  - link "View quorum":
+    - /url: "#tab-attendance"
+    - generic: Quorum
+    - generic: 0/3
+    - generic: Quorum pending
+  - link "View agenda":
+    - /url: "#tab-agenda"
+    - generic: Agenda
+    - generic: "0"
+    - generic: Scheduled items
+  - link "View resolutions":
+    - /url: "#tab-resolutions"
+    - generic: Resolutions
+    - generic: "1"
+    - generic: Decisions filed
+  - heading "Meeting RSVP Required" [level=3]
+  - paragraph: Please confirm whether you will attend this meeting or send apologies.
+  - button "Submit RSVP"
+  - paragraph: Chair
+  - paragraph: Review Chair
+  - paragraph: Secretary
+  - paragraph: Review Secretary
+  - paragraph: CEO Report
+  - paragraph: Pending
+  - paragraph: Board Pack
+  - paragraph: Not started
+  - paragraph: Quorum
+  - paragraph: 0/3
+  - paragraph: Pending Resolutions
+  - paragraph: "1"
+  - paragraph: Minutes
+  - paragraph: Approved
+  - paragraph: Previous Follow-through
+  - paragraph: Reviewed
+  - tablist:
+    - tab "Agenda (0)":
+      - generic: Agenda (0)
+    - tab "Attendance":
+      - generic: Attendance
+    - tab "Minutes":
+      - generic: Minutes
+    - tab "Resolutions (1)" [selected]:
+      - generic: Resolutions (1)
+    - tab "Workflow":
+      - generic: Workflow
+  - tabpanel "Resolutions (1)":
+    - button "Back to Meeting Agenda":
+      - text: Back to Meeting Agenda
+    - generic: "Meeting: Review September Board"
+    - generic: RES-ZAPSPC
+    - generic: Open
+    - heading "Review equipment renewal" [level=2]
+    - strong: "Frozen Decision Paper:"
+    - text: All votes evaluate these exact terms as frozen upon opening.
+    - generic: Immutable Snapshot
+    - generic: Exact Motion
+    - generic: decision paper
+    - generic: resolution
+    - blockquote: That the Board approves the proposal as presented.
+    - text: Context & Background (Why now?)
+    - paragraph: Test resolution context providing background and rationale for the decision.
+    - text: Alternatives Evaluated (2)
+    - generic: Consequential decisions evaluate alternatives with explicit benefits and drawbacks.
+    - generic: Approve
+    - generic: Option 1
+    - paragraph: Proceed with implementation
+    - paragraph: "Benefits:"
+    - paragraph: Immediate rollout
+    - paragraph: "Drawbacks & Costs:"
+    - paragraph: Capital outlay
+    - generic: Defer
+    - generic: Option 2
+    - paragraph: Defer to next financial year
+    - paragraph: "Benefits:"
+    - paragraph: Preserves cash
+    - paragraph: "Drawbacks & Costs:"
+    - paragraph: Delays benefits
+    - paragraph: Management Recommendation
+    - paragraph: Management recommends Option 1 (Approve) based on service continuity.
+    - text: Impact & Governance Assessments
+    - text: Financial Cost
+    - paragraph: "Confirmed: No direct financial cost."
+    - text: Service-User & Safety
+    - paragraph: None specified.
+    - text: Risk & Equity
+    - paragraph: None specified.
+    - text: Your Vote Receipt
+    - generic: Official tamper-proof record of your vote for RES-ZAPSPC.
+    - generic: FOR
+    - generic: "Recorded 9/13/2026, 8:10:39 PM · Method: electronic"
+- region "Notifications alt+T"

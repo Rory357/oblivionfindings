@@ -1,0 +1,7 @@
+{
+    "checked_at": "2026-09-13T08:09:24+00:00",
+    "http_status": 500,
+    "fixture_action": "AUDIT4-UI-FOLLOWUP",
+    "exception_message": "Call to undefined relationship [assignee] on model [App\\Domain\\Governance\\Models\\ActionItem] (from preview log).",
+    "synthetic_action_soft_deleted_to_continue_ui_audit": true
+}
