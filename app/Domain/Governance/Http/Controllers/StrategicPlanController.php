@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
+use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\StrategicPlan;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -34,10 +35,27 @@ class StrategicPlanController extends Controller
     {
         $this->authorize('view', $plan);
 
-        $plan->load(['goals' => fn ($q) => $q->orderBy('order')]);
+        $plan->load([
+            'goals' => fn ($q) => $q->orderBy('order'),
+            'goals.initiatives.owner',
+            'goals.leadExecutive',
+            'goals.originGoal',
+            'goals.roadmapInitiative',
+            'approvalResolution.meeting',
+            'supersedes',
+            'creator',
+        ]);
+
+        $carriedResolutions = Resolution::query()
+            ->where('status', 'closed')
+            ->where('outcome', 'carried')
+            ->orderByDesc('closed_at')
+            ->orderByDesc('id')
+            ->get(['id', 'resolution_reference', 'title', 'outcome', 'closed_at']);
 
         return Inertia::render('Governance/Strategy/Show', [
             'plan' => $plan,
+            'carriedResolutions' => $carriedResolutions,
         ]);
     }
 
@@ -84,7 +102,7 @@ class StrategicPlanController extends Controller
             'vision_statement' => ['nullable', 'string'],
             'mission_statement' => ['nullable', 'string'],
             'values' => ['nullable', 'array'],
-            'status' => ['sometimes', 'string', 'in:draft,active,completed,archived'],
+            'status' => ['sometimes', 'string', 'in:draft,review,approved,active,superseded,archived,completed'],
         ]);
 
         $plan->update([
@@ -171,7 +189,7 @@ class StrategicPlanController extends Controller
         $changeData = $plan->getChangesSinceLastSnapshot();
 
         return Inertia::render('Governance/Strategy/Changes', [
-            'plan' => $plan->load('goals'),
+            'plan' => $plan->load(['goals.leadExecutive', 'supersedes']),
             'changes' => $changeData,
         ]);
     }

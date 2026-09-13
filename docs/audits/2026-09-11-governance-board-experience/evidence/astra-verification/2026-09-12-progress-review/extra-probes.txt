@@ -1,0 +1,225 @@
+{
+    "checked_at": "2026-09-12T09:47:20+00:00",
+    "database": "oblivion_gov_review_runtime_20260912_25964",
+    "cases": {
+        "unanimous_all_entitled_for": {
+            "outcome": "defeated",
+            "summary": {
+                "for": 4,
+                "abstain": 0,
+                "against": 0,
+                "conflicts": 0,
+                "total_votes": 4,
+                "decision_snapshot": {
+                    "title": "Test Resolution",
+                    "outcome": "defeated",
+                    "closed_at": "2026-09-12T09:47:20+00:00",
+                    "conflicts": [],
+                    "threshold": "unanimous",
+                    "electorate": [
+                        {
+                            "name": "Review Chair",
+                            "role": null,
+                            "board_member_id": 1
+                        },
+                        {
+                            "name": "Review Alex Morgan",
+                            "role": null,
+                            "board_member_id": 3
+                        },
+                        {
+                            "name": "Review Finance",
+                            "role": null,
+                            "board_member_id": 4
+                        },
+                        {
+                            "name": "Review Alex Morgan",
+                            "role": null,
+                            "board_member_id": 5
+                        }
+                    ],
+                    "quorum_met": true,
+                    "vote_summary": {
+                        "for": 4,
+                        "abstain": 0,
+                        "against": 0,
+                        "conflicts": 0,
+                        "total_votes": 4
+                    },
+                    "resolution_id": 11,
+                    "quorum_details": {
+                        "met": true,
+                        "present": 4,
+                        "required": 3,
+                        "apologies": 0,
+                        "total_eligible": 4,
+                        "resolution_mode": "out_of_session",
+                        "percentage_present": 100
+                    },
+                    "quorum_required": true,
+                    "individual_votes": [
+                        {
+                            "id": 11,
+                            "vote": "for",
+                            "method": "electronic",
+                            "voted_at": "2026-09-12T09:47:20+00:00",
+                            "board_member_id": 1,
+                            "board_member_name": "Review Chair",
+                            "conflict_declared": false
+                        },
+                        {
+                            "id": 12,
+                            "vote": "for",
+                            "method": "electronic",
+                            "voted_at": "2026-09-12T09:47:20+00:00",
+                            "board_member_id": 3,
+                            "board_member_name": "Review Alex Morgan",
+                            "conflict_declared": false
+                        },
+                        {
+                            "id": 13,
+                            "vote": "for",
+                            "method": "electronic",
+                            "voted_at": "2026-09-12T09:47:20+00:00",
+                            "board_member_id": 4,
+                            "board_member_name": "Review Finance",
+                            "conflict_declared": false
+                        },
+                        {
+                            "id": 14,
+                            "vote": "for",
+                            "method": "electronic",
+                            "voted_at": "2026-09-12T09:47:20+00:00",
+                            "board_member_id": 5,
+                            "board_member_name": "Review Alex Morgan",
+                            "conflict_declared": false
+                        }
+                    ],
+                    "resolution_reference": "RES-AZSSG9"
+                }
+            },
+            "ratio_type": "int"
+        },
+        "ordinary_majority_written_without_authority": {
+            "written_permitted": false,
+            "outcome": "carried"
+        },
+        "ceo_raw_review_exposed": {
+            "http_status": 200,
+            "raw_assessment_in_response": true
+        },
+        "private_decision_widget": {
+            "private_title_present": true
+        },
+        "pack_confidential_agenda_and_motion": {
+            "confidential_title_in_content": true,
+            "paper_keys": [
+                "id",
+                "reference",
+                "title",
+                "context",
+                "recommendation",
+                "options",
+                "voting_threshold",
+                "status",
+                "deadline"
+            ]
+        },
+        "stale_minutes_approval": {
+            "reviewer_saw_version": 1,
+            "approved_version": 2,
+            "status": "approved"
+        },
+        "unrelated_resolution_approves_budget": {
+            "actor_role": "board_chair",
+            "resolution_title": "Unrelated vote: change meeting venue",
+            "resolution_cost_impact": null,
+            "adjustment_status": "approved",
+            "budget_total": "106000.00"
+        },
+        "implemented_decision_calendar_status": {
+            "id": "governance:decision:14",
+            "source": "decisions",
+            "group": "auto",
+            "title": "[Vote deadline] Test Resolution",
+            "start": "2026-09-11",
+            "end": "2026-09-11",
+            "allDay": true,
+            "status": "overdue",
+            "owner": null,
+            "room": null,
+            "ref": "RES-ZIYL8F",
+            "site": null,
+            "link": "/governance/resolutions/14",
+            "editable": false,
+            "eventType": "resolution",
+            "desc": "Test resolution context providing background and rationale for the decision.",
+            "mine": false
+        },
+        "policy_schema_and_work_feed": {
+            "attestation_columns": [
+                "id",
+                "governance_policy_id",
+                "user_id",
+                "acknowledged",
+                "acknowledged_at",
+                "notes",
+                "created_at",
+                "updated_at"
+            ],
+            "policy_version_column": [
+                "version_number"
+            ],
+            "policies_availability": "unavailable",
+            "totals": {
+                "all": 3,
+                "vote": 0,
+                "read": 0,
+                "act": 2,
+                "know": 1,
+                "pending": 3,
+                "overdue": 1,
+                "blocked": 0,
+                "completed": 0
+            }
+        },
+        "role_http_smoke": {
+            "member": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 403,
+                "/governance/performance/1": 403
+            },
+            "chair": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 200,
+                "/governance/performance/1": 200
+            },
+            "secretary": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 403,
+                "/governance/performance/1": 403
+            },
+            "finance": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 403,
+                "/governance/performance/1": 403
+            },
+            "ceo": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 403,
+                "/governance/performance/1": 200
+            },
+            "observer": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 403,
+                "/governance/performance/1": 403
+            }
+        }
+    }
+}

@@ -1,0 +1,68 @@
+{
+  "work_package": "GOV-W05",
+  "acceptance_criteria": "GOV-A05",
+  "title": "Minutes Immutability, Attestation, and Concurrency Workflow",
+  "verified_at": "2026-09-12T11:15:00+12:00",
+  "test_suite": "tests/Feature/Governance/GovernanceMinuteIntegrityTest.php",
+  "verification_results": {
+    "total_tests": 9,
+    "total_assertions": 49,
+    "status": "PASSED"
+  },
+  "verified_behaviors": [
+    {
+      "key": "immutability_approved_minutes",
+      "rule": "PUT /governance/meetings/{meeting}/minutes on an approved minute is strictly rejected and existing content remains unaltered.",
+      "tested_by": "test_approved_minutes_put_is_denied_and_old_content_retained",
+      "status": "VERIFIED"
+    },
+    {
+      "key": "immutability_signed_minutes",
+      "rule": "PUT /governance/meetings/{meeting}/minutes on a signed minute is strictly rejected and existing content remains unaltered.",
+      "tested_by": "test_signed_minutes_put_is_denied_and_old_content_retained",
+      "status": "VERIFIED"
+    },
+    {
+      "key": "two_editor_concurrency",
+      "rule": "Optimistic concurrency version check prevents two-editor race condition. If expected_version does not match current version, 409 Conflict exception is thrown.",
+      "tested_by": "test_stale_two_editor_conflict_detected_and_rejected",
+      "status": "VERIFIED"
+    },
+    {
+      "key": "version_history_preservation",
+      "rule": "Draft updates increment version_number and preserve complete prior version snapshots (including content blocks, SHA-256 fingerprint, and timestamp) in version_history.",
+      "tested_by": "test_old_content_retained_in_version_history_on_update",
+      "status": "VERIFIED"
+    },
+    {
+      "key": "actor_id_divergence_resolution",
+      "rule": "signed_by and reviewed_by resolve to board_members.id (not users.id) to preserve foreign key constraints, while accessors report full human-readable attribution.",
+      "tested_by": "test_signer_and_reviewer_correct_when_user_and_board_member_ids_differ",
+      "status": "VERIFIED"
+    },
+    {
+      "key": "signing_idempotence",
+      "rule": "Replay of minute signing is idempotent; repeated signing returns existing receipt and original signed timestamp without drift.",
+      "tested_by": "test_duplicate_sign_replay_is_idempotent",
+      "status": "VERIFIED"
+    },
+    {
+      "key": "empty_minutes_approval_guard",
+      "rule": "Attempting to approve an empty minute (no non-empty textual content blocks) throws DomainException.",
+      "tested_by": "test_cannot_approve_empty_minutes",
+      "status": "VERIFIED"
+    },
+    {
+      "key": "correction_draft_lineage",
+      "rule": "createCorrection creates a new draft version N+1, resets signed status, and stores full superseded signed snapshot in version_history with reason for correction.",
+      "tested_by": "test_correction_creates_new_draft_and_preserves_signed_original",
+      "status": "VERIFIED"
+    },
+    {
+      "key": "legacy_attribution_fallback",
+      "rule": "Historical minute records with timestamps but missing foreign keys explicitly report 'Legacy attribution unavailable' instead of empty strings or errors.",
+      "tested_by": "test_legacy_attribution_explicitly_reports_unavailable_when_signer_is_null",
+      "status": "VERIFIED"
+    }
+  ]
+}

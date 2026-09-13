@@ -1,0 +1,305 @@
+{
+    "checked_at": "2026-09-13T00:02:11+00:00",
+    "database": "oblivion_gov_review2_runtime_20260913_39488",
+    "cases": {
+        "policy_old_acknowledgement_claims_new_version": {
+            "attest_status": 302,
+            "original_receipt": {
+                "id": 1,
+                "governance_policy_id": 1,
+                "user_id": 1,
+                "acknowledged": true,
+                "policy_version": 1,
+                "due_date": null,
+                "acknowledged_at": "2026-09-13T00:02:12.000000Z",
+                "notes": null,
+                "created_at": "2026-09-13T00:02:12.000000Z",
+                "updated_at": "2026-09-13T00:02:12.000000Z"
+            },
+            "policy_version_now": 2,
+            "feed_contains_v2_attestation": true,
+            "feed": {
+                "items": [
+                    {
+                        "id": "policy:1:read:completed",
+                        "kind": "read",
+                        "source": {
+                            "type": "policy",
+                            "id": 1,
+                            "reference": "Policy #1",
+                            "href": "/governance/policies/1"
+                        },
+                        "title": "Attested: Review versioned policy",
+                        "reason": "Policy reading and compliance attestation confirmed.",
+                        "priority": "low",
+                        "status": "completed",
+                        "due_at": null,
+                        "due_date": null,
+                        "assignee_user_id": 1,
+                        "board_member_id": 1,
+                        "required_action": {
+                            "key": "read",
+                            "label": "View Policy",
+                            "href": "/governance/policies/1",
+                            "allowed": true,
+                            "blocked_reason": null
+                        },
+                        "source_version": 1,
+                        "available_as_of": "2026-09-13T00:02:12+00:00",
+                        "receipt": {
+                            "receipt_id": "ATT-RCP-1",
+                            "completed_at": "2026-09-13 00:02:12",
+                            "version": 1
+                        },
+                        "area": "Policies",
+                        "area_key": "policies",
+                        "detail": "Policy reading and compliance attestation confirmed.",
+                        "action_label": "View Policy",
+                        "action_url": "/governance/policies/1",
+                        "owner": "Review Chair"
+                    }
+                ],
+                "totals": {
+                    "all": 41,
+                    "vote": 0,
+                    "read": 0,
+                    "act": 39,
+                    "know": 2,
+                    "pending": 41,
+                    "overdue": 39,
+                    "blocked": 0,
+                    "completed": 1
+                },
+                "pagination": {
+                    "total": 1,
+                    "per_page": 25,
+                    "current_page": 1,
+                    "last_page": 1
+                },
+                "scope": {
+                    "viewer": {
+                        "user_id": 1,
+                        "name": "Review Chair",
+                        "board_member_id": 1
+                    },
+                    "filters": {
+                        "status": "completed"
+                    }
+                },
+                "availability": {
+                    "resolutions": "available",
+                    "board_packs": "available",
+                    "action_items": "available",
+                    "policies": "available",
+                    "meetings": "available"
+                },
+                "all_sources_succeeded": true,
+                "generated_at": "2026-09-13T00:02:12+00:00"
+            }
+        },
+        "unrelated_resolution_approves_strategy": {
+            "exception": "Illuminate\\Validation\\ValidationException",
+            "message": "The selected resolution does not authorize approval of this strategic plan."
+        },
+        "closed_evaluation_accepts_invalid_response": {
+            "http_status": 422,
+            "evaluation_status": "closed",
+            "response": null
+        },
+        "evaluation_period_and_deadline_roundtrip": {
+            "http_status": 302,
+            "stored": {
+                "id": 2,
+                "title": "Return review custom evaluation",
+                "evaluation_type": "board",
+                "year": 2026,
+                "period_start": "2026-03-01T00:00:00.000000Z",
+                "period_end": "2026-06-30T00:00:00.000000Z",
+                "due_date": "2026-11-15T00:00:00.000000Z",
+                "version_number": 1,
+                "audience": "all_members",
+                "status": "draft",
+                "summary": null,
+                "questions": [
+                    {
+                        "id": 1,
+                        "type": "rating",
+                        "question": "Board quality"
+                    }
+                ],
+                "aggregate_results": null,
+                "recommendations": null,
+                "action_plan": null,
+                "created_by": 1,
+                "opened_at": null,
+                "closed_at": null,
+                "created_at": "2026-09-13T00:02:13.000000Z",
+                "updated_at": "2026-09-13T00:02:13.000000Z"
+            },
+            "detail_contains_requested_start": true,
+            "detail_contains_requested_due": true
+        },
+        "missing_compliance_file_satisfies_completion": {
+            "exception": "Illuminate\\Validation\\ValidationException",
+            "message": "Evidence file 'Evidence metadata without bytes' does not exist on disk and cannot satisfy compliance."
+        },
+        "duplicate_voting_reminders": {
+            "same_job_invocations": 2,
+            "notifications_to_member": 1
+        },
+        "pack_recipient_receives_confidential_agenda": {
+            "builder_content_contains_private_agenda": true,
+            "member_can_view_pack": false,
+            "download_http_status": 404,
+            "download_contains_private_agenda": false,
+            "note": "Real content builder and download controller; synthetic JSON used instead of PDF rendering."
+        },
+        "empty_action_evidence_in_local_environment": {
+            "exception": "DomainException",
+            "message": "Evidence documentation is required to complete this action item."
+        },
+        "invalid_governance_setting_saved": {
+            "http_status": 302,
+            "saved_value": null
+        },
+        "wizard_followup_owner_name_ignored": {
+            "requested_name": "Review Alex Morgan",
+            "requested_user_id": 3,
+            "actual_assigned_to": 3,
+            "proposed_by": 1
+        }
+    }
+}{
+    "checked_at": "2026-09-13T00:02:16+00:00",
+    "database": "oblivion_gov_review2_runtime_20260913_39488",
+    "cases": {
+        "completed_private_action_still_leaks": {
+            "can_view": false,
+            "private_title_in_completed_feed": true
+        },
+        "present_attendance_still_invites": {
+            "can_view_without_explicit_invitation": true
+        },
+        "expired_committee_still_grants_access": {
+            "expired_member_can_view": true
+        },
+        "rules_change_after_open_changes_outcome": {
+            "opening_written_unanimity": true,
+            "profile_changed_after_open": true,
+            "outcome": "carried",
+            "frozen_rule_payload": null
+        },
+        "quorum_denominator_changes_after_open": {
+            "opening_electorate_count": 4,
+            "before": {
+                "present": 0,
+                "apologies": 0,
+                "total_eligible": 4,
+                "required": 3,
+                "met": false,
+                "percentage_present": 0,
+                "resolution_mode": "out_of_session"
+            },
+            "after": {
+                "present": 0,
+                "apologies": 0,
+                "total_eligible": 3,
+                "required": 2,
+                "met": false,
+                "percentage_present": 0,
+                "resolution_mode": "out_of_session"
+            }
+        },
+        "rules_authority_keyword_bypass": {
+            "unrelated_motion": "Buy printer paper for the office",
+            "activated": true
+        },
+        "strategy_authority_keyword_bypass": {
+            "motion": "Buy employee wellbeing resources",
+            "unrelated_plan_status": "approved"
+        },
+        "budget_authority_keyword_bypass": {
+            "motion": "Approve vehicle capital purchase",
+            "explicit_adjustment_id": null,
+            "adjustment_status": "approved",
+            "budget_total": "106000.00"
+        },
+        "legitimate_catering_authority_rejected": {
+            "exception": "Illuminate\\Validation\\ValidationException",
+            "message": "The board resolution does not authorize this specific budget adjustment subject. (and 1 more error)"
+        },
+        "action_public_asset_is_accepted_evidence": {
+            "file_is_public_website_asset": true,
+            "completed": "complete",
+            "receipt": "ACT-REC-ACT-UDLCGH-20260913000216",
+            "evidence": [
+                "robots.txt"
+            ]
+        },
+        "completed_action_can_be_blocked_again": {
+            "status": "blocked",
+            "completion_receipt": "SYNTHETIC-PRIOR",
+            "completed_at": "2026-09-13T00:02:16.000000Z",
+            "version_number": 2
+        },
+        "duplicate_name_followup_wrong_owner": {
+            "intended_user_id": 5,
+            "same_name_users": [
+                3,
+                5
+            ],
+            "actual_assigned_to": 3
+        },
+        "draft_policy_can_be_attested": {
+            "http_status": 302,
+            "policy_status": "draft",
+            "receipt_count": 1
+        },
+        "evaluation_accepts_missing_and_wrong_type_answers": {
+            "http_status": 302,
+            "stored_audience": "chair_only",
+            "responses": [
+                {
+                    "board_member_id": 3,
+                    "answers": [
+                        {
+                            "type": "rating",
+                            "answer": null,
+                            "question": "Rating",
+                            "question_id": 1
+                        },
+                        {
+                            "type": "yes_no",
+                            "answer": [
+                                "not",
+                                "boolean"
+                            ],
+                            "question": "Yes or no",
+                            "question_id": 2
+                        }
+                    ]
+                }
+            ]
+        },
+        "future_unverified_compliance_evidence_passes": {
+            "valid_from": "2027-01-01T00:00:00.000000Z",
+            "verified": false,
+            "obligation_status": "complete",
+            "evidence_provided": true
+        },
+        "settings_partial_write_on_validation_failure": {
+            "http_status": 422,
+            "capex_before": null,
+            "capex_after_failed_request": "12345"
+        },
+        "settings_negative_threshold_saved": {
+            "http_status": 302,
+            "saved": "-999"
+        },
+        "reminder_duplicates_across_hour_boundary": {
+            "elapsed_minutes": 2,
+            "claimed_window_hours": 4,
+            "notifications": 2
+        }
+    }
+}

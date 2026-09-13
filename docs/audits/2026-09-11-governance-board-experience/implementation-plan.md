@@ -1,5 +1,10 @@
+CURRENT RETURN REVIEW — 13 September 2026: [Independent audit](astra-verification.md) records **Not ready** and GOV-R01–GOV-R17. Read the [user-approved single-home/meeting-workspace decision](navigation-workflow-decision-2026-09-13.md) and [current Gemini fresh-context prompt](gemini-fresh-context-prompt.md). All GOV-W01–W24 / GOV-A01–A28 remain in scope. Older completion claims and navigation descriptions are historical where superseded by these current decisions.
+
 # Governance implementation plan
-Status: specification complete; implementation Not started; acceptance Not run. Repository: C:\Users\steph\Herd\oblivionfindings. Baseline and evidence limits: audit.md.
+
+Current correction order and evidence: [independent review](astra-progress-review-2026-09-12.md). Resume with [Gemini correction prompt](gemini-correction-prompt.md) before moving past the failed foundational acceptance. The original complete required scope and external D1/D2/D3 boundaries remain.
+
+Status: specification retained; implementation partial and acceptance reopened by Astra on 12 September 2026. Current statuses: implementation-progress.md and acceptance-checklist.md. Repository: C:\Users\steph\Herd\oblivionfindings. Baseline and evidence limits: audit.md.
 
 ## Target outcome and scope
 A member enters Board overview, sees their next authorised meeting and its current published pack, understands the main exceptions and changes, and can reach Vote, Read or Act without knowing an internal module. Secretariat/executive preparation is a distinct permission-appropriate queue. Keep useful underlying services and canonical records.
@@ -102,3 +107,4 @@ Run targeted tests after each consequential slice and the full Governance suite 
 Engineering completion requires all W tasks implemented and every executable A check independently evidenced. D1 activation/actual appointments/service-content validation and representative-human sessions remain visible external gates until actually satisfied.
 Recruit 3–5 representative board users including an infrequent/less confident member, chair/secretary and finance/committee member; use synthetic scenarios without coaching. Record unassisted completion, errors/backtracking, elapsed time and teach-back. Benchmarks: 30 seconds to identify meeting/concern/personal work; two minutes to find pack/awaiting decision; explain alternatives/consequences/conflict before voting; explain receipt/outcome/next owner afterwards. If missed, refine affected task and retest. Agent browser success does not pass GOV-A28.
 No deployment, publishing, real mail, production votes or destructive data actions. Final implementation report must distinguish implemented from verified and include remaining gates. The subsequent Astra session is an independent audit only.
+

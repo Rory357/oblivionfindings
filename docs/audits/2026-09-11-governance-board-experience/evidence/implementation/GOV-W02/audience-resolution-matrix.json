@@ -1,0 +1,35 @@
+{
+  "task": "GOV-W02",
+  "name": "Restricted Record Audience Matrix",
+  "timestamp": "2026-09-12T09:18:00+12:00",
+  "d2_rules": {
+    "ordinary_board_records": {
+      "audience": ["admin", "board_chair", "board_secretary", "board_member", "board_observer"],
+      "executive_contribution": "Assigned publication audience only",
+      "projections": "Unrestricted across meetings, resolutions, packs, actions"
+    },
+    "full_board_in_camera": {
+      "audience": ["admin", "board_chair", "board_secretary", "board_member", "board_observer"],
+      "ceo_executive_inclusion": "Excluded unless explicitly designated/invited for defined item",
+      "projections": "Derived exclusion for uninvited viewers across search, calendar, dashboard, counts"
+    },
+    "executive_session": {
+      "audience": ["admin", "board_chair", "meeting creator", "meeting chair/secretary", "executive committee members", "designated attendees marked by chair/admin"],
+      "ordinary_board_members": "Excluded completely (direct 403, hidden from index/calendar/dashboard/search)",
+      "self_authorization": "RSVP and attendance creation by non-executive members explicitly stripped of self-authorization grant"
+    },
+    "ceo_performance_review": {
+      "raw_appraisal_audience": ["admin", "board_chair", "remuneration committee", "governance committee", "executive committee"],
+      "ceo_reviewee_audience": "Can view own review, view goals/kpis, submit self-assessment; raw reviewer feedback redacted",
+      "ordinary_board_members": "Excluded completely (403 on index/show/edit; no leakage into counts or timeline)"
+    },
+    "action_items": {
+      "audience": "User with governance.actions.view where parent meeting/resolution is visible or assigned to user",
+      "projections": "scopeActionItems filters out items tied to executive session meetings or restricted resolutions"
+    },
+    "board_packs": {
+      "audience": "User with governance.packs.view where parent meeting is visible; pack managers cannot view executive session packs without meeting authority",
+      "projections": "visibleQuery and canView enforce parent meeting visibility"
+    }
+  }
+}

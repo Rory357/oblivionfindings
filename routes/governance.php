@@ -38,6 +38,24 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         ->name('dashboard.widget')
         ->middleware('permission:governance.view');
 
+    // My Work (L2)
+    Route::get('/my-work', [\App\Domain\Governance\Http\Controllers\GovernanceMyWorkController::class, 'index'])
+        ->name('my-work')
+        ->middleware('permission:governance.view');
+
+    Route::get('/my-work/data', [\App\Domain\Governance\Http\Controllers\GovernanceMyWorkController::class, 'data'])
+        ->name('my-work.data')
+        ->middleware('permission:governance.view');
+
+    // Governance Calendar (L5)
+    Route::get('/calendar', [\App\Domain\Governance\Http\Controllers\GovernanceCalendarController::class, 'index'])
+        ->name('calendar')
+        ->middleware('permission:governance.view');
+
+    Route::get('/calendar/items', [\App\Domain\Governance\Http\Controllers\GovernanceCalendarController::class, 'items'])
+        ->name('calendar.items')
+        ->middleware('permission:governance.view');
+
     // Reports & Exports
     Route::middleware('permission:governance.view')->group(function () {
         Route::get('/reports/board-monthly', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'boardMonthly'])->name('reports.board-monthly');
@@ -69,14 +87,17 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
             // Minutes
             Route::post('/meetings/{meeting}/minutes', [GovernanceMeetingController::class, 'storeMinutes'])->name('meetings.minutes.store');
             Route::put('/meetings/{meeting}/minutes', [GovernanceMeetingController::class, 'updateMinutes'])->name('meetings.minutes.update');
+            Route::post('/meetings/{meeting}/minutes/submit-for-review', [GovernanceMeetingController::class, 'submitMinutesForReview'])->name('meetings.minutes.submit_review');
             Route::post('/meetings/{meeting}/minutes/approve', [GovernanceMeetingController::class, 'approveMinutes'])->name('meetings.minutes.approve');
+            Route::post('/meetings/{meeting}/sign-minutes', [GovernanceMeetingController::class, 'signMinutes'])->name('meetings.minutes.sign');
+            Route::post('/meetings/{meeting}/minutes/archive', [GovernanceMeetingController::class, 'archiveMinutes'])->name('meetings.minutes.archive');
+            Route::post('/meetings/{meeting}/minutes/correction', [GovernanceMeetingController::class, 'createMinutesCorrection'])->name('meetings.minutes.correction');
             
             // Attendance
             Route::post('/meetings/{meeting}/attendance', [GovernanceMeetingController::class, 'recordAttendance'])->name('meetings.attendance.record');
 
             // Meeting status transitions
             Route::post('/meetings/{meeting}/lock', [GovernanceMeetingController::class, 'lockMeeting'])->name('meetings.lock');
-            Route::post('/meetings/{meeting}/sign-minutes', [GovernanceMeetingController::class, 'signMinutes'])->name('meetings.minutes.sign');
         });
     });
     
@@ -178,13 +199,14 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         
         Route::get('/performance/{review}/edit', [PerformanceReviewController::class, 'edit'])->name('performance.edit');
 
+        Route::post('/performance/{review}/feedback', [PerformanceReviewController::class, 'submitFeedback'])->name('performance.feedback');
+        Route::post('/performance/{review}/self-assessment', [PerformanceReviewController::class, 'submitSelfAssessment'])->name('performance.self-assessment');
+
         Route::middleware('permission:governance.performance.manage')->group(function () {
             Route::post('/performance', [PerformanceReviewController::class, 'store'])->name('performance.store');
             Route::put('/performance/{review}', [PerformanceReviewController::class, 'update'])->name('performance.update');
             Route::post('/performance/{review}/goals', [PerformanceReviewController::class, 'addGoal'])->name('performance.goals.add');
             Route::post('/performance/{review}/assess', [PerformanceReviewController::class, 'submitAssessment'])->name('performance.assess');
-            Route::post('/performance/{review}/feedback', [PerformanceReviewController::class, 'submitFeedback'])->name('performance.feedback');
-            Route::post('/performance/{review}/self-assessment', [PerformanceReviewController::class, 'submitSelfAssessment'])->name('performance.self-assessment');
             Route::post('/performance/{review}/approve', [PerformanceReviewController::class, 'approve'])->name('performance.approve');
         });
     });
@@ -255,15 +277,15 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     Route::middleware('permission:governance.policies.view')->group(function () {
         Route::get('/policies', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'index'])->name('policies.index');
         Route::get('/policies/attestations', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'attestations'])->name('policies.attestations');
-        Route::get('/policies/create', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'create'])->name('policies.create');
         Route::get('/policies/{policy}', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'show'])->name('policies.show');
-        Route::get('/policies/{policy}/edit', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'edit'])->name('policies.edit');
+        Route::post('/policies/{policy}/attest', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'attest'])->name('policies.attest');
 
         Route::middleware('permission:governance.policies.manage')->group(function () {
+            Route::get('/policies/create', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'create'])->name('policies.create');
+            Route::get('/policies/{policy}/edit', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'edit'])->name('policies.edit');
             Route::post('/policies', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'store'])->name('policies.store');
             Route::put('/policies/{policy}', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'update'])->name('policies.update');
             Route::post('/policies/{policy}/approve', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'approve'])->name('policies.approve');
-            Route::post('/policies/{policy}/attest', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'attest'])->name('policies.attest');
             Route::post('/policies/{policy}/version', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'newVersion'])->name('policies.version');
         });
     });
@@ -361,6 +383,7 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::post('/actions/{action}/block', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'block'])->name('actions.block');
         Route::post('/actions/{action}/unblock', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'unblock'])->name('actions.unblock');
         Route::post('/actions/{action}/escalate', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'escalate'])->name('actions.escalate');
+        Route::post('/actions/{action}/reassign', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'reassign'])->name('actions.reassign');
     });
 
     // Governance Audit Log (cross-module changes + action events)
@@ -397,6 +420,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
 
         Route::middleware('permission:governance.settings.manage')->group(function () {
             Route::put('/settings', [GovernanceSettingController::class, 'update'])->name('settings.update');
+            Route::post('/settings/rules', [GovernanceSettingController::class, 'updateRules'])->name('settings.rules.update');
+            Route::post('/settings/rules/activate', [GovernanceSettingController::class, 'activateRules'])->name('settings.rules.activate');
         });
     });
 });

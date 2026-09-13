@@ -96,6 +96,29 @@ class GovernanceSettingController extends Controller
             ];
         });
 
+        $profileService = app(\App\Domain\Governance\Services\GovernanceVotingProfileService::class);
+        $activeProfile = $profileService->getActiveProfile('board');
+        $candidateProfile = $activeProfile ?? $profileService->getOrCreateCandidateDefault('board');
+
+        $boardMembers = \App\Domain\Governance\Models\BoardMember::with('user')
+            ->get()
+            ->map(function ($m) {
+                return [
+                    'id' => $m->id,
+                    'name' => $m->user?->name ?? 'Unknown',
+                    'email' => $m->user?->email,
+                    'role' => $m->board_role,
+                    'has_voting_seat' => $m->has_voting_seat,
+                    'can_vote' => $m->canVote(),
+                    'is_active' => (bool) $m->is_active,
+                    'term_start' => $m->term_start?->toDateString(),
+                    'term_end' => $m->term_end?->toDateString(),
+                ];
+            });
+
+        $eligibleCount = $boardMembers->where('can_vote', true)->count();
+        $quorumRequired = $profileService->calculateQuorumRequired($eligibleCount, $candidateProfile);
+
         return Inertia::render('Governance/Settings/Index', [
             'settings' => $settings,
             'categories' => [
@@ -103,6 +126,18 @@ class GovernanceSettingController extends Controller
                 GovernanceSetting::CATEGORY_ESCALATION => 'Escalation',
                 GovernanceSetting::CATEGORY_GENERAL => 'General',
             ],
+            'rulesProfile' => [
+                'profile' => $candidateProfile,
+                'isConfirmed' => $candidateProfile->isConfirmed(),
+                'statusLabel' => $candidateProfile->isConfirmed()
+                    ? 'Rules confirmed by governing authority'
+                    : 'Rules not confirmed — live voting unavailable',
+                'eligibleVoterCount' => $eligibleCount,
+                'quorumRequired' => $quorumRequired,
+                'quorumFormula' => 'floor(N/2)+1',
+                'members' => $boardMembers,
+            ],
+            'canManage' => auth()->user()?->hasPermissionTo('governance.settings.manage') ?? false,
         ]);
     }
 
@@ -124,6 +159,18 @@ class GovernanceSettingController extends Controller
             $def = collect($this->definitions)->firstWhere('key', $key);
             $category = $def['category'] ?? GovernanceSetting::CATEGORY_GENERAL;
             $description = $def['description'] ?? null;
+            $type = $def['type'] ?? 'string';
+
+            if ($type === 'number' && $value !== null && $value !== '') {
+                if (! is_numeric($value)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "settings.{$key}" => "The setting '{$def['label']}' must be a valid number.",
+                    ]);
+                }
+                $value = is_float($value + 0) ? (float) $value : (int) $value;
+            } elseif ($type === 'boolean' && $value !== null) {
+                $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            }
 
             GovernanceSetting::set($key, $value, $category, $description);
             $changes++;
@@ -137,5 +184,83 @@ class GovernanceSettingController extends Controller
         }
 
         return back()->with('success', "Updated {$changes} setting(s).");
+    }
+
+    public function updateRules(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'legal_form' => 'required|string|max:100',
+            'governing_document_reference' => 'nullable|string|max:255',
+            'governing_document_version' => 'nullable|string|max:50',
+            'quorum_mode' => 'required|string|in:majority_floor_plus_one,percentage,fixed_count',
+            'quorum_formula' => 'required|string|max:100',
+            'ordinary_threshold_formula' => 'required|string|max:255',
+            'unanimous_denominator_formula' => 'required|string|max:255',
+            'written_voting_permitted' => 'boolean',
+            'written_unanimity_required' => 'boolean',
+            'recusal_policy' => 'required|string|max:255',
+        ]);
+
+        $profileService = app(\App\Domain\Governance\Services\GovernanceVotingProfileService::class);
+        $profile = $profileService->getOrCreateCandidateDefault('board');
+
+        if ($profile->is_active || $profile->approved_at) {
+            $profile = \App\Domain\Governance\Models\GovernanceVotingProfile::create([
+                ...$profile->toArray(),
+                ...$validated,
+                'id' => null,
+                'is_active' => false,
+                'approved_at' => null,
+                'approved_by_user_id' => null,
+                'approved_by_resolution_id' => null,
+                'effective_from' => null,
+                'effective_to' => null,
+                'created_by' => auth()->id(),
+            ]);
+        } else {
+            $profile->update($validated);
+        }
+
+        GovernanceAuditService::log('governance_rules.updated', 'GovernanceVotingProfile', $profile->id, [
+            'updated_by' => auth()->id(),
+            'fields' => array_keys($validated),
+        ]);
+
+        return back()->with('success', 'Governance voting rules updated.');
+    }
+
+    public function activateRules(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'governing_document_reference' => 'required|string|min:3',
+            'governing_document_version' => 'nullable|string|max:50',
+            'approved_by_resolution_id' => 'nullable|exists:resolutions,id',
+        ]);
+
+        $profileService = app(\App\Domain\Governance\Services\GovernanceVotingProfileService::class);
+        $profile = $profileService->getOrCreateCandidateDefault('board');
+
+        try {
+            $resolution = !empty($validated['approved_by_resolution_id'])
+                ? \App\Domain\Governance\Models\Resolution::find($validated['approved_by_resolution_id'])
+                : null;
+
+            $profileService->activateProfile(
+                $profile,
+                auth()->user(),
+                $resolution,
+                $validated['governing_document_reference'],
+                $validated['governing_document_version'] ?? null
+            );
+
+            GovernanceAuditService::log('governance_rules.activated', 'GovernanceVotingProfile', $profile->id, [
+                'activated_by' => auth()->id(),
+                'document_reference' => $validated['governing_document_reference'],
+            ]);
+
+            return back()->with('success', 'Governance voting profile successfully activated.');
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 }

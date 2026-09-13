@@ -182,6 +182,7 @@ export default function RiskShow({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Risks', href: '/governance/risks' },
                 { title: 'Risk', href: `/governance/risks/${risk.id}` },

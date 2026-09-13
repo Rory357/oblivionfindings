@@ -1,0 +1,93 @@
+{
+  "task": "GOV-W03",
+  "acceptance_criteria": "GOV-A03",
+  "generated_at": "2026-09-12T09:59:00+12:00",
+  "d1_candidate_profile": {
+    "governing_body": "board",
+    "legal_form": "charitable_trust",
+    "quorum_mode": "majority_floor_plus_one",
+    "quorum_formula": "floor(N/2)+1",
+    "ordinary_threshold_formula": "for > against of valid votes cast",
+    "unanimous_denominator_formula": "assent from all entitled voters",
+    "recusal_policy": "exclude_from_presence_and_tally_without_reducing_N",
+    "written_voting_permitted": false,
+    "written_unanimity_required": true,
+    "live_activation_status": "blocked_pending_d1_legal_authority",
+    "activation_requirements": [
+      "governing_document_reference (non-candidate, e.g. Trust Deed 2024)",
+      "approval_evidence (approved_by_resolution_id or formal approval timestamp/user)"
+    ]
+  },
+  "quorum_formula_cases": [
+    { "N": 0, "required": 0, "met": false, "notes": "Zero eligible voters never makes quorum" },
+    { "N": 1, "required": 1, "met_with_1": true, "met_with_0": false },
+    { "N": 4, "required": 3, "met_with_3": true, "met_with_2": false },
+    { "N": 5, "required": 3, "met_with_3": true, "met_with_2": false }
+  ],
+  "membership_entitlement_cases": [
+    {
+      "case": "chair",
+      "active": true,
+      "term": "current",
+      "can_vote": true,
+      "electorate": "board"
+    },
+    {
+      "case": "member",
+      "active": true,
+      "term": "current",
+      "can_vote": true,
+      "electorate": "board"
+    },
+    {
+      "case": "treasurer",
+      "active": true,
+      "term": "current",
+      "can_vote": true,
+      "electorate": "board",
+      "notes": "Appointed member with finance responsibilities, retains full voting entitlement"
+    },
+    {
+      "case": "observer",
+      "active": true,
+      "term": "current",
+      "can_vote": false,
+      "electorate": "none",
+      "notes": "Excluded from quorum denominator and cannot cast votes"
+    },
+    {
+      "case": "administrative_secretary",
+      "active": true,
+      "has_voting_seat": false,
+      "can_vote": false,
+      "electorate": "none",
+      "notes": "Administrative role without voting seat cannot vote"
+    },
+    {
+      "case": "voting_secretary",
+      "active": true,
+      "has_voting_seat": true,
+      "can_vote": true,
+      "electorate": "board",
+      "notes": "Secretary explicitly appointed to a voting seat can vote"
+    },
+    {
+      "case": "expired_term_member",
+      "active": true,
+      "term": "expired",
+      "can_vote": false,
+      "electorate": "none",
+      "notes": "Member with term_end < today() cannot vote"
+    },
+    {
+      "case": "committee_electorate",
+      "type": "finance_committee",
+      "committee_member": true,
+      "can_vote_on_committee": true,
+      "non_committee_member_can_vote": false,
+      "notes": "Committee resolutions restrict voting strictly to appointed committee voting members"
+    }
+  ],
+  "verification_command": "& 'C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe' vendor/bin/pest tests/Unit/Governance/VotingServiceTest.php tests/Feature/Governance/GovernanceBoardMemberAdminTest.php tests/Feature/Governance/GovernanceBoardMemberSelfServiceTest.php --compact",
+  "result": "Passed (17 tests, 85 assertions, exit 0)"
+}

@@ -2,7 +2,6 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
-use App\Domain\Finance\Services\BudgetActualsService;
 use App\Domain\Governance\Services\DashboardAggregatorService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Domain\Governance\Support\GovernancePresenter;
@@ -17,7 +16,6 @@ class DashboardController extends Controller
         protected DashboardAggregatorService $aggregator,
         protected GovernanceWorkflowService $workflowService,
         protected GovernancePresenter $presenter,
-        protected BudgetActualsService $budgetActualsService,
     ) {}
 
     public function index(Request $request)
@@ -26,6 +24,16 @@ class DashboardController extends Controller
 
         // Check if user is a board member
         $boardMember = $user?->boardMember;
+
+        $workTotals = null;
+        try {
+            if ($user) {
+                $workFeed = $this->workflowService->workQuery()->queryFeed($user);
+                $workTotals = $workFeed['totals'] ?? null;
+            }
+        } catch (\Throwable) {
+            // Non-blocking fallback
+        }
 
         return Inertia::render('Governance/Dashboard', [
             'periods' => [
@@ -36,6 +44,7 @@ class DashboardController extends Controller
             ],
             'isBoardMember' => $boardMember !== null,
             'boardRole' => $boardMember?->board_role,
+            'workTotals' => $workTotals,
         ]);
     }
 
@@ -50,6 +59,15 @@ class DashboardController extends Controller
         $period = $request->validate(['period' => 'required|in:today,week,month,year'])['period'];
         $user = $request->user();
         $workflow = $this->workflowService->dashboardWorkflow($user);
+        $workTotals = null;
+        try {
+            if ($user) {
+                $workFeed = $this->workflowService->workQuery()->queryFeed($user);
+                $workTotals = $workFeed['totals'] ?? null;
+            }
+        } catch (\Throwable) {
+            // Non-blocking fallback
+        }
 
         try {
             // Widget visibility is permission-scoped, so the cache is per
@@ -60,7 +78,6 @@ class DashboardController extends Controller
             $cacheKey = "governance:dashboard:{$period}:{$user->id}";
 
             if ($request->boolean('fresh')) {
-                $this->syncBudgetActuals($request);
                 Cache::forget($cacheKey);
             }
 
@@ -83,48 +100,17 @@ class DashboardController extends Controller
                 'period' => $periodData,
                 'widgets' => $widgets,
                 'workflow' => $workflow,
+                'work_totals' => $workTotals,
                 'freshness' => $freshness,
                 'cockpit' => $this->presenter->dashboard($widgets, $periodData, $freshness, $workflow, $user),
                 'captured_at' => $result['data']['captured_at'] ?? now()->toIso8601String(),
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             report($e);
 
-            $periodData = [
-                'type' => $period,
-                'start' => now()->startOfMonth()->toDateString(),
-                'end' => now()->toDateString(),
-            ];
-            $widgets = [
-                'top_risks' => ['critical' => 0, 'high' => 0, 'medium' => 0, 'above_appetite' => 0, 'items' => []],
-                'voided_risks' => ['count' => 0, 'items' => []],
-                'risk_changes' => ['new' => 0, 'escalated' => 0, 'closed' => 0, 'net_change' => 0],
-                'client_safety' => ['high_risk_clients' => 0, 'serious_incidents_period' => 0, 'open_critical_incidents' => 0, 'status' => 'good'],
-                'operational_safety' => ['near_misses' => 0, 'injuries' => 0, 'status' => 'good'],
-                'privacy_data' => ['breaches_90d' => 0, 'open_breaches' => 0, 'open_dpias' => 0, 'dsr_backlog' => 0, 'status' => 'good'],
-                'workforce' => ['overtime_percentage' => 0, 'unfilled_shifts' => 0, 'training_compliance' => null, 'status' => 'good'],
-                'financial' => ['budget_utilization' => 0, 'variance' => 0, 'status' => 'unknown'],
-                'it_cyber' => ['security_incidents' => 0, 'uptime_percentage' => null, 'critical_open_alerts' => 0, 'status' => 'good'],
-                'compliance_calendar' => [],
-                'decisions_required' => ['count' => 0, 'overdue' => 0, 'items' => []],
-                'roadmap' => ['status' => 'unavailable', 'reason' => 'roadmap unavailable'],
-                'control_room' => ['critical_alerts' => 0, 'high_alerts' => 0, 'mtta_minutes' => 0, 'mttr_minutes' => 0, 'open_critical' => 0],
-                'incidents' => ['total_period' => 0, 'by_severity' => [], 'open_count' => 0, 'avg_close_hours' => 0],
-                'safeguarding' => ['new_concerns' => 0, 'critical_concerns' => 0, 'open_concerns' => 0, 'investigations_opened' => 0, 'status' => 'good'],
-                'fleet_assets' => ['total_assets' => 0, 'fleet_vehicles' => 0, 'overdue_inspections' => 0, 'asset_incidents' => 0, 'status' => 'unknown'],
-                'hs_backbone' => ['status' => 'unavailable', 'reason' => 'hs integration unavailable'],
-            ];
-            $freshness = [];
-
             return response()->json([
-                'snapshot_id' => null,
-                'period' => $periodData,
-                'widgets' => $widgets,
-                'workflow' => $workflow,
-                'freshness' => $freshness,
-                'cockpit' => $this->presenter->dashboard($widgets, $periodData, $freshness, $workflow, $request->user()),
-                'captured_at' => now()->toIso8601String(),
-            ]);
+                'message' => 'Board information could not be loaded.',
+            ], 500);
         }
     }
 
@@ -161,14 +147,5 @@ class DashboardController extends Controller
         };
 
         return ['start' => $start, 'end' => $end];
-    }
-
-    protected function syncBudgetActuals(Request $request): void
-    {
-        try {
-            $this->budgetActualsService->syncActuals($request->user()?->organization_id);
-        } catch (\Throwable $exception) {
-            report($exception);
-        }
     }
 }

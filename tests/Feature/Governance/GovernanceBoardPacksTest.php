@@ -994,6 +994,153 @@ class GovernanceBoardPacksTest extends TestCase
         $this->actingAs($recipient)->post("/governance/packs/{$pack->id}/read")->assertNotFound();
     }
 
+    public function test_same_day_same_title_packs_use_distinct_paths(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin, [
+            'title' => 'Annual Strategy Session',
+            'scheduled_at' => now(),
+        ]);
+
+        $builder = app(\App\Domain\Governance\Services\BoardPackBuilderService::class);
+        $this->actingAs($admin);
+        $packV1 = $builder->build($meeting);
+        $packV2 = $builder->regenerate($packV1);
+
+        $this->assertSame(1, $packV1->revision_number);
+        $this->assertSame(2, $packV2->revision_number);
+        $this->assertNotSame($packV1->file_path, $packV2->file_path);
+        $this->assertFalse($packV1->fresh()->isCurrent());
+        $this->assertTrue($packV2->fresh()->isCurrent());
+        $this->assertTrue(Storage::disk('local')->exists($packV1->file_path));
+        $this->assertTrue(Storage::disk('local')->exists($packV2->file_path));
+    }
+
+    public function test_new_revision_requires_new_reading_acknowledgement(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->createAdminUser();
+        $memberUser = $this->createUserWithRole('board_member');
+        $member = $this->createBoardMember($memberUser);
+        $meeting = $this->createMeeting($admin);
+
+        $builder = app(\App\Domain\Governance\Services\BoardPackBuilderService::class);
+        $this->actingAs($admin);
+        $packV1 = $builder->build($meeting);
+        $builder->distribute($packV1, [$member->id]);
+
+        // Member reads v1
+        $readResponse = $this->actingAs($memberUser)->post("/governance/packs/{$packV1->id}/read");
+        $readResponse->assertOk();
+        $this->assertTrue($packV1->fresh()->hasMemberRead($member->id));
+
+        // Generate v2 and distribute
+        $this->actingAs($admin);
+        $packV2 = $builder->regenerate($packV1);
+        $builder->distribute($packV2, [$member->id]);
+
+        // V2 should NOT be marked as read by member yet
+        $this->assertFalse($packV2->fresh()->hasMemberRead($member->id));
+
+        // Now member reads v2
+        $readV2Response = $this->actingAs($memberUser)->post("/governance/packs/{$packV2->id}/read");
+        $readV2Response->assertOk();
+        $this->assertTrue($packV2->fresh()->hasMemberRead($member->id));
+
+        // Both receipts exist with distinct revision numbers
+        $receiptV1 = $packV1->fresh()->getMemberReceipt($member->id);
+        $receiptV2 = $packV2->fresh()->getMemberReceipt($member->id);
+        $this->assertSame(1, $receiptV1['revision_number']);
+        $this->assertSame(2, $receiptV2['revision_number']);
+        $this->assertNotSame($receiptV1['receipt_id'], $receiptV2['receipt_id']);
+    }
+
+    public function test_download_is_not_read_acknowledgement(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->createAdminUser();
+        $memberUser = $this->createUserWithRole('board_member');
+        $member = $this->createBoardMember($memberUser);
+        $meeting = $this->createMeeting($admin);
+
+        $builder = app(\App\Domain\Governance\Services\BoardPackBuilderService::class);
+        $this->actingAs($admin);
+        $pack = $builder->build($meeting);
+        $builder->distribute($pack, [$member->id]);
+
+        $this->actingAs($memberUser)->get("/governance/packs/{$pack->id}/download")->assertOk();
+
+        $fresh = $pack->fresh();
+        $this->assertCount(1, $fresh->download_tracking ?? []);
+        $this->assertSame([], $fresh->read_tracking ?? []);
+        $this->assertFalse($fresh->hasMemberRead($member->id));
+    }
+
+    public function test_actual_document_count_does_not_count_root_section_keys(): void
+    {
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin);
+
+        $snapshotData = ['widgets' => []];
+        $snapshot = DashboardSnapshot::create([
+            'snapshot_data' => $snapshotData,
+            'period_type' => 'month',
+            'period_start' => now()->startOfMonth()->toDateString(),
+            'period_end' => now()->toDateString(),
+            'checksum' => DashboardSnapshot::generateChecksum($snapshotData),
+            'captured_at' => now(),
+            'captured_by' => $admin->id,
+            'data_freshness' => [],
+        ]);
+
+        $pack = BoardPack::create([
+            'governance_meeting_id' => $meeting->id,
+            'dashboard_snapshot_id' => $snapshot->id,
+            'revision_number' => 1,
+            'build_status' => 'published',
+            'is_current' => true,
+            'document_manifest' => [
+                'manifest_sections' => [
+                    ['id' => 'cover', 'title' => 'Cover'],
+                    ['id' => 'agenda', 'title' => 'Agenda'],
+                    ['id' => 'dashboard', 'title' => 'Dashboard'],
+                    ['id' => 'risk_report', 'title' => 'Risk Report'],
+                    ['id' => 'finance_report', 'title' => 'Finance Report'],
+                    ['id' => 'ceo_report', 'title' => 'CEO Report'],
+                    ['id' => 'committee_reports', 'title' => 'Committee Reports'],
+                    ['id' => 'resolutions', 'title' => 'Decision Papers'],
+                ],
+                'content_sections' => [
+                    'cover' => ['title' => 'Cover'],
+                    'agenda' => [['order' => 1, 'title' => 'Item 1']],
+                    'ceo_report' => ['status' => 'Submitted'],
+                    'resolutions' => [
+                        'items' => [
+                            ['id' => 1, 'title' => 'Paper 1'],
+                            ['id' => 2, 'title' => 'Paper 2'],
+                        ],
+                    ],
+                    'supporting_documents' => [
+                        'items' => [
+                            ['id' => 10, 'title' => 'Doc 1'],
+                        ],
+                    ],
+                ],
+            ],
+            'generated_at' => now(),
+            'generated_by' => $admin->id,
+            'supplementary_attachments' => [
+                ['id' => 'att-1', 'original_name' => 'extra.pdf'],
+            ],
+        ]);
+
+        $this->assertSame(5, $pack->actualDocumentCount());
+    }
+
     /**
      * @param  array<int, int>|null  $recipientIds
      * @param  array<int, array<string, mixed>>  $attachments

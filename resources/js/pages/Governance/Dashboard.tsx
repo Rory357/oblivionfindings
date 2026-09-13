@@ -1,18 +1,23 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
-import { Landmark, RefreshCw } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { AlertCircle, Landmark, RefreshCw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
-import { PageHero, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageLayout,
+} from '@/components/page';
+import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
+import { canDoGovernance } from '@/lib/governance-permissions';
 import { data as dashboardData } from '@/routes/governance/dashboard';
 import { PageProps } from '@/types';
 
@@ -26,12 +31,26 @@ interface DashboardPayload {
         summary: { total: number; critical: number; overdue: number };
         actions: WorkflowAction[];
     };
+    work_totals?: {
+        all: number;
+        pending: number;
+        overdue: number;
+        completed: number;
+        [key: string]: number;
+    } | null;
     cockpit: CockpitPayload;
 }
 
 type Props = PageProps & {
     isBoardMember: boolean;
     boardRole?: string;
+    workTotals?: {
+        all: number;
+        pending: number;
+        overdue: number;
+        completed: number;
+        [key: string]: number;
+    } | null;
 };
 
 const formatLabel = (value: string) => value.replace(/_/g, ' ');
@@ -46,36 +65,90 @@ export default function GovernanceDashboard({
     auth,
     isBoardMember,
     boardRole,
+    workTotals,
 }: Props) {
     const [period, setPeriod] = useState('month');
+    const [searchQuery, setSearchQuery] = useState('');
     const [payload, setPayload] = useState<DashboardPayload | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [refreshError, setRefreshError] = useState<string | null>(null);
+    const [lastCapturedAt, setLastCapturedAt] = useState<string | null>(null);
+    const activeRequestRef = useRef<number>(0);
 
     // Manual refresh bypasses the server-side dashboard cache (fresh=1)
     // so the button always returns just-computed numbers.
     const fetchData = async () => {
         setLoading(true);
+        setRefreshError(null);
+        const reqId = ++activeRequestRef.current;
         try {
             const response = await axios.get(dashboardData.url(), {
                 params: { period, fresh: 1 },
             });
-            setPayload(response.data);
+            if (reqId === activeRequestRef.current) {
+                setPayload(response.data);
+                setError(null);
+                setRefreshError(null);
+                if (response.data?.captured_at) {
+                    setLastCapturedAt(response.data.captured_at);
+                }
+            }
+        } catch (err) {
+            if (reqId === activeRequestRef.current) {
+                if (!payload) {
+                    setError('Board information could not be loaded.');
+                } else {
+                    const timeLabel = lastCapturedAt
+                        ? new Date(lastCapturedAt).toLocaleTimeString()
+                        : 'earlier capture';
+                    setRefreshError(
+                        `Refresh failed — showing data as of ${timeLabel}.`,
+                    );
+                }
+            }
         } finally {
-            setLoading(false);
+            if (reqId === activeRequestRef.current) {
+                setLoading(false);
+            }
         }
     };
 
     useEffect(() => {
         let cancelled = false;
+        const reqId = ++activeRequestRef.current;
         const load = async () => {
             setLoading(true);
+            setRefreshError(null);
             try {
                 const response = await axios.get(dashboardData.url(), {
                     params: { period },
                 });
-                if (!cancelled) setPayload(response.data);
+                if (!cancelled && reqId === activeRequestRef.current) {
+                    setPayload(response.data);
+                    setError(null);
+                    setRefreshError(null);
+                    if (response.data?.captured_at) {
+                        setLastCapturedAt(response.data.captured_at);
+                    }
+                }
+            } catch (err) {
+                if (!cancelled && reqId === activeRequestRef.current) {
+                    if (!payload) {
+                        setError('Board information could not be loaded.');
+                    } else {
+                        const timeLabel = lastCapturedAt
+                            ? new Date(lastCapturedAt).toLocaleTimeString()
+                            : 'earlier capture';
+                        setRefreshError(
+                            `Refresh failed — showing data as of ${timeLabel}.`,
+                        );
+                    }
+                }
             } finally {
-                if (!cancelled) setLoading(false);
+                if (!cancelled && reqId === activeRequestRef.current) {
+                    setLoading(false);
+                }
             }
         };
         void load();
@@ -90,105 +163,313 @@ export default function GovernanceDashboard({
         (auth as { can?: { governance?: Record<string, unknown> } })?.can
             ?.governance ?? null;
 
-    const stats = workflow
-        ? [
-              { label: 'Open actions', value: workflow.summary.total },
-              { label: 'Critical', value: workflow.summary.critical },
-              { label: 'Overdue', value: workflow.summary.overdue },
-          ]
-        : undefined;
+    const myWorkCount =
+        payload?.work_totals?.pending ??
+        workTotals?.pending ??
+        workflow?.actions.filter((a) => {
+            if (auth.user?.id && a.assignee_user_id) {
+                return a.assignee_user_id === auth.user.id;
+            }
+            return false;
+        }).length ?? 0;
+
+    const overdueActionsCount =
+        (workflow?.summary as { action_items_overdue?: number; overdue?: number } | undefined)?.action_items_overdue ??
+        Number(cockpit?.cards_by_key?.follow_through?.metrics?.find((m) => m.label === 'Overdue')?.value ?? workflow?.summary?.overdue ?? 0);
+
+    const risksOverAppetiteCount = Number(
+        cockpit?.kpi_band?.find((k) => k.key === 'risks_over_appetite')?.value ??
+            0,
+    );
+
+    const complianceCard = cockpit?.cards_by_key?.['compliance_calendar'];
+    const overdueObligationsMetric = complianceCard?.metrics?.find(
+        (m) => m.label === 'Overdue',
+    );
+    const obligationsOverdueCount = Number(
+        overdueObligationsMetric?.value ?? 0,
+    );
+
+    const isSecretaryOrChair =
+        isBoardMember && (boardRole === 'secretary' || boardRole === 'chair');
+    const canManageMeetings = canDoGovernance(permissions, 'meetings', 'manage');
+    const showPrepareMeeting = isBoardMember || isSecretaryOrChair || canManageMeetings;
 
     return (
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
             ]}
         >
-            <Head title="Governance Dashboard" />
+            <Head title="Board overview" />
 
             <PageLayout
                 hero={
-                    <PageHero
-                        category="governance"
+                    <PageHeader
+                        variant="index"
                         icon={Landmark}
-                        title={
-                            <span dusk="governance-cockpit-heading">
-                                Executive &amp; Board Cockpit
+                        title="Board overview"
+                        titleChip={
+                            <span
+                                dusk="governance-cockpit-heading"
+                                className="hidden"
+                            >
+                                Board overview
                             </span>
                         }
-                        description="Your central hub for meetings, decisions, risks, compliance, and financial governance."
-                        stats={stats}
-                        badges={
-                            isBoardMember && boardRole
-                                ? [{ label: formatLabel(boardRole) }]
-                                : undefined
+                        subline={
+                            <>
+                                Reporting period: {formatLabel(period)} ·{' '}
+                                {lastCapturedAt ? (
+                                    <>
+                                        Last captured{' '}
+                                        <time dateTime={lastCapturedAt}>
+                                            {new Date(
+                                                lastCapturedAt,
+                                            ).toLocaleTimeString([], {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                            })}
+                                        </time>
+                                    </>
+                                ) : (
+                                    'Latest capture'
+                                )}
+                            </>
                         }
                         actions={
-                            <div className="flex items-center gap-2">
-                                <Select
-                                    value={period}
-                                    onValueChange={setPeriod}
-                                >
-                                    <SelectTrigger
-                                        className="w-36 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm"
-                                        aria-label="Reporting period"
+                            <>
+                                <PageHeaderSearch
+                                    value={searchQuery}
+                                    onChange={setSearchQuery}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && searchQuery.trim()) {
+                                            router.visit(
+                                                `/governance/actions?search=${encodeURIComponent(searchQuery.trim())}`,
+                                            );
+                                        }
+                                    }}
+                                    placeholder="Search governance..."
+                                />
+                                {showPrepareMeeting ? (
+                                    <PageHeaderPrimaryButton
+                                        onClick={() =>
+                                            router.visit(
+                                                cockpit?.next_meeting
+                                                    ? `/governance/meetings/${cockpit.next_meeting.meeting.id}`
+                                                    : '/governance/meetings',
+                                            )
+                                        }
                                     >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="today">
-                                            Today
-                                        </SelectItem>
-                                        <SelectItem value="week">
-                                            This Week
-                                        </SelectItem>
-                                        <SelectItem value="month">
-                                            This Month
-                                        </SelectItem>
-                                        <SelectItem value="year">
-                                            This Year
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Button
-                                    variant="outline"
+                                        Prepare meeting
+                                    </PageHeaderPrimaryButton>
+                                ) : (
+                                    <PageHeaderPrimaryButton
+                                        onClick={() =>
+                                            router.visit('/governance/my-work')
+                                        }
+                                    >
+                                        My work
+                                        {myWorkCount > 0
+                                            ? ` (${myWorkCount})`
+                                            : ''}
+                                    </PageHeaderPrimaryButton>
+                                )}
+                                <PageHeaderGlassButton
+                                    icon={RefreshCw}
                                     onClick={fetchData}
                                     disabled={loading}
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                     aria-label="Refresh dashboard"
                                 >
-                                    <RefreshCw
-                                        className={
-                                            loading
-                                                ? 'h-4 w-4 animate-spin'
-                                                : 'h-4 w-4'
-                                        }
-                                        aria-hidden="true"
-                                    />
-                                    <span className="ml-2">
+                                    <span className="hidden sm:inline">
                                         {loading ? 'Refreshing' : 'Refresh'}
                                     </span>
-                                </Button>
-                            </div>
+                                </PageHeaderGlassButton>
+                            </>
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="My pending work"
+                                    href="/governance/my-work"
+                                    tone={myWorkCount > 0 ? 'warning' : 'brand'}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {myWorkCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {myWorkCount === 1
+                                            ? '1 item requiring you'
+                                            : `${myWorkCount} items requiring you`}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Overdue board actions"
+                                    href="/governance/actions?status=overdue"
+                                    tone={
+                                        overdueActionsCount > 0
+                                            ? 'critical'
+                                            : 'brand'
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {overdueActionsCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {overdueActionsCount === 1
+                                            ? '1 action overdue'
+                                            : `${overdueActionsCount} actions overdue`}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Risks above appetite"
+                                    href="/governance/risks"
+                                    tone={
+                                        risksOverAppetiteCount > 0
+                                            ? 'warning'
+                                            : 'brand'
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {risksOverAppetiteCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {risksOverAppetiteCount > 0
+                                            ? 'Outside tolerance'
+                                            : 'Within appetite'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Obligations overdue"
+                                    href="/governance/compliance?status=overdue"
+                                    tone={
+                                        obligationsOverdueCount > 0
+                                            ? 'critical'
+                                            : 'brand'
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {obligationsOverdueCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {obligationsOverdueCount > 0
+                                            ? 'Statutory & compliance'
+                                            : 'All obligations current'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
+                        filters={
+                            <PageHeaderFilterSelect
+                                label="Period"
+                                value={period}
+                                options={[
+                                    { value: 'today', label: 'Today' },
+                                    { value: 'week', label: 'This Week' },
+                                    { value: 'month', label: 'This Month' },
+                                    { value: 'year', label: 'This Year' },
+                                ]}
+                                onChange={setPeriod}
+                            />
+                        }
+                        rail={
+                            <PageHeaderRail
+                                items={[
+                                    { key: 'overview', label: 'Overview' },
+                                    {
+                                        key: 'my-work',
+                                        label: 'My work',
+                                        count: myWorkCount,
+                                    },
+                                    { key: 'calendar', label: 'Calendar' },
+                                    { key: 'decisions', label: 'Decisions' },
+                                ]}
+                                value="overview"
+                                onSelect={(key) => {
+                                    if (key === 'overview')
+                                        router.visit('/governance/dashboard');
+                                    else if (key === 'my-work')
+                                        router.visit('/governance/my-work');
+                                    else if (key === 'calendar')
+                                        router.visit(
+                                            '/governance/meetings/calendar',
+                                        );
+                                    else if (key === 'decisions')
+                                        router.visit('/governance/resolutions');
+                                }}
+                            />
                         }
                     />
                 }
             >
-                {loading && !payload ? (
+                {error && !payload ? (
+                    <div
+                        className="mx-auto max-w-2xl py-12 text-center"
+                        data-dusk="dashboard-error"
+                    >
+                        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-8">
+                            <AlertCircle className="mx-auto h-8 w-8 text-destructive" />
+                            <h2 className="mt-3 text-lg font-semibold text-foreground">
+                                Board information could not be loaded
+                            </h2>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Unable to connect to governance reporting services.
+                                Please try again.
+                            </p>
+                            <Button
+                                variant="outline"
+                                onClick={() => void fetchData()}
+                                disabled={loading}
+                                className="mt-4"
+                            >
+                                <RefreshCw
+                                    className={
+                                        loading
+                                            ? 'mr-2 h-4 w-4 animate-spin'
+                                            : 'mr-2 h-4 w-4'
+                                    }
+                                />
+                                Retry
+                            </Button>
+                        </div>
+                    </div>
+                ) : loading && !payload ? (
                     <CockpitSkeleton />
                 ) : cockpit && workflow ? (
-                    <CockpitLayout
-                        cockpit={cockpit}
-                        workflow={workflow}
-                        permissions={permissions}
-                        currentUserName={auth.user?.name ?? null}
-                        boardRole={boardRole ?? null}
-                        userRole={
-                            (auth.user as { role?: string } | undefined)
-                                ?.role ?? null
-                        }
-                    />
+                    <>
+                        {refreshError && (
+                            <div
+                                className="mb-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-800 dark:text-amber-300"
+                                data-dusk="refresh-failed-banner"
+                            >
+                                <span>{refreshError}</span>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => void fetchData()}
+                                    disabled={loading}
+                                    className="h-6 text-xs text-amber-900 hover:bg-amber-500/20 dark:text-amber-200"
+                                >
+                                    Retry
+                                </Button>
+                            </div>
+                        )}
+                        <CockpitLayout
+                            cockpit={cockpit}
+                            workflow={workflow}
+                            permissions={permissions}
+                            currentUserId={auth.user?.id ?? null}
+                            currentUserName={auth.user?.name ?? null}
+                            boardRole={boardRole ?? null}
+                            userRole={
+                                (auth.user as { role?: string } | undefined)
+                                    ?.role ?? null
+                            }
+                            onRefresh={fetchData}
+                        />
+                    </>
                 ) : (
                     <CockpitSkeleton />
                 )}

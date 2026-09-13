@@ -1,4 +1,11 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +24,7 @@ import {
     Vote,
 } from 'lucide-react';
 import { useState } from 'react';
-import { NewResolutionDialog, type MeetingOption } from './_dialogs';
+import { ResolutionWizardDialog, type MeetingOption } from './_dialogs';
 
 interface Resolution {
     id: number;
@@ -63,10 +70,38 @@ export default function ResolutionsIndex({
         );
     };
 
+    const formatDeadline = (dateStr: string | null): string => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-NZ', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        });
+    };
+
+    const formatThreshold = (threshold: string): string => {
+        switch (threshold) {
+            case 'simple_majority':
+                return 'Simple majority (50% + 1)';
+            case 'two_thirds':
+                return 'Two-thirds majority (66.7%)';
+            case 'special_majority':
+            case 'three_quarters':
+                return 'Special majority (75%)';
+            case 'unanimous':
+                return 'Unanimous (100% entitled)';
+            default:
+                return threshold.replace(/_/g, ' ');
+        }
+    };
+
     return (
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Resolutions', href: '/governance/resolutions' },
             ]}
@@ -75,36 +110,71 @@ export default function ResolutionsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
+                        variant="index"
                         icon={Gavel}
                         title="Resolutions"
-                        description="Record board voting outcomes and track decisions through to implementation."
-                        stats={[
-                            { label: 'Total', value: resolutions.data.length },
-                            {
-                                label: 'Awaiting your vote',
-                                value: my_pending_votes.length,
-                            },
-                            {
-                                label: 'Carried',
-                                value: resolutions.data.filter(
-                                    (r) => r.outcome === 'carried',
-                                ).length,
-                            },
-                        ]}
+                        subline="Record board voting outcomes and track decisions through to implementation."
                         actions={
-                            <Button
+                            <PageHeaderPrimaryButton
                                 onClick={() => setNewResolutionOpen(true)}
                                 dusk="new-resolution-button"
                             >
                                 <Plus className="mr-1.5 h-4 w-4" />
                                 New Resolution
-                            </Button>
+                            </PageHeaderPrimaryButton>
+                        }
+                        meters={
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <PageHeaderMeterBlock
+                                    label="Total"
+                                    href="/governance/resolutions"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {resolutions.data.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Total resolutions
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Awaiting Vote"
+                                    href="/governance/my-work?kind=vote"
+                                    tone={
+                                        my_pending_votes.length > 0
+                                            ? 'warning'
+                                            : 'brand'
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {my_pending_votes.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Awaiting your vote
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Carried"
+                                    href="/governance/resolutions?status=closed"
+                                    tone="success"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {
+                                            resolutions.data.filter(
+                                                (r) => r.outcome === 'carried',
+                                            ).length
+                                        }
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Carried decisions
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </div>
                         }
                     />
                 }
             >
-                <NewResolutionDialog
+                <ResolutionWizardDialog
                     isOpen={newResolutionOpen}
                     onClose={() => setNewResolutionOpen(false)}
                     meetings={meetings ?? []}
@@ -197,10 +267,7 @@ export default function ResolutionsIndex({
                                             <span>|</span>
                                             <span>
                                                 Threshold:{' '}
-                                                {resolution.voting_threshold.replace(
-                                                    '_',
-                                                    ' ',
-                                                )}
+                                                {formatThreshold(resolution.voting_threshold)}
                                             </span>
                                             {resolution.meeting && (
                                                 <>
@@ -219,9 +286,7 @@ export default function ResolutionsIndex({
                                                     <span className="flex items-center gap-1">
                                                         <Clock className="h-3 w-3" />
                                                         Due{' '}
-                                                        {new Date(
-                                                            resolution.deadline,
-                                                        ).toLocaleDateString()}
+                                                        {formatDeadline(resolution.deadline)}
                                                     </span>
                                                 </>
                                             )}

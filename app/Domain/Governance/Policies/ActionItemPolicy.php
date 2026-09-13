@@ -9,11 +9,16 @@ class ActionItemPolicy
 {
     public function view(User $user, ActionItem $action): bool
     {
-        return $user->canDo('governance.actions.view');
+        return app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
+            ->canViewActionItem($user, $action);
     }
 
     public function update(User $user, ActionItem $action): bool
     {
-        return $user->canDo('governance.actions.manage') || $action->assigned_to === $user->id;
+        if (! $this->view($user, $action)) {
+            return false;
+        }
+
+        return $user->canDo('governance.actions.manage') || (int) $action->assigned_to === (int) $user->id;
     }
 }

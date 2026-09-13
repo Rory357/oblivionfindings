@@ -1,0 +1,172 @@
+[
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/playwright.governance.config.ts",
+    "last_write_utc": "2026-09-11T20:09:32.0890295Z",
+    "sha256": "F9E072CD811BE17F733D9F7902A2B772E24AA4EFB9130BF5BD0FC9609ABC32A9"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/tests/e2e/global-setup.ts",
+    "last_write_utc": "2026-08-24T02:47:00.5243444Z",
+    "sha256": "D02758D1B5BE1C57AEA8DBAE18AED0BC8AE1E7C6A367D3DA8AE14B7748C1101C"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/tests/e2e/governance/fixtures.ts",
+    "last_write_utc": "2026-09-11T20:09:25.4597683Z",
+    "sha256": "B702FB7C5A474F1B108ED0024262C5672E3C0CED2F3676630846F1B5FAC19E56"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/tests/Support/GovernanceSyntheticFixtures.php",
+    "last_write_utc": "2026-09-12T00:30:48.0835826Z",
+    "sha256": "BF5931F63B8A5322DD5790E2AF6556CAFFD2EA32A9EE8988C37F2E24035588DB"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Services/GovernanceRecordAccessService.php",
+    "last_write_utc": "2026-09-12T06:41:10.0772081Z",
+    "sha256": "797F3983520CB58AE4378B7AAF89C15E35C2EFF4D0C28D0059435397E5FFBC0C"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Services/ExecutiveMeetingAccessService.php",
+    "last_write_utc": "2026-09-11T20:53:56.7894248Z",
+    "sha256": "AE962F799133F154671CDD8EB3BA427C3900C417BBDDC2D2DDDD92C7EEB01B73"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Services/DashboardAggregatorService.php",
+    "last_write_utc": "2026-09-12T00:58:42.4310143Z",
+    "sha256": "B6DCADBCFE4587AA1114A494FF74652836C76D443BEF07D67C15ECFD2596E3AE"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Http/Controllers/PerformanceReviewController.php",
+    "last_write_utc": "2026-09-11T20:55:31.5517157Z",
+    "sha256": "860FC17C6065046015A4E3D1F3D576E5D7F56FB1529B69532C82E75408A29373"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Services/VotingService.php",
+    "last_write_utc": "2026-09-12T05:58:57.5034882Z",
+    "sha256": "19D4691A984F616C3BB802BCCCAFA31068653628B41053F67CEA3EE7B03133EA"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Services/GovernanceVotingProfileService.php",
+    "last_write_utc": "2026-09-12T00:17:49.7155174Z",
+    "sha256": "5B22B398AF385EFBEA3079467C6D45E98775D2CD8E1785E00845D8F941009319"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Http/Controllers/GovernanceSettingController.php",
+    "last_write_utc": "2026-09-11T21:33:49.9783782Z",
+    "sha256": "9E6079D9AEE554D24FBD4B570D9F4960487DB671AED2D331137EF172E1ECF33F"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Models/Resolution.php",
+    "last_write_utc": "2026-09-12T06:40:31.5056731Z",
+    "sha256": "F35CD49859CE751399A0BBA02C3231A5AA9552BCEC517C829A394A08651830BF"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Services/MeetingMinuteService.php",
+    "last_write_utc": "2026-09-11T23:06:16.2817973Z",
+    "sha256": "B82614F62D57C41C06CECF5FE04FCCA7190021BF0886302CB1662DD7C52F4ACB"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Services/BoardPackBuilderService.php",
+    "last_write_utc": "2026-09-11T23:47:11.2944833Z",
+    "sha256": "34C58F4AC880A89466D3D69A2D6BDA1B3800578C7A485C0BE3818812B7C1D758"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Http/Controllers/ActionItemController.php",
+    "last_write_utc": "2026-09-12T06:41:56.7624412Z",
+    "sha256": "B1BD104AAC6982AD20177B7C9B25926F646BE21944115A93E4B509AD56B4509A"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Models/ActionItem.php",
+    "last_write_utc": "2026-09-12T06:40:15.2034622Z",
+    "sha256": "FA298A8C99AA1E93C2B9867993F2F8CCF22771768FB1455B358DA7A0BE5B2D26"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Services/GovernanceNestedMutationService.php",
+    "last_write_utc": "2026-09-12T08:05:33.3443297Z",
+    "sha256": "81C09508E76C03338917F50AFF05F103B07BB7379F35BAA8096CD48F60503598"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Models/StrategicPlan.php",
+    "last_write_utc": "2026-09-12T09:05:40.1039668Z",
+    "sha256": "7119BACA264BC83611CB26736D89A873758104EC3FA517660FC4D2B59C67B887"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Services/GovernanceWorkQuery.php",
+    "last_write_utc": "2026-09-12T05:02:38.6467757Z",
+    "sha256": "00BABDFE403E357865EBCEF4AAEA18D3DB458C6FEDBFFB8D3A07F60BAD993537"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Models/PolicyAttestation.php",
+    "last_write_utc": "2026-05-20T21:38:32.0608228Z",
+    "sha256": "E231DDDF1E36B5EFF0638EDDD6D55B6BCDA9BA5385A683F4610D0DD97FE858AF"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Models/GovernancePolicy.php",
+    "last_write_utc": "2026-04-02T23:16:48.1785490Z",
+    "sha256": "354168DFCFCA2BD71C1C47CD4C51F4095DF69FB47309E2997569555F6CEF3A2B"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/resources/js/pages/Governance/Dashboard.tsx",
+    "last_write_utc": "2026-09-12T02:47:14.2936932Z",
+    "sha256": "FF21FA51E312E39DE083F1FDF9638876303275A5CBE05495A8CF53286E9A88CA"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Services/GovernanceWorkflowService.php",
+    "last_write_utc": "2026-09-12T05:09:16.7345359Z",
+    "sha256": "C7E2E25C077C989C46345DB268D3686DAF4E4C7DE7C0E0B7090E7D4C80D52C68"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/resources/js/components/governance/PriorityOverviewPanel.tsx",
+    "last_write_utc": "2026-09-12T02:45:21.1036553Z",
+    "sha256": "7B37509408439B42CF2E931FAB8E710464CB026ADE5D467CA6B5ECC8113040F3"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/resources/js/pages/Governance/Cockpit/CockpitLayout.tsx",
+    "last_write_utc": "2026-09-12T02:49:07.7718246Z",
+    "sha256": "9D170C695FB1293CC6930AE6BC4DB018343FFE8BA59BD7A6C2616C2E4764AAC6"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/resources/js/pages/sites/calendar/SiteCalendar.tsx",
+    "last_write_utc": "2026-09-12T03:54:44.8761853Z",
+    "sha256": "F0513B7BFAFF4FF2C532393D6B6135543F6AA08FC4A493891815AEDDAEFDB3C4"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Governance/Services/GovernanceCalendarQuery.php",
+    "last_write_utc": "2026-09-12T03:47:15.8820911Z",
+    "sha256": "51F1F2027AC18EE6D04B71EDF8D2742234A858768805C473804A9A071CF5FDC8"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/resources/js/pages/Governance/Meetings/Calendar.tsx",
+    "last_write_utc": "2026-09-12T03:55:56.5039761Z",
+    "sha256": "768DA2439BB0C5D107CF99472228AF4D9A619479414C083064DA3B619851EBDA"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/resources/js/pages/Governance/Resolutions/Index.tsx",
+    "last_write_utc": "2026-08-24T02:46:59.0073167Z",
+    "sha256": "F9CC4285578B6ABA012F5E860C38BE5D916F0CB79121D2EDFB0AFDC83342AFAB"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/resources/js/pages/Governance/Resolutions/_dialogs.tsx",
+    "last_write_utc": "2026-08-24T02:46:59.0088208Z",
+    "sha256": "3E9BF508F36A3A63AADE9B5FF4D6B8F4D6DBD34205244003F827E60951CD0CA0"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/resources/js/pages/Governance/Resolutions/Create.tsx",
+    "last_write_utc": "2026-09-12T06:02:07.7157652Z",
+    "sha256": "3530B4EAC5811C66ACC04347D347B3EE9B6E435857712076D7DDD4078B3F5C39"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/design_styles/POPUP_STYLE_GUIDE.md",
+    "last_write_utc": "2026-09-05T05:23:33.0076374Z",
+    "sha256": "AEE723E21491E9BE908554A6F200D73204280A63D9028EA78DE6BB9049F4A477"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+    "last_write_utc": "2026-09-08T02:45:34.2796646Z",
+    "sha256": "A528A0E863A676FDBBFCB028E532ECE2799E39A7345CA3C1ECA619AC4491D931"
+  },
+  {
+    "path": "C:/Users/steph/Herd/oblivionfindings/design_styles/APP_SHELL_STYLE_GUIDE.md",
+    "last_write_utc": "2026-09-07T04:45:33.0817147Z",
+    "sha256": "62515485265119962773E6015FEFE38BE94434AAE468ACD017C078DA61B20AB5"
+  }
+]

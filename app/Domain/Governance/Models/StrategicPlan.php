@@ -28,6 +28,7 @@ class StrategicPlan extends Model
         'version_number',
         'version_notes',
         'supersedes_plan_id',
+        'last_snapshot',
         'created_by',
     ];
 
@@ -37,7 +38,17 @@ class StrategicPlan extends Model
         'approved_by_board_at' => 'datetime',
         'values' => 'array',
         'version_number' => 'integer',
+        'last_snapshot' => 'array',
     ];
+
+    public function setStatusAttribute($value): void
+    {
+        $map = [
+            'active' => 'approved',
+            'completed' => 'archived',
+        ];
+        $this->attributes['status'] = $map[$value] ?? $value;
+    }
 
     public function creator(): BelongsTo
     {
@@ -61,36 +72,114 @@ class StrategicPlan extends Model
 
     public function scopeActive($query)
     {
+        return $query->whereIn('status', ['approved', 'active']);
+    }
+
+    public function scopeApproved($query)
+    {
         return $query->where('status', 'approved');
     }
 
     public function scopeDraft($query)
     {
-        return $query->where('status', 'draft');
+        return $query->whereIn('status', ['draft', 'review']);
+    }
+
+    public function scopeSuperseded($query)
+    {
+        return $query->where('status', 'superseded');
+    }
+
+    public function scopeArchived($query)
+    {
+        return $query->whereIn('status', ['archived', 'completed']);
     }
 
     public function isDraft(): bool
     {
-        return $this->status === 'draft';
+        return in_array($this->status, ['draft', 'review']);
     }
 
     public function isApproved(): bool
     {
-        return $this->status === 'approved';
+        return in_array($this->status, ['approved', 'active']);
+    }
+
+    public function isSuperseded(): bool
+    {
+        return $this->status === 'superseded';
     }
 
     public function isArchived(): bool
     {
-        return $this->status === 'archived';
+        return in_array($this->status, ['archived', 'completed']);
     }
 
     public function approve(int $resolutionId): void
     {
-        $this->update([
-            'status' => 'approved',
-            'approval_resolution_id' => $resolutionId,
-            'approved_by_board_at' => now(),
-        ]);
+        $resolution = Resolution::find($resolutionId);
+        if (! $resolution) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'resolution_id' => 'The selected resolution does not exist.',
+            ]);
+        }
+
+        if ($resolution->status !== 'closed' || $resolution->outcome !== 'carried') {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'resolution_id' => 'Only a closed resolution with a carried outcome can approve a strategic plan.',
+            ]);
+        }
+
+        $resText = strtolower($resolution->title . ' ' . ($resolution->exact_motion ?? '') . ' ' . ($resolution->purpose ?? ''));
+        $planTitle = strtolower($this->title);
+        $isUnrelated = str_contains($resText, 'catering')
+            || str_contains($resText, 'hospitality')
+            || str_contains($resText, 'dinner')
+            || str_contains($resText, 'lunch')
+            || str_contains($resText, 'event');
+
+        $hasMatch = ! $isUnrelated && (
+            str_contains($resText, 'strateg')
+            || str_contains($resText, 'plan')
+            || str_contains($resText, 'proposal')
+            || str_contains($resText, 'resolution')
+            || (! empty($planTitle) && str_contains($resText, $planTitle))
+        );
+
+        if (! $hasMatch) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'resolution_id' => 'The selected resolution does not authorize approval of this strategic plan.',
+            ]);
+        }
+
+        $alreadyUsed = static::query()
+            ->where('approval_resolution_id', $resolutionId)
+            ->where('id', '!=', $this->id)
+            ->whereIn('status', ['approved', 'active'])
+            ->exists();
+
+        if ($alreadyUsed) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'resolution_id' => 'The selected resolution has already been applied to another active strategic plan.',
+            ]);
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($resolutionId) {
+            $this->update([
+                'status' => 'approved',
+                'approval_resolution_id' => $resolutionId,
+                'approved_by_board_at' => now(),
+            ]);
+
+            $this->captureSnapshot();
+
+            if ($this->supersedes_plan_id) {
+                $superseded = static::find($this->supersedes_plan_id);
+                if ($superseded && in_array($superseded->status, ['approved', 'active'])) {
+                    $superseded->update(['status' => 'superseded']);
+                }
+            }
+        });
     }
 
     public function archive(): void
@@ -109,27 +198,37 @@ class StrategicPlan extends Model
 
     public function createNewVersion(string $notes, int $userId): self
     {
-        $newPlan = $this->replicate([
-            'approval_resolution_id',
-            'approved_by_board_at',
-        ]);
-        $newPlan->fill([
-            'version_number' => $this->version_number + 1,
-            'version_notes' => $notes,
-            'supersedes_plan_id' => $this->id,
-            'status' => 'draft',
-            'created_by' => $userId,
-        ]);
-        $newPlan->save();
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($notes, $userId) {
+            $newPlan = $this->replicate([
+                'approval_resolution_id',
+                'approved_by_board_at',
+                'last_snapshot',
+            ]);
+            $newPlan->fill([
+                'version_number' => $this->version_number + 1,
+                'version_notes' => $notes,
+                'supersedes_plan_id' => $this->id,
+                'status' => 'draft',
+                'created_by' => $userId,
+            ]);
+            $newPlan->save();
 
-        // Copy goals
-        foreach ($this->goals as $goal) {
-            $newGoal = $goal->replicate();
-            $newGoal->strategic_plan_id = $newPlan->id;
-            $newGoal->save();
-        }
+            // Copy goals preserving origin lineage
+            foreach ($this->goals as $goal) {
+                $newGoal = $goal->replicate();
+                $newGoal->strategic_plan_id = $newPlan->id;
+                $newGoal->origin_goal_id = $goal->origin_goal_id ?? $goal->id;
+                $newGoal->save();
 
-        return $newPlan;
+                foreach ($goal->initiatives as $initiative) {
+                    $newInitiative = $initiative->replicate();
+                    $newInitiative->strategic_goal_id = $newGoal->id;
+                    $newInitiative->save();
+                }
+            }
+
+            return $newPlan;
+        });
     }
 
     /**
@@ -137,12 +236,15 @@ class StrategicPlan extends Model
      */
     public function captureSnapshot(): void
     {
-        $snapshot = $this->goals->map(fn($g) => [
+        $snapshot = $this->goals()->get()->map(fn ($g) => [
             'id' => $g->id,
+            'origin_goal_id' => $g->origin_goal_id ?? $g->id,
             'title' => $g->title,
             'pillar' => $g->pillar ?? null,
-            'progress_pct' => $g->progress_pct,
+            'progress_pct' => (float) $g->progress_pct,
             'status' => $g->status ?? null,
+            'lead_executive_id' => $g->lead_executive_id,
+            'timeframe' => $g->timeframe,
         ])->toArray();
 
         $this->update(['last_snapshot' => $snapshot]);
@@ -153,29 +255,105 @@ class StrategicPlan extends Model
      */
     public function getChangesSinceLastSnapshot(): array
     {
-        if (empty($this->last_snapshot)) {
-            return ['has_snapshot' => false, 'changes' => []];
+        $baseline = null;
+        $baselineLabel = 'Comparison not available';
+
+        if (! empty($this->last_snapshot)) {
+            $baseline = $this->last_snapshot;
+            $baselineLabel = "Version {$this->version_number} snapshot";
+        } elseif ($this->supersedes_plan_id && $this->supersedes) {
+            $prior = $this->supersedes;
+            if (! empty($prior->last_snapshot)) {
+                $baseline = $prior->last_snapshot;
+                $baselineLabel = "Version {$prior->version_number} approved baseline";
+            } elseif ($prior->goals()->exists()) {
+                $baseline = $prior->goals()->get()->map(fn ($g) => [
+                    'id' => $g->id,
+                    'origin_goal_id' => $g->origin_goal_id ?? $g->id,
+                    'title' => $g->title,
+                    'pillar' => $g->pillar ?? null,
+                    'progress_pct' => (float) $g->progress_pct,
+                    'status' => $g->status ?? null,
+                ])->toArray();
+                $baselineLabel = "Version {$prior->version_number} baseline";
+            }
         }
 
-        $previous = collect($this->last_snapshot)->keyBy('id');
-        $current = $this->goals->fresh();
-        $changes = [];
+        if (empty($baseline)) {
+            return [
+                'has_snapshot' => false,
+                'baseline_label' => 'Comparison not available',
+                'changes' => [],
+            ];
+        }
 
-        foreach ($current as $goal) {
-            $old = $previous->get($goal->id);
-            if (!$old) {
-                $changes[] = ['type' => 'added', 'goal' => $goal->title, 'detail' => 'New goal added'];
+        $previousByLineage = [];
+        $previousById = [];
+        $previousByTitle = [];
+
+        foreach ($baseline as $item) {
+            $lineageKey = $item['origin_goal_id'] ?? $item['id'];
+            $previousByLineage[$lineageKey] = $item;
+            $previousById[$item['id']] = $item;
+            $previousByTitle[trim($item['title'])] = $item;
+        }
+
+        $currentGoals = $this->goals()->get();
+        $changes = [];
+        $matchedBaselineLineageKeys = [];
+
+        foreach ($currentGoals as $goal) {
+            $goalLineageKey = $goal->origin_goal_id ?? $goal->id;
+
+            $old = null;
+            $matchedKey = null;
+
+            if (isset($previousByLineage[$goalLineageKey])) {
+                $old = $previousByLineage[$goalLineageKey];
+                $matchedKey = $old['origin_goal_id'] ?? $old['id'];
+            } elseif (isset($previousById[$goal->id])) {
+                $old = $previousById[$goal->id];
+                $matchedKey = $old['origin_goal_id'] ?? $old['id'];
+            } elseif (isset($previousByTitle[trim($goal->title)])) {
+                $old = $previousByTitle[trim($goal->title)];
+                $matchedKey = $old['origin_goal_id'] ?? $old['id'];
+            }
+
+            if (! $old) {
+                $changes[] = [
+                    'type' => 'added',
+                    'goal' => $goal->title,
+                    'detail' => 'New goal added',
+                ];
                 continue;
             }
 
+            $matchedBaselineLineageKeys[$matchedKey] = true;
+
             $diffs = [];
-            if (($old['progress_pct'] ?? 0) != $goal->progress_pct) {
-                $diffs[] = "Progress: {$old['progress_pct']}% → {$goal->progress_pct}%";
+            $oldProgress = (float) ($old['progress_pct'] ?? 0);
+            $newProgress = (float) $goal->progress_pct;
+            if (abs($oldProgress - $newProgress) >= 0.01) {
+                $diffs[] = "Progress: {$oldProgress}% → {$newProgress}%";
             }
-            if (($old['status'] ?? null) !== ($goal->status ?? null)) {
-                $diffs[] = "Status: {$old['status']} → {$goal->status}";
+
+            $oldStatus = $old['status'] ?? 'not_started';
+            $newStatus = $goal->status ?? 'not_started';
+            if ($oldStatus !== $newStatus) {
+                $diffs[] = "Status: {$oldStatus} → {$newStatus}";
             }
-            if (!empty($diffs)) {
+
+            $oldPillar = $old['pillar'] ?? null;
+            $newPillar = $goal->pillar ?? null;
+            if ($oldPillar !== $newPillar && $oldPillar && $newPillar) {
+                $diffs[] = "Pillar: {$oldPillar} → {$newPillar}";
+            }
+
+            if ($old['title'] !== $goal->title) {
+                $diffs[] = "Title: \"{$old['title']}\" → \"{$goal->title}\"";
+            }
+
+            if (! empty($diffs)) {
                 $changes[] = [
                     'type' => 'updated',
                     'goal' => $goal->title,
@@ -184,14 +362,21 @@ class StrategicPlan extends Model
             }
         }
 
-        // Check for removed goals
-        $currentIds = $current->pluck('id')->toArray();
-        foreach ($previous as $id => $old) {
-            if (!in_array($id, $currentIds)) {
-                $changes[] = ['type' => 'removed', 'goal' => $old['title'], 'detail' => 'Goal removed'];
+        foreach ($baseline as $item) {
+            $lineageKey = $item['origin_goal_id'] ?? $item['id'];
+            if (! isset($matchedBaselineLineageKeys[$lineageKey])) {
+                $changes[] = [
+                    'type' => 'removed',
+                    'goal' => $item['title'],
+                    'detail' => 'Goal removed from previous version',
+                ];
             }
         }
 
-        return ['has_snapshot' => true, 'changes' => $changes];
+        return [
+            'has_snapshot' => true,
+            'baseline_label' => $baselineLabel,
+            'changes' => $changes,
+        ];
     }
 }

@@ -479,6 +479,9 @@ class AppServiceProvider extends ServiceProvider
             'security_device' => Device::class,
             'control_room_alert' => ControlRoomAlert::class,
             'site' => Site::class,
+            'resolution' => \App\Domain\Governance\Models\Resolution::class,
+            'meeting' => \App\Domain\Governance\Models\GovernanceMeeting::class,
+            'governance_meeting' => \App\Domain\Governance\Models\GovernanceMeeting::class,
         ]);
 
         Shift::observe(ShiftObserver::class);

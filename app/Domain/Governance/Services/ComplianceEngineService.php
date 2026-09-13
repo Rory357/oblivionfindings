@@ -25,7 +25,8 @@ class ComplianceEngineService
         ?string $obligationCode = null,
         ?array $reminderDays = null,
         string $priority = 'medium',
-        ?string $requirements = null
+        ?string $requirements = null,
+        bool $evidenceRequired = true
     ): ComplianceObligation {
         $dueDate = $dueDate ?? $this->calculateNextDueDate($frequency);
 
@@ -42,74 +43,250 @@ class ComplianceEngineService
             'reminder_days' => $reminderDays ?? [30, 14, 7],
             'owner_id' => $owner->id,
             'status' => 'not_due',
-            'evidence_required' => true,
+            'evidence_required' => $evidenceRequired,
+            'version_number' => 1,
         ]);
     }
 
     /**
-     * Calculate next due date based on frequency
+     * Calculate next due date based on frequency.
+     * Advances strictly past $from with end-of-month and leap-year boundaries:
+     * - Monthly: advances 1 month. If starting on month-end (e.g. Jan 31), lands on next month-end (e.g. Feb 28/29).
+     * - Quarterly: advances 3 months. If starting on quarter-end (e.g. Mar 31), lands on next quarter-end.
+     * - Annual: advances 1 year. If starting on year-end (e.g. Dec 31), lands on next Dec 31. If starting on Feb 29 (leap day), lands on Feb 28.
      */
     public function calculateNextDueDate(string $frequency, ?Carbon $from = null): Carbon
     {
-        $from = $from ?? now();
+        $from = $from ? $from->copy()->startOfDay() : now()->startOfDay();
 
-        return match ($frequency) {
-            'monthly' => $from->copy()->endOfMonth(),
-            'quarterly' => $from->copy()->endOfQuarter(),
-            'annual' => $from->copy()->endOfYear(),
-            default => $from->copy()->addMonth(),
+        $next = match ($frequency) {
+            'monthly' => $this->advanceMonthly($from),
+            'quarterly' => $this->advanceQuarterly($from),
+            'annual' => $this->advanceAnnual($from),
+            default => $from->copy()->addMonthsNoOverflow(1),
         };
+
+        // Guarantee strictly greater than $from
+        if ($next->lte($from)) {
+            $next = $from->copy()->addDay();
+        }
+
+        return $next->startOfDay();
+    }
+
+    protected function advanceMonthly(Carbon $from): Carbon
+    {
+        $isEndOfMonth = $from->isLastOfMonth();
+        $next = $from->copy()->addMonthsNoOverflow(1);
+
+        if ($isEndOfMonth) {
+            return $next->endOfMonth();
+        }
+
+        return $next;
+    }
+
+    protected function advanceQuarterly(Carbon $from): Carbon
+    {
+        $isEndOfMonth = $from->isLastOfMonth();
+        $next = $from->copy()->addMonthsNoOverflow(3);
+
+        if ($isEndOfMonth) {
+            return $next->endOfMonth();
+        }
+
+        return $next;
+    }
+
+    protected function advanceAnnual(Carbon $from): Carbon
+    {
+        $isEndOfMonth = $from->isLastOfMonth();
+        $next = $from->copy()->addYearsNoOverflow(1);
+
+        if ($isEndOfMonth) {
+            return $next->endOfMonth();
+        }
+
+        return $next;
     }
 
     /**
-     * Complete an obligation
+     * Complete an obligation under database transaction with optimistic concurrency
+     * and strict evidence validation.
      */
     public function completeObligation(
         ComplianceObligation $obligation,
         User $completedBy,
-        ?array $evidenceIds = null
+        ?array $evidenceIds = null,
+        ?string $notes = null,
+        ?int $expectedVersion = null
     ): void {
-        $obligation->markComplete($completedBy->id);
+        \Illuminate\Support\Facades\DB::transaction(function () use (
+            $obligation,
+            $completedBy,
+            $evidenceIds,
+            $notes,
+            $expectedVersion
+        ) {
+            /** @var ComplianceObligation $locked */
+            $locked = ComplianceObligation::whereKey($obligation->id)->lockForUpdate()->firstOrFail();
 
-        // Update evidence links if provided
-        if ($evidenceIds) {
-            ComplianceEvidence::whereIn('id', $evidenceIds)
-                ->update(['compliance_obligation_id' => $obligation->id]);
+            // Idempotent completion replay: already complete is a no-op
+            if ($locked->status === 'complete') {
+                return;
+            }
 
-            $obligation->update(['evidence_provided' => true]);
-        }
+            // Optimistic concurrency check
+            if ($expectedVersion !== null && (int) $locked->version_number !== (int) $expectedVersion) {
+                abort(409, 'The compliance obligation has been updated by another user. Please refresh and try again.');
+            }
 
-        // Schedule next occurrence if recurring
-        if ($obligation->frequency !== 'ad_hoc' && $obligation->frequency !== 'event_driven') {
-            $this->scheduleNextOccurrence($obligation);
-        }
+            // Validate provided evidence IDs
+            if ($evidenceIds !== null && count($evidenceIds) > 0) {
+                $evidences = ComplianceEvidence::whereIn('id', $evidenceIds)->get();
+
+                if ($evidences->count() !== count($evidenceIds)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'evidence_ids' => 'One or more selected evidence records do not exist.',
+                    ]);
+                }
+
+                foreach ($evidences as $ev) {
+                    // Check for foreign evidence (borrowed / reparenting attempt forbidden)
+                    if ((int) $ev->compliance_obligation_id !== (int) $locked->id) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'evidence_ids' => "Evidence '{$ev->title}' belongs to another obligation and cannot be reassigned.",
+                        ]);
+                    }
+
+                    // Check for expired evidence
+                    if ($ev->valid_until && $ev->valid_until->lt(today())) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'evidence_ids' => "Evidence '{$ev->title}' expired on {$ev->valid_until->toDateString()} and cannot satisfy compliance.",
+                        ]);
+                    }
+
+                    // Check that document evidence has real file bytes on disk
+                    if ($ev->evidence_type === 'document') {
+                        $filePath = $ev->file_path ?? '';
+                        $exists = ! empty($filePath) && (
+                            \Illuminate\Support\Facades\Storage::disk('local')->exists($filePath)
+                            || \Illuminate\Support\Facades\Storage::disk('public')->exists($filePath)
+                            || \Illuminate\Support\Facades\Storage::exists($filePath)
+                            || file_exists(storage_path('app/' . $filePath))
+                            || file_exists(storage_path('app/public/' . $filePath))
+                        );
+
+                        if (! $exists) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'evidence_ids' => "Evidence file '{$ev->title}' does not exist on disk and cannot satisfy compliance.",
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            // Check if valid, unexpired evidence with existing file bytes is linked
+            $evidenceQuery = $locked->evidence();
+            if ($evidenceIds !== null) {
+                $evidenceQuery->whereIn('id', $evidenceIds);
+            }
+
+            $hasValidEvidence = false;
+            foreach ($evidenceQuery->get() as $ev) {
+                if ($ev->valid_until && $ev->valid_until->lt(today())) {
+                    continue;
+                }
+                if ($ev->evidence_type === 'document') {
+                    $filePath = $ev->file_path ?? '';
+                    $exists = ! empty($filePath) && (
+                        \Illuminate\Support\Facades\Storage::disk('local')->exists($filePath)
+                        || \Illuminate\Support\Facades\Storage::disk('public')->exists($filePath)
+                        || \Illuminate\Support\Facades\Storage::exists($filePath)
+                        || file_exists(storage_path('app/' . $filePath))
+                        || file_exists(storage_path('app/public/' . $filePath))
+                    );
+                    if (! $exists) {
+                        continue;
+                    }
+                }
+                $hasValidEvidence = true;
+                break;
+            }
+
+            if ($locked->evidence_required && ! $hasValidEvidence) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'evidence' => 'Valid, unexpired evidence with verified files is required to complete this compliance obligation.',
+                ]);
+            }
+
+            // Derive evidence_provided directly from valid linked evidence
+            $locked->evidence_provided = $hasValidEvidence;
+
+            $locked->markComplete($completedBy->id, $notes, $expectedVersion);
+
+            // Schedule next occurrence if recurring
+            if ($locked->frequency !== 'ad_hoc' && $locked->frequency !== 'event_driven') {
+                $this->scheduleNextOccurrence($locked);
+            }
+        });
     }
 
     /**
-     * Schedule next occurrence of a recurring obligation
+     * Schedule next occurrence of a recurring obligation.
+     * Idempotently creates exactly one next occurrence with lineage and reminder set.
      */
-    protected function scheduleNextOccurrence(ComplianceObligation $completed): void
+    protected function scheduleNextOccurrence(ComplianceObligation $completed): ?ComplianceObligation
     {
         $nextDueDate = $this->calculateNextDueDate($completed->frequency, $completed->due_date);
 
-        // Check if obligation already exists for this date
-        $existing = ComplianceObligation::where('framework', $completed->framework)
-            ->where('obligation_code', $completed->obligation_code)
-            ->whereDate('due_date', $nextDueDate)
-            ->first();
+        if ($nextDueDate->lte($completed->due_date)) {
+            $nextDueDate = $completed->due_date->copy()->addDay();
+        }
+
+        $code = $completed->obligation_code ?: "OBL-{$completed->id}";
+        $cycleKey = "CYCLE-{$completed->framework}-{$code}-{$nextDueDate->toDateString()}";
+
+        // Idempotency: series/cycle key unique
+        $existing = ComplianceObligation::where('recurrence_cycle_key', $cycleKey)->first();
 
         if (! $existing) {
-            $this->createObligation(
-                $completed->framework,
-                $completed->obligation_title,
-                $completed->description,
-                $completed->frequency,
-                $completed->owner,
-                $nextDueDate,
-                $completed->obligation_code,
-                $completed->reminder_days
-            );
+            $existing = ComplianceObligation::where('framework', $completed->framework)
+                ->where('obligation_code', $completed->obligation_code)
+                ->whereDate('due_date', $nextDueDate)
+                ->first();
         }
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $nextObligation = ComplianceObligation::create([
+            'framework' => $completed->framework,
+            'obligation_code' => $completed->obligation_code,
+            'obligation_title' => $completed->obligation_title,
+            'description' => $completed->description,
+            'requirements' => $completed->requirements,
+            'priority' => $completed->priority ?? 'medium',
+            'frequency' => $completed->frequency,
+            'due_date' => $nextDueDate,
+            'next_due_date' => $nextDueDate,
+            'reminder_days' => $completed->reminder_days ?? [30, 14, 7],
+            'owner_id' => $completed->owner_id,
+            'backup_owner_id' => $completed->backup_owner_id,
+            'status' => 'not_due',
+            'evidence_required' => $completed->evidence_required,
+            'evidence_provided' => false,
+            'sign_off_required' => $completed->sign_off_required,
+            'sign_off_role' => $completed->sign_off_role,
+            'parent_obligation_id' => $completed->id,
+            'recurrence_cycle_key' => $cycleKey,
+            'version_number' => 1,
+        ]);
+
+        $this->scheduleReminders($nextObligation);
+
+        return $nextObligation;
     }
 
     /**
@@ -135,7 +312,15 @@ class ComplianceEngineService
             'uploaded_at' => now(),
         ]);
 
-        $obligation->update(['evidence_provided' => true]);
+        // Derive evidence_provided from valid unexpired evidence
+        $hasValidEvidence = $obligation->evidence()
+            ->where(function ($q) {
+                $q->whereNull('valid_until')
+                  ->orWhereDate('valid_until', '>=', today());
+            })
+            ->exists();
+
+        $obligation->update(['evidence_provided' => $hasValidEvidence]);
 
         return $evidence;
     }

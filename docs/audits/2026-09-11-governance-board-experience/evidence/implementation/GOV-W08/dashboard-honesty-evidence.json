@@ -1,0 +1,39 @@
+{
+  "task_id": "GOV-W08",
+  "acceptance_id": "GOV-A08",
+  "status": "Verified",
+  "verified_at": "2026-09-12T13:23:00+12:00",
+  "verified_by": "Gemini 3.8 Flash",
+  "findings_resolved": [
+    "GOV-F09",
+    "GOV-F26"
+  ],
+  "verification_results": {
+    "phpunit_feature_dashboard": {
+      "command": "& 'C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe' vendor/bin/phpunit tests/Feature/Governance/GovernanceDashboardTest.php",
+      "exit_code": 0,
+      "tests_passed": 8,
+      "assertions": 48
+    },
+    "phpunit_unit_presenter": {
+      "command": "& 'C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe' vendor/bin/phpunit tests/Unit/Governance/GovernancePresenterTest.php",
+      "exit_code": 0,
+      "tests_passed": 6,
+      "assertions": 21
+    },
+    "typescript": {
+      "command": "npm run types",
+      "exit_code": 0,
+      "errors": 0
+    }
+  },
+  "invariants_enforced": [
+    "GET /governance/dashboard/data?fresh=1 performs zero write queries against Finance models",
+    "GET /governance/reports/board-monthly performs zero write queries against Finance models",
+    "GovernancePresenter::buildTimeline guarantees zero-indexed sequential JSON arrays even after filtering",
+    "GovernanceTimeline client component defends against malformed events with retry state",
+    "DashboardController::data returns honest 500 JSON response on aggregator failure",
+    "DashboardAggregatorService suppresses raw exception internals in widget fallbacks",
+    "Dashboard client preserves last-good payload on background refresh failure and uses monotonic sequence IDs"
+  ]
+}

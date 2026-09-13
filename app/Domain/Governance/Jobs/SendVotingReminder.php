@@ -50,6 +50,14 @@ class SendVotingReminder implements ShouldQueue
             return;
         }
 
+        // Deduplication key per resolution, member and reminder window (4 hours)
+        $reminderWindow = now()->format('YmdH');
+        $dedupKey = "voting_reminder:res_{$resolution->id}:bm_{$boardMember->id}:{$reminderWindow}";
+
+        if (! \Illuminate\Support\Facades\Cache::add($dedupKey, true, now()->addHours(4))) {
+            return;
+        }
+
         $user->notify(new VotingReminderNotification($resolution));
     }
 }

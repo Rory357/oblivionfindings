@@ -1,5 +1,10 @@
+CURRENT RETURN REVIEW — 13 September 2026: [Independent audit](astra-verification.md) records **Not ready** and GOV-R01–GOV-R17. Read the [user-approved single-home/meeting-workspace decision](navigation-workflow-decision-2026-09-13.md) and [current Gemini fresh-context prompt](gemini-fresh-context-prompt.md). All GOV-W01–W24 / GOV-A01–A28 remain in scope. Older completion claims and navigation descriptions are historical where superseded by these current decisions.
+
 # Required implementation tasks
-All 24 tasks are **Required for this implementation**. Implementation status for every task: **Not started**. Acceptance status: **Not run**.
+
+Resume update 2026-09-12: read [independent review](astra-progress-review-2026-09-12.md) and [Gemini correction prompt](gemini-correction-prompt.md). GOV-R01-GOV-R13 are required corrections mapped to these existing tasks; none of GOV-W01-GOV-W24 is dropped. Preserve the Sites calendar reuse and complete Rory's UI requirements.
+
+All 24 tasks remain **Required for this implementation**. Current implementation/acceptance statuses live in implementation-progress.md and acceptance-checklist.md; this file specifies scope.
 Reading order: audit.md → implementation-plan.md (including D1/D2/D3, L1–L5, shared UI/state/data contracts and migrations) → this file → acceptance-checklist.md → implementation-progress.md.
 The shared contracts are normative parts of **each** task; their complete loading/empty/error/stale/denied/blocked/success/keyboard definitions are not optional because they are referenced rather than repeated below.
 Paths under Models/, Policies/, Services/, Support/ and Http/ in code-surface descriptions are relative to app/Domain/Governance/. Frontend family paths are under resources/js/pages/governance/ unless a full repository-relative path is given. “Proposed” symbols/files do not exist yet. Exact navigation line aids are preserved in evidence/source-navigation.txt; inspect source drift before editing.
@@ -7,7 +12,7 @@ Commands shown below run from C:\Users\steph\Herd\oblivionfindings in PowerShell
 Every task is complete only after its named acceptance item and relevant cross-cutting GOV-A25–GOV-A28 are assessed, evidence is saved under evidence/implementation/ in a subfolder named for the actual task ID, and progress records actual changed files, check command/exit/result, deviations and blockers. External gates remain explicitly incomplete until satisfied.
 
 ## GOV-W01 — Establish isolated fixtures and a trustworthy baseline
-**P1; Required; Not started.** Findings: GOV-F23. Acceptance: GOV-A01, relevant GOV-A25–GOV-A28. Dependencies: None.
+**P1; Required.** Findings: GOV-F23. Acceptance: GOV-A01, relevant GOV-A25–GOV-A28. Dependencies: None.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Two baseline failures and a broad shared e2e setup make a passing report unsafe. Produce reproducible ordinary-member/chair/secretary/finance-committee/CEO/observer fixtures, not an all-powerful test admin. Correct the stale test constructor to resolve both real service dependencies; decide JSON numeric assertions by the public amount contract rather than changing business values.
@@ -27,7 +32,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Save baseline, fixture manifest without credentials, role permission matrix, build/preview hashes, command logs and cleanup proof. Do not mark any later task verified merely because this baseline passes.
 
 ## GOV-W02 — Apply one restricted-record audience through every projection
-**P0; Required; Not started.** Findings: GOV-F01, GOV-F02, GOV-F12, GOV-F16. Acceptance: GOV-A02, relevant GOV-A25–GOV-A28. Dependencies: GOV-W01.
+**P0; Required.** Findings: GOV-F01, GOV-F02, GOV-F12, GOV-F16. Acceptance: GOV-A02, relevant GOV-A25–GOV-A28. Dependencies: GOV-W01.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** A member sees an excluded executive session through dashboard/resolutions. Centralise parent-aware audience resolution and query scopes; apply before pagination/counts/serialization, not only button rendering. Follow research D2 exactly. Full-board private meetings invite their non-conflicted board audience; restricted committee/CEO raw material has a narrower assigned audience.
@@ -47,7 +52,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Permission matrix, direct/derived denial responses, screenshots of safe denied state, migration/backfill review counts and notification revocation results.
 
 ## GOV-W03 — Make board rules, appointment and electorate explicit
-**P1; Required; Not started.** Findings: GOV-F04, GOV-F17, GOV-F22. Acceptance: GOV-A03, relevant GOV-A25–GOV-A28. Dependencies: GOV-W01,GOV-W02.
+**P1; Required.** Findings: GOV-F04, GOV-F17, GOV-F22. Acceptance: GOV-A03, relevant GOV-A25–GOV-A28. Dependencies: GOV-W01,GOV-W02.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Job titles, role permission and canVote disagree. Apply D1 candidate defaults with a governed profile; distinguish board appointment, committee voting seat, administrator and executive contributor. Treasurer remains a member with finance responsibility, not a new universal role. Secretary vote depends on voting appointment plus capability, not administrative title.
@@ -67,7 +72,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Approved/default rule matrix with examples, membership cases, migration notes and D1 activation status. No claim of legal confirmation from synthetic evidence.
 
 ## GOV-W04 — Make voting, recusal and closure atomic and auditable
-**P1; Required; Not started.** Findings: GOV-F04, GOV-F05, GOV-F11. Acceptance: GOV-A04, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W03.
+**P1; Required.** Findings: GOV-F04, GOV-F05, GOV-F11. Acceptance: GOV-A04, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W03.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Deadline can disappear, recusal creates abstention, eligible counts drift and votes race closure. Use one transactional command path locking the resolution before checking state/version/deadline/electorate. Preserve supplied deadline. Recusal is separate from abstention, with no second participation count. Closed results exclusively use immutable snapshot data.
@@ -87,7 +92,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Before/after tally and frozen snapshot, race ordering logs, receipt screenshots, denied attempts and no downstream actions for invalid decisions.
 
 ## GOV-W05 — Protect minute versions, approval and signing
-**P0; Required; Not started.** Findings: GOV-F03, GOV-F10, GOV-F21. Acceptance: GOV-A05, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W03.
+**P0; Required.** Findings: GOV-F03, GOV-F10, GOV-F21. Acceptance: GOV-A05, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W03.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Approved content changes in place and signing loses attribution. Route all draft→reviewed→approved→signed→archived transitions through a service with explicit guards and exact version identity. Store previous content before editing; approved/signed content is immutable. Correction creates linked new draft, leaving the signed original intact.
@@ -107,7 +112,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Persisted before/after content hashes, distinct actor IDs, version history screenshots, race/replay logs and legacy attribution report.
 
 ## GOV-W06 — Publish immutable, audience-safe board-pack versions
-**P1; Required; Not started.** Findings: GOV-F01, GOV-F06, GOV-F18. Acceptance: GOV-A06, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W05.
+**P1; Required.** Findings: GOV-F01, GOV-F06, GOV-F18. Acceptance: GOV-A06, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W05.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Regenerate overwrites the published artifact and can destroy it on failure. Create a new immutable revision with a unique storage path and snapshot; retain old revision/recipient/receipt records. Published version is current only after successful publication. New revision requires new reading acknowledgement. Remove Packs/Show.tsx:85 automatic on-mount /read POST; page opening must not mark a pack read, and acknowledgement errors must be visible.
@@ -127,7 +132,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** PDF/version hashes, build status/failed retry evidence, receipt records, audience/notification checks and text accessibility inspection.
 
 ## GOV-W07 — Derive full authorised totals and personal obligations
-**P1; Required; Not started.** Findings: GOV-F01, GOV-F07, GOV-F08, GOV-F21, GOV-F22. Acceptance: GOV-A07, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W04,GOV-W06.
+**P1; Required.** Findings: GOV-F01, GOV-F07, GOV-F08, GOV-F21, GOV-F22. Acceptance: GOV-A07, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W04,GOV-W06.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** A 15-item mixed sample masquerades as total actions; name matching and early limits drop personal work. Derive independent Vote/Read/Act/Know obligations from canonical sources, enforce viewer identity server-side, count full scopes before pagination, then rank previews. Map area keys through an enum instead of display strings.
@@ -147,7 +152,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Fixture-to-query reconciliation, full vs preview counts, scoped JSON snapshots and no duplicated canonical records.
 
 ## GOV-W08 — Make dashboard availability, provenance and refresh honest
-**P1; Required; Not started.** Findings: GOV-F08, GOV-F09, GOV-F21, GOV-F26. Acceptance: GOV-A08, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W07.
+**P1; Required.** Findings: GOV-F08, GOV-F09, GOV-F21, GOV-F26. Acceptance: GOV-A08, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W07.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Exceptions become healthy zeros; stale requests overwrite newer periods and GET refresh syncs actuals. Return typed availability for each source and an explicit endpoint failure when necessary. Refresh only refreshes read models; leave actuals synchronisation to its authorised job/command. Preserve last-good data visibly labelled on failure.
@@ -169,7 +174,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Failure screenshots/HTTP results, before/after Finance row counts, cache revocation test, metric definitions/source reconciliation and sparse-list regression/console evidence.
 
 ## GOV-W09 — Recompose Board overview and permission-aware navigation
-**P2; Required; Not started.** Findings: GOV-F18, GOV-F19, GOV-F07, GOV-F08, GOV-F20, GOV-F26. Acceptance: GOV-A09, relevant GOV-A25–GOV-A28. Dependencies: GOV-W07,GOV-W08.
+**P2; Required.** Findings: GOV-F18, GOV-F19, GOV-F07, GOV-F08, GOV-F20, GOV-F26. Acceptance: GOV-A09, relevant GOV-A25–GOV-A28. Dependencies: GOV-W07,GOV-W08.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Large hero, duplicate metrics and stacked panels hide the next meeting and own work. Implement L1 content order and labels exactly. Replace PageHero with PageHeader, put next meeting/current pack and personal work first, use one full-scope meter row. Default member primary action My work; secretariat Prepare meeting only when assigned/allowed.
@@ -189,7 +194,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** L1 before/after captures, authorised nav inventory, keyboard/focus and no-overflow measurements; human timing deferred to A28.
 
 ## GOV-W10 — Provide the complete My work journey
-**P1; Required; Not started.** Findings: GOV-F07, GOV-F22. Acceptance: GOV-A10, relevant GOV-A25–GOV-A28. Dependencies: GOV-W07,GOV-W09.
+**P1; Required.** Findings: GOV-F07, GOV-F22. Acceptance: GOV-A10, relevant GOV-A25–GOV-A28. Dependencies: GOV-W07,GOV-W09.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** View all personal work lands on all actions. Add /governance/my-work, driven by W07, and link every personal preview to its matching kind filter. Keep the existing Actions register for board follow-up administration.
@@ -209,7 +214,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Personal work lifecycle recordings/receipts, pagination reconciliation, denial evidence and L2 captures.
 
 ## GOV-W11 — Reuse the Sites calendar experience for all Governance calendars
-**P2; Required; Not started.** Findings: GOV-F20, GOV-F01, GOV-F19. Acceptance: GOV-A11, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W07,GOV-W09.
+**P2; Required.** Findings: GOV-F20, GOV-F01, GOV-F19. Acceptance: GOV-A11, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W07,GOV-W09.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Three Governance calendar presentations differ from Sites. Reuse the existing shared rendering and controls, not a visual imitation. Replace both standalone calendars with the same calendar workspace configured for Governance; overview stops rendering a bespoke mini-grid.
@@ -229,7 +234,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Shared component import/call-site diff, side-by-side Sites/Governance captures, range/scoping payload, denial results and Sites regression evidence. Owner calendar reuse is a non-negotiable release gate.
 
 ## GOV-W12 — Make meeting preparation and Workflow role-appropriate
-**P1; Required; Not started.** Findings: GOV-F10, GOV-F19, GOV-F18. Acceptance: GOV-A12, relevant GOV-A25–GOV-A28. Dependencies: GOV-W03,GOV-W05,GOV-W06,GOV-W07,GOV-W11.
+**P1; Required.** Findings: GOV-F10, GOV-F19, GOV-F18. Acceptance: GOV-A12, relevant GOV-A25–GOV-A28. Dependencies: GOV-W03,GOV-W05,GOV-W06,GOV-W07,GOV-W11.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Member next step leads to read-only attendance; RSVP is hidden; every meeting appears to need a CEO report/resolution; secretary attendance defaults everyone present. Implement L3 preparation based on actual invitation, purpose and role. Default new attendance unrecorded, never inferred from RSVP.
@@ -249,7 +254,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** End-to-end role journey captures, RSVP/attendance receipts, phase-state matrix and next-action permission checks.
 
 ## GOV-W13 — Complete structured decision-paper authoring and reading
-**P1; Required; Not started.** Findings: GOV-F11, GOV-F19. Acceptance: GOV-A13, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W04,GOV-W06.
+**P1; Required.** Findings: GOV-F11, GOV-F19. Acceptance: GOV-A13, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W04,GOV-W06.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Create persists no options while detail promises options/recommendation. Extend current resolution paper, not another document database. Implement L4 with draft-save versus publish validation. A member can explain exact motion, alternatives and consequences before voting.
@@ -269,7 +274,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Sample synthetic paper HTML/PDF, validation/failure screenshots, round-trip payload and publication version links.
 
 ## GOV-W14 — Connect decisions to accountable evidence-based follow-through
-**P1; Required; Not started.** Findings: GOV-F05, GOV-F12, GOV-F21. Acceptance: GOV-A14, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W04,GOV-W07,GOV-W13.
+**P1; Required.** Findings: GOV-F05, GOV-F12, GOV-F21. Acceptance: GOV-A14, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W04,GOV-W07,GOV-W13.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Automatic follow-up fails SQL and completion can be asserted without evidence. Create canonical source_type=resolution/source_id actions once when a carried decision closes; correct relation query. Implemented means recorded accountable follow-up is complete or an authorised explicit no-action outcome with reason, not merely voting closed.
@@ -289,7 +294,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Resolution→action→evidence→implementation lineage, duplicate/replay/rollback logs, owner receipt and history screenshots.
 
 ## GOV-W15 — Make financial oversight and approvals enforce their authority
-**P1; Required; Not started.** Findings: GOV-F13, GOV-F09, GOV-F19. Acceptance: GOV-A15, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W03,GOV-W04,GOV-W08,GOV-W14.
+**P1; Required.** Findings: GOV-F13, GOV-F09, GOV-F19. Acceptance: GOV-A15, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W03,GOV-W04,GOV-W08,GOV-W14.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Threshold_applies is informational but approval still applies adjustment directly. Require a carried, applicable, immutable approval decision when threshold applies; use existing transaction/parent locks and replay logic. Show financial exceptions and canonical site variance without implying zero actuals is proven healthy.
@@ -309,7 +314,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Amount/authority/source reconciliation, exact threshold cases, race/replay results, finance source regression and exception UI captures.
 
 ## GOV-W16 — Repair risk and compliance assurance, evidence and recurrence
-**P1; Required; Not started.** Findings: GOV-F08, GOV-F14, GOV-F19, GOV-F21. Acceptance: GOV-A16, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W07,GOV-W08,GOV-W11.
+**P1; Required.** Findings: GOV-F08, GOV-F14, GOV-F19, GOV-F21. Acceptance: GOV-A16, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W07,GOV-W08,GOV-W11.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Risk summaries cap totals and compare wrong baselines; evidence can be reassigned across obligations and next period can equal current. Keep canonical scoring, enforce linked valid evidence before completion, and advance each recurring cycle strictly past the completed due date.
@@ -329,7 +334,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Evidence lineage/unchanged source owner, recurrence dates/unique counts, risk total reconciliation, source applicability gate and desktop calendar consistency.
 
 ## GOV-W17 — Make strategic approval and progress comparisons reliable
-**P1; Required; Not started.** Findings: GOV-F15, GOV-F21, GOV-F19. Acceptance: GOV-A17, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W04,GOV-W08,GOV-W14.
+**P1; Required.** Findings: GOV-F15, GOV-F21, GOV-F19. Acceptance: GOV-A17, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W04,GOV-W08,GOV-W14.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Draft decision can approve a plan, active differs from approved and snapshots do not persist reliably. Use one lifecycle draft→review→approved→superseded/archived, with compatibility mapping for legacy active/completed. Board intent and actual delivery stay distinct.
@@ -349,7 +354,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Plan-version/approval lineage, snapshot before/after, no duplicate source project records, source availability and strategy flow captures.
 
 ## GOV-W18 — Complete CEO preparation and private performance-review workflows
-**P1; Required; Not started.** Findings: GOV-F02, GOV-F17, GOV-F19. Acceptance: GOV-A18, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W03,GOV-W04,GOV-W06,GOV-W08.
+**P1; Required.** Findings: GOV-F02, GOV-F17, GOV-F19. Acceptance: GOV-A18, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W03,GOV-W04,GOV-W06,GOV-W08.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Default ceo role cannot reach preparation while members/observers can read all reviews. Give the actual executive contributor the minimum capabilities for own/assigned report and self-assessment; enforce D2 record audience in every path. Separate CEO operational report publication from raw employment appraisal.
@@ -369,7 +374,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Role/audience matrix and before/after payloads, reviewer/subject receipts, publication versions, blocked transitions and private-document denial evidence.
 
 ## GOV-W19 — Make policy attestations and evidence documents version-correct
-**P1; Required; Not started.** Findings: GOV-F16, GOV-F08, GOV-F19, GOV-F25. Acceptance: GOV-A19, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W06,GOV-W07.
+**P1; Required.** Findings: GOV-F16, GOV-F08, GOV-F19, GOV-F25. Acceptance: GOV-A19, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W06,GOV-W07.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Document upload and download roots differ; confidentiality is hard-coded false. Attestation upserts by policy+user only, so changed policy versions may inherit old acknowledgement; update validates attestation flag but does not persist it. Preserve version-specific evidence and derive completion from assigned current obligations.
@@ -389,7 +394,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Byte/hash round-trip, per-version receipt counts, full assigned denominator, private download denial and wizard/read states.
 
 ## GOV-W20 — Connect membership, interests and evaluations to real responsibilities
-**P1; Required; Not started.** Findings: GOV-F22, GOV-F24, GOV-F04, GOV-F19. Acceptance: GOV-A20, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W03,GOV-W07.
+**P1; Required.** Findings: GOV-F22, GOV-F24, GOV-F04, GOV-F19. Acceptance: GOV-A20, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W03,GOV-W07.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Terms/committee roles and personal interests exist; preserve them and connect to preparation. Evaluation accepts period/due date then discards them, synthesising dates from year/opened_at; respond lacks explicit open/eligible guard. Make real deadlines and respondents durable and enforce phase/assignment.
@@ -409,7 +414,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Term/committee matrix, evaluation deadline/response lifecycle, own-record denials and plain-language form captures.
 
 ## GOV-W21 — Present supported-living assurance and historical change with provenance
-**P2; Required; Not started.** Findings: GOV-F01, GOV-F09, GOV-F21, GOV-F19. Acceptance: GOV-A21, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W08,GOV-W15,GOV-W16,GOV-W17,GOV-W18.
+**P2; Required.** Findings: GOV-F01, GOV-F09, GOV-F21, GOV-F19. Acceptance: GOV-A21, relevant GOV-A25–GOV-A28. Dependencies: GOV-W02,GOV-W08,GOV-W15,GOV-W16,GOV-W17,GOV-W18.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Many source metrics exist but lack consistent coverage, changes and actionable meaning. Retain reports and expose authorised assurance: what happened, why material, owner/action, reporting period and evidence. Distinguish governance overview from operational case access.
@@ -429,7 +434,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Source-to-report reconciliation, privacy-safe report/PDF examples, cross-module checks and service owner D3 content gate.
 
 ## GOV-W22 — Finish current design contracts across every retained Governance surface
-**P2; Required; Not started.** Findings: GOV-F19, GOV-F18, GOV-F20. Acceptance: GOV-A22, relevant GOV-A25–GOV-A28. Dependencies: GOV-W09,GOV-W10,GOV-W11,GOV-W12,GOV-W13,GOV-W14,GOV-W15,GOV-W16,GOV-W17,GOV-W18,GOV-W19,GOV-W20,GOV-W21.
+**P2; Required.** Findings: GOV-F19, GOV-F18, GOV-F20. Acceptance: GOV-A22, relevant GOV-A25–GOV-A28. Dependencies: GOV-W09,GOV-W10,GOV-W11,GOV-W12,GOV-W13,GOV-W14,GOV-W15,GOV-W16,GOV-W17,GOV-W18,GOV-W19,GOV-W20,GOV-W21.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Functional slices must not leave legacy PageHero, full-page form or disconnected tab remnants. This is a conformance completion sweep of specified journeys, not a separate redesign. Remove only superseded duplicate presentation after feature parity is demonstrated.
@@ -449,7 +454,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Complete surface parity ledger, old-to-new navigation map, design hash comparison, scoped lint/type results and representative captures per page family.
 
 ## GOV-W23 — Make reminders, settings and infrequent-user help actionable
-**P2; Required; Not started.** Findings: GOV-F22, GOV-F04, GOV-F09, GOV-F19. Acceptance: GOV-A23, relevant GOV-A25–GOV-A28. Dependencies: GOV-W03,GOV-W07,GOV-W11,GOV-W12,GOV-W18,GOV-W19,GOV-W20,GOV-W22.
+**P2; Required.** Findings: GOV-F22, GOV-F04, GOV-F09, GOV-F19. Acceptance: GOV-A23, relevant GOV-A25–GOV-A28. Dependencies: GOV-W03,GOV-W07,GOV-W11,GOV-W12,GOV-W18,GOV-W19,GOV-W20,GOV-W22.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** Settings accept raw values and users must infer roles/terminology. Validate existing governance settings by key/type/range and make scheduled reminders target real outstanding work. Add short contextual help, not a new onboarding system.
@@ -469,7 +474,7 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Completion evidence.** Typed settings matrix, fake notification recipient/results log, help content/keyboard captures and no external-send confirmation.
 
 ## GOV-W24 — Complete integrated desktop verification and maintain the handoff
-**P1; Required; Not started.** Findings: GOV-F23. Acceptance: GOV-A24, relevant GOV-A25–GOV-A28. Dependencies: GOV-W01–GOV-W23.
+**P1; Required.** Findings: GOV-F23. Acceptance: GOV-A24, relevant GOV-A25–GOV-A28. Dependencies: GOV-W01–GOV-W23.
 Affected persona/journey is specified in the behaviour and browser steps; all UI follows the plan's shared contract.
 
 **Purpose and before/after.** A task marked implemented is not independently verified. Run every GOV-A01–GOV-A28 criterion against actual code and built preview; maintain row-level evidence and never replace missing evidence with a completion summary.
@@ -487,4 +492,5 @@ Affected persona/journey is specified in the behaviour and browser steps; all UI
 **Desktop journey and failure/denial checks.** Run seven audit journeys uncoached in synthetic environment; two browser sessions for concurrent edits/votes, both widths/modes and direct deny URLs. Then representative board-user sessions for A28; if unavailable, label Blocked/Not run and do not claim full ready.
 
 **Completion evidence.** Final task/acceptance matrix, screenshots/logs/reconciliation, source/asset identity, unrelated/protected diff check, external gate list and exact Astra verification prompt path. All required tasks implemented plus all executable gates verified before claiming engineering completion.
+
 

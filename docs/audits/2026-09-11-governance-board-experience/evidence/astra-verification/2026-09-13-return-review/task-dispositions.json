@@ -1,0 +1,170 @@
+[
+  {
+    "id": "01",
+    "findings": "GOV-R01",
+    "note": "Baseline commands pass, but the browser harness fails open and full adversarial journeys are absent.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "02",
+    "findings": "GOV-R02, GOV-R06",
+    "note": "Private actions/CEO list payloads leak and pack recipients receive confidential content.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "03",
+    "findings": "GOV-R03, GOV-R04",
+    "note": "Active profile formulas/authority binding and frozen electorate enforcement fail.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "04",
+    "findings": "GOV-R03, GOV-R04",
+    "note": "Written unanimity is ignored; a post-opening member can vote.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "05",
+    "findings": "GOV-R05",
+    "note": "UI-shaped approval accepts a revision the reviewer did not see.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "06",
+    "findings": "GOV-R06",
+    "note": "Real content-builder/download probe leaks a confidential agenda to a distributed recipient.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "07",
+    "findings": "GOV-R02, GOV-R09, GOV-R10, GOV-R17",
+    "note": "Full personal totals improved, but privacy/version/count consistency and contextual completion fail.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "08",
+    "findings": "GOV-R10, GOV-R11",
+    "note": "Unavailable finance still yields healthy-looking derivatives; calendar authorization loss retains data.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "09",
+    "findings": "GOV-R10, GOV-R13, GOV-R17",
+    "note": "Overdue count opens an empty register; approved single-home journey remains to implement.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "10",
+    "findings": "GOV-R02, GOV-R09, GOV-R10, GOV-R17",
+    "note": "My Work leaks private actions and does not supply the approved contextual workflow.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "11",
+    "findings": "GOV-R11, GOV-R17",
+    "note": "Real shared calendar and five views confirmed; terminal states, revocation and creation context remain.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "12",
+    "findings": "GOV-R05, GOV-R12, GOV-R13, GOV-R17",
+    "note": "Minutes approval/UI and integrated meeting preparation remain incomplete.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "13",
+    "findings": "GOV-R12, GOV-R13, GOV-R17",
+    "note": "Create/edit use different forms; typed owner round trip and dirty-close guard fail.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "14",
+    "findings": "GOV-R07, GOV-R12, GOV-R17",
+    "note": "Empty evidence creates a receipt, stale updates overwrite, and wizard ownership changes.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "15",
+    "findings": "GOV-R08, GOV-R10, GOV-R13",
+    "note": "Same-amount unrelated authority approves spending; unavailable finance and UI gaps remain.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "16",
+    "findings": "GOV-R15, GOV-R13",
+    "note": "Missing compliance file still satisfies completion; retained UI incomplete.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "17",
+    "findings": "GOV-R08, GOV-R13",
+    "note": "Unrelated carried resolution approves a strategy; retained UI incomplete.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "18",
+    "findings": "GOV-R02, GOV-R13",
+    "note": "CEO raw list assessment and broad audience shortcuts remain.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "19",
+    "findings": "GOV-R09, GOV-R13",
+    "note": "Member cannot attest; historical receipt is relabelled with current policy version.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "20",
+    "findings": "GOV-R04, GOV-R14, GOV-R13",
+    "note": "Post-opening electorate changes, discarded evaluation dates and closed invalid responses fail.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "21",
+    "findings": "GOV-R02, GOV-R10, GOV-R13",
+    "note": "Complete supported-living source-coverage/history/export journey not independently verified; related privacy/provenance failures remain.",
+    "task_status": "Implemented (not yet verified)",
+    "acceptance": "Not tested"
+  },
+  {
+    "id": "22",
+    "findings": "GOV-R12, GOV-R13, GOV-R17",
+    "note": "60 PageHero pages, divergent entity forms and approved navigation/workspace work remain.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "23",
+    "findings": "GOV-R03, GOV-R16, GOV-R17",
+    "note": "Invalid numeric setting saved, reminder duplicated; help must match final workflows.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  },
+  {
+    "id": "24",
+    "findings": "GOV-R01–GOV-R17",
+    "note": "Green engineering checks coexist with reproducible failures and incomplete integrated/browser acceptance.",
+    "task_status": "In progress",
+    "acceptance": "Failed"
+  }
+]

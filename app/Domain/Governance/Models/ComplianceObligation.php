@@ -30,8 +30,12 @@ class ComplianceObligation extends Model
         'owner_id',
         'backup_owner_id',
         'status',
+        'version_number',
+        'parent_obligation_id',
+        'recurrence_cycle_key',
         'completed_at',
         'completed_by',
+        'completion_notes',
         'evidence_required',
         'evidence_provided',
         'sign_off_required',
@@ -50,6 +54,7 @@ class ComplianceObligation extends Model
         'evidence_required' => 'boolean',
         'evidence_provided' => 'boolean',
         'sign_off_required' => 'boolean',
+        'version_number' => 'integer',
     ];
 
     protected static function boot(): void
@@ -63,7 +68,7 @@ class ComplianceObligation extends Model
 
     public function updateStatus(): void
     {
-        if ($this->status === 'complete') {
+        if ($this->status === 'complete' || $this->status === 'cancelled') {
             return;
         }
 
@@ -114,6 +119,16 @@ class ComplianceObligation extends Model
         return $this->hasMany(ComplianceReminder::class, 'compliance_obligation_id');
     }
 
+    public function parentObligation(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_obligation_id');
+    }
+
+    public function recurrences(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_obligation_id');
+    }
+
     public function scopeByFramework($query, string $framework)
     {
         return $query->where('framework', $framework);
@@ -150,12 +165,18 @@ class ComplianceObligation extends Model
         return now()->diffInDays($this->due_date, false) <= $days && ! $this->isOverdue();
     }
 
-    public function markComplete(int $userId): void
+    public function markComplete(int $userId, ?string $notes = null, ?int $expectedVersion = null): void
     {
+        if ($expectedVersion !== null && (int) $this->version_number !== (int) $expectedVersion) {
+            abort(409, 'The compliance obligation has been updated by another user. Please refresh and try again.');
+        }
+
         $this->update([
             'status' => 'complete',
             'completed_at' => now(),
             'completed_by' => $userId,
+            'completion_notes' => $notes ?? $this->completion_notes,
+            'version_number' => (int) ($this->version_number ?? 1) + 1,
         ]);
     }
 

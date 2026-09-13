@@ -23,6 +23,7 @@ interface Props extends PageProps {
     plan: any;
     changes: {
         has_snapshot: boolean;
+        baseline_label?: string;
         changes: Change[];
     };
 }
@@ -55,7 +56,7 @@ const typeConfig: Record<
 };
 
 export default function StrategyChanges({ auth, plan, changes }: Props) {
-    const grouped = changes.changes.reduce<Record<string, Change[]>>(
+    const grouped = (changes.changes || []).reduce<Record<string, Change[]>>(
         (acc, c) => {
             (acc[c.type] = acc[c.type] || []).push(c);
             return acc;
@@ -69,18 +70,26 @@ export default function StrategyChanges({ auth, plan, changes }: Props) {
             breadcrumbs={[
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Strategy', href: '/governance/strategy' },
+                {
+                    title: plan?.title ?? 'Plan',
+                    href: plan?.id ? `/governance/strategy/${plan.id}` : '/governance/strategy',
+                },
                 { title: 'Changes', href: '#' },
             ]}
         >
-            <Head title="Strategic Plan Changes" />
+            <Head title={`Changes - ${plan?.title ?? 'Strategic Plan'}`} />
 
             <PageLayout
                 hero={
                     <PageHero
                         icon={History}
                         title="Strategic Plan Changes"
-                        description="Changes since last snapshot."
+                        description={changes.baseline_label ?? 'Changes since last snapshot.'}
                         stats={[
+                            {
+                                label: 'Baseline',
+                                value: changes.has_snapshot ? (changes.baseline_label ?? 'Snapshot') : 'None',
+                            },
                             {
                                 label: 'Added',
                                 value: grouped.added?.length ?? 0,
@@ -100,12 +109,21 @@ export default function StrategyChanges({ auth, plan, changes }: Props) {
                 {/* Plan Header */}
                 <Card className="mb-6">
                     <CardHeader>
-                        <CardTitle>{plan?.title ?? 'Strategic Plan'}</CardTitle>
-                        {plan?.period && (
-                            <CardDescription>
-                                Period: {plan.period}
-                            </CardDescription>
-                        )}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle>{plan?.title ?? 'Strategic Plan'}</CardTitle>
+                                {plan?.period_start && plan?.period_end && (
+                                    <CardDescription>
+                                        Period: {plan.period_start} to {plan.period_end}
+                                    </CardDescription>
+                                )}
+                            </div>
+                            {changes.has_snapshot && changes.baseline_label && (
+                                <Badge variant="outline" className="text-xs">
+                                    Baseline: {changes.baseline_label}
+                                </Badge>
+                            )}
+                        </div>
                     </CardHeader>
                 </Card>
 
@@ -114,11 +132,14 @@ export default function StrategyChanges({ auth, plan, changes }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3 text-muted-foreground">
                                 <Info className="h-5 w-5" />
-                                <span>
-                                    No previous snapshot available. Changes will
-                                    be tracked after the first snapshot is
-                                    created.
-                                </span>
+                                <div>
+                                    <p className="font-semibold text-foreground">
+                                        Comparison not available
+                                    </p>
+                                    <p className="text-sm">
+                                        No prior approved baseline or snapshot exists for this strategic plan version.
+                                    </p>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -126,7 +147,7 @@ export default function StrategyChanges({ auth, plan, changes }: Props) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="py-8 text-center text-muted-foreground">
-                                No changes detected since last snapshot.
+                                No changes detected compared to {changes.baseline_label || 'last snapshot'}.
                             </div>
                         </CardContent>
                     </Card>

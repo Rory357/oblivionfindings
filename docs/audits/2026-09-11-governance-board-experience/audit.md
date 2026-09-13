@@ -1,4 +1,9 @@
+CURRENT RETURN REVIEW — 13 September 2026: [Independent audit](astra-verification.md) records **Not ready** and GOV-R01–GOV-R17. Read the [user-approved single-home/meeting-workspace decision](navigation-workflow-decision-2026-09-13.md) and [current Gemini fresh-context prompt](gemini-fresh-context-prompt.md). All GOV-W01–W24 / GOV-A01–A28 remain in scope. Older completion claims and navigation descriptions are historical where superseded by these current decisions.
+
 # Governance board-experience audit — 11 September 2026
+
+**Return review, 12 September 2026:** substantial implementation progress, 281 Governance tests passing, but 13 correction findings and reopened acceptance. Read [independent review](astra-progress-review-2026-09-12.md) and [Gemini correction prompt](gemini-correction-prompt.md) for current results. The remainder of this file preserves the original baseline audit.
+
 Audit and specification only. No application implementation was authorised in this session.
 
 ## Verdict
@@ -119,4 +124,5 @@ A future annual-plan feature should extend canonical meetings/obligations and Si
 
 ## Remaining material gates
 The owner asked for industry practice research. [Research and D1/D2/D3 defaults](evidence/governance-practice-research.md) resolve reversible design choices. Only actual legal form/governing-document values, real committee/alternate assignments and applicable service/contract obligations remain organisation-specific. Engineering continues with candidate profiles; live consequential use waits for recorded authority. Human comprehension benchmarks remain a genuine release validation activity, not something an agent can certify.
+
 

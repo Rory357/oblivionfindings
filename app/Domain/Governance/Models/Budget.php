@@ -37,6 +37,18 @@ class Budget extends Model
         'version_number' => 'integer',
     ];
 
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::creating(function (self $model) {
+            if ($model->version_number === null) {
+                $max = (int) static::query()->where('fiscal_year', $model->fiscal_year)->max('version_number');
+                $model->version_number = $max + 1;
+            }
+        });
+    }
+
     public function proposedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'proposed_by');

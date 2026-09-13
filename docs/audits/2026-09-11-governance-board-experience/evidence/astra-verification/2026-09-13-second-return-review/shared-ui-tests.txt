@@ -1,0 +1,35 @@
+
+> test
+> vitest run resources/js/components/wizard/shell.test.tsx resources/js/components/wizard/shell-focus.test.tsx resources/js/components/page/page-header-rail.test.tsx
+
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/wizard/shell.test.tsx (8 tests | 1 failed) 704ms
+     × uses visible labels and semantic default action tokens 31ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/wizard/shell.test.tsx > ConfirmDialog > uses visible labels and semantic default action tokens
+Error: expect(element).toHaveClass("bg-primary text-primary-foreground")
+
+Expected the element to have class:
+  bg-primary text-primary-foreground
+Received:
+  inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-primary text-primary-foreground h-9 px-4 py-2 has-[>svg]:px-3
+ ❯ resources/js/components/wizard/shell.test.tsx:267:68
+    265|
+    266|         expect(screen.getByRole('button', { name: 'Cancel' })).toBeVis…
+    267|         expect(screen.getByRole('button', { name: 'Close trip' })).toH…
+       |                                                                    ^
+    268|             'bg-primary',
+    269|             'text-primary-foreground',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 14 passed (15)
+   Start at  11:57:30
+   Duration  10.71s (transform 535ms, setup 6.15s, import 9.74s, tests 1.66s, environment 11.07s)
+

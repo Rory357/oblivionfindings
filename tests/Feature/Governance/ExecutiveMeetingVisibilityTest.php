@@ -262,10 +262,6 @@ class ExecutiveMeetingVisibilityTest extends TestCase
     public function test_executive_committee_member_can_view_executive_session_meeting(): void
     {
         $admin = $this->createAdminUser();
-        $execMeeting = $this->createExecutiveMeeting($admin);
-
-        $memberUser = $this->createNonExecutiveViewer();
-        $member = $memberUser->boardMember;
 
         $committee = BoardCommittee::firstOrCreate([
             'committee_type' => 'executive',
@@ -274,6 +270,13 @@ class ExecutiveMeetingVisibilityTest extends TestCase
             'meeting_frequency' => 'monthly',
             'is_active' => true,
         ]);
+
+        $execMeeting = $this->createExecutiveMeeting($admin, [
+            'board_committee_id' => $committee->id,
+        ]);
+
+        $memberUser = $this->createNonExecutiveViewer();
+        $member = $memberUser->boardMember;
 
         $committee->members()->attach($member->id, [
             'role' => 'member',

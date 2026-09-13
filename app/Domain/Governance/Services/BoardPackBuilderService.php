@@ -28,31 +28,100 @@ class BoardPackBuilderService
     }
 
     /**
-     * Build a complete board pack
+     * Build a complete board pack (creates next revision if one already exists)
      */
     public function build(GovernanceMeeting $meeting, ?DashboardSnapshot $snapshot = null): BoardPack
     {
-        $snapshot = $snapshot ?? $this->dashboardService->captureSnapshot('month');
+        $latestPack = BoardPack::where('governance_meeting_id', $meeting->id)
+            ->orderByDesc('revision_number')
+            ->first();
+
+        $revisionNumber = $latestPack ? (int) $latestPack->revision_number + 1 : 1;
+        $supersedesId = $latestPack?->id;
+
+        return $this->createPackRevision($meeting, $revisionNumber, $supersedesId, $snapshot);
+    }
+
+    /**
+     * Create an immutable revision of a board pack with unique storage path and snapshot.
+     * Retains old revisions, files, snapshots, and read/download tracking intact.
+     */
+    public function createPackRevision(
+        GovernanceMeeting $meeting,
+        int $revisionNumber,
+        ?int $supersedesId = null,
+        ?DashboardSnapshot $snapshot = null
+    ): BoardPack {
+        $viewer = auth()->user() ?? $meeting->creator;
+        $snapshot = $snapshot ?? $this->dashboardService->captureSnapshot('month', viewer: $viewer);
         $content = $this->buildPackContent($meeting, $snapshot);
         $manifest = $this->buildDocumentManifest($content);
-        $fileData = $this->generateFile($meeting, $content);
 
-        $pack = BoardPack::create([
-            'governance_meeting_id' => $meeting->id,
-            'dashboard_snapshot_id' => $snapshot->id,
-            'document_manifest' => [
-                'manifest_sections' => $manifest,
-                'content_sections' => $content,
-            ],
-            'generated_at' => now(),
-            'generated_by' => auth()->id() ?? $meeting->created_by,
-            'file_path' => $fileData['path'] ?? null,
-            'file_size' => $fileData['size'] ?? null,
-            'checksum' => $fileData['checksum'] ?? $this->generateContentChecksum($content),
-            'watermark_text' => 'CONFIDENTIAL - BOARD ONLY',
-        ]);
+        try {
+            $fileData = $this->generateFile($meeting, $content, $revisionNumber);
+        } catch (\Throwable $e) {
+            BoardPack::create([
+                'governance_meeting_id' => $meeting->id,
+                'revision_number' => $revisionNumber,
+                'supersedes_id' => $supersedesId,
+                'build_status' => 'failed',
+                'error_reference' => $e->getMessage(),
+                'is_current' => false,
+                'dashboard_snapshot_id' => $snapshot->id,
+                'document_manifest' => [
+                    'manifest_sections' => $manifest,
+                    'content_sections' => $content,
+                ],
+                'generated_at' => now(),
+                'generated_by' => auth()->id() ?? $meeting->created_by,
+                'checksum' => $this->generateContentChecksum($content),
+                'watermark_text' => 'CONFIDENTIAL - BOARD ONLY',
+            ]);
 
-        return $pack;
+            throw $e;
+        }
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use (
+            $meeting,
+            $snapshot,
+            $content,
+            $manifest,
+            $fileData,
+            $revisionNumber,
+            $supersedesId
+        ) {
+            // Atomic pointer switch: previous versions for this meeting become non-current
+            BoardPack::where('governance_meeting_id', $meeting->id)
+                ->where('is_current', true)
+                ->update(['is_current' => false]);
+
+            $pack = BoardPack::create([
+                'governance_meeting_id' => $meeting->id,
+                'revision_number' => $revisionNumber,
+                'supersedes_id' => $supersedesId,
+                'build_status' => 'published',
+                'is_current' => true,
+                'dashboard_snapshot_id' => $snapshot->id,
+                'document_manifest' => [
+                    'manifest_sections' => $manifest,
+                    'content_sections' => $content,
+                ],
+                'generated_at' => now(),
+                'generated_by' => auth()->id() ?? $meeting->created_by,
+                'file_path' => $fileData['path'] ?? null,
+                'file_size' => $fileData['size'] ?? null,
+                'checksum' => $fileData['checksum'] ?? $this->generateContentChecksum($content),
+                'watermark_text' => 'CONFIDENTIAL - BOARD ONLY',
+                'read_tracking' => [],
+                'download_tracking' => [],
+            ]);
+
+            if ($meeting->status === 'scheduled') {
+                $meeting->update(['status' => 'pack_draft']);
+            }
+
+            return $pack;
+        });
     }
 
     /**
@@ -60,17 +129,37 @@ class BoardPackBuilderService
      */
     protected function buildDocumentManifest(array $content): array
     {
-        return collect($content)
-            ->map(function ($section, $key) {
-                return [
+        $manifest = [];
+        foreach ($content as $key => $section) {
+            if ($key === 'supporting_documents' && ! empty($section['items'])) {
+                foreach ($section['items'] as $idx => $doc) {
+                    $manifest[] = [
+                        'id' => "doc_{$idx}",
+                        'title' => $doc['title'] ?? "Supporting Document " . ($idx + 1),
+                        'type' => 'attachment',
+                        'included' => true,
+                    ];
+                }
+            } elseif ($key === 'resolutions' && ! empty($section['items'])) {
+                foreach ($section['items'] as $res) {
+                    $manifest[] = [
+                        'id' => "res_{$res['id']}",
+                        'title' => "Paper: {$res['title']}",
+                        'type' => 'paper',
+                        'included' => true,
+                    ];
+                }
+            } else {
+                $manifest[] = [
                     'id' => $key,
                     'title' => $this->sectionTitle($key),
-                    'type' => $key === 'supporting_documents' ? 'attachment' : 'auto',
+                    'type' => 'section',
                     'included' => true,
                 ];
-            })
-            ->values()
-            ->all();
+            }
+        }
+
+        return $manifest;
     }
 
     /**
@@ -80,19 +169,31 @@ class BoardPackBuilderService
     {
         $meeting->loadMissing(['agendaItems.presenter', 'ceoReport.submittedBy', 'resolutions']);
 
+        $viewer = auth()->user();
+        $agendaItems = $meeting->agendaItems->filter(function ($item) use ($meeting, $viewer) {
+            if (! $item->is_confidential) {
+                return true;
+            }
+            if (! $viewer) {
+                return false;
+            }
+            return app(ExecutiveMeetingAccessService::class)->canViewAgendaItem($viewer, $meeting, $item);
+        });
+
         $content = [
             'cover' => [
                 'title' => $meeting->title,
                 'date' => $meeting->scheduled_at->format('l, j F Y'),
                 'type' => $this->getMeetingTypeLabel($meeting->meeting_type),
             ],
-            'agenda' => $meeting->agendaItems->map(fn ($item) => [
+            'agenda' => $agendaItems->map(fn ($item) => [
                 'order' => $item->order,
                 'title' => $item->title,
                 'presenter' => $item->presenter?->name,
                 'duration' => $item->duration_minutes,
                 'type' => $item->item_type,
-            ])->toArray(),
+                'is_confidential' => (bool) $item->is_confidential,
+            ])->values()->toArray(),
             'dashboard' => $snapshot->snapshot_data['widgets'] ?? [],
             'risk_report' => $this->riskService->generateBoardReport(),
         ];
@@ -130,6 +231,19 @@ class BoardPackBuilderService
                     'id' => $resolution->id,
                     'reference' => $resolution->resolution_reference,
                     'title' => $resolution->title,
+                    'exact_motion' => $resolution->exact_motion,
+                    'purpose' => $resolution->purpose,
+                    'context' => $resolution->context,
+                    'recommendation' => $resolution->recommendation,
+                    'options' => $resolution->options ?? [],
+                    'single_option_reason' => $resolution->single_option_reason,
+                    'cost_impact' => $resolution->cost_impact,
+                    'risk_impact' => $resolution->risk_impact,
+                    'service_user_implications' => $resolution->service_user_implications,
+                    'risk_equity_implications' => $resolution->risk_equity_implications,
+                    'attachments' => $resolution->attachments ?? [],
+                    'version_number' => $resolution->version_number,
+                    'voting_threshold' => $resolution->voting_threshold,
                     'status' => $resolution->status,
                     'deadline' => $resolution->deadline?->toDateString(),
                 ])->values()->all(),
@@ -142,49 +256,53 @@ class BoardPackBuilderService
     /**
      * Generate file output - PDF if library available, JSON fallback
      */
-    protected function generateFile(GovernanceMeeting $meeting, array $content): array
+    protected function generateFile(GovernanceMeeting $meeting, array $content, int $revisionNumber = 1): array
     {
         // Try PDF generation if dompdf is available
         if (class_exists(Pdf::class)) {
-            return $this->generatePdf($meeting, $content);
+            return $this->generatePdf($meeting, $content, $revisionNumber);
         }
 
         // Fallback: store as JSON file
-        return $this->generateJsonPack($meeting, $content);
+        return $this->generateJsonPack($meeting, $content, $revisionNumber);
     }
 
     /**
-     * Generate a JSON-based board pack file
+     * Generate a JSON-based board pack file with collision-free path
      */
-    protected function generateJsonPack(GovernanceMeeting $meeting, array $content): array
+    protected function generateJsonPack(GovernanceMeeting $meeting, array $content, int $revisionNumber = 1): array
     {
+        $unique = Str::random(8);
         $filename = sprintf(
-            'board-pack-%s-%s.json',
-            $meeting->scheduled_at->format('Y-m-d'),
-            Str::slug($meeting->title)
+            'board-pack-m%d-rev%d-%s.json',
+            $meeting->id,
+            $revisionNumber,
+            $unique
         );
 
         $path = 'board-packs/'.$filename;
         $jsonContent = json_encode($content, JSON_PRETTY_PRINT);
 
-        Storage::put($path, $jsonContent);
+        Storage::disk('local')->put($path, $jsonContent);
 
         return [
             'path' => $path,
-            'size' => Storage::size($path),
+            'size' => Storage::disk('local')->size($path),
             'checksum' => hash('sha256', $jsonContent),
         ];
     }
 
     /**
-     * Generate PDF board pack (requires barryvdh/laravel-dompdf)
+     * Generate PDF board pack (requires barryvdh/laravel-dompdf) with collision-free path
      */
-    protected function generatePdf(GovernanceMeeting $meeting, array $content): array
+    protected function generatePdf(GovernanceMeeting $meeting, array $content, int $revisionNumber = 1): array
     {
+        $unique = Str::random(8);
         $filename = sprintf(
-            'board-pack-%s-%s.pdf',
-            $meeting->scheduled_at->format('Y-m-d'),
-            Str::slug($meeting->title)
+            'board-pack-m%d-rev%d-%s.pdf',
+            $meeting->id,
+            $revisionNumber,
+            $unique
         );
 
         $path = 'board-packs/'.$filename;
@@ -192,17 +310,18 @@ class BoardPackBuilderService
         $pdf = Pdf::loadView('governance.board-pack.pdf', [
             'meeting' => $meeting,
             'content' => $content,
+            'revision' => $revisionNumber,
             'generated_at' => now(),
             'watermark' => 'CONFIDENTIAL - BOARD ONLY',
         ]);
         $pdf->setPaper('a4', 'portrait');
 
-        Storage::put($path, $pdf->output());
+        Storage::disk('local')->put($path, $pdf->output());
 
         return [
             'path' => $path,
-            'size' => Storage::size($path),
-            'checksum' => hash_file('sha256', Storage::path($path)),
+            'size' => Storage::disk('local')->size($path),
+            'checksum' => hash_file('sha256', Storage::disk('local')->path($path)),
         ];
     }
 
@@ -231,7 +350,7 @@ class BoardPackBuilderService
     }
 
     /**
-     * Distribute pack to board members
+     * Distribute pack to board members with audience intersection and after-commit queueing.
      */
     public function distribute(BoardPack $pack, ?array $boardMemberIds = null): void
     {
@@ -245,55 +364,61 @@ class BoardPackBuilderService
 
         $recipients = $recipientQuery->get();
 
+        // If executive session or pack contains confidential items, intersect with executive access
+        $manifest = $pack->document_manifest ?? [];
+        $contentSections = $manifest['content_sections'] ?? [];
+        $agenda = $contentSections['agenda'] ?? [];
+
+        $hasConfidential = false;
+        foreach ($agenda as $item) {
+            if (! empty($item['is_confidential'])) {
+                $hasConfidential = true;
+                break;
+            }
+        }
+
+        if ($hasConfidential || $meeting->isExecutiveSession()) {
+            $executiveAccess = app(\App\Domain\Governance\Services\ExecutiveMeetingAccessService::class);
+            $recipients = $recipients->filter(function (BoardMember $member) use ($executiveAccess, $meeting) {
+                if (! $member->user) {
+                    return false;
+                }
+                return $executiveAccess->canViewMeeting($member->user, $meeting) && (
+                    $executiveAccess->hasExecutiveAuthority($member->user) ||
+                    (int) $meeting->chair_id === (int) $member->id ||
+                    (int) $meeting->secretary_id === (int) $member->id ||
+                    ($meeting->board_committee_id && $member->committeeMemberships()->where('board_committee_id', $meeting->board_committee_id)->where('is_active', true)->exists())
+                );
+            })->values();
+        }
+
         $ids = $recipients->pluck('id')->toArray();
         $pack->markAsDistributed($ids);
 
-        // Send notifications
-        foreach ($recipients as $member) {
-            if (class_exists(SendBoardPackNotification::class)) {
-                SendBoardPackNotification::dispatch($pack, $member);
+        // Send notifications queued after database commit
+        \Illuminate\Support\Facades\DB::afterCommit(function () use ($pack, $recipients) {
+            foreach ($recipients as $member) {
+                if (class_exists(SendBoardPackNotification::class)) {
+                    SendBoardPackNotification::dispatch($pack, $member);
+                }
             }
-        }
+        });
 
         // Update meeting status
         $meeting->update(['pack_distributed_at' => now()]);
     }
 
     /**
-     * Regenerate a pack (with new snapshot)
+     * Regenerate a pack: creates a new immutable revision N+1.
+     * Retains the existing pack file, snapshot, and receipt records intact.
      */
     public function regenerate(BoardPack $pack): BoardPack
     {
         $meeting = $pack->meeting;
-        if ($pack->file_path && Storage::exists($pack->file_path)) {
-            Storage::delete($pack->file_path);
-        }
+        $nextRevision = (int) ($pack->revision_number ?? 1) + 1;
+        $supersedesId = $pack->id;
 
-        if ($pack->snapshot) {
-            $pack->snapshot->delete();
-        }
-
-        $snapshot = $this->dashboardService->captureSnapshot('month');
-        $content = $this->buildPackContent($meeting, $snapshot);
-        $manifest = $this->buildDocumentManifest($content);
-        $fileData = $this->generateFile($meeting, $content);
-
-        $pack->update([
-            'dashboard_snapshot_id' => $snapshot->id,
-            'document_manifest' => [
-                'manifest_sections' => $manifest,
-                'content_sections' => $content,
-            ],
-            'generated_at' => now(),
-            'generated_by' => auth()->id() ?? $meeting->created_by,
-            'file_path' => $fileData['path'] ?? null,
-            'file_size' => $fileData['size'] ?? null,
-            'checksum' => $fileData['checksum'] ?? $this->generateContentChecksum($content),
-            'distributed_at' => null,
-            'distributed_to' => null,
-        ]);
-
-        return $pack->fresh();
+        return $this->createPackRevision($meeting, $nextRevision, $supersedesId);
     }
 
     /**

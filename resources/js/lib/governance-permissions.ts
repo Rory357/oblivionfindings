@@ -14,8 +14,7 @@ export type GovernancePermissionMap =
 /**
  * Read a `section.action` permission flag from `auth.can.governance`.
  *
- * Defaults to `true` for missing keys so that pages don't blank out when a
- * new permission is introduced before the seeder/Inertia middleware catches up.
+ * Fails closed on missing or unknown keys; backend action capabilities are authoritative.
  */
 export function canDoGovernance(
     can: GovernancePermissionMap,
@@ -24,14 +23,19 @@ export function canDoGovernance(
 ): boolean {
     if (can == null) return false;
     const sec = (can as Record<string, unknown>)[section];
-    if (sec === undefined || sec === null) return true;
+    if (sec === undefined || sec === null) return false;
     if (typeof sec === 'boolean') return sec;
     if (action && typeof sec === 'object') {
         const value = (sec as Record<string, unknown>)[action];
-        if (value === undefined) return true;
+        if (value === undefined || value === null) return false;
         return Boolean(value);
     }
-    return true;
+    if (!action && typeof sec === 'object') {
+        const viewValue = (sec as Record<string, unknown>)['view'];
+        if (typeof viewValue === 'boolean') return viewValue;
+        return Object.values(sec as Record<string, unknown>).some(Boolean);
+    }
+    return false;
 }
 
 /**

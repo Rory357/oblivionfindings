@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,20 +9,41 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
 import { governanceStatusColor } from '@/lib/governance-status';
 import { cn } from '@/lib/utils';
 import { PageProps } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle,
     Clock,
     Compass,
+    History,
+    Plus,
     Rocket,
     Target,
+    UserCheck,
 } from 'lucide-react';
+
+interface CarriedResolution {
+    id: number;
+    resolution_reference: string;
+    title: string;
+    outcome: string;
+    closed_at: string | null;
+}
 
 interface Initiative {
     id: number;
@@ -41,8 +63,12 @@ interface Goal {
     timeframe: string;
     title: string;
     description: string;
+    progress_pct?: number | string;
     key_results: Array<{ result: string; status: string }>;
     status: string;
+    lead_executive?: { name: string } | null;
+    origin_goal_id?: number | null;
+    roadmap_initiative?: { id: number; title: string; status: string } | null;
     initiatives: Initiative[];
 }
 
@@ -62,13 +88,53 @@ interface StrategicPlan {
         outcome: string;
     } | null;
     goals: Goal[];
+    supersedes?: { id: number; title: string; version_number: number } | null;
 }
 
 interface Props extends PageProps {
     plan: StrategicPlan;
+    carriedResolutions?: CarriedResolution[];
 }
 
-export default function StrategyShow({ auth, plan }: Props) {
+export default function StrategyShow({ auth, plan, carriedResolutions = [] }: Props) {
+    const [isApproveOpen, setIsApproveOpen] = useState(false);
+    const [selectedResolutionId, setSelectedResolutionId] = useState<string>('');
+    const [isVersionOpen, setIsVersionOpen] = useState(false);
+    const [versionNotes, setVersionNotes] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleApprove = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedResolutionId) return;
+        setSubmitting(true);
+        router.post(
+            `/governance/strategy/${plan.id}/approve`,
+            { resolution_id: Number(selectedResolutionId) },
+            {
+                onFinish: () => {
+                    setSubmitting(false);
+                    setIsApproveOpen(false);
+                },
+            },
+        );
+    };
+
+    const handleCreateVersion = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!versionNotes.trim()) return;
+        setSubmitting(true);
+        router.post(
+            `/governance/strategy/${plan.id}/version`,
+            { version_notes: versionNotes.trim() },
+            {
+                onFinish: () => {
+                    setSubmitting(false);
+                    setIsVersionOpen(false);
+                    setVersionNotes('');
+                },
+            },
+        );
+    };
     const getPillarLabel = (pillar: string) => {
         const labels: Record<string, string> = {
             safety: 'Safety',
@@ -119,6 +185,7 @@ export default function StrategyShow({ auth, plan }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Strategy', href: '/governance/strategy' },
                 { title: 'Plan', href: `/governance/strategy/${plan.id}` },
@@ -165,8 +232,23 @@ export default function StrategyShow({ auth, plan }: Props) {
                                 <Badge variant="outline">
                                     v{plan.version_number}
                                 </Badge>
-                                {plan.status === 'draft' && (
-                                    <Button>Submit for Approval</Button>
+                                <Link href={`/governance/strategy/${plan.id}/changes`}>
+                                    <Button variant="outline" size="sm">
+                                        <History className="mr-1.5 h-4 w-4" />
+                                        View Changes
+                                    </Button>
+                                </Link>
+                                {(plan.status === 'draft' || plan.status === 'review') && (
+                                    <Button size="sm" onClick={() => setIsApproveOpen(true)}>
+                                        <CheckCircle className="mr-1.5 h-4 w-4" />
+                                        Approve Plan
+                                    </Button>
+                                )}
+                                {plan.status === 'approved' && (
+                                    <Button size="sm" variant="outline" onClick={() => setIsVersionOpen(true)}>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Version
+                                    </Button>
                                 )}
                             </div>
                         }
@@ -292,6 +374,19 @@ export default function StrategyShow({ auth, plan }: Props) {
                                                         <p className="text-sm text-muted-foreground">
                                                             {goal.description}
                                                         </p>
+                                                        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                                            {goal.lead_executive && (
+                                                                <span className="flex items-center gap-1">
+                                                                    <UserCheck className="h-3.5 w-3.5" />
+                                                                    Lead: {goal.lead_executive.name}
+                                                                </span>
+                                                            )}
+                                                            {goal.roadmap_initiative && (
+                                                                <Badge variant="outline" className="text-[10px]">
+                                                                    Roadmap: {goal.roadmap_initiative.title}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <div className="flex gap-2">
                                                         <Badge
@@ -311,6 +406,20 @@ export default function StrategyShow({ auth, plan }: Props) {
                                                             )}
                                                         </Badge>
                                                     </div>
+                                                </div>
+
+                                                {/* Goal Progress */}
+                                                <div className="mt-2 mb-3">
+                                                    <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                                                        <span>Progress</span>
+                                                        <span className="font-medium">
+                                                            {Math.round(Number(goal.progress_pct ?? 0))}%
+                                                        </span>
+                                                    </div>
+                                                    <Progress
+                                                        value={Number(goal.progress_pct ?? 0)}
+                                                        className="h-1.5"
+                                                    />
                                                 </div>
 
                                                 {/* Key Results */}
@@ -450,6 +559,116 @@ export default function StrategyShow({ auth, plan }: Props) {
                         </Card>
                     )}
                 </div>
+
+                {/* Approval Modal */}
+                <Dialog open={isApproveOpen} onOpenChange={setIsApproveOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <form onSubmit={handleApprove}>
+                            <DialogHeader>
+                                <DialogTitle>Approve Strategic Plan</DialogTitle>
+                                <DialogDescription>
+                                    Formally approve version {plan.version_number} with a carried board resolution.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="py-4">
+                                {carriedResolutions.length === 0 ? (
+                                    <div className="flex items-start gap-3 rounded-lg border border-status-warning/40 bg-status-warning-bg p-3 text-status-warning">
+                                        <AlertTriangle className="h-5 w-5 shrink-0" />
+                                        <div>
+                                            <p className="text-sm font-semibold">
+                                                No Carried Resolutions Available
+                                            </p>
+                                            <p className="mt-1 text-xs">
+                                                A board resolution must be closed and marked as &quot;carried&quot; before this plan can be approved.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <Label htmlFor="resolution-select">Select Carried Resolution</Label>
+                                        <select
+                                            id="resolution-select"
+                                            value={selectedResolutionId}
+                                            onChange={(e) => setSelectedResolutionId(e.target.value)}
+                                            required
+                                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        >
+                                            <option value="">-- Choose resolution --</option>
+                                            {carriedResolutions.map((res) => (
+                                                <option key={res.id} value={res.id}>
+                                                    {res.resolution_reference} - {res.title} ({res.outcome})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setIsApproveOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={
+                                        !selectedResolutionId ||
+                                        carriedResolutions.length === 0 ||
+                                        submitting
+                                    }
+                                >
+                                    {submitting ? 'Approving...' : 'Approve Plan'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+
+                {/* New Version Modal */}
+                <Dialog open={isVersionOpen} onOpenChange={setIsVersionOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <form onSubmit={handleCreateVersion}>
+                            <DialogHeader>
+                                <DialogTitle>Create New Plan Version</DialogTitle>
+                                <DialogDescription>
+                                    Create version {plan.version_number + 1} branched from this plan. All goals and initiatives will retain their lineage for snapshot comparisons.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="space-y-3 py-4">
+                                <Label htmlFor="version-notes">Version Notes / Rationale</Label>
+                                <Textarea
+                                    id="version-notes"
+                                    value={versionNotes}
+                                    onChange={(e) => setVersionNotes(e.target.value)}
+                                    required
+                                    placeholder="Describe why this new version is being created..."
+                                    rows={3}
+                                />
+                            </div>
+
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setIsVersionOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={!versionNotes.trim() || submitting}
+                                >
+                                    {submitting ? 'Creating...' : 'Create Version'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             </PageLayout>
         </AppLayout>
     );

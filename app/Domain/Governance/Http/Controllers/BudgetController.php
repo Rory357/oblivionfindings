@@ -6,6 +6,7 @@ use App\Domain\Governance\Models\Budget;
 use App\Domain\Governance\Models\BudgetAdjustment;
 use App\Domain\Governance\Models\BudgetAllocation;
 use App\Domain\Governance\Models\BudgetLineItem;
+use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Domain\Governance\Services\GovernanceNestedMutationService;
 use App\Http\Controllers\Controller;
@@ -54,6 +55,7 @@ class BudgetController extends Controller
             'adjustments.proposedBy',
             'adjustments.approvedBy',
             'adjustments.lineItem',
+            'adjustments.approvalResolution:id,resolution_reference,title,status,outcome,cost_impact',
             'allocations.createdBy:id,name',
             'allocations.budgetLineItem:id,description,category',
             'approvalResolution.votes',
@@ -71,11 +73,19 @@ class BudgetController extends Controller
             'other' => 'Other',
         ];
 
+        $carriedResolutions = Resolution::query()
+            ->where('outcome', 'carried')
+            ->whereIn('status', ['closed', 'implemented', 'archived'])
+            ->select(['id', 'resolution_reference', 'title', 'outcome', 'cost_impact', 'closed_at'])
+            ->orderByDesc('id')
+            ->get();
+
         $user = $request->user();
 
         return Inertia::render('Governance/Budgets/Show', [
             'budget' => $budget,
             'categories' => $categories,
+            'carriedResolutions' => $carriedResolutions,
             'canEdit' => ($budget->isDrafting() || $budget->status === 'proposed') && $user->canDo('governance.budgets.create'),
             'canPropose' => $budget->isDrafting() && $user->canDo('governance.budgets.submit'),
             'canApprove' => $budget->isProposed() && $user->canDo('governance.budgets.approve'),
@@ -97,6 +107,9 @@ class BudgetController extends Controller
         $isApproved = $data['board_approved'] ?? false;
         $data['status'] = $isApproved ? 'approved' : 'drafting';
         $data['created_by'] = $request->user()->id;
+        $data['version_number'] = (int) Budget::query()
+            ->where('fiscal_year', $data['fiscal_year'])
+            ->max('version_number') + 1;
         if ($isApproved) {
             $data['approved_by_board_at'] = now();
         }
@@ -333,6 +346,7 @@ class BudgetController extends Controller
             'adjustment_type' => ['required', 'string', 'in:increase,decrease,reallocate'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'reason' => ['required', 'string', 'max:1000'],
+            'approval_resolution_id' => ['nullable', 'integer', 'exists:resolutions,id'],
         ]);
 
         $adjustment = $this->nestedMutations->requestBudgetAdjustment(
@@ -348,7 +362,13 @@ class BudgetController extends Controller
 
     public function approveAdjustment(Request $request, Budget $budget, BudgetAdjustment $adjustment)
     {
-        $this->nestedMutations->approveBudgetAdjustment($request->user(), $budget, $adjustment);
+        $data = $request->validate([
+            'approval_resolution_id' => ['nullable', 'integer', 'exists:resolutions,id'],
+        ]);
+
+        $resolutionId = $this->validInteger($data['approval_resolution_id'] ?? null);
+
+        $this->nestedMutations->approveBudgetAdjustment($request->user(), $budget, $adjustment, $resolutionId);
 
         return redirect()->back()->with('success', 'Adjustment approved and applied.');
     }

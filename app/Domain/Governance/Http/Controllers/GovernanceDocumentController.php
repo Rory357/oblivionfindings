@@ -5,6 +5,7 @@ namespace App\Domain\Governance\Http\Controllers;
 use App\Domain\Governance\Models\GovernanceDocument;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class GovernanceDocumentController extends Controller
@@ -103,10 +104,15 @@ class GovernanceDocumentController extends Controller
     {
         $this->authorize('download', $document);
 
-        $path = storage_path('app/' . $document->file_path);
-        abort_unless(is_file($path), 404);
+        if (! Storage::disk('local')->exists($document->file_path)) {
+            $legacyPath = storage_path('app/' . $document->file_path);
+            if (! is_file($legacyPath)) {
+                abort(404, 'Document not found.');
+            }
+            return response()->download($legacyPath, basename($document->file_path));
+        }
 
-        return response()->download($path, basename($document->file_path));
+        return Storage::disk('local')->download($document->file_path, basename($document->file_path));
     }
 
     public function destroy(GovernanceDocument $document)

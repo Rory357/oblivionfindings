@@ -240,7 +240,7 @@ class GovernanceNestedBindingIntegrityTest extends TestCase
         $adjustment = $this->adjustment($budget, $line, ['amount' => 10]);
         $auditCount = AuditLog::query()->count();
 
-        $service = new class(app(UserSiteAccessService::class)) extends GovernanceNestedMutationService
+        $service = new class(app(UserSiteAccessService::class), app(\App\Domain\Governance\Services\ExecutiveMeetingAccessService::class)) extends GovernanceNestedMutationService
         {
             protected function afterNestedMutation(
                 string $mutation,

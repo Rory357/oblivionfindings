@@ -247,6 +247,53 @@ class GovernancePermissionsSeeder extends Seeder
             }
         }
 
-        $this->command->info('Governance permissions seeded successfully!');
+        // Assign CEO permissions (executive contributor)
+        $ceoRole = Role::where('name', 'ceo')->first();
+        if ($ceoRole) {
+            $ceoPerms = [
+                'governance.view',
+                'governance.performance.view',
+                'governance.ceo-reports.view',
+                'governance.ceo-reports.manage',
+            ];
+            foreach ($ceoPerms as $key) {
+                $perm = Permission::where('key', $key)->first();
+                if ($perm && ! $ceoRole->permissions()->where('permissions.id', $perm->id)->exists()) {
+                    $ceoRole->permissions()->attach($perm->id);
+                }
+            }
+        }
+
+        // Assign treasurer permissions (member with finance responsibility)
+        $treasurerRoles = Role::whereIn('name', ['board_treasurer', 'treasurer'])->get();
+        foreach ($treasurerRoles as $role) {
+            foreach ($memberPerms as $key) {
+                $perm = Permission::where('key', $key)->first();
+                if ($perm && ! $role->permissions()->where('permissions.id', $perm->id)->exists()) {
+                    $role->permissions()->attach($perm->id);
+                }
+            }
+            $treasurerExtra = [
+                'governance.budgets.create',
+                'governance.budgets.submit',
+                'governance.spend.request',
+            ];
+            foreach ($treasurerExtra as $key) {
+                $perm = Permission::where('key', $key)->first();
+                if ($perm && ! $role->permissions()->where('permissions.id', $perm->id)->exists()) {
+                    $role->permissions()->attach($perm->id);
+                }
+            }
+        }
+
+        // Seed candidate voting profile
+        if (\Illuminate\Support\Facades\Schema::hasTable('governance_voting_profiles')) {
+            \App\Domain\Governance\Models\GovernanceVotingProfile::firstOrCreate(
+                ['governing_body' => 'board', 'board_committee_id' => null],
+                \App\Domain\Governance\Models\GovernanceVotingProfile::candidateDefaults('board')
+            );
+        }
+
+        $this->command?->info('Governance permissions seeded successfully!');
     }
 }

@@ -15,8 +15,10 @@ class ActionItem extends Model
 
     protected $fillable = [
         'action_reference',
+        'title',
         'source_type',
         'source_id',
+        'follow_up_key',
         'description',
         'assigned_to',
         'due_date',
@@ -24,6 +26,7 @@ class ActionItem extends Model
         'completed_at',
         'completed_by',
         'completion_notes',
+        'completion_receipt',
         'evidence_required',
         'evidence_attachments',
         'escalated_at',
@@ -33,6 +36,7 @@ class ActionItem extends Model
         'created_by',
         'progress_pct',
         'progress_notes',
+        'version_number',
         'blocked_at',
         'blocked_reason',
     ];
@@ -44,6 +48,8 @@ class ActionItem extends Model
         'blocked_at' => 'datetime',
         'evidence_attachments' => 'array',
         'evidence_required' => 'boolean',
+        'version_number' => 'integer',
+        'progress_pct' => 'integer',
     ];
 
     protected static function boot(): void
@@ -128,53 +134,180 @@ class ActionItem extends Model
         return now()->diffInDays($this->due_date, false);
     }
 
-    public function updateProgress(int $pct, ?string $notes = null): void
+    public function getTitleAttribute($value): string
     {
-        $this->update([
-            'progress_pct' => $pct,
-            'progress_notes' => $notes,
-        ]);
-
-        if ($pct >= 100) {
-            $this->markComplete(auth()->id());
-        }
+        return $value ?: \Illuminate\Support\Str::limit($this->description, 60);
     }
 
-    public function block(string $reason): void
+    public function updateProgress(int $pct, ?string $notes = null, ?int $expectedVersion = null): void
     {
-        $this->update([
-            'blocked_at' => now(),
-            'blocked_reason' => $reason,
-            'status' => 'blocked',
-        ]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($pct, $notes, $expectedVersion) {
+            $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status === 'complete') {
+                throw new \DomainException('Completed actions are closed and cannot be updated. Create a follow-up action if further work is required.');
+            }
+
+            $currentVersion = (int) ($locked->version_number ?? 1);
+            if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
+                throw new \DomainException('Action item was modified by another user. Please reload and review the latest changes.');
+            }
+
+            $clamped = min(100, max(0, $pct));
+
+            $locked->update([
+                'progress_pct' => $clamped,
+                'progress_notes' => $notes ?? $locked->progress_notes,
+                'status' => $locked->status === 'blocked' ? 'blocked' : 'in_progress',
+                'version_number' => $currentVersion + 1,
+            ]);
+
+            $this->refresh();
+        });
+        // 100% alone does NOT close the action item. Completion requires formal notes & evidence.
     }
 
-    public function unblock(): void
+    public function block(string $reason, ?int $expectedVersion = null): void
     {
-        $this->update([
-            'blocked_at' => null,
-            'blocked_reason' => null,
-            'status' => 'in_progress',
-        ]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($reason, $expectedVersion) {
+            $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
+
+            $currentVersion = (int) ($locked->version_number ?? 1);
+            if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
+                throw new \DomainException('Action item was modified by another user. Please reload and review the latest changes.');
+            }
+
+            if (empty(trim($reason))) {
+                throw new \DomainException('A reason is required to mark an action item as blocked.');
+            }
+
+            $locked->update([
+                'blocked_at' => now(),
+                'blocked_reason' => trim($reason),
+                'status' => 'blocked',
+                'version_number' => $currentVersion + 1,
+            ]);
+
+            $this->refresh();
+        });
     }
 
-    public function markComplete(int $userId, ?string $notes = null): void
+    public function unblock(?int $expectedVersion = null): void
     {
-        $this->update([
-            'status' => 'complete',
-            'completed_at' => now(),
-            'completed_by' => $userId,
-            'completion_notes' => $notes,
-        ]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($expectedVersion) {
+            $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
+
+            $currentVersion = (int) ($locked->version_number ?? 1);
+            if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
+                throw new \DomainException('Action item was modified by another user. Please reload and review the latest changes.');
+            }
+
+            $locked->update([
+                'blocked_at' => null,
+                'blocked_reason' => null,
+                'status' => 'in_progress',
+                'version_number' => $currentVersion + 1,
+            ]);
+
+            $this->refresh();
+        });
     }
 
-    public function escalate(int $userId, string $reason): void
+    public function markComplete(int $userId, ?string $notes = null, ?array $evidenceFiles = null, ?int $expectedVersion = null): string
     {
-        $this->update([
-            'escalated_at' => now(),
-            'escalated_by' => $userId,
-            'escalation_reason' => $reason,
-            'priority' => $this->priority === 'low' ? 'medium' : 'high',
-        ]);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($userId, $notes, $evidenceFiles, $expectedVersion) {
+            $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
+
+            $currentVersion = (int) ($locked->version_number ?? 1);
+            if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
+                throw new \DomainException('Action item was modified by another user. Please reload and review the latest changes.');
+            }
+
+            if ($locked->status === 'complete') {
+                // Idempotent completion returns existing receipt
+                return $locked->completion_receipt ?? ('ACT-REC-' . $locked->action_reference);
+            }
+
+            if (empty($notes) || empty(trim($notes))) {
+                throw new \DomainException('Completion notes are required to complete this action item.');
+            }
+
+            $normalizedFiles = [];
+            if (is_array($evidenceFiles)) {
+                foreach ($evidenceFiles as $file) {
+                    $filePath = is_array($file) ? ($file['path'] ?? $file['file_path'] ?? '') : (string) $file;
+                    if (! empty(trim($filePath))) {
+                        $normalizedFiles[] = trim($filePath);
+                    }
+                }
+            }
+
+            if ($locked->evidence_required && empty($normalizedFiles) && empty($locked->evidence_attachments)) {
+                throw new \DomainException('Evidence documentation is required to complete this action item.');
+            }
+
+            foreach ($normalizedFiles as $filePath) {
+                $exists = \Illuminate\Support\Facades\Storage::disk('local')->exists($filePath)
+                    || \Illuminate\Support\Facades\Storage::disk('public')->exists($filePath)
+                    || \Illuminate\Support\Facades\Storage::exists($filePath)
+                    || file_exists(storage_path('app/' . $filePath))
+                    || file_exists(storage_path('app/public/' . $filePath))
+                    || file_exists(public_path($filePath));
+
+                if (! $exists) {
+                    throw new \DomainException("Evidence file '{$filePath}' does not exist or has not been uploaded.");
+                }
+            }
+
+            $receipt = 'ACT-REC-' . $locked->action_reference . '-' . now()->format('YmdHis');
+
+            $allAttachments = $locked->evidence_attachments ?? [];
+            if (! empty($normalizedFiles)) {
+                $allAttachments = array_merge($allAttachments, $normalizedFiles);
+            }
+
+            $locked->update([
+                'status' => 'complete',
+                'progress_pct' => 100,
+                'completed_at' => now(),
+                'completed_by' => $userId,
+                'completion_notes' => trim($notes),
+                'completion_receipt' => $receipt,
+                'evidence_attachments' => $allAttachments,
+                'blocked_at' => null,
+                'blocked_reason' => null,
+                'version_number' => $currentVersion + 1,
+            ]);
+
+            $this->refresh();
+
+            return $receipt;
+        });
+    }
+
+    public function escalate(int $userId, string $reason, ?int $expectedVersion = null): void
+    {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($userId, $reason, $expectedVersion) {
+            $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
+
+            $currentVersion = (int) ($locked->version_number ?? 1);
+            if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
+                throw new \DomainException('Action item was modified by another user. Please reload and review the latest changes.');
+            }
+
+            if (empty(trim($reason))) {
+                throw new \DomainException('An escalation reason is required.');
+            }
+
+            $locked->update([
+                'escalated_at' => now(),
+                'escalated_by' => $userId,
+                'escalation_reason' => trim($reason),
+                'priority' => $locked->priority === 'low' ? 'medium' : 'high',
+                'version_number' => $currentVersion + 1,
+            ]);
+
+            $this->refresh();
+        });
     }
 }

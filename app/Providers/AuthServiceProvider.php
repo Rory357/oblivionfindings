@@ -60,6 +60,8 @@ use App\Domain\Governance\Policies\ComplianceObligationPolicy;
 use App\Domain\Governance\Policies\GovernanceDocumentPolicy;
 use App\Domain\Governance\Policies\GovernanceMeetingPolicy;
 use App\Domain\Governance\Policies\GovernancePolicyPolicy;
+use App\Domain\Governance\Models\PerformanceReview;
+use App\Domain\Governance\Policies\PerformanceReviewPolicy;
 use App\Domain\Governance\Policies\ResolutionPolicy;
 use App\Domain\Governance\Policies\RiskRegisterEntryPolicy;
 use App\Domain\Governance\Policies\SpendApprovalPolicy;
@@ -196,6 +198,7 @@ class AuthServiceProvider extends ServiceProvider
         BoardMember::class => BoardMemberPolicy::class,
         CeoBoardReport::class => CeoBoardReportPolicy::class,
         GovernanceDocument::class => GovernanceDocumentPolicy::class,
+        PerformanceReview::class => PerformanceReviewPolicy::class,
         // HR
         HrEmployeeProfile::class => HrEmployeeProfilePolicy::class,
         HrPerformanceReview::class => HrPerformanceReviewPolicy::class,

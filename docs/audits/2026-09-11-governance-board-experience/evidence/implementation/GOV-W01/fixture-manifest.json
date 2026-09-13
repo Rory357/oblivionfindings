@@ -1,0 +1,87 @@
+{
+  "taskId": "GOV-W01",
+  "generated_at": "2026-09-12T08:45:00Z",
+  "database": "isolated_test_runner",
+  "personas": [
+    {
+      "key": "chair",
+      "name": "Synthetic Chair",
+      "email": "gov-chair@synthetic.test",
+      "role": "admin",
+      "board_role": "chair",
+      "voting_entitled": true
+    },
+    {
+      "key": "secretary",
+      "name": "Synthetic Secretary",
+      "email": "gov-secretary@synthetic.test",
+      "role": "staff",
+      "board_role": "secretary",
+      "voting_entitled": false
+    },
+    {
+      "key": "member",
+      "name": "Synthetic Member",
+      "email": "gov-member@synthetic.test",
+      "role": "staff",
+      "board_role": "member",
+      "voting_entitled": true
+    },
+    {
+      "key": "duplicateNameMember",
+      "name": "Synthetic Member",
+      "email": "gov-member-dup@synthetic.test",
+      "role": "staff",
+      "board_role": "member",
+      "voting_entitled": true
+    },
+    {
+      "key": "finance",
+      "name": "Synthetic Finance Lead",
+      "email": "gov-finance@synthetic.test",
+      "role": "staff",
+      "board_role": "member",
+      "committee": "finance_chair",
+      "voting_entitled": true
+    },
+    {
+      "key": "ceo",
+      "name": "Synthetic CEO",
+      "email": "gov-ceo@synthetic.test",
+      "role": "ceo",
+      "board_role": null,
+      "voting_entitled": false
+    },
+    {
+      "key": "observer",
+      "name": "Synthetic Observer",
+      "email": "gov-observer@synthetic.test",
+      "role": "staff",
+      "board_role": "observer",
+      "voting_entitled": false
+    }
+  ],
+  "sites": [
+    { "name": "Governance Site Alpha", "type": "facility" },
+    { "name": "Governance Site Beta", "type": "facility" }
+  ],
+  "counts": {
+    "action_items": 40,
+    "above_appetite_risks": 12,
+    "resolutions": 4,
+    "meetings": 2,
+    "board_packs": 1,
+    "performance_reviews": 1
+  },
+  "adversarial_scenarios": [
+    "Duplicate member name (Synthetic Member) with different email and ID",
+    "Blocked overdue action item assigned to Synthetic Member",
+    "Last-page (item #30) action item assigned to Synthetic Member",
+    "Private executive session scheduled earlier than regular board meeting",
+    "Decision opened without deadline (null deadline)",
+    "Decision with expired voting deadline",
+    "Valid scoring inputs producing residual risk score (25) exceeding appetite (10)",
+    "Expired committee term on Synthetic Audit & Risk Committee",
+    "Two distinct sites with separate OPEX and CAPEX spend approvals"
+  ]
+}

@@ -1,0 +1,426 @@
+ M app/Domain/Governance/Http/Controllers/ActionItemController.php
+ M app/Domain/Governance/Http/Controllers/BoardPackController.php
+ M app/Domain/Governance/Http/Controllers/BudgetController.php
+ M app/Domain/Governance/Http/Controllers/ComplianceController.php
+ M app/Domain/Governance/Http/Controllers/DashboardController.php
+ M app/Domain/Governance/Http/Controllers/GovernanceDocumentController.php
+ M app/Domain/Governance/Http/Controllers/GovernanceMeetingController.php
+ M app/Domain/Governance/Http/Controllers/GovernancePolicyController.php
+ M app/Domain/Governance/Http/Controllers/GovernanceSettingController.php
+ M app/Domain/Governance/Http/Controllers/PerformanceReviewController.php
+ M app/Domain/Governance/Http/Controllers/ReportController.php
+ M app/Domain/Governance/Http/Controllers/ResolutionController.php
+ M app/Domain/Governance/Http/Controllers/StrategicPlanController.php
+ M app/Domain/Governance/Http/Requests/StoreResolutionRequest.php
+ M app/Domain/Governance/Http/Requests/UpdateMeetingRequest.php
+ M app/Domain/Governance/Http/Requests/UpdateResolutionRequest.php
+ M app/Domain/Governance/Models/ActionItem.php
+ M app/Domain/Governance/Models/BoardCommittee.php
+ M app/Domain/Governance/Models/BoardMember.php
+ M app/Domain/Governance/Models/BoardPack.php
+ M app/Domain/Governance/Models/Budget.php
+ M app/Domain/Governance/Models/CommitteeMembership.php
+ M app/Domain/Governance/Models/ComplianceObligation.php
+ M app/Domain/Governance/Models/GovernanceMeeting.php
+ M app/Domain/Governance/Models/GovernancePolicy.php
+ M app/Domain/Governance/Models/MeetingMinute.php
+ M app/Domain/Governance/Models/PolicyAttestation.php
+ M app/Domain/Governance/Models/Resolution.php
+ M app/Domain/Governance/Models/RiskRegisterEntry.php
+ M app/Domain/Governance/Models/StrategicGoal.php
+ M app/Domain/Governance/Models/StrategicPlan.php
+ M app/Domain/Governance/Policies/ActionItemPolicy.php
+ M app/Domain/Governance/Policies/GovernanceMeetingPolicy.php
+ M app/Domain/Governance/Policies/ResolutionPolicy.php
+ M app/Domain/Governance/Services/BoardPackAccessService.php
+ M app/Domain/Governance/Services/BoardPackBuilderService.php
+ M app/Domain/Governance/Services/ComplianceEngineService.php
+ M app/Domain/Governance/Services/DashboardAggregatorService.php
+ M app/Domain/Governance/Services/ExecutiveMeetingAccessService.php
+ M app/Domain/Governance/Services/GovernanceNestedMutationService.php
+ M app/Domain/Governance/Services/GovernanceWorkflowService.php
+ M app/Domain/Governance/Services/VotingService.php
+ M app/Domain/Governance/Support/GovernancePresenter.php
+ M app/Domain/Hr/Services/AttendanceService.php
+ M app/Domain/It/Services/ItAttachmentStorageIntentService.php
+ M app/Domain/It/Services/ItAttachmentStorageService.php
+ M app/Domain/It/Services/ItCatalogAccessService.php
+ M app/Domain/It/Services/ItCatalogManagementService.php
+ M app/Domain/It/Services/ItCatalogSubmissionService.php
+ M app/Domain/It/Services/ItProvisioningAccessService.php
+ M app/Domain/It/Services/ItProvisioningTrackingService.php
+ M app/Domain/It/Services/ItTicketIntakeService.php
+ M app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php
+ M app/Domain/Shifts/Timesheets/Drafts/DraftTimesheetService.php
+ M app/Domain/Shifts/Timesheets/TimesheetApprovalService.php
+ M app/Http/Controllers/AttendanceController.php
+ M app/Http/Controllers/It/ItCatalogController.php
+ M app/Http/Controllers/It/ItTicketController.php
+ M app/Http/Controllers/MyDayActionsController.php
+ M app/Http/Controllers/MyTasksController.php
+ M app/Http/Controllers/ShiftTaskController.php
+ M app/Http/Controllers/TimesheetController.php
+ M app/Http/Requests/It/SaveItCatalogItemRequest.php
+ M app/Http/Requests/It/SearchItCatalogFieldOptionsRequest.php
+ M app/Http/Requests/It/StoreCatalogRequest.php
+ M app/Http/Resources/MyShiftResource.php
+ M app/Models/ItAttachment.php
+ M app/Models/ItAttachmentStorageIntent.php
+ M app/Models/ItCatalogItem.php
+ M app/Models/ItCatalogSubmission.php
+ M app/Models/ItTicketCommandReceipt.php
+ M app/Models/ShiftTask.php
+ M app/Providers/AppServiceProvider.php
+ M app/Providers/AuthServiceProvider.php
+ M app/Services/ShiftHandoverService.php
+ M app/Services/Tasks/Providers/ShiftTaskProvider.php
+ M app/Support/ShiftTaskSupport.php
+ M database/seeders/GovernancePermissionsSeeder.php
+ M database/seeders/RbacSeeder.php
+ M docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-environment.ps1
+ M docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-router.php
+ M docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-runtime.php
+ M docs/audits/2026-09-08-it-support/evidence/w15-catalogue-browser-fixture.php
+ M docs/audits/2026-09-08-it-support/evidence/w15-catalogue-browser-inspect.php
+ M docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-build.txt
+ M docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-lint.txt
+ M docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-results.md
+ M docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-source-hashes.json
+ M docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-types.txt
+ M docs/audits/2026-09-08-it-support/implementation-checkpoints-history-2026-09-12.md
+ M docs/audits/2026-09-08-it-support/implementation-progress.md
+ M docs/audits/2026-09-11-governance-board-experience/acceptance-checklist.md
+ M docs/audits/2026-09-11-governance-board-experience/antigravity-implementation-prompt.md
+ M docs/audits/2026-09-11-governance-board-experience/astra-verification-prompt.md
+ M docs/audits/2026-09-11-governance-board-experience/audit.md
+ M docs/audits/2026-09-11-governance-board-experience/implementation-plan.md
+ M docs/audits/2026-09-11-governance-board-experience/implementation-progress.md
+ M docs/audits/2026-09-11-governance-board-experience/implementation-tasks.md
+ M resources/js/components/app-header.tsx
+ M resources/js/components/app-sidebar.tsx
+ M resources/js/components/end-of-shift-checklist.test.tsx
+ M resources/js/components/end-of-shift-checklist.tsx
+ M resources/js/components/governance/BoardPriorityCard.tsx
+ M resources/js/components/governance/GovernanceTimeline.tsx
+ M resources/js/components/governance/MyNextActionsRail.tsx
+ M resources/js/components/governance/PriorityOverviewPanel.tsx
+ M resources/js/components/governance/RecentlyCompletedRail.tsx
+ M resources/js/components/it/__tests__/catalogue-entity-picker.test.tsx
+ M resources/js/components/it/__tests__/it-catalogue-management.test.tsx
+ M resources/js/components/it/__tests__/provisioning-tracking.test.tsx
+ M resources/js/components/it/catalogue-entity-picker.tsx
+ M resources/js/components/it/it-catalogue-management.tsx
+ M resources/js/components/it/it-service-catalogue.tsx
+ M resources/js/components/it/ticket-thread.tsx
+ M resources/js/components/page/page-header.tsx
+ M resources/js/components/shift-task-list.tsx
+ M resources/js/components/wizard/shell.test.tsx
+ M resources/js/components/wizard/shell.tsx
+ M resources/js/hooks/use-live-refresh.ts
+ M resources/js/lib/governance-permissions.ts
+ M resources/js/pages/Governance/Actions/Index.tsx
+ M resources/js/pages/Governance/Actions/Show.tsx
+ M resources/js/pages/Governance/AuditLog/Index.tsx
+ M resources/js/pages/Governance/Budgets/Index.tsx
+ M resources/js/pages/Governance/Budgets/Show.tsx
+ M resources/js/pages/Governance/Cockpit/CockpitLayout.tsx
+ M resources/js/pages/Governance/Compliance/Calendar.tsx
+ M resources/js/pages/Governance/Compliance/Show.tsx
+ M resources/js/pages/Governance/Dashboard.tsx
+ M resources/js/pages/Governance/Meetings/Calendar.tsx
+ M resources/js/pages/Governance/Meetings/Create.tsx
+ M resources/js/pages/Governance/Meetings/Edit.tsx
+ M resources/js/pages/Governance/Meetings/Index.tsx
+ M resources/js/pages/Governance/Meetings/Show.tsx
+ M resources/js/pages/Governance/Packs/Index.tsx
+ M resources/js/pages/Governance/Packs/Show.tsx
+ M resources/js/pages/Governance/Policies/Index.tsx
+ M resources/js/pages/Governance/Policies/Show.tsx
+ M resources/js/pages/Governance/Resolutions/Create.tsx
+ M resources/js/pages/Governance/Resolutions/Index.tsx
+ M resources/js/pages/Governance/Resolutions/Show.tsx
+ M resources/js/pages/Governance/Resolutions/_dialogs.tsx
+ M resources/js/pages/Governance/Risks/Index.tsx
+ M resources/js/pages/Governance/Risks/Show.tsx
+ M resources/js/pages/Governance/Settings/Index.tsx
+ M resources/js/pages/Governance/Strategy/Changes.tsx
+ M resources/js/pages/Governance/Strategy/Index.tsx
+ M resources/js/pages/Governance/Strategy/Show.tsx
+ M resources/js/pages/it/provisioning/show.tsx
+ M resources/js/pages/it/tickets/show.tsx
+ M resources/js/pages/my-day/_dialogs.tsx
+ M resources/js/pages/my-day/components/digest-panel.tsx
+ M resources/js/pages/my-day/components/paperwork-panel.tsx
+ M resources/js/pages/my-day/index-audit-fixes.test.tsx
+ M resources/js/pages/my-day/index.tsx
+ M resources/js/pages/my-day/lib/stream-grouping.ts
+ M resources/js/pages/my-day/lib/timesheet-allocation.test.ts
+ M resources/js/pages/my-day/lib/timesheet-allocation.ts
+ M resources/js/pages/my-day/lib/types.ts
+ M resources/js/pages/sites/calendar/SiteCalendar.tsx
+ M resources/js/pages/sites/calendar/_parts.tsx
+ M routes/governance.php
+ M routes/web.php
+ M tests/Concurrency/It/README.md
+ M tests/Feature/Governance/GovernanceActionItemsTest.php
+ M tests/Feature/Governance/GovernanceBoardPacksTest.php
+ M tests/Feature/Governance/GovernanceBudgetsTest.php
+ M tests/Feature/Governance/GovernanceComplianceTest.php
+ M tests/Feature/Governance/GovernanceDashboardTest.php
+ M tests/Feature/Governance/GovernanceMeetingsTest.php
+ M tests/Feature/Governance/GovernanceNestedBindingIntegrityTest.php
+ M tests/Feature/Governance/GovernanceResolutionsTest.php
+ M tests/Feature/Governance/GovernanceSpendDashboardScopeTest.php
+ M tests/Feature/Governance/GovernanceStrategyTest.php
+ M tests/Feature/Governance/ResolutionQuorumDecisionSnapshotTest.php
+ M tests/Feature/It/ItServiceCatalogTest.php
+ M tests/Feature/It/ItTicketNotificationOutboxTest.php
+ M tests/Feature/MyDayTimesheetAllocationTest.php
+ M tests/Feature/Tasks/ShiftTaskProviderTest.php
+ M tests/Support/GovernanceTestHelpers.php
+ M tests/Unit/Governance/ComplianceEngineServiceTest.php
+ M tests/Unit/Governance/GovernancePresenterTest.php
+ M tests/Unit/Governance/GovernanceWorkflowServiceTest.php
+ M tests/Unit/Governance/RiskScoringServiceTest.php
+ M tests/Unit/Governance/VotingServiceTest.php
+ M vite.config.ts
+?? app/Domain/Governance/Data/
+?? app/Domain/Governance/Enums/
+?? app/Domain/Governance/Http/Controllers/GovernanceCalendarController.php
+?? app/Domain/Governance/Http/Controllers/GovernanceMyWorkController.php
+?? app/Domain/Governance/Models/GovernanceVotingProfile.php
+?? app/Domain/Governance/Policies/PerformanceReviewPolicy.php
+?? app/Domain/Governance/Services/GovernanceCalendarQuery.php
+?? app/Domain/Governance/Services/GovernanceRecordAccessService.php
+?? app/Domain/Governance/Services/GovernanceVotingProfileService.php
+?? app/Domain/Governance/Services/GovernanceWorkQuery.php
+?? app/Domain/Governance/Services/MeetingMinuteService.php
+?? app/Domain/It/Services/ItCatalogAttachmentService.php
+?? app/Domain/Shifts/Timesheets/TimesheetAllocationService.php
+?? app/Http/Controllers/It/ItCatalogRequestedForOptionController.php
+?? app/Http/Controllers/MyDayTaskController.php
+?? app/Http/Controllers/MyDayTaskDraftController.php
+?? app/Http/Requests/It/RecoverCatalogSubmissionRequest.php
+?? app/Models/ShiftTaskDraft.php
+?? app/Services/MyDay/
+?? database/migrations/2026_09_12_000032_create_governance_voting_profiles_table.php
+?? database/migrations/2026_09_12_000033_make_governance_meeting_id_nullable_on_conflict_declarations_table.php
+?? database/migrations/2026_09_12_000034_add_versioning_and_status_to_board_packs_table.php
+?? database/migrations/2026_09_12_000040_enhance_resolution_papers.php
+?? database/migrations/2026_09_12_000041_enhance_governance_action_items.php
+?? database/migrations/2026_09_12_000042_enhance_compliance_obligations.php
+?? database/migrations/2026_09_12_000043_enhance_strategic_goals.php
+?? database/migrations/2026_09_12_000045_enhance_governance_policies_and_attestations.php
+?? database/migrations/2026_09_12_000060_add_my_day_shift_task_context.php
+?? database/migrations/2026_09_12_000061_create_shift_task_drafts.php
+?? database/migrations/2026_09_12_000062_add_shift_task_follow_through.php
+?? database/migrations/2026_09_12_000070_add_catalogue_field_to_it_attachments.php
+?? database/seeders/MyDayTaskPermissionSeeder.php
+?? docs/audits/2026-09-08-it-support/evidence/it_06b76842279845f8.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_1cb004eca3194989.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_23b85ad325ab4057.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_33418a20b9954e6e.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_3f44eb3769f04fdc.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_4161ee3b2b6045f7.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_4745fe4a0b4c40e5.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_4eef0a66d5764de4.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_4efe48c0ecff4a19.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_61668dc549174502.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_6ee1989ed00347e9.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_6fd79c4134d04ea2.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_839fa2354238415c.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_87333bf8d1534c25.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_888b2ec6449648e3.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_c08df9d7832149ab.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_c22f4d0df42f4994.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_dabcd94bb2a24f3b.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_f7e65ccd38f9493f.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/it_fca2facfdc1e469c.diagnostic.jsonl
+?? docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-cleanup-3b468ee0f28746fb.json
+?? docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-cleanup-5b971ab2b4f244c1.json
+?? docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-cleanup-ccc3ce9ef30d466d.json
+?? docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-cleanup-ecbf021c315045f4.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-backend-final.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-backend-retry.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-backend-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-alternate-bootstrap.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-alternate-identity.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-alternate-preview.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-bootstrap.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-identity.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-interrupted-cleanup.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-interrupted-inspection.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-postcrash-inspection.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-preview-review.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-preview.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-runtime.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-browser-source-snapshot.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-build-postflight.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-build-shared-route-drift.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-build-source-snapshot.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-build.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-crash-observe.php
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-diagnostic-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-feature-final-totals.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-focused-final.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-initial-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-lint-final.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-lint.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-pint.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-results.md
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-session-design-baseline.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-tracking-retry.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-transactions-retry.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-transactions-storage-postflight.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-transactions.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-types-final.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-types-retry.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-types.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-ui-combined.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-ui-final.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-ui-retry.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-ui-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-worker-races.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-attachment-worker-storage-postflight.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-browser-bootstrap.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-browser-cleanup.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-browser-denial-records.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-browser-identity.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-browser-postflight.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-browser-preview.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-browser.md
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-build.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-source-hashes.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-types.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding-ui.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-actor-binding.md
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-cancellation-retry-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-cancellation-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-browser-bootstrap.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-browser-cleanup.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-browser-design-postflight.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-browser-final-records.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-browser-hold.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-browser-identity.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-browser-postflight.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-browser-preview.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-browser-results.md
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-browser-shared-route-review.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-browser-source-postflight.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-concurrency-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-intake-build.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-intake-final-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-intake-results.md
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-intake-retry-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-intake-source-hashes.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-intake-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-shared-shell-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-canonical-ui-final.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-command-recovery-source-hashes.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-command-recovery-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-command-recovery.md
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-outbox-privacy-regression-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-private-fields-assets.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-private-fields-build.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-private-fields-lint.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-private-fields-source-hashes.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-private-fields-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-private-fields-types.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-private-fields-ui.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-requested-for-final-lint.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-requested-for-lint.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-requested-for-types-retry.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-requested-for-types.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-requested-for-ui-final.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-requested-for-ui.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-submission-concurrency-tests.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-submission-contract-ui.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-browser-bootstrap.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-browser-cleanup.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-browser-denial-records.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-browser-final-records.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-browser-hold-retry.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-browser-hold.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-browser-identity.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-browser-postflight.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-browser-preview.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-browser-recovery-records.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-browser-results.md
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-command-ui.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-final-ui.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-assets.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-browser-bootstrap.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-browser-cleanup.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-browser-final-records.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-browser-identity.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-browser-postflight.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-browser-preview.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-build.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-lint.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-source-hashes.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-types.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-ui-retry.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-focus-ui.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-lifecycle-ui-retry.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-lifecycle-ui.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-overlapping-build-observation.json
+?? docs/audits/2026-09-08-it-support/evidence/w15-catalogue-wizard-types-retry.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-internal-upload-fixture.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-public-upload-fixture.txt
+?? docs/audits/2026-09-08-it-support/evidence/w15-unsupported-content-fixture.txt
+?? docs/audits/2026-09-11-governance-board-experience/astra-progress-review-2026-09-12.md
+?? docs/audits/2026-09-11-governance-board-experience/evidence/astra-verification/
+?? docs/audits/2026-09-11-governance-board-experience/evidence/implementation/
+?? docs/audits/2026-09-11-governance-board-experience/gemini-correction-prompt.md
+?? docs/audits/2026-09-11-governance-board-experience/gemini-fresh-context-prompt.md
+?? docs/audits/2026-09-12-my-day/
+?? docs/my-day-desktop-redesign-review-2026-09-12.md
+?? playwright-report-governance/
+?? playwright.governance.config.ts
+?? public/my-day-review-20260912/
+?? resources/js/components/it/__tests__/catalogue-request-wizard.test.tsx
+?? resources/js/components/it/__tests__/catalogue-submission-contract.test.ts
+?? resources/js/components/it/__tests__/use-catalogue-submission.test.ts
+?? resources/js/components/it/catalogue-attachments.tsx
+?? resources/js/components/it/catalogue-request-fields.tsx
+?? resources/js/components/it/catalogue-request-wizard.tsx
+?? resources/js/components/it/catalogue-submission-contract.ts
+?? resources/js/components/it/use-catalogue-submission.ts
+?? resources/js/hooks/use-live-refresh.test.ts
+?? resources/js/lib/governance-calendar-adapter.ts
+?? resources/js/pages/Governance/Calendar/
+?? resources/js/pages/Governance/MyWork/
+?? resources/js/pages/my-day/components/day-work-list.tsx
+?? resources/js/pages/my-day/components/handover-follow-ups.test.tsx
+?? resources/js/pages/my-day/components/handover-follow-ups.tsx
+?? resources/js/pages/my-day/components/my-day-header.tsx
+?? resources/js/pages/my-day/components/quick-add-task.test.tsx
+?? resources/js/pages/my-day/components/quick-add-task.tsx
+?? resources/js/pages/my-day/components/task-detail-dialog.test.tsx
+?? resources/js/pages/my-day/components/task-detail-dialog.tsx
+?? resources/js/pages/my-day/components/task-help-inbox.tsx
+?? resources/js/pages/my-day/components/task-help.test.tsx
+?? resources/js/pages/my-day/components/task-help.tsx
+?? resources/js/pages/my-day/components/task-step-draft.tsx
+?? resources/js/pages/my-day/components/task-steps.tsx
+?? resources/js/pages/my-day/components/timesheet-review.test.tsx
+?? resources/js/pages/my-day/components/timesheet-review.tsx
+?? resources/js/pages/my-day/lib/task-api.ts
+?? resources/js/pages/my-day/lib/work-priority.test.ts
+?? resources/js/pages/my-day/lib/work-priority.ts
+?? tests/Concurrency/It/ItCatalogAttachmentTransactionTest.php
+?? tests/Concurrency/It/ItCatalogSubmissionConcurrencyTest.php
+?? tests/Feature/Governance/GovernanceCalendarScopeTest.php
+?? tests/Feature/Governance/GovernanceDerivedAudienceTest.php
+?? tests/Feature/Governance/GovernanceMinuteIntegrityTest.php
+?? tests/Feature/Governance/GovernanceMyWorkTest.php
+?? tests/Feature/It/ItCatalogAttachmentTest.php
+?? tests/Feature/MyDayHandoverFollowUpTest.php
+?? tests/Feature/MyDayTaskHelpTest.php
+?? tests/Feature/MyDayTaskWorkTest.php
+?? tests/Feature/MyDayTimesheetReviewAuditTest.php
+?? tests/Support/GovernanceSyntheticFixtures.php
+?? tests/Support/It/catalogue-submission-concurrency-worker.php
+?? tests/Unit/Governance/GovernanceSyntheticFixturesTest.php
+?? tests/e2e/governance/

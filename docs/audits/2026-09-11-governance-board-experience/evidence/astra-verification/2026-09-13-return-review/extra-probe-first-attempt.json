@@ -1,0 +1,114 @@
+{
+    "checked_at": "2026-09-12T19:35:00+00:00",
+    "database": "oblivion_gov_review_runtime_20260913_20892",
+    "cases": {
+        "policy_old_acknowledgement_claims_new_version": {
+            "attest_status": 403,
+            "original_receipt": null,
+            "policy_version_now": 2,
+            "feed_contains_v2_attestation": false,
+            "feed": {
+                "items": [],
+                "totals": {
+                    "all": 4,
+                    "vote": 0,
+                    "read": 0,
+                    "act": 3,
+                    "know": 1,
+                    "pending": 4,
+                    "overdue": 1,
+                    "blocked": 0,
+                    "completed": 0
+                },
+                "pagination": {
+                    "total": 0,
+                    "per_page": 25,
+                    "current_page": 1,
+                    "last_page": 1
+                },
+                "scope": {
+                    "viewer": {
+                        "user_id": 3,
+                        "name": "Review Alex Morgan",
+                        "board_member_id": 3
+                    },
+                    "filters": {
+                        "status": "completed"
+                    }
+                },
+                "availability": {
+                    "resolutions": "available",
+                    "board_packs": "available",
+                    "action_items": "available",
+                    "policies": "available",
+                    "meetings": "available"
+                },
+                "all_sources_succeeded": true,
+                "generated_at": "2026-09-12T19:35:00+00:00"
+            }
+        },
+        "unrelated_resolution_approves_strategy": {
+            "exception": "Illuminate\\Database\\QueryException",
+            "message": "SQLSTATE[HY000]: General error: 1364 Field 'vision_statement' doesn't have a default value (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_gov_review_runtime_20260913_20892, SQL: insert into `strategic_plans` (`title`, `planning_horizon`, `period_start`, `period_end`, `status`, `version_number`, `created_by`, `updated_at`, `created_at`) values (Unrelated five year strategy, 5_year, 2026-01-01 00:00:00, 2030-12-31 00:00:00, draft, 1, 1, 2026-09-12 19:35:00, 2026-09-12 19:35:00))"
+        },
+        "closed_evaluation_accepts_invalid_response": {
+            "http_status": 302,
+            "evaluation_status": "closed",
+            "response": {
+                "board_member_id": 3,
+                "answers": [
+                    {
+                        "type": "rating",
+                        "answer": 999,
+                        "rating": 999,
+                        "question": "Rate board assurance",
+                        "question_id": 1
+                    }
+                ],
+                "submitted_at": "2026-09-12T19:35:00.000000Z"
+            }
+        },
+        "evaluation_period_and_deadline_roundtrip": {
+            "http_status": 302,
+            "stored": {
+                "id": 2,
+                "title": "Return review custom evaluation",
+                "evaluation_type": "board",
+                "year": 2026,
+                "status": "draft",
+                "summary": null,
+                "questions": [
+                    {
+                        "id": 1,
+                        "type": "rating",
+                        "question": "Board quality"
+                    }
+                ],
+                "aggregate_results": null,
+                "recommendations": null,
+                "action_plan": null,
+                "created_by": 1,
+                "opened_at": null,
+                "closed_at": null,
+                "created_at": "2026-09-12T19:35:00.000000Z",
+                "updated_at": "2026-09-12T19:35:00.000000Z"
+            },
+            "detail_contains_requested_start": false,
+            "detail_contains_requested_due": false
+        },
+        "missing_compliance_file_satisfies_completion": {
+            "file_exists": false,
+            "evidence_verified": false,
+            "obligation_status": "complete",
+            "evidence_provided": true
+        },
+        "duplicate_voting_reminders": {
+            "same_job_invocations": 2,
+            "notifications_to_member": 2
+        },
+        "pack_recipient_receives_confidential_agenda": {
+            "exception": "Illuminate\\Database\\QueryException",
+            "message": "SQLSTATE[HY000]: General error: 1364 Field 'dashboard_snapshot_id' doesn't have a default value (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_gov_review_runtime_20260913_20892, SQL: insert into `board_packs` (`governance_meeting_id`, `revision_number`, `build_status`, `is_current`, `document_manifest`, `generated_at`, `generated_by`, `file_path`, `distributed_at`, `distributed_to`, `updated_at`, `created_at`) values (1, 1, published, 1, {\"cover\":{\"title\":\"Review September Board\",\"date\":\"Wednesday, 16 September 2026\",\"type\":\"Full Board Meeting\"},\"agenda\":[{\"order\":1,\"title\":\"REVIEW CONFIDENTIAL agenda\",\"presenter\":null,\"duration\":15,\"type\":\"decision\",\"is_confidential\":true}],\"dashboard\":[],\"risk_report\":{\"executive_summary\":{\"total_active\":12,\"critical_count\":12,\"high_"
+        }
+    }
+}

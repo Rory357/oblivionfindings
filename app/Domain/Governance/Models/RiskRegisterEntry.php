@@ -126,7 +126,7 @@ class RiskRegisterEntry extends Model
 
     public function scopeActive($query)
     {
-        return $query->where('status', 'active');
+        return $query->whereIn('status', ['active', 'open']);
     }
 
     public function scopeCritical($query)

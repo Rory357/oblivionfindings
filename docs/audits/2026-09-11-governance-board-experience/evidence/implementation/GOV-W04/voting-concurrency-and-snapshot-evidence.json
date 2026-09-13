@@ -1,0 +1,59 @@
+{
+  "task_id": "GOV-W04",
+  "acceptance_id": "GOV-A04",
+  "verified_at": "2026-09-12T10:30:00+12:00",
+  "concurrency_controls": {
+    "locking_strategy": "DB::transaction with Resolution::lockForUpdate()",
+    "covered_methods": [
+      "VotingService::openVoting",
+      "VotingService::castVote",
+      "VotingService::declareConflict",
+      "VotingService::closeVoting"
+    ]
+  },
+  "recusal_separation": {
+    "creates_abstain_vote": false,
+    "excludes_from_presence": true,
+    "excludes_from_tally": true,
+    "reduces_electorate_denominator_n": false,
+    "removes_prior_vote_on_withdrawal": true,
+    "blocks_subsequent_voting": true
+  },
+  "outcome_states": {
+    "quorum_unmet": "no_quorum",
+    "display_text": "No valid decision — quorum not met",
+    "tie_after_quorum": "defeated",
+    "for_majority": "carried",
+    "implementation_permitted": {
+      "carried": true,
+      "defeated": false,
+      "no_quorum": false,
+      "cancelled": false
+    }
+  },
+  "snapshot_immutability": {
+    "captured_on": "Resolution::closeVoting",
+    "fields_frozen": [
+      "resolution_id",
+      "resolution_reference",
+      "title",
+      "closed_at",
+      "threshold",
+      "quorum_required",
+      "quorum_met",
+      "quorum_details",
+      "electorate",
+      "vote_summary",
+      "outcome",
+      "individual_votes",
+      "conflicts"
+    ],
+    "survives_subsequent_member_deletion": true
+  },
+  "test_execution": {
+    "suite": "tests/Unit/Governance/VotingServiceTest.php tests/Feature/Governance/GovernanceResolutionsTest.php tests/Feature/Governance/ResolutionQuorumDecisionSnapshotTest.php",
+    "tests_total": 32,
+    "assertions_total": 141,
+    "exit_code": 0
+  }
+}

@@ -1,3 +1,7 @@
+CURRENT RETURN REVIEW — 13 September 2026: [Independent audit](astra-verification.md) records **Not ready** and GOV-R01–GOV-R17. Read the [user-approved single-home/meeting-workspace decision](navigation-workflow-decision-2026-09-13.md) and [current Gemini fresh-context prompt](gemini-fresh-context-prompt.md). All GOV-W01–W24 / GOV-A01–A28 remain in scope. Older completion claims and navigation descriptions are historical where superseded by these current decisions.
+
+CURRENT RESUME UPDATE — 12 September 2026: First read C:/Users/steph/Herd/oblivionfindings/docs/audits/2026-09-11-governance-board-experience/gemini-correction-prompt.md and astra-progress-review-2026-09-12.md in that same folder. Fix GOV-R01-GOV-R13, then finish the remaining required tasks. Do not rely on old W01-W16 Verified declarations. Preserve actual Sites calendar reuse and complete Rory's UI rules. This original prompt remains the full implementation scope.
+
 You are Gemini 3.8 Flash in Antigravity. Implement ALL work marked Required in the Governance audit package for C:/Users/steph/Herd/oblivionfindings. Complete backend, frontend, integrations, desktop accessibility, tests and handoff documentation. Do not stop after the dashboard or first phase.
 
 Read in this order:
@@ -37,3 +41,4 @@ After context loss, reread the package and ledger, inspect actual diffs/evidence
 Final gate: all 24 required tasks implemented, every executable GOV-A01–GOV-A28 check evidenced, Sites calendar reuse/regressions passed, protected/unrelated work preserved, deviations explained. Actual authority/content and representative-human comprehension gates must be explicitly reported until satisfied; an incomplete required gate prevents a full-ready claim. Passing tests alone do not prove board usability.
 
 Return a concise implementation report covering task IDs, actual changes, commands/results/browser roles, evidence paths, deviations and remaining gates. Hand back the exact independent review prompt at C:/Users/steph/Herd/oblivionfindings/docs/audits/2026-09-11-governance-board-experience/astra-verification-prompt.md. Do not perform that independent audit yourself.
+

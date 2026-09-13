@@ -53,4 +53,30 @@ class RiskScoringServiceTest extends TestCase
             $this->assertArrayHasKey('color', $row[0]);
         }
     }
+
+    public function test_category_summary_handles_zero_records_cleanly(): void
+    {
+        $service = new RiskScoringService();
+        $summary = $service->getCategorySummary();
+
+        $this->assertIsArray($summary);
+        $this->assertArrayHasKey('client_safety', $summary);
+        $this->assertArrayHasKey('financial', $summary);
+        $this->assertEquals(0, $summary['financial']['total']);
+        $this->assertEquals(0, $summary['financial']['critical']);
+        $this->assertEquals(0, $summary['financial']['high']);
+        $this->assertEquals(0, $summary['financial']['above_appetite']);
+    }
+
+    public function test_board_report_handles_zero_records_cleanly(): void
+    {
+        $service = new RiskScoringService();
+        $report = $service->generateBoardReport();
+
+        $this->assertIsArray($report);
+        $this->assertArrayHasKey('executive_summary', $report);
+        $this->assertEquals(0, $report['executive_summary']['total_active']);
+        $this->assertEquals(0, $report['executive_summary']['critical_count']);
+        $this->assertEmpty($report['top_10_risks']);
+    }
 }

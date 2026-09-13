@@ -1,0 +1,151 @@
+Review fixture ready: oblivion_gov_review_runtime_20260912_25964
+{
+    "checked_at": "2026-09-12T09:37:05+00:00",
+    "database": "oblivion_gov_review_runtime_20260912_25964",
+    "cases": {
+        "no_approved_profile_opens": {
+            "active_profiles": 0,
+            "status": "open"
+        },
+        "written_disabled_still_opens": {
+            "written_permitted": false,
+            "status": "open",
+            "bound_profile_id": null
+        },
+        "unanimity_with_abstention": {
+            "status": "closed",
+            "outcome": "defeated",
+            "summary": {
+                "for": 2,
+                "abstain": 1,
+                "against": 0,
+                "conflicts": 0,
+                "total_votes": 3,
+                "decision_snapshot": {
+                    "title": "Test Resolution",
+                    "outcome": "defeated",
+                    "closed_at": "2026-09-12T09:37:05+00:00",
+                    "conflicts": [],
+                    "threshold": "unanimous",
+                    "electorate": [
+                        {
+                            "name": "Review Chair",
+                            "role": null,
+                            "board_member_id": 1
+                        },
+                        {
+                            "name": "Review Alex Morgan",
+                            "role": null,
+                            "board_member_id": 3
+                        },
+                        {
+                            "name": "Review Finance",
+                            "role": null,
+                            "board_member_id": 4
+                        },
+                        {
+                            "name": "Review Alex Morgan",
+                            "role": null,
+                            "board_member_id": 5
+                        }
+                    ],
+                    "quorum_met": true,
+                    "vote_summary": {
+                        "for": 2,
+                        "abstain": 1,
+                        "against": 0,
+                        "conflicts": 0,
+                        "total_votes": 3
+                    },
+                    "resolution_id": 5,
+                    "quorum_details": {
+                        "met": true,
+                        "present": 3,
+                        "required": 3,
+                        "apologies": 0,
+                        "total_eligible": 4,
+                        "resolution_mode": "out_of_session",
+                        "percentage_present": 75
+                    },
+                    "quorum_required": true,
+                    "individual_votes": [
+                        {
+                            "id": 1,
+                            "vote": "for",
+                            "method": "electronic",
+                            "voted_at": "2026-09-12T09:37:05+00:00",
+                            "board_member_id": 1,
+                            "board_member_name": "Review Chair",
+                            "conflict_declared": false
+                        },
+                        {
+                            "id": 2,
+                            "vote": "for",
+                            "method": "electronic",
+                            "voted_at": "2026-09-12T09:37:05+00:00",
+                            "board_member_id": 3,
+                            "board_member_name": "Review Alex Morgan",
+                            "conflict_declared": false
+                        },
+                        {
+                            "id": 3,
+                            "vote": "abstain",
+                            "method": "electronic",
+                            "voted_at": "2026-09-12T09:37:05+00:00",
+                            "board_member_id": 4,
+                            "board_member_name": "Review Finance",
+                            "conflict_declared": false
+                        }
+                    ],
+                    "resolution_reference": "RES-8YOY14"
+                }
+            },
+            "electorate_at_open": null
+        },
+        "draft_resolution_activates_rules": {
+            "approval_resolution_status": "draft",
+            "is_confirmed": true
+        },
+        "assigned_private_action": {
+            "parent_visible": false,
+            "action_visible": true,
+            "http_status": 200,
+            "private_title_in_response": true
+        },
+        "attendance_grants_private_access": {
+            "before": false,
+            "after_apology": true
+        },
+        "fabricated_action_evidence": {
+            "http_status": 302,
+            "status": "complete",
+            "stored_evidence": [
+                "does-not-exist.pdf"
+            ],
+            "receipt": "ACT-REC-ACT-YFZVPM-20260912093708"
+        },
+        "stale_action_models_overwrite": {
+            "expected_version": 1,
+            "final_version": 2,
+            "progress": 80,
+            "notes": "Stale second actor"
+        },
+        "closed_action_reopens": {
+            "status": "in_progress",
+            "progress_pct": 20,
+            "completed_at": "2026-09-12T09:37:08.000000Z",
+            "completion_receipt": "ACT-REC-ACT-YFZVPM-20260912093708"
+        },
+        "filtered_timeline_array": {
+            "is_list": true,
+            "count": 0
+        },
+        "approved_minutes_update": {
+            "exception": "DomainException",
+            "message": "Minutes in status 'approved' cannot be edited in place. Approved and signed minutes are immutable. Create a correction draft to propose revisions."
+        },
+        "annual_recurrence": {
+            "next": "2027-12-31"
+        }
+    }
+}

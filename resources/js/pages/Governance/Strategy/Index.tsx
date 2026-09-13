@@ -47,6 +47,7 @@ export default function StrategyIndex({ auth, plans }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Strategy', href: '/governance/strategy' },
             ]}
