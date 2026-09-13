@@ -20,7 +20,7 @@ class MatchRuleController extends Controller
             ->with('createdBy:id,name')
             ->byPriority()
             ->get()
-            ->map(fn(FinMatchRule $rule) => [
+            ->map(fn (FinMatchRule $rule) => [
                 'id' => $rule->id,
                 'name' => $rule->name,
                 'priority' => $rule->priority,

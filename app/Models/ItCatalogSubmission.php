@@ -6,6 +6,7 @@ use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use LogicException;
 
@@ -56,5 +57,10 @@ class ItCatalogSubmission extends Model
     public function result(): MorphTo
     {
         return $this->morphTo(__FUNCTION__, 'result_type', 'result_id');
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(ItAttachment::class, 'attachable');
     }
 }

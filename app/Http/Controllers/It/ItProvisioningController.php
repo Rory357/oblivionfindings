@@ -15,9 +15,12 @@ use App\Domain\It\Presenters\ItTicketConversationPresenter;
 use App\Domain\It\Presenters\ItTicketRoutingPresenter;
 use App\Domain\It\Services\ItAutomationScheduleCatalog;
 use App\Domain\It\Services\ItCatalogAccessService;
+use App\Domain\It\Services\ItCatalogAttachmentService;
 use App\Domain\It\Services\ItCatalogFieldOptionService;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItKbAccessService;
+use App\Domain\It\Services\ItKbRevisionService;
+use App\Domain\It\Services\ItKnowledgeWorkspace;
 use App\Domain\It\Services\ItLinkedContextOptions;
 use App\Domain\It\Services\ItProvisioningAccessService;
 use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
@@ -108,6 +111,24 @@ class ItProvisioningController extends Controller
         $canKnowledge = $user && $knowledgeAccess->hasKnowledgeCapability($user);
         abort_unless($isAgent || $canRequest || $canKnowledge, 403);
 
+        $workspace = match ($request->route()?->getName()) {
+            'it.provisioning.index' => 'provisioning',
+            'it.knowledge.index' => 'knowledge',
+            'it.reports.index' => 'reports',
+            default => 'desk',
+        };
+        if ($workspace === 'desk') {
+            $legacyWorkspace = $request->query('tab');
+            if (in_array($legacyWorkspace, ['provisioning', 'knowledge', 'reports'], true)) {
+                abort_unless($legacyWorkspace === 'knowledge' || $isAgent, 403);
+
+                return redirect()->route('it.'.$legacyWorkspace.'.index', Arr::except($request->query(), ['tab']));
+            }
+            if (! $isAgent && ! $canRequest) {
+                return redirect()->route('it.knowledge.index', Arr::except($request->query(), ['tab']));
+            }
+        }
+
         $filters = [
             'status' => $this->cleanFilter($request->query('status'), ItProvisioningRequest::STATUSES),
             'type' => $this->cleanFilter($request->query('type'), ItProvisioningRequest::TYPES),
@@ -178,7 +199,7 @@ class ItProvisioningController extends Controller
 
         // Requesters get ONLY their own tickets — the agent queues, summary
         // and staff directory never reach a self-service payload.
-        $agentProps = $isAgent ? [
+        $agentProps = $isAgent && in_array($workspace, ['desk', 'provisioning'], true) ? [
             'requests' => $this->requestPage($filters, $user),
             'provisioningWorkflows' => $this->provisioningWorkflows($user),
             'tickets' => $this->ticketPage($filters, $user),
@@ -205,9 +226,11 @@ class ItProvisioningController extends Controller
 
         // Knowledge-only roles receive the existing catalogue, with no ticket
         // queues, reports, provisioning records or agent directories.
-        $knowledgeProps = ($isAgent || $canKnowledge) ? [
-            'kbArticles' => $this->kbArticles($user),
+        $knowledgeProps = in_array($workspace, ['desk', 'knowledge'], true) && ($isAgent || $canKnowledge) ? [
+            'kbArticles' => $workspace === 'knowledge' ? $this->kbArticles($user) : [],
             'kbOptions' => [
+                'organisation_wide' => $user->canDo('it.organisationWide'),
+                'revisions_ready' => app(ItKbRevisionService::class)->ready(),
                 'owners' => $knowledgeAccess->ownerOptions($user),
                 'sites' => Site::query()
                     ->whereIn('id', $this->workAccess->approvedSiteIds($user))
@@ -222,7 +245,7 @@ class ItProvisioningController extends Controller
             ],
         ] : [];
 
-        $catalogItems = $canRequest ? ItCatalogItem::query()
+        $catalogItems = $workspace === 'desk' && $canRequest ? ItCatalogItem::query()
             ->published()
             ->with('publishedVersion')
             ->get()
@@ -238,7 +261,7 @@ class ItProvisioningController extends Controller
             ->values()
             ->all();
 
-        return Inertia::render('it/index', [
+        return Inertia::render($workspace === 'desk' ? 'it/index' : 'it/'.$workspace.'/index', [
             'draftRecovery' => $this->draftRecoveryOptions(),
             'conversation_ready' => ItTicket::hasConversationEvidence(),
             ...$agentProps,
@@ -248,16 +271,16 @@ class ItProvisioningController extends Controller
                 'matrix_version' => 1,
                 'priority_matrix' => ItTicketPriorityService::MATRIX,
             ],
-            'myTickets' => $canRequest ? $this->myTicketRows($user) : [],
-            'myProvisioning' => $canRequest ? app(ItProvisioningTrackingService::class)->listing($user, $request) : null,
+            'myTickets' => $workspace === 'desk' && $canRequest ? $this->myTicketRows($user) : [],
+            'myProvisioning' => $workspace === 'desk' && $canRequest ? app(ItProvisioningTrackingService::class)->listing($user, $request) : null,
             'catalogItems' => $catalogItems->all(),
             'catalogFieldOptions' => $canRequest
                 ? $this->catalogFieldOptions->forTypes($user, $catalogEntityTypes)
                 : ['employee' => [], 'user' => [], 'asset' => []],
             // Requester KB browse (§I) — pure requesters only; agents browse the
             // full catalogue in their Knowledge tab.
-            'kbPublished' => ($canRequest && ! $isAgent) ? $this->kbPublished($user) : [],
-            'summary' => ($isAgent || $canRequest) ? $this->summary($user, $isAgent) : null,
+            'kbPublished' => in_array($workspace, ['desk', 'knowledge'], true) && ($canRequest && ! $isAgent) ? $this->kbPublished($user) : [],
+            'summary' => in_array($workspace, ['desk', 'provisioning'], true) && ($isAgent || $canRequest) ? $this->summary($user, $isAgent) : null,
             'can' => [
                 'view' => $isAgent,
                 'manage' => $canManage,
@@ -423,7 +446,8 @@ class ItProvisioningController extends Controller
         abort_unless($assignee, 403);
 
         try {
-            $changed = $this->provisioningLifecycle->assign($provisioning, $user, $assignee);
+            $outcome = $this->provisioningCommand($request, $provisioning, 'assign', $validated);
+            $changed = $outcome['status'] === 'committed';
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -439,7 +463,7 @@ class ItProvisioningController extends Controller
         $validated = $request->validated();
 
         try {
-            $this->provisioningLifecycle->fulfil($provisioning, $user, $validated);
+            $this->provisioningCommand($request, $provisioning, 'fulfil', $validated);
         } catch (DomainException|\LogicException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -454,11 +478,7 @@ class ItProvisioningController extends Controller
         $validated = $request->validated();
 
         try {
-            $this->provisioningLifecycle->approve(
-                $provisioning,
-                $user,
-                $validated['decision_note'] ?? null,
-            );
+            $this->provisioningCommand($request, $provisioning, 'approve', ['reason' => $validated['decision_note'] ?? null]);
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -473,7 +493,7 @@ class ItProvisioningController extends Controller
         $validated = $request->validated();
 
         try {
-            $this->provisioningLifecycle->fail($provisioning, $user, $validated['failure_reason']);
+            $this->provisioningCommand($request, $provisioning, 'fail', ['reason' => $validated['failure_reason']]);
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -490,7 +510,8 @@ class ItProvisioningController extends Controller
         $reason = trim((string) $validated['reason']);
 
         try {
-            $provisioning = $this->provisioningLifecycle->cancel($provisioning, $user, $reason);
+            $outcome = $this->provisioningCommand($request, $provisioning, 'cancel', ['reason' => $reason]);
+            $provisioning->refresh();
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -498,7 +519,7 @@ class ItProvisioningController extends Controller
         // The lifecycle commits the cancellation and canonical HR task note
         // together. Notification delivery is tracked separately and remains
         // retryable from the operations workspace if the provider fails.
-        if ($provisioning->onboarding_task_id) {
+        if ($provisioning->onboarding_task_id && ! ($outcome['data']['replayed'] ?? false)) {
             try {
                 $task = $provisioning->onboardingTask()->with('checklist.employeeProfile.user:id,name')->first();
                 if ($task && $task->status !== 'completed') {
@@ -524,6 +545,21 @@ class ItProvisioningController extends Controller
         return redirect()->back()->with('success', 'Request cancelled.');
     }
 
+    /** Legacy form transports use the same actor/version/receipt boundary. */
+    private function provisioningCommand(Request $request, ItProvisioningRequest $provisioning, string $operation, array $payload): array
+    {
+        $identity = $request->validate(['actor_user_id' => ['required', 'integer', 'min:1'],
+            'request_uuid' => ['required', 'uuid'], 'expected_version' => ['required', 'integer', 'min:1']]);
+        $outcome = app(\App\Domain\It\Services\ItProvisioningCommandService::class)->execute(
+            $request->user(), 'request', (int) $provisioning->id, $operation, [...$payload, ...$identity],
+        );
+        if ($outcome['status'] !== 'committed') {
+            throw new DomainException('This command was cancelled. Open the current provisioning task to review another action.');
+        }
+
+        return $outcome;
+    }
+
     /**
      * §H manual "New provisioning request" — the ad-hoc path agents raise
      * outside onboarding (a swapped device, a one-off access grant). Canonical
@@ -542,12 +578,9 @@ class ItProvisioningController extends Controller
             ? User::query()->findOrFail($assigneeId)
             : null;
 
-        $provisioning = $this->provisioningLifecycle->createManual(
-            $user,
-            $profile,
-            $assignee,
-            $data,
-        );
+        $outcome = app(\App\Domain\It\Services\ItProvisioningCommandService::class)->execute($user, 'manual', (int) $profile->id, 'create', $data);
+        if ($outcome['status'] !== 'committed') throw new DomainException('This request was cancelled. Review another task from Provisioning.');
+        $provisioning = ItProvisioningRequest::query()->findOrFail($outcome['data']['result_id']);
 
         return redirect()->back()->with('success', "Provisioning request raised — {$provisioning->item}.");
     }
@@ -590,6 +623,13 @@ class ItProvisioningController extends Controller
         $user = $request->user();
         $validated = $request->validated();
         $action = (string) $validated['action'];
+        abort_unless((int) $validated['actor_user_id'] === (int) $user->id, 403);
+        foreach ($validated['ids'] as $id) {
+            \Illuminate\Support\Facades\Validator::make([
+                'expected_version' => $validated['expected_versions'][$id] ?? null,
+                'request_uuid' => $validated['request_uuids'][$id] ?? null,
+            ], ['expected_version' => ['required', 'integer', 'min:1'], 'request_uuid' => ['required', 'uuid']])->validate();
+        }
 
         $assignee = null;
         if ($action === 'assign') {
@@ -606,11 +646,21 @@ class ItProvisioningController extends Controller
         foreach ($validated['ids'] as $selectedId) {
             $provisioning = $requests->get((int) $selectedId);
             $outcome = $provisioning === null ? ItBulkActionResult::outcome('unavailable')
-                : ItBulkActionResult::capture(fn (): bool => match ($action) {
-                    'assign' => $assignee
-                        ? $this->provisioningLifecycle->assign($provisioning, $user, $assignee, 'bulk')
-                        : false,
-                    'fulfil' => (bool) $this->provisioningLifecycle->fulfil($provisioning, $user),
+                : ItBulkActionResult::capture(function () use ($provisioning, $user, $action, $assignee, $validated, $selectedId): bool {
+                    try {
+                        $result = app(\App\Domain\It\Services\ItProvisioningCommandService::class)->execute($user, 'request', (int) $selectedId, $action, [
+                            'actor_user_id' => (int) $user->id,
+                            'request_uuid' => $validated['request_uuids'][$selectedId],
+                            'expected_version' => $validated['expected_versions'][$selectedId],
+                            ...($assignee ? ['assigned_to_user_id' => (int) $assignee->id] : []),
+                        ]);
+                        if ($result['status'] !== 'committed') throw new DomainException('This command was cancelled.');
+                        return (bool) ($result['data']['changed'] ?? true);
+                    } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+                        if ($exception->getStatusCode() === 409) throw new DomainException('This work changed. Review its current version.');
+                        if (in_array($exception->getStatusCode(), [403, 404], true)) throw new \Illuminate\Auth\Access\AuthorizationException;
+                        throw $exception;
+                    }
                 });
             $items[] = ['id' => (int) $selectedId, ...$outcome];
         }
@@ -1007,6 +1057,7 @@ class ItProvisioningController extends Controller
                 ] : null,
                 'external_ref' => $r->external_ref,
                 'notes' => $r->notes,
+                'attachments' => app(ItCatalogAttachmentService::class)->forResult($user, $r),
                 'from_onboarding' => $r->onboarding_task_id !== null,
                 'sign_off_required' => (bool) ($r->onboardingTask?->sign_off_required ?? false),
                 'created' => $r->created_at?->diffForHumans(short: true),
@@ -1551,46 +1602,13 @@ class ItProvisioningController extends Controller
         if (! Schema::hasTable('it_kb_articles')) {
             return [];
         }
-
-        $knowledgeAccess = app(ItKbAccessService::class);
-        $articles = $knowledgeAccess->applyViewScope(ItKbArticle::query(), $user)
+        $articles = app(ItKbAccessService::class)->applyViewScope(ItKbArticle::query(), $user)
             ->with(['author:id,name', 'owner:id,name', 'service:id,name'])
-            ->orderByDesc('updated_at')
-            ->limit(200)
-            ->get();
-        $capabilities = $knowledgeAccess->capabilities($user, $articles->modelKeys());
+            ->orderByDesc('updated_at')->limit(200)->get();
 
-        return $articles->map(fn (ItKbArticle $a) => [
-            'id' => $a->id,
-            'can' => [
-                'author' => $capabilities[$a->id]['author'] ?? false,
-                'review' => $capabilities[$a->id]['review'] ?? false,
-                'manage' => ($capabilities[$a->id]['author'] ?? false) || ($capabilities[$a->id]['review'] ?? false),
-            ],
-            'title' => $a->title,
-            'slug' => $a->slug,
-            'category' => $a->category,
-            'status' => $a->status,
-            'audience' => $a->audience,
-            'site_scope' => $a->site_scope ?? [],
-            'body' => $a->body,
-            'views' => (int) $a->view_count,
-            'helpful_yes' => (int) $a->helpful_yes,
-            'helpful_no' => (int) $a->helpful_no,
-            'helpful_percent' => $a->helpfulPercent(),
-            'deflections' => (int) $a->deflection_count,
-            'author' => $a->author?->name,
-            'owner_user_id' => $a->owner_user_id,
-            'owner' => $a->owner?->name,
-            'related_service_id' => $a->related_service_id,
-            'related_service' => $a->service?->name,
-            'review_due_at' => $a->review_due_at?->toDateString(),
-            'review_started_at' => $a->review_started_at?->toIso8601String(),
-            'published_at' => $a->published_at?->toIso8601String(),
-            'retired_at' => $a->retired_at?->toIso8601String(),
-            'updated' => $a->updated_at?->diffForHumans(short: true),
-        ])
-            ->all();
+        return app(ItKnowledgeWorkspace::class)->rows(
+            $articles, $user, true, app(ItKbRevisionService::class)->ready(),
+        );
     }
 
     /**
@@ -1628,6 +1646,8 @@ class ItProvisioningController extends Controller
                     'title' => $a->title,
                     'category' => $a->category,
                     'body' => $a->body,
+                    'document_type' => $a->document_type ?? 'guide',
+                    'structured_content' => $a->structured_content,
                     'views' => (int) $a->view_count,
                     'helpful_yes' => (int) $a->helpful_yes,
                     'helpful_no' => (int) $a->helpful_no,

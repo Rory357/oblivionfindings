@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { ClipboardCheck, History } from 'lucide-react';
+import { KnowledgeResolutionLinks } from './knowledge-resolution-links';
 import {
     ticketResolutionLabel,
     type TicketResolution,
@@ -9,9 +10,11 @@ import {
 export function TicketResolutionSummary({
     resolution,
     onHistory,
+    ticketId,
 }: {
     resolution: TicketResolution | null | undefined;
     onHistory: () => void;
+    ticketId?: number;
 }) {
     return (
         <section
@@ -58,6 +61,9 @@ export function TicketResolutionSummary({
                     </div>
                 ))}
             </dl>
+            {ticketId !== undefined && (
+                <KnowledgeResolutionLinks ticketId={ticketId} />
+            )}
         </section>
     );
 }

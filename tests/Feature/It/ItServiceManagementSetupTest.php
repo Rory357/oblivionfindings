@@ -55,7 +55,7 @@ beforeEach(function () {
 
 test('IT pages share the approved grouped navigation while preserving existing deep links', function () {
     $this->actingAs($this->manager)
-        ->get('/it?tab=provisioning&status=pending')
+        ->get('/it/provisioning?status=pending')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('it/index')

@@ -546,7 +546,13 @@ export default function ItTicketShow({
                 (file) =>
                     [
                         file.id,
-                        { ...file, source: 'Original report', internal: false },
+                        {
+                            ...file,
+                            source: file.catalogue_field_label
+                                ? `Request form · ${file.catalogue_field_label}`
+                                : 'Original report',
+                            internal: file.is_internal ?? false,
+                        },
                     ] as const,
             ),
             ...comments.flatMap((comment) =>
@@ -1118,6 +1124,7 @@ export default function ItTicketShow({
                                                 ticket.status,
                                             ) && (
                                                 <TicketResolutionSummary
+                                                    ticketId={ticket.id}
                                                     resolution={
                                                         ticket.resolution
                                                     }

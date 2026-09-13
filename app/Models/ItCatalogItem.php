@@ -16,7 +16,7 @@ class ItCatalogItem extends Model
 
     public const OUTCOME_TYPES = ['service_request', 'security_request', 'provisioning'];
 
-    public const CONTRACT_FIELDS = ['it_service_id', 'name', 'slug', 'description', 'outcome_type', 'category', 'provisioning_type', 'default_priority', 'requires_approval', 'internal_only', 'site_scope', 'form_schema_version', 'form_schema', 'search_terms', 'sort_order'];
+    public const CONTRACT_FIELDS = ['it_service_id', 'name', 'slug', 'description', 'outcome_type', 'category', 'provisioning_type', 'provisioning_template_version_id', 'default_priority', 'requires_approval', 'internal_only', 'site_scope', 'form_schema_version', 'form_schema', 'search_terms', 'sort_order'];
 
     protected $fillable = [
         'it_service_id',
@@ -26,6 +26,7 @@ class ItCatalogItem extends Model
         'outcome_type',
         'category',
         'provisioning_type',
+        'provisioning_template_version_id',
         'default_priority',
         'requires_approval',
         'is_published',
@@ -51,6 +52,7 @@ class ItCatalogItem extends Model
         'search_terms' => 'array',
         'sort_order' => 'integer',
         'lock_version' => 'integer',
+        'provisioning_template_version_id' => 'integer',
     ];
 
     protected static function booted(): void
@@ -85,12 +87,20 @@ class ItCatalogItem extends Model
 
     public function publishedContract(): self
     {
+        abort_unless($this->is_published, 404);
+
+        return $this->retainedPublishedContract();
+    }
+
+    /** For recovery of prior commands only; never makes a withdrawn item discoverable. */
+    public function retainedPublishedContract(): self
+    {
         $version = $this->publishedVersion;
-        abort_unless($this->is_published && $version && (int) $version->catalog_item_id === (int) $this->id, 404);
+        abort_unless($version && (int) $version->catalog_item_id === (int) $this->id, 404);
         $copy = clone $this;
         // Older immutable versions predate Site restrictions. Never inherit
         // a newer draft's restrictions while reading that original contract.
-        $copy->forceFill(['site_scope' => null, ...$version->contract]);
+        $copy->forceFill(['site_scope' => null, 'provisioning_template_version_id' => null, ...$version->contract]);
 
         return $copy;
     }

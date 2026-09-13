@@ -11,6 +11,7 @@ use App\Domain\It\ItStaffDirectory;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
+use App\Models\ItCatalogItem;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItService;
 use App\Models\ItTicket;
@@ -57,6 +58,23 @@ final class ItTicketIntakeService
         return isset($data['request_uuid'])
             ? $this->createCommand($actor, $data, $attachments)->ticket
             : $this->performCreate($actor, $data, $attachments)->ticket;
+    }
+
+    /**
+     * Catalogue submission owns the outer idempotent command. Only the locked
+     * publication may supply classification that ordinary requesters cannot set.
+     * Its submission, ticket, audit and notification intents share one commit.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<int, UploadedFile>  $attachments
+     */
+    public function createFromCatalogue(User $actor, int $itemId, int $publicationId, array $data,
+        array $attachments, ItAttachmentWriteContext $attachmentContext): ItTicket
+    {
+        $attachmentContext->assertActive();
+
+        return $this->performCreate($actor, $data, $attachments,
+            attachmentContext: $attachmentContext, catalogItemId: $itemId, catalogVersionId: $publicationId)->ticket;
     }
 
     /**
@@ -118,6 +136,8 @@ final class ItTicketIntakeService
         ?string $requestUuid = null,
         ItTicketCommandChannel $channel = ItTicketCommandChannel::Browser,
         ?ItAttachmentWriteContext $attachmentContext = null,
+        ?int $catalogItemId = null,
+        ?int $catalogVersionId = null,
     ): ItTicketCreationResult {
         $storedPaths = [];
         $attachmentReservations = [];
@@ -128,7 +148,7 @@ final class ItTicketIntakeService
         $preparedResult = null;
 
         try {
-            return DB::transaction(function () use ($actor, $data, $attachments, $requestUuid, $requestHash, $channel, $attachmentContext, &$storedPaths, &$attachmentReservations, &$preparedResult): ItTicketCreationResult {
+            return DB::transaction(function () use ($actor, $data, $attachments, $requestUuid, $requestHash, $channel, $attachmentContext, $catalogItemId, $catalogVersionId, &$storedPaths, &$attachmentReservations, &$preparedResult): ItTicketCreationResult {
                 // Existing actor lock also serializes concurrent commands from
                 // this browser identity; the unique index is the final boundary.
                 $currentEvidence = $channel === ItTicketCommandChannel::ServiceApi;
@@ -136,6 +156,20 @@ final class ItTicketIntakeService
                     ? app(AuthorizationEvidenceLockService::class)->lockForUser($actor, ['*'])
                     : User::query()->whereKey($actor->getKey())->lockForUpdate()->firstOrFail();
                 $this->guardCreateActor($actor);
+                $catalogue = null;
+                if ($catalogItemId !== null) {
+                    $catalogue = ItCatalogItem::query()->whereKey($catalogItemId)->published()
+                        ->lockForUpdate()->firstOrFail()->publishedContract();
+                    abort_unless(app(ItCatalogAccessService::class)->canDiscover($actor, $catalogue), 404);
+                    if ((int) $catalogue->published_version_id !== $catalogVersionId
+                        || ! in_array($catalogue->outcome_type, ['service_request', 'security_request'], true)) {
+                        throw ValidationException::withMessages(['schema_version' => 'This request form has changed. Refresh it before submitting.']);
+                    }
+                    // Do not trust posted values for the published contract.
+                    $data = [...$data, 'title' => $catalogue->name, 'category' => $catalogue->category,
+                        'priority' => $catalogue->default_priority, 'work_type' => $catalogue->outcome_type,
+                        'it_service_id' => $catalogue->it_service_id];
+                }
                 $receipt = null;
                 if ($requestUuid !== null) {
                     $receipt = $this->receiptQuery($actor, $requestUuid, $channel)->lockForUpdate()->first();
@@ -165,23 +199,34 @@ final class ItTicketIntakeService
                 $isOrganisationWide = $isAgent && (bool) ($data['is_organisation_wide'] ?? false);
 
                 $this->guardScope($actor, $siteId, $isOrganisationWide, $isAgent, $data, $currentEvidence);
+                if ($catalogue && ($isOrganisationWide || ! app(ItCatalogAccessService::class)->allowsSite($catalogue, $siteId))) {
+                    throw ValidationException::withMessages(['site_id' => 'This form is not available at the selected Site.']);
+                }
                 $priority = $this->priority->decide($data, $actor);
 
                 $requesterId = $isAgent && $this->nullableId($data['requester_user_id'] ?? null) !== null
                     ? (int) $data['requester_user_id']
                     : (int) $actor->id;
+                $requestedForId = $this->nullableId($data['requested_for_user_id'] ?? null) ?? $requesterId;
+                if (! $isAgent && $requestedForId !== $requesterId) {
+                    throw new AuthorizationException('You cannot request IT work for another person.');
+                }
                 $assigneeId = $isAgent ? $this->nullableId($data['assigned_to_user_id'] ?? null) : null;
                 $watcherIds = $isAgent
                     ? collect($data['watchers'] ?? [])->filter(fn (mixed $id): bool => is_numeric($id))->map(fn (mixed $id): int => (int) $id)->unique()->values()->all()
                     : [];
 
-                $users = $this->lockUsers([$requesterId, $assigneeId, ...$watcherIds]);
+                $users = $this->lockUsers([$requesterId, $requestedForId, $assigneeId, ...$watcherIds]);
                 if ($currentEvidence && $users->has($actor->id)) {
                     $users->put($actor->id, $actor);
                 }
                 $requester = $users->get($requesterId);
                 if (! $requester || ! $this->staffMemberMatchesScope($requester, $siteId, $isOrganisationWide, $currentEvidence)) {
                     throw new AuthorizationException('The requester is not available in this ticket scope.');
+                }
+                $requestedFor = $users->get($requestedForId);
+                if (! $requestedFor || ! $this->staffMemberMatchesScope($requestedFor, $siteId, $isOrganisationWide, $currentEvidence)) {
+                    throw new AuthorizationException('The requested-for person is not available in this ticket scope.');
                 }
                 if ($assigneeId !== null) {
                     $assignee = $users->get($assigneeId);
@@ -190,7 +235,7 @@ final class ItTicketIntakeService
                     }
                 }
 
-                $serviceId = $isAgent ? $this->nullableId($data['it_service_id'] ?? null) : null;
+                $serviceId = $isAgent || $catalogue ? $this->nullableId($data['it_service_id'] ?? null) : null;
                 if ($serviceId !== null && ! ItService::query()
                     ->whereKey($serviceId)
                     ->where('is_active', true)
@@ -235,7 +280,7 @@ final class ItTicketIntakeService
                     'title' => $data['title'],
                     'description' => $data['description'] ?? null,
                     'requester_user_id' => $requesterId,
-                    'requested_for_user_id' => $requesterId,
+                    'requested_for_user_id' => $requestedForId,
                     'assigned_to_user_id' => $assigneeId,
                     'asset_id' => $assetId,
                     'site_id' => $siteId,
@@ -243,10 +288,10 @@ final class ItTicketIntakeService
                     'it_service_id' => $serviceId,
                     'provisioning_request_id' => $provisioningRequestId,
                     'category' => $data['category'],
-                    'requires_approval' => ItTicket::categoryNeedsApproval((string) $data['category']),
+                    'requires_approval' => ($catalogue?->requires_approval ?? false) || ItTicket::categoryNeedsApproval((string) $data['category']),
                     'subcategory' => $isAgent ? ($data['subcategory'] ?? null) : null,
                     ...$priority,
-                    'work_type' => $isAgent ? ($data['work_type'] ?? 'incident') : 'incident',
+                    'work_type' => $isAgent || $catalogue ? ($data['work_type'] ?? 'incident') : 'incident',
                     'workflow_state' => 'submitted',
                     'source' => match ($channel) {
                         ItTicketCommandChannel::Email => 'email',
@@ -273,13 +318,17 @@ final class ItTicketIntakeService
                 }
 
                 ItTicketEvent::record($ticket, 'created', $actor->id, array_filter([
-                    'source' => $ticket->source,
+                    'source' => $catalogue ? 'catalog' : $ticket->source,
+                    ...($catalogue ? ['catalog_item_id' => $catalogue->id,
+                        'catalog_version_id' => $catalogue->published_version_id,
+                        'form_schema_version' => $catalogue->form_schema_version] : []),
                     ...($channel === ItTicketCommandChannel::ServiceApi ? ['source_channel' => $channel->value] : []),
                     'command_receipt_id' => $receipt?->id,
                     'assigned_to_user_id' => $assigneeId,
                     'device_id' => $deviceId,
                     'provisioning_request_id' => $provisioningRequestId,
                     'on_behalf_of' => $requesterId !== (int) $actor->id ? $requesterId : null,
+                    'requested_for_user_id' => $requestedForId !== $requesterId ? $requestedForId : null,
                 ]));
                 ItTicketEvent::record($ticket, 'priority_assessed', $actor->id, [
                     'impact' => $ticket->impact, 'urgency' => $ticket->urgency,
@@ -314,6 +363,9 @@ final class ItTicketIntakeService
                     'actor_id' => $actor->id,
                     'command_receipt_id' => $receipt?->id,
                     'requester_user_id' => $requesterId,
+                    'requested_for_user_id' => $requestedForId,
+                    ...($catalogue ? ['catalog_item_id' => $catalogue->id,
+                        'catalog_version_id' => $catalogue->published_version_id] : []),
                     'site_id' => $siteId,
                     'is_organisation_wide' => $isOrganisationWide,
                     'source' => $ticket->source,
@@ -497,7 +549,7 @@ final class ItTicketIntakeService
             'sha256' => hash_file('sha256', $file->getPathname()),
         ], $attachments);
         // Absent additions must not invalidate committed W02 command receipts.
-        foreach (['impact', 'urgency', 'priority_reason', 'routing_reason', 'draft_uuid', 'draft_revision', 'draft_actor_user_id'] as $field) {
+        foreach (['impact', 'urgency', 'priority_reason', 'routing_reason', 'draft_uuid', 'draft_revision', 'draft_actor_user_id', 'requested_for_user_id'] as $field) {
             if (array_key_exists($field, $data)) {
                 $payload[$field] = $data[$field] ?? null;
             }

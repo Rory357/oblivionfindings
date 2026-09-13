@@ -239,7 +239,7 @@ class ConsolidationController extends Controller
             return redirect()->route('finance.consolidation.show-run', [$group, $run])
                 ->with('success', 'Consolidation run completed successfully.');
         } catch (\Throwable $e) {
-            return back()->withErrors(['consolidation' => 'Consolidation failed: ' . $e->getMessage()]);
+            return back()->withErrors(['consolidation' => 'Consolidation failed: '.$e->getMessage()]);
         }
     }
 

@@ -2,14 +2,17 @@
 
 namespace App\Domain\It\Services;
 
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\ItCatalogItem;
 use App\Models\ItCatalogVersion;
 use App\Models\ItProvisioningRequest;
+use App\Models\ItProvisioningTemplate;
 use App\Models\User;
 use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -22,6 +25,7 @@ final class ItCatalogManagementService
         'outcome_type',
         'category',
         'provisioning_type',
+        'provisioning_template_version_id',
         'default_priority',
         'requires_approval',
         'internal_only',
@@ -35,7 +39,7 @@ final class ItCatalogManagementService
     public function create(User $actor, array $data): ItCatalogItem
     {
         return DB::transaction(function () use ($actor, $data): ItCatalogItem {
-            $this->guardActor($actor);
+            $actor = $this->guardActor($actor);
             $data['site_scope'] = app(ItCatalogAccessService::class)->validateSiteScope($actor, $data['site_scope'] ?? null);
             $item = ItCatalogItem::query()->create([
                 ...Arr::only($this->normalise($data), self::EDITABLE),
@@ -60,7 +64,7 @@ final class ItCatalogManagementService
     public function update(ItCatalogItem $item, User $actor, array $data): ItCatalogItem
     {
         return DB::transaction(function () use ($item, $actor, $data): ItCatalogItem {
-            $item = $this->lock($item, $actor);
+            [$item, $actor] = $this->lock($item, $actor);
             $this->expectVersion($item, (int) ($data['expected_version'] ?? 0));
             $data['site_scope'] = app(ItCatalogAccessService::class)->validateSiteScope($actor, array_key_exists('site_scope', $data) ? $data['site_scope'] : $item->site_scope);
             $before = $item->only(self::EDITABLE);
@@ -88,12 +92,23 @@ final class ItCatalogManagementService
     public function publish(ItCatalogItem $item, User $actor, int $expectedVersion): ItCatalogItem
     {
         return DB::transaction(function () use ($item, $actor, $expectedVersion): ItCatalogItem {
-            $item = $this->lock($item, $actor);
+            [$item, $actor] = $this->lock($item, $actor);
             $this->expectVersion($item, $expectedVersion);
             if ($item->is_published && $item->publishedVersion?->version === $item->form_schema_version) {
                 return $item;
             }
             app(ItCatalogAccessService::class)->validateSiteScope($actor, $item->site_scope);
+            $this->assertAttachmentLimits($item->form_schema['fields'] ?? []);
+            if ($item->provisioning_template_version_id !== null) {
+                $template = ItProvisioningTemplate::query()->where('published_version_id', $item->provisioning_template_version_id)->lockForUpdate()->first();
+                if ($item->outcome_type !== 'provisioning' || ! $template
+                    || ! app(ItProvisioningTemplatePublicationService::class)->canView($actor, $template)) {
+                    throw new DomainException('Choose a currently published provisioning template version before publishing this catalogue request.');
+                }
+                if (in_array($template->publishedVersion->contract['lifecycle_type'], ['mover', 'leaver'], true) && ! $item->internal_only) {
+                    throw new DomainException('Mover and leaver catalogue workflows must be restricted to IT staff. HR retains ownership of employment changes.');
+                }
+            }
             if ($item->it_service_id !== null && ! $item->service()->where('is_active', true)->exists()) {
                 throw new DomainException('Choose an active service before publishing this request.');
             }
@@ -109,7 +124,7 @@ final class ItCatalogManagementService
                 'provenance' => 'reviewed_publication',
                 'published_by' => $actor->id,
             ]);
-            if (['site_scope' => null, ...$version->contract] != $item->only(ItCatalogItem::CONTRACT_FIELDS)) {
+            if (['site_scope' => null, 'provisioning_template_version_id' => null, ...$version->contract] != $item->only(ItCatalogItem::CONTRACT_FIELDS)) {
                 throw new DomainException('This draft differs from its recorded version. Save a new revision before publishing.');
             }
             $item->forceFill([
@@ -131,7 +146,7 @@ final class ItCatalogManagementService
     public function unpublish(ItCatalogItem $item, User $actor, string $reason, int $expectedVersion): ItCatalogItem
     {
         return DB::transaction(function () use ($item, $actor, $reason, $expectedVersion): ItCatalogItem {
-            $item = $this->lock($item, $actor);
+            [$item, $actor] = $this->lock($item, $actor);
             $this->expectVersion($item, $expectedVersion);
             $reason = trim($reason);
             if ($reason === '') {
@@ -157,11 +172,34 @@ final class ItCatalogManagementService
         });
     }
 
-    private function lock(ItCatalogItem $item, User $actor): ItCatalogItem
+    public function canManage(User $actor, ItCatalogItem $item): bool
     {
-        $this->guardActor($actor);
+        if ($actor->approved_at === null || ! $actor->canDo('it.manage')
+            || ! app(HrCurrentStaffService::class)->isCurrent($actor)) {
+            return false;
+        }
+        $item = ItCatalogItem::query()->with('publishedVersion')->find($item->id);
+        if (! $item) {
+            return false;
+        }
+        try {
+            $access = app(ItCatalogAccessService::class);
+            $access->validateSiteScope($actor, $item->site_scope);
+            $access->validateSiteScope($actor, $item->publishedVersion?->contract['site_scope'] ?? null);
+        } catch (ValidationException) {
+            return false;
+        }
 
-        return ItCatalogItem::query()->lockForUpdate()->findOrFail($item->getKey());
+        return true;
+    }
+
+    private function lock(ItCatalogItem $item, User $actor): array
+    {
+        $actor = $this->guardActor($actor);
+        $item = ItCatalogItem::query()->lockForUpdate()->findOrFail($item->getKey());
+        abort_unless($this->canManage($actor, $item), 404);
+
+        return [$item, $actor];
     }
 
     private function expectVersion(ItCatalogItem $item, int $version): void
@@ -171,16 +209,28 @@ final class ItCatalogManagementService
         }
     }
 
-    private function guardActor(User $actor): void
+    private function guardActor(User $actor): User
     {
-        if ($actor->approved_at === null || ! $actor->canDo('it.manage')) {
+        $actor = User::query()->whereKey($actor->id)->lockForUpdate()->firstOrFail();
+        if ($actor->approved_at === null || ! $actor->canDo('it.manage')
+            || ! app(HrCurrentStaffService::class)->isCurrent($actor)) {
             throw new DomainException('You are not allowed to manage the service catalogue.');
         }
+
+        return $actor;
     }
 
     /** @param array<string, mixed> $data @return array<string, mixed> */
     private function normalise(array $data): array
     {
+        if (! Schema::hasColumn('it_catalog_items', 'provisioning_template_version_id')) {
+            if (! empty($data['provisioning_template_version_id'])) {
+                throw ValidationException::withMessages(['provisioning_template_version_id' => 'Complete provisioning history setup before linking a workflow.']);
+            }
+            unset($data['provisioning_template_version_id']);
+        } elseif (($data['outcome_type'] ?? null) !== 'provisioning') {
+            $data['provisioning_template_version_id'] = null;
+        }
         $data['provisioning_type'] = ($data['outcome_type'] ?? null) === 'provisioning'
             ? ($data['provisioning_type'] ?? null)
             : null;
@@ -210,9 +260,29 @@ final class ItCatalogManagementService
 
             return $normalised;
         })->values()->all();
+        $this->assertAttachmentLimits($fields);
         $data['form_schema'] = ['fields' => $fields];
 
         return $data;
+    }
+
+    private function assertAttachmentLimits(array $fields): void
+    {
+        $requiredFiles = 0;
+        foreach ($fields as $field) {
+            if (($field['type'] ?? null) !== 'attachment') {
+                continue;
+            }
+            if ((int) ($field['min'] ?? 0) > 5 || (int) ($field['max'] ?? 5) > 5) {
+                throw ValidationException::withMessages(['form_schema.fields' => 'Each attachment field must fit within the five-file request limit.']);
+            }
+            if ($field['required'] ?? false) {
+                $requiredFiles += max(1, (int) ($field['min'] ?? 0));
+            }
+        }
+        if ($requiredFiles > 5) {
+            throw ValidationException::withMessages(['form_schema.fields' => 'The required attachment fields need more than five files in total. Reduce their minimums or make a field optional.']);
+        }
     }
 
     private function uniqueSlug(string $name): string

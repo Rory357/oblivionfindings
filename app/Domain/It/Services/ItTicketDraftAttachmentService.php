@@ -5,6 +5,7 @@ namespace App\Domain\It\Services;
 use App\Domain\It\Enums\ItTicketDraftPurpose as Purpose;
 use App\Domain\It\Exceptions\ItTicketDraftException as DraftError;
 use App\Models\ItAttachment;
+use App\Models\ItCatalogSubmission;
 use App\Models\ItTicket;
 use App\Models\ItTicketComment;
 use App\Models\ItTicketDraft;
@@ -28,7 +29,7 @@ final class ItTicketDraftAttachmentService
         private readonly ItAttachmentStorageService $storage,
     ) {}
 
-    public function upload(User $actor, string $uuid, int $expectedRevision, string $uploadUuid, UploadedFile $file): array
+    public function upload(User $actor, string $uuid, int $expectedRevision, string $uploadUuid, UploadedFile $file, ?string $catalogueFieldKey = null): array
     {
         Validator::make(['expected_revision' => $expectedRevision, 'upload_uuid' => $uploadUuid, 'attachment' => $file], [
             'expected_revision' => ['integer', 'min:0'], 'upload_uuid' => ['uuid'],
@@ -40,13 +41,18 @@ final class ItTicketDraftAttachmentService
         // Commit a tracked private path before any physical write. A process
         // crash or uncertain DB acknowledgement can never orphan that path.
         try {
-            $reserved = $this->drafts->forAttachmentMutation($actor, $uuid, function (ItTicketDraft $draft, User $current) use ($expectedRevision, $uploadUuid, $file, $hash): ItAttachment {
+            $reserved = $this->drafts->forAttachmentMutation($actor, $uuid, function (ItTicketDraft $draft, User $current) use ($expectedRevision, $uploadUuid, $file, $hash, $catalogueFieldKey): ItAttachment {
                 $this->assertPurpose($draft);
+                $field = $draft->purpose === Purpose::CatalogueRequest ? app(ItCatalogueDraftAdapter::class)->field($current, $draft, $catalogueFieldKey) : null;
+                if (! $field && $catalogueFieldKey !== null) {
+                    throw DraftError::unavailable();
+                }
                 $existing = ItAttachment::query()->where('draft_upload_uuid', $uploadUuid)->lockForUpdate()->first();
                 if ($existing) {
                     $this->assertOwned($existing, $draft, $current);
                     if (! hash_equals((string) $existing->draft_content_hash, $hash)
-                        || $existing->original_name !== $file->getClientOriginalName()) {
+                        || $existing->original_name !== $file->getClientOriginalName()
+                        || $existing->catalogue_field_key !== $catalogueFieldKey) {
                         throw new DraftError('draft_upload_conflict', 409, 'This upload identity already belongs to different file content.');
                     }
                     if (in_array($existing->draft_storage_state, ['cleanup_pending', 'removed'], true)) {
@@ -56,6 +62,14 @@ final class ItTicketDraftAttachmentService
                     return $existing;
                 }
                 $this->drafts->assertAttachmentRevision($draft, $current, $expectedRevision);
+                if ($field && $this->rows($draft)->where('catalogue_field_key', $catalogueFieldKey)->whereIn('draft_storage_state', ['reserved', 'ready', 'failed'])->count() >= min(5, (int) ($field['max'] ?? 5))) {
+                    throw ValidationException::withMessages(['attachment' => 'This original file field has reached its attachment limit.']);
+                }
+                if ($field && ($field['visibility'] ?? 'requester') !== 'requester') {
+                    $scope = $draft->bound_scope;
+                    $scope['catalogue']['internal'] = true;
+                    $draft->forceFill(['bound_scope' => $scope])->save();
+                }
                 if ($this->rows($draft)->whereIn('draft_storage_state', ['reserved', 'ready', 'failed'])->count() >= 5) {
                     throw ValidationException::withMessages(['attachment' => 'Attach no more than five files to this draft.']);
                 }
@@ -64,6 +78,7 @@ final class ItTicketDraftAttachmentService
                     'mime' => $file->getMimeType() ?? 'application/octet-stream', 'size' => $file->getSize() ?: 0, 'uploaded_by' => $current->id,
                     'draft_generation_uuid' => $draft->draft_uuid, 'draft_upload_uuid' => $uploadUuid,
                     'draft_content_hash' => $hash, 'draft_storage_state' => 'reserved',
+                    ...($catalogueFieldKey !== null ? ['catalogue_field_key' => $catalogueFieldKey] : []),
                 ]);
                 $this->drafts->recordAttachmentChange($draft, $current, 'file_reserved');
 
@@ -152,8 +167,59 @@ final class ItTicketDraftAttachmentService
         }, write: false);
     }
 
+    /** Resolve staged rows inside the catalogue commit transaction; never trust file ids alone. */
+    public function catalogueFiles(User $actor, array $input, int $itemId, int $schemaVersion): array
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new LogicException('Catalogue draft files need the canonical transaction.');
+        }
+        $hasDraft = array_intersect(['draft_uuid', 'draft_revision', 'draft_actor_user_id'], array_keys($input)) !== [];
+        if (! $hasDraft) {
+            if (! empty($input['staged_attachment_ids'])) {
+                throw DraftError::unavailable();
+            }
+
+            return [];
+        }
+        $data = Validator::make($input, [
+            'draft_uuid' => ['required', 'uuid'], 'draft_revision' => ['required', 'integer', 'min:0'],
+            'draft_actor_user_id' => ['required', 'integer', 'min:1'],
+            'staged_attachment_ids' => ['sometimes', 'array', 'list', 'max:5'],
+            'staged_attachment_ids.*' => ['integer', 'min:1', 'distinct'],
+        ])->validate();
+        if ((int) $data['draft_actor_user_id'] !== (int) $actor->id) {
+            throw DraftError::unavailable();
+        }
+
+        return $this->drafts->forAttachmentMutation($actor, $data['draft_uuid'], function (ItTicketDraft $draft, User $current) use ($input, $data, $itemId, $schemaVersion): array {
+            if ($draft->purpose !== Purpose::CatalogueRequest || $draft->request_uuid !== (string) $input['idempotency_key']
+                || (int) ($draft->bound_scope['catalogue']['catalog_item_id'] ?? 0) !== $itemId
+                || (int) ($draft->bound_scope['catalogue']['schema_version'] ?? 0) !== $schemaVersion) {
+                throw DraftError::unavailable();
+            }
+            $this->drafts->assertAttachmentRevision($draft, $current, (int) $data['draft_revision']);
+            if (app(ItCatalogueDraftAdapter::class)->blocker($draft)) {
+                throw new DraftError('catalogue_changed', 409, 'Review the current published form before submitting.');
+            }
+            $files = $this->rows($draft)->whereNotIn('draft_storage_state', ['removed', 'cleanup_pending'])->lockForUpdate()->get();
+            $expected = array_map('intval', $data['staged_attachment_ids'] ?? []);
+            sort($expected);
+            $actual = $files->modelKeys();
+            sort($actual);
+            if ($expected !== $actual || $files->contains(fn (ItAttachment $file) => $file->draft_storage_state !== 'ready')) {
+                throw new DraftError('draft_files_not_ready', 409, 'Review every staged file and finish or remove pending uploads.');
+            }
+            foreach ($files as $file) {
+                $this->assertOwned($file, $draft, $current);
+                app(ItCatalogueDraftAdapter::class)->field($current, $draft, $file->catalogue_field_key);
+            }
+
+            return $files->groupBy('catalogue_field_key')->map(fn ($group) => $group->all())->all();
+        }, write: false);
+    }
+
     /** Caller holds Ticket/User/draft; rows move in the same business commit. */
-    public function transfer(ItTicketDraft $draft, ItTicket|ItTicketComment|null $target): void
+    public function transfer(ItTicketDraft $draft, ItTicket|ItTicketComment|ItCatalogSubmission|null $target): void
     {
         if (DB::transactionLevel() < 1) {
             throw new LogicException('Staged attachments must transfer inside the canonical commit transaction.');
@@ -163,6 +229,11 @@ final class ItTicketDraftAttachmentService
             return;
         }
         $validTarget = match ($draft->purpose) {
+            Purpose::CatalogueRequest => $target instanceof ItCatalogSubmission
+                && (int) $target->requester_user_id === (int) $draft->actor_user_id
+                && $target->idempotency_key === $draft->request_uuid
+                && (int) $target->catalog_item_id === (int) ($draft->bound_scope['catalogue']['catalog_item_id'] ?? 0)
+                && (int) $target->schema_version === (int) ($draft->bound_scope['catalogue']['schema_version'] ?? 0),
             Purpose::RequesterIntake, Purpose::TechnicianIntake => $target instanceof ItTicket,
             Purpose::PublicReply => $target instanceof ItTicketComment && ! $target->is_internal && (int) $target->ticket_id === (int) $draft->it_ticket_id,
             Purpose::InternalNote => $target instanceof ItTicketComment && $target->is_internal && (int) $target->ticket_id === (int) $draft->it_ticket_id,
@@ -245,7 +316,7 @@ final class ItTicketDraftAttachmentService
 
     private function assertPurpose(ItTicketDraft $draft): void
     {
-        if (! in_array($draft->purpose, [Purpose::RequesterIntake, Purpose::TechnicianIntake, Purpose::PublicReply, Purpose::InternalNote], true)) {
+        if (! in_array($draft->purpose, [Purpose::RequesterIntake, Purpose::TechnicianIntake, Purpose::CatalogueRequest, Purpose::PublicReply, Purpose::InternalNote], true)) {
             throw new DraftError('draft_files_unsupported', 422, 'This form does not accept attachments.');
         }
     }
@@ -255,6 +326,7 @@ final class ItTicketDraftAttachmentService
         return [
             'id' => (int) $file->id, 'upload_uuid' => $file->draft_upload_uuid, 'name' => $file->original_name,
             'mime' => $file->mime, 'size' => (int) $file->size, 'state' => $file->draft_storage_state,
+            'catalogue_field_key' => $file->catalogue_field_key,
             'download_url' => $file->draft_storage_state === 'ready' ? route('it.attachments.download', $file, false) : null,
         ];
     }

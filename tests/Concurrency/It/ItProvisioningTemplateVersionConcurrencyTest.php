@@ -3,6 +3,7 @@
 namespace Tests\Concurrency\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItProvisioningTemplatePublicationService;
 use App\Domain\It\Services\ItProvisioningTemplateService;
 use App\Models\ItProvisioningTemplate;
 use App\Models\ItProvisioningTemplateVersion;
@@ -44,7 +45,7 @@ final class ItProvisioningTemplateVersionConcurrencyTest extends TestCase
         $actor = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $actor->roles()->sync(Role::where('name', 'admin')->pluck('id'));
         $site = Site::factory()->create();
-        $profile = HrEmployeeProfile::factory()->create(['user_id' => $actor->id, 'primary_site_id' => $site->id, 'is_active' => true]);
+        $profile = HrEmployeeProfile::factory()->create(['user_id' => $actor->id, 'primary_site_id' => $site->id, 'is_active' => true, 'start_date' => now()->subMonth(), 'end_date' => null]);
         $template = app(ItProvisioningTemplateService::class)->create($actor, [
             'name' => 'Synthetic concurrency template', 'description' => 'No external fulfilment', 'lifecycle_type' => 'joiner',
             'position_role' => null, 'site_id' => $site->id, 'employment_type' => null, 'selection_priority' => 0, 'is_active' => true,
@@ -55,6 +56,12 @@ final class ItProvisioningTemplateVersionConcurrencyTest extends TestCase
         ]);
         foreach ([['edit', 'edit'], ['edit', 'launch'], ['launch', 'edit']] as $operations) {
             $template->refresh();
+            app(ItProvisioningTemplatePublicationService::class)->publish($template, $actor, true, [
+                'expected_version' => $template->lock_version, 'expected_published_version_id' => $template->published_version_id,
+                'reason' => 'Synthetic explicit publication before the next concurrent author edit.',
+            ]);
+            $template->refresh();
+            $publishedVersionId = $template->published_version_id;
             $before = $template->lock_version;
             $beforeVersions = ItProvisioningTemplateVersion::query()->count();
             $results = $this->race($template, $actor, $profile, $operations);
@@ -70,13 +77,25 @@ final class ItProvisioningTemplateVersionConcurrencyTest extends TestCase
                 $workflow = ItProvisioningWorkflow::query()->findOrFail($result['workflow_id']);
                 $version = $workflow->templateVersion;
                 $request = $workflow->requests()->sole();
-                $this->assertContains($version->version, [$before, $before + 1]);
+                $this->assertSame($publishedVersionId, $version->id);
                 $this->assertSame($version->contract['tasks'][0]['title'], $request->item);
                 $this->assertSame($version->contract['tasks'][0]['description'], $request->notes);
                 $this->assertTrue($request->approval_required);
                 $this->assertTrue($request->evidence_required);
             }
         }
+        // Publishing contends with launch, while each launch still copies one entire immutable graph.
+        $template->refresh();
+        $allowedVersions = [$template->published_version_id, $template->current_version_id];
+        $before = $template->lock_version;
+        $beforeVersions = ItProvisioningTemplateVersion::count();
+        $results = $this->race($template, $actor, $profile, ['publish', 'launch']);
+        $this->assertSame(['committed', 'committed'], array_column($results, 'status'));
+        $this->assertSame($before, $template->fresh()->lock_version);
+        $this->assertSame($beforeVersions, ItProvisioningTemplateVersion::count());
+        $launched = ItProvisioningWorkflow::findOrFail(collect($results)->firstWhere('operation', 'launch')['workflow_id']);
+        $this->assertContains($launched->template_version_id, $allowedVersions);
+        $this->assertSame($template->fresh()->current_version_id, $template->fresh()->published_version_id);
         foreach (ItProvisioningWorkflow::query()->with(['templateVersion', 'requests'])->get() as $workflow) {
             $this->assertSame($workflow->templateVersion->contract['tasks'][0]['title'], $workflow->requests->sole()->item);
         }
@@ -117,7 +136,13 @@ final class ItProvisioningTemplateVersionConcurrencyTest extends TestCase
             $results = [];
             foreach ($workers as $worker) {
                 $worker->wait();
-                $this->assertTrue($worker->isSuccessful(), trim($worker->getErrorOutput()));
+                if (! $worker->isSuccessful()) {
+                    $diagnostic = json_decode(trim($worker->getErrorOutput()), true);
+                    fwrite(STDERR, json_encode(['worker_exit' => $worker->getExitCode(),
+                        'failure' => is_array($diagnostic) ? ($diagnostic['failure'] ?? null) : null,
+                    ], JSON_THROW_ON_ERROR).PHP_EOL);
+                }
+                $this->assertTrue($worker->isSuccessful(), 'Worker failed; see bounded stderr diagnostics.');
                 $result = json_decode(trim($worker->getOutput()), true, flags: JSON_THROW_ON_ERROR);
                 $this->assertTrue($result['waiting']);
                 $this->assertSame(0, $result['transaction_level']);

@@ -12,6 +12,7 @@ use Illuminate\Console\Command;
 class BackfillTimelineEvents extends Command
 {
     protected $signature = 'timeline:backfill {--force : Rebuild even if events already exist}';
+
     protected $description = 'Backfill timeline_events from shifts and client_notes';
 
     public function handle(): int

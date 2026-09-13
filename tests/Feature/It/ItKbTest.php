@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\It\Services\ItKbRevisionService;
 use App\Models\AuditLog;
 use App\Models\ItKbArticle;
 use App\Models\ItKbInteraction;
@@ -48,8 +49,8 @@ test('an agent creates a KB article with an application-unique slug', function (
         ->where('auditable_id', $article->id)
         ->count())->toBe(1);
 
-    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/submit-review")->assertRedirect();
-    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/publish")->assertRedirect();
+    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/submit-review", ['lock_version' => (int) $article->fresh()->lock_version])->assertRedirect();
+    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/publish", ['lock_version' => (int) $article->fresh()->lock_version])->assertRedirect();
     expect($article->fresh()->status)->toBe('published');
 
     // A second article with the same title gets a de-duplicated slug.
@@ -69,7 +70,7 @@ test('agents edit articles and use the governed publish lifecycle while the slug
     $slug = $article->slug;
 
     // Content edits never bypass the explicit review/publish lifecycle.
-    $this->actingAs($this->hr)->patch("/it/kb/{$article->id}", [
+    $this->actingAs($this->hr)->patch("/it/kb/{$article->id}", ['lock_version' => (int) $article->fresh()->lock_version,
         'title' => 'Edited title',
         'category' => 'network',
         'body' => 'Edited body.',
@@ -81,16 +82,18 @@ test('agents edit articles and use the governed publish lifecycle while the slug
     expect($article->status)->toBe('draft');
     expect($article->slug)->toBe($slug); // a title edit never churns the slug
 
-    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/submit-review")->assertRedirect();
-    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/publish")->assertRedirect();
+    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/submit-review", ['lock_version' => (int) $article->fresh()->lock_version])->assertRedirect();
+    $this->actingAs($this->hr)->post("/it/kb/{$article->id}/publish", ['lock_version' => (int) $article->fresh()->lock_version])->assertRedirect();
     expect($article->fresh()->status)->toBe('published');
 
-    $this->actingAs($this->hr)->patch("/it/kb/{$article->id}", [
+    $this->actingAs($this->hr)->patch("/it/kb/{$article->id}", ['lock_version' => (int) $article->fresh()->lock_version,
         'body' => 'Published guidance corrected without bypassing lifecycle state.',
-    ])->assertRedirect()->assertSessionHas('error', 'Return this article to draft before editing its content.');
+    ])->assertRedirect()->assertSessionDoesntHaveErrors()->assertSessionMissing('error');
     expect($article->fresh()->status)->toBe('published')
         ->and($article->fresh()->body)->toBe('Edited body.')
-        ->and($article->fresh()->slug)->toBe($slug);
+        ->and($article->fresh()->slug)->toBe($slug)
+        ->and(app(ItKbRevisionService::class)->workingCopy($article->fresh())->snapshot['body'])
+        ->toBe('Published guidance corrected without bypassing lifecycle state.');
 });
 
 test('KB authoring requires its explicit grant while deletion is reasoned and draft-only', function () {
@@ -102,23 +105,23 @@ test('KB authoring requires its explicit grant while deletion is reasoned and dr
     $this->actingAs($worker)->post('/it/kb', [
         'title' => 'Nope', 'category' => 'other', 'body' => 'x',
     ])->assertForbidden();
-    $this->actingAs($worker)->patch("/it/kb/{$first->id}", ['title' => 'Nope'])->assertForbidden();
+    $this->actingAs($worker)->patch("/it/kb/{$first->id}", ['lock_version' => (int) $first->fresh()->lock_version, 'title' => 'Nope'])->assertForbidden();
     $this->actingAs($worker)->delete("/it/kb/{$first->id}")->assertForbidden();
 
     // One authorised agent governs the whole application library, but review
     // and published history cannot be destroyed through the draft action.
-    $this->actingAs($this->hr)->patch("/it/kb/{$second->id}", ['title' => 'Shared guidance'])->assertRedirect();
-    $this->actingAs($this->hr)->post("/it/kb/{$second->id}/submit-review")->assertRedirect();
+    $this->actingAs($this->hr)->patch("/it/kb/{$second->id}", ['lock_version' => (int) $second->fresh()->lock_version, 'title' => 'Shared guidance'])->assertRedirect();
+    $this->actingAs($this->hr)->post("/it/kb/{$second->id}/submit-review", ['lock_version' => (int) $second->fresh()->lock_version])->assertRedirect();
     expect($second->fresh()->status)->toBe('in_review');
     $this->actingAs($this->hr)
-        ->delete("/it/kb/{$second->id}", ['reason' => 'This review is obsolete.'])
+        ->delete("/it/kb/{$second->id}", ['lock_version' => (int) $second->fresh()->lock_version, 'reason' => 'This review is obsolete.'])
         ->assertRedirect()
         ->assertSessionHas('error', 'Return this article to draft before deleting it.');
     expect(ItKbArticle::query()->find($second->id))->not->toBeNull();
 
-    $this->actingAs($this->hr)->post("/it/kb/{$second->id}/publish")->assertRedirect();
+    $this->actingAs($this->hr)->post("/it/kb/{$second->id}/publish", ['lock_version' => (int) $second->fresh()->lock_version])->assertRedirect();
     $this->actingAs($this->hr)
-        ->delete("/it/kb/{$second->id}", ['reason' => 'This published guide is obsolete.'])
+        ->delete("/it/kb/{$second->id}", ['lock_version' => (int) $second->fresh()->lock_version, 'reason' => 'This published guide is obsolete.'])
         ->assertRedirect()
         ->assertSessionHas('error', 'Retire published knowledge so its history remains available.');
     expect(ItKbArticle::query()->find($second->id))->not->toBeNull();
@@ -128,7 +131,7 @@ test('KB authoring requires its explicit grant while deletion is reasoned and dr
         ->delete("/it/kb/{$first->id}")
         ->assertSessionHasErrors('reason');
     $this->actingAs($this->hr)
-        ->delete("/it/kb/{$first->id}", ['reason' => 'Duplicate draft created during authoring.'])
+        ->delete("/it/kb/{$first->id}", ['lock_version' => (int) $first->fresh()->lock_version, 'reason' => 'Duplicate draft created during authoring.'])
         ->assertRedirect();
     expect(ItKbArticle::query()->find($first->id))->toBeNull();
     expect(AuditLog::query()
@@ -143,7 +146,7 @@ test('the knowledge catalogue reaches agents but never a self-service payload', 
     ItKbArticle::factory()->create(['status' => 'published']);
 
     $this->actingAs($this->hr)
-        ->get('/it')
+        ->get('/it/knowledge')
         ->assertOk()
         ->assertInertia(fn ($page) => $page->has('kbArticles', 1));
 
@@ -165,11 +168,11 @@ test('pure requesters browse only published articles; agents get the full catalo
         ->assertOk()
         ->assertInertia(fn ($page) => $page->has('kbPublished', 1)->missing('kbArticles'));
 
-    // Agents get the management catalogue (both), not the requester browse list.
+    // The dedicated Knowledge workspace includes both permitted records.
     $this->actingAs($this->hr)
-        ->get('/it')
+        ->get('/it/knowledge')
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('kbArticles', 2)->has('kbPublished', 0));
+        ->assertInertia(fn ($page) => $page->has('kbArticles', 2));
 });
 
 test('a requester read is recorded while helpful feedback is one canonical vote per user', function () {
@@ -185,7 +188,7 @@ test('a requester read is recorded while helpful feedback is one canonical vote 
     $article->refresh();
     expect($article->helpful_yes)->toBe(1);
     expect($article->helpful_no)->toBe(0);
-    expect($article->deflection_count)->toBe(1);
+    expect($article->deflection_count)->toBe(0);
     expect(ItKbInteraction::query()
         ->where('it_kb_article_id', $article->id)
         ->where('user_id', $worker->id)

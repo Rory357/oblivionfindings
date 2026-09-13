@@ -69,7 +69,7 @@ class MarScheduleService
      * matching by {@see slotKey()}. Callers iterate generated slots and look up
      * `$map->get($this->slotKey(...))` instead of issuing one administration
      * query per slot (the N+1 that re-ran on every /my-day & /meds/today
-     * 60s refresh). Mirrors the pattern in TodayDashboardController.
+     * 60s refresh).
      *
      * The DB window spans the full local day(s) the [$from, $to] range covers
      * (it may straddle two worker-local days near midnight), expressed in UTC.

@@ -30,7 +30,7 @@ class PurchaseOrderApprovalNotification extends Notification
 
         return (new MailMessage)
             ->subject("Purchase Order {$po->po_number} Requires Approval")
-            ->line("A new purchase order requires your approval.")
+            ->line('A new purchase order requires your approval.')
             ->line('')
             ->line("**PO Number:** {$po->po_number}")
             ->line("**Vendor:** {$vendorName}")

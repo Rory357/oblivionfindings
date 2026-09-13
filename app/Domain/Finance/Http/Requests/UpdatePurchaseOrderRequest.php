@@ -2,7 +2,6 @@
 
 namespace App\Domain\Finance\Http\Requests;
 
-use App\Domain\Finance\Models\FinPurchaseOrder;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdatePurchaseOrderRequest extends FormRequest

@@ -473,12 +473,6 @@ function buildIconNavItems({
                       label: 'Overview',
                       href: '/dashboard',
                   } as IconNavItem,
-                  {
-                      id: 'today',
-                      icon: ClipboardList,
-                      label: 'Today',
-                      href: '/today',
-                  } as IconNavItem,
               ]
             : []),
         {
@@ -838,6 +832,11 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                     : []),
                 ...(can?.it?.view
                     ? [
+                          {
+                              title: 'Provisioning',
+                              href: '/it/provisioning',
+                              icon: Server,
+                          },
                           {
                               title: 'Work planning',
                               href: '/it/work',

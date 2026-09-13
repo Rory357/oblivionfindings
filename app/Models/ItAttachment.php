@@ -40,6 +40,7 @@ class ItAttachment extends Model
         'mime',
         'size',
         'uploaded_by',
+        'catalogue_field_key',
         'draft_generation_uuid', 'draft_upload_uuid', 'draft_content_hash',
         'draft_storage_state', 'draft_cleanup_attempts', 'draft_cleanup_error_code',
     ];

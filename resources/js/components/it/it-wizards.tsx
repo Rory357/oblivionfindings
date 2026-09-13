@@ -1,10 +1,27 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+    KNOWLEDGE_DOCUMENT_TYPES,
+    KNOWLEDGE_SECTIONS,
+    knowledgeSectionsFor,
+} from '@/components/it/knowledge-document';
+import {
+    KnowledgeConflictReview,
+    useKnowledgeEditorContext,
+} from '@/components/it/knowledge-editor-context';
+import {
+    KnowledgeRelatedRecords,
+    KnowledgeRelationshipEditor,
+    type KnowledgeRecord,
+} from '@/components/it/knowledge-related-records';
 import { ResolveTicketDialog } from '@/components/it/resolve-ticket-dialog';
+import { ProvisioningManualDialog } from './provisioning-manual-dialog';
 /* The IT & Support dialogs — Log ticket (3-step), Fulfil request and
  * Assign owner (single-step). All built on the shared HR wizard kit
  * (WizardShell + primitives) so they are visually identical to the
  * Add-Client / Asset lifecycle modals. Zero confirm(): every action is a
  * reviewed modal ending in a success pane. */
 import { router, useForm, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
     BookOpen,
     CalendarClock,
@@ -45,6 +62,10 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/hr/wizard';
+import {
+    ProvisioningSubmittedFiles,
+    type ProvisioningAttachment,
+} from '@/components/it/provisioning-request-files';
 import { TicketCommandWizard } from '@/components/it/ticket-command-wizard';
 import { TicketDuplicateSuggestions } from '@/components/it/ticket-duplicate-suggestions';
 import {
@@ -79,6 +100,7 @@ import {
 import { useItTicketCommand } from '@/hooks/use-it-ticket-command';
 import type { ItDraftBrowserRestored } from '@/hooks/use-it-ticket-draft';
 import { itIntakeDraftMemoryRequestIds } from '@/hooks/use-it-ticket-draft-memory';
+import { formatDateOnly } from '@/lib/datetime';
 import {
     IT_ATTACHMENT_ACCEPT,
     itAttachmentSelectionError,
@@ -144,6 +166,7 @@ export interface RequestRow {
     approver: AssigneeOption | null;
     evidence_required: boolean;
     evidence_summary: string | null;
+    attachments?: ProvisioningAttachment[];
     failure_reason: string | null;
     fulfiller_context: Record<string, unknown>;
     workflow: {
@@ -229,8 +252,49 @@ export interface EmployeeOption {
 
 /** A knowledge-base article row for the agent Knowledge tab (§I). */
 export interface KbRow {
+    media_ready?: boolean;
+    diagrams?: import('./knowledge-diagrams').KnowledgeDiagram[];
+    file_ids?: number[];
+    content_loaded?: boolean;
+    related_records?: KnowledgeRecord[];
+    review_overdue?: boolean;
+    user_vote?: boolean | null;
+    user_solved?: boolean;
+    confirmed_solved?: number | null;
+    lock_version?: number;
+    revision_ready?: boolean;
+    document_type?: string;
+    structured_content?: Record<string, string | null> | null;
+    working_copy?: {
+        status: 'draft' | 'in_review';
+        content: Partial<
+            Pick<
+                KbRow,
+                | 'title'
+                | 'category'
+                | 'body'
+                | 'audience'
+                | 'site_scope'
+                | 'owner_user_id'
+                | 'related_service_id'
+                | 'review_due_at'
+                | 'document_type'
+                | 'structured_content'
+                | 'related_records'
+                | 'diagrams'
+                | 'file_ids'
+                | 'tags'
+            >
+        >;
+    } | null;
     id: number;
-    can: { manage: boolean; author: boolean; review: boolean };
+    can: {
+        manage: boolean;
+        author: boolean;
+        review: boolean;
+        edit?: boolean;
+        retire?: boolean;
+    };
     title: string;
     slug: string;
     category: string;
@@ -243,6 +307,13 @@ export interface KbRow {
     helpful_no: number;
     helpful_percent: number | null;
     deflections: number;
+    tags?: string[];
+    document_issues?: Array<{
+        code: string;
+        message: string;
+        section: string;
+        field?: string;
+    }>;
     author: string | null;
     owner_user_id: number | null;
     owner: string | null;
@@ -256,6 +327,16 @@ export interface KbRow {
 }
 
 export interface KbOptions {
+    organisation_wide?: boolean;
+    revisions_ready?: boolean;
+    tags_ready?: boolean;
+    document_templates?: Array<{
+        type: string;
+        version: number;
+        label: string;
+        description: string;
+        required: string[];
+    }>;
     owners: Array<{ id: number; name: string }>;
     sites: Array<{ id: number; name: string }>;
     services: Array<{ id: number; name: string }>;
@@ -290,6 +371,10 @@ export type ItModal =
 
 /** Pre-fill for a NEW KB article (e.g. drafted from a resolution note). */
 export interface KbDraft {
+    source_ticket_id?: number;
+    source_ticket_version?: number;
+    source_reference?: string;
+    related_records?: KnowledgeRecord[];
     title?: string;
     body?: string;
     category?: string;
@@ -349,8 +434,15 @@ export function ItWizard({
         SharedData & { draftRecovery?: { enabled: boolean } }
     >();
     const actorId = page.props.auth.user.id;
+    const [modalActor, setModalActor] = useState(actorId);
+    useEffect(() => {
+        if (modalActor !== actorId) {
+            onClose();
+            if (!modal) setModalActor(actorId);
+        }
+    }, [actorId, modalActor, modal, onClose]);
     const draftRecoveryEnabled = page.props.draftRecovery?.enabled === true;
-    if (!modal) return null;
+    if (!modal || modalActor !== actorId) return null;
     switch (modal.type) {
         case 'ticket':
             return (
@@ -373,15 +465,19 @@ export function ItWizard({
             );
         case 'new-request':
             return (
-                <NewProvisioningRequestDialog
-                    employeeOptions={employeeOptions}
-                    assignees={assignees}
+                <ProvisioningManualDialog
+                    actorId={actorId}
                     onClose={onClose}
+                    onDenied={() => {
+                        onClose();
+                        router.visit('/it');
+                    }}
                 />
             );
         case 'kb':
             return (
                 <KbArticleDialog
+                    key={`${actorId}:${modal.article?.id ?? 'new'}`}
                     article={modal.article}
                     draft={modal.draft}
                     options={kbOptions}
@@ -1698,265 +1794,6 @@ function CreateTicketWizard({
 /*  New provisioning request (agent, 2 steps)                         */
 /* ================================================================== */
 
-const PROVISIONING_STEPS: readonly WizardStep[] = [
-    { key: 'what', label: 'Request', blurb: 'Who & what', icon: FileText },
-    { key: 'assign', label: 'Assign', blurb: 'Owner & due', icon: Flag },
-];
-
-const REQUEST_TYPE_OPTIONS = [
-    {
-        key: 'account',
-        label: 'Account',
-        description: 'Email, logins & software',
-        icon: Mail,
-    },
-    {
-        key: 'access',
-        label: 'Access',
-        description: 'Systems & permissions',
-        icon: KeyRound,
-    },
-    {
-        key: 'equipment',
-        label: 'Equipment',
-        description: 'Laptop, phone & devices',
-        icon: Laptop,
-    },
-    {
-        key: 'other',
-        label: 'Other',
-        description: 'Anything else to provision',
-        icon: Server,
-    },
-] as const;
-
-function NewProvisioningRequestDialog({
-    employeeOptions,
-    assignees,
-    onClose,
-}: {
-    employeeOptions: EmployeeOption[];
-    assignees: AssigneeOption[];
-    onClose: () => void;
-}) {
-    const wizard = useWizard(PROVISIONING_STEPS.length);
-    const [done, setDone] = useState(false);
-
-    const form = useForm({
-        employee_profile_id: '',
-        type: 'account',
-        item: '',
-        assigned_to_user_id: UNASSIGNED,
-        priority: 'normal',
-        due_date: '',
-        notes: '',
-    });
-
-    const employee =
-        employeeOptions.find(
-            (e) => String(e.id) === form.data.employee_profile_id,
-        ) ?? null;
-    const detailsValid =
-        form.data.employee_profile_id !== '' &&
-        form.data.item.trim().length > 0;
-
-    const submit = () => {
-        form.transform((data) => ({
-            ...data,
-            employee_profile_id: Number(data.employee_profile_id),
-            assigned_to_user_id:
-                data.assigned_to_user_id === UNASSIGNED
-                    ? null
-                    : Number(data.assigned_to_user_id),
-            due_date: data.due_date === '' ? null : data.due_date,
-            notes: data.notes.trim() === '' ? null : data.notes,
-        }));
-        form.post('/it/provisioning', {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                const err = pageFlashError(page);
-                if (err) {
-                    toast.error(err);
-                    return;
-                }
-                setDone(true);
-            },
-        });
-    };
-
-    return (
-        <WizardShell
-            open
-            onClose={onClose}
-            title="New provisioning request"
-            description="Raise an ad-hoc account, access or equipment request."
-            railIcon={Server}
-            railTitle="New request"
-            railSub="Provisioning"
-            steps={PROVISIONING_STEPS}
-            stepIndex={wizard.index}
-            onStepClick={wizard.goTo}
-            pct={wizard.progress}
-            success={
-                done ? (
-                    <WizardSuccessPane
-                        title="Request raised"
-                        blurb={
-                            <>
-                                “{form.data.item}” is on the provisioning queue
-                                {employee ? <> for {employee.name}</> : null}.
-                            </>
-                        }
-                        actions={<Button onClick={onClose}>Done</Button>}
-                    />
-                ) : undefined
-            }
-            footerStart={
-                wizard.isFirst ? null : (
-                    <Button variant="outline" onClick={wizard.back}>
-                        Back
-                    </Button>
-                )
-            }
-            footerEnd={
-                <>
-                    <Button variant="ghost" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    {wizard.isLast ? (
-                        <Button
-                            onClick={submit}
-                            disabled={form.processing || !detailsValid}
-                        >
-                            {form.processing ? 'Raising…' : 'Raise request'}
-                        </Button>
-                    ) : (
-                        <Button onClick={wizard.next} disabled={!detailsValid}>
-                            Continue
-                        </Button>
-                    )}
-                </>
-            }
-        >
-            {wizard.index === 0 && (
-                <WizardStepPane>
-                    <StepHead
-                        icon={FileText}
-                        title="Who & what"
-                        blurb="Who’s this for, and what needs provisioning?"
-                    />
-                    <div className="grid gap-3.5">
-                        <Field
-                            label="Employee"
-                            required
-                            error={form.errors.employee_profile_id}
-                        >
-                            <SelectInput
-                                value={form.data.employee_profile_id}
-                                onChange={(v) =>
-                                    form.setData('employee_profile_id', v)
-                                }
-                                placeholder="Choose an employee"
-                                options={employeeOptions.map((e) => ({
-                                    value: String(e.id),
-                                    label: e.name,
-                                }))}
-                            />
-                        </Field>
-                        <Field label="Type" error={form.errors.type}>
-                            <TilePicker
-                                value={form.data.type}
-                                onChange={(v) => form.setData('type', v)}
-                                options={[...REQUEST_TYPE_OPTIONS]}
-                            />
-                        </Field>
-                        <Field label="Item" required error={form.errors.item}>
-                            <Input
-                                value={form.data.item}
-                                onChange={(e) =>
-                                    form.setData('item', e.target.value)
-                                }
-                                placeholder="e.g. Replacement laptop"
-                                maxLength={255}
-                            />
-                        </Field>
-                    </div>
-                </WizardStepPane>
-            )}
-            {wizard.index === 1 && (
-                <WizardStepPane>
-                    <StepHead
-                        icon={Flag}
-                        title="Assign & schedule"
-                        blurb="Owner, priority and a due date if there is one."
-                    />
-                    <div className="grid gap-3.5">
-                        <Field label="Priority" error={form.errors.priority}>
-                            <TilePicker
-                                value={form.data.priority}
-                                onChange={(v) => form.setData('priority', v)}
-                                options={[...PRIORITY_OPTIONS]}
-                            />
-                        </Field>
-                        {assignees.length > 0 ? (
-                            <Field
-                                label="Assign to"
-                                hint="optional"
-                                error={form.errors.assigned_to_user_id}
-                            >
-                                <SelectInput
-                                    value={form.data.assigned_to_user_id}
-                                    onChange={(v) =>
-                                        form.setData('assigned_to_user_id', v)
-                                    }
-                                    placeholder="Unassigned"
-                                    options={[
-                                        {
-                                            value: UNASSIGNED,
-                                            label: 'Unassigned',
-                                        },
-                                        ...assignees.map((a) => ({
-                                            value: String(a.id),
-                                            label: a.name,
-                                        })),
-                                    ]}
-                                />
-                            </Field>
-                        ) : null}
-                        <Field
-                            label="Due date"
-                            hint="optional"
-                            error={form.errors.due_date}
-                        >
-                            <Input
-                                type="date"
-                                value={form.data.due_date}
-                                onChange={(e) =>
-                                    form.setData('due_date', e.target.value)
-                                }
-                            />
-                        </Field>
-                        <Field
-                            label="Notes"
-                            hint="optional"
-                            error={form.errors.notes}
-                        >
-                            <Textarea
-                                value={form.data.notes}
-                                onChange={(e) =>
-                                    form.setData('notes', e.target.value)
-                                }
-                                rows={3}
-                                placeholder="Anything the fulfiller should know…"
-                            />
-                        </Field>
-                    </div>
-                </WizardStepPane>
-            )}
-        </WizardShell>
-    );
-}
-
 /* ================================================================== */
 /*  Raise a ticket (self-service, single step — speed IS the spec)    */
 /* ================================================================== */
@@ -3037,10 +2874,10 @@ export function KbPreview({ body }: { body: string }) {
     );
 }
 
-function KbArticleDialog({
+export function KbArticleDialog({
     article,
     draft,
-    options,
+    options: providedOptions,
     onClose,
 }: {
     article?: KbRow;
@@ -3048,29 +2885,163 @@ function KbArticleDialog({
     options: KbOptions;
     onClose: () => void;
 }) {
+    const actorId = usePage<SharedData>().props.auth.user.id;
+    const context = useKnowledgeEditorContext(
+        article?.id,
+        actorId,
+        providedOptions,
+    );
+    const contextMessage = 'message' in context ? context.message : undefined;
+    const current = context.status === 'ready' ? context.data : null;
+    const currentArticle = current?.article ?? article;
+    const options = current?.options ?? providedOptions;
+    const [reviewingCurrent, setReviewingCurrent] = useState(false);
+    const deniedHandled = useRef(false);
+    const commandConfirmed = useRef(false);
+    useEffect(() => {
+        if (article && context.status === 'denied' && !deniedHandled.current) {
+            deniedHandled.current = true;
+            toast.error(
+                contextMessage ?? 'This document is no longer available.',
+            );
+            onClose();
+        }
+    }, [article, context.status, contextMessage, onClose]);
+    useEffect(() => {
+        setReviewingCurrent(false);
+    }, [current?.article.lock_version]);
     const editing = Boolean(article);
+    const [reviewedSourceVersion, setReviewedSourceVersion] = useState<
+        number | null
+    >(null);
+    const [sourceError, setSourceError] = useState<string | null>(null);
+    const [sourceLoading, setSourceLoading] = useState(false);
     const wizard = useWizard(KB_STEPS.length);
     const [done, setDone] = useState(false);
+    const [discard, setDiscard] = useState(false);
+    const [replaceRelationships, setReplaceRelationships] = useState(false);
+    const content = article?.working_copy?.content ?? article;
+    const [contentReady, setContentReady] = useState(
+        article?.content_loaded !== false,
+    );
 
     // A `draft` (e.g. from a resolution note) pre-fills a NEW article — no
     // article means we still create, we just start with content in place.
     const form = useForm({
-        title: article?.title ?? draft?.title ?? '',
-        category: article?.category ?? draft?.category ?? 'hardware',
-        audience: article?.audience ?? 'all_staff',
-        site_scope: article?.site_scope ?? ([] as number[]),
-        owner_user_id: String(article?.owner_user_id ?? ''),
-        related_service_id: String(article?.related_service_id ?? ''),
-        review_due_at: article?.review_due_at ?? '',
-        body: article?.body ?? draft?.body ?? '',
+        actor_user_id: actorId,
+        lock_version: article?.lock_version ?? 1,
+        title: content?.title ?? draft?.title ?? '',
+        source_ticket_id: draft?.source_ticket_id ?? null,
+        source_ticket_version: draft?.source_ticket_version ?? null,
+        tags_text: (content?.tags ?? []).join(', '),
+        category: content?.category ?? draft?.category ?? 'hardware',
+        audience: content?.audience ?? 'all_staff',
+        site_scope: content?.site_scope ?? ([] as number[]),
+        owner_user_id: String(content?.owner_user_id ?? ''),
+        related_service_id: String(content?.related_service_id ?? ''),
+        review_due_at: content?.review_due_at ?? '',
+        body: content?.body ?? draft?.body ?? '',
+        document_type: content?.document_type ?? 'guide',
+        structured_content: Object.fromEntries(
+            KNOWLEDGE_SECTIONS.map((field) => [
+                field.key,
+                content?.structured_content?.[field.key] ?? '',
+            ]),
+        ),
+        related_records:
+            content?.related_records ??
+            draft?.related_records ??
+            ([] as KnowledgeRecord[]),
     });
+    const stale =
+        editing &&
+        !done &&
+        (Boolean(form.errors.lock_version) ||
+            (current !== null &&
+                current.article.lock_version !== form.data.lock_version));
+    const editBlocked = editing && (!current || !current.editable || stale);
+    const referencePayload = (records: KnowledgeRecord[]) =>
+        records.map(({ type, id, relation }) => ({
+            type,
+            id,
+            relation: relation ?? 'documents',
+        }));
+    const originalRelationships = useRef(
+        JSON.stringify(referencePayload(form.data.related_records)),
+    );
+    // Populate a metadata-only row once from the authorized editor response.
+    // Later refreshes must retain the user's proposal and conflict choices.
+    useEffect(() => {
+        if (contentReady || !current) return;
+        const loaded = current.article.working_copy?.content ?? current.article;
+        const next = {
+            actor_user_id: actorId,
+            lock_version: current.article.lock_version,
+            title: loaded.title ?? '',
+            source_ticket_id: null,
+            source_ticket_version: null,
+            tags_text: (loaded.tags ?? []).join(', '),
+            category: loaded.category ?? 'hardware',
+            audience: loaded.audience ?? 'all_staff',
+            site_scope: loaded.site_scope ?? [],
+            owner_user_id: String(loaded.owner_user_id ?? ''),
+            related_service_id: String(loaded.related_service_id ?? ''),
+            review_due_at: loaded.review_due_at ?? '',
+            body: loaded.body ?? '',
+            document_type: loaded.document_type ?? 'guide',
+            structured_content: Object.fromEntries(
+                KNOWLEDGE_SECTIONS.map((field) => [
+                    field.key,
+                    loaded.structured_content?.[field.key] ?? '',
+                ]),
+            ),
+            related_records: loaded.related_records ?? [],
+        };
+        form.setDefaults(next);
+        form.setData(next);
+        originalRelationships.current = JSON.stringify(
+            next.related_records.map(({ type, id, relation }) => ({
+                type,
+                id,
+                relation: relation ?? 'documents',
+            })),
+        );
+        setContentReady(true);
+    }, [actorId, contentReady, current, form]);
+    const originalAudienceAllowed =
+        !article ||
+        [article, article.working_copy?.content].every((snapshot) => {
+            if (!snapshot || snapshot.audience !== 'specific_sites')
+                return true;
+            return (
+                Boolean(snapshot.site_scope?.length) &&
+                (options.organisation_wide === true ||
+                    snapshot.site_scope!.every((id) =>
+                        options.sites.some(
+                            (site) => Number(site.id) === Number(id),
+                        ),
+                    ))
+            );
+        });
+    useEffect(() => {
+        if (!originalAudienceAllowed) onClose();
+    }, [originalAudienceAllowed, onClose]);
+
+    const requestClose = () => {
+        if (form.processing) return;
+        if (!done && form.isDirty) setDiscard(true);
+        else onClose();
+    };
 
     const basicsValid = form.data.title.trim().length > 0;
     const contentValid = form.data.body.trim().length > 0;
     const savedState = editing
         ? {
               title: 'Article updated',
-              blurb: ' with its lifecycle state unchanged',
+              blurb:
+                  currentArticle?.status === 'published'
+                      ? ' as a proposed revision; the approved publication remains available'
+                      : ' with its lifecycle state unchanged',
               action: 'Save changes',
           }
         : {
@@ -3080,7 +3051,7 @@ function KbArticleDialog({
           };
 
     const afterSave = (addAnother: boolean) => {
-        toast.success(editing ? 'Article updated.' : `${savedState.title}.`);
+        commandConfirmed.current = true;
         if (addAnother && !editing) {
             form.reset();
             wizard.goTo(0);
@@ -3089,10 +3060,68 @@ function KbArticleDialog({
         }
     };
 
+    const recoverRelationshipAccess = (errors: Record<string, string>) => {
+        if (errors.knowledge_relationship_access) {
+            setReplaceRelationships(true);
+            form.setData('related_records', []);
+            form.setError(
+                'related_records',
+                'Linked-record access changed. Your document text is retained. Choose the available links again.',
+            );
+            wizard.goTo(2);
+        }
+    };
+
     const submit = (addAnother = false) => {
+        if (form.processing || editBlocked) return;
+        commandConfirmed.current = false;
+        form.transform((data) => {
+            const { related_records, tags_text, ...values } = data;
+            const fields = {
+                ...values,
+                ...(options.tags_ready
+                    ? {
+                          tags: tags_text
+                              .split(',')
+                              .map((tag) => tag.trim())
+                              .filter(Boolean),
+                      }
+                    : {}),
+            };
+            const references = referencePayload(related_records);
+            // Editing prose does not silently erase references concealed by current record access.
+            return editing &&
+                !replaceRelationships &&
+                JSON.stringify(references) === originalRelationships.current
+                ? fields
+                : { ...fields, related_records: references };
+        });
         if (editing) {
             form.patch(`/it/kb/${article!.id}`, {
                 preserveScroll: true,
+                onError: (errors) => {
+                    recoverRelationshipAccess(errors);
+                    if (errors.title || errors.category || errors.document_type)
+                        wizard.goTo(0);
+                    else if (
+                        errors.audience ||
+                        errors.site_scope ||
+                        errors.owner_user_id ||
+                        errors.review_due_at ||
+                        errors.related_service_id
+                    )
+                        wizard.goTo(1);
+                    else if (
+                        errors.body ||
+                        Object.keys(errors).some((key) =>
+                            key.startsWith('structured_content'),
+                        )
+                    )
+                        wizard.goTo(2);
+                },
+                onFinish: () => {
+                    if (editing && !commandConfirmed.current) context.refresh();
+                },
                 onSuccess: (page) => {
                     const err = pageFlashError(page);
                     if (err) {
@@ -3105,6 +3134,29 @@ function KbArticleDialog({
         } else {
             form.post('/it/kb', {
                 preserveScroll: true,
+                onError: (errors) => {
+                    recoverRelationshipAccess(errors);
+                    if (errors.title || errors.category || errors.document_type)
+                        wizard.goTo(0);
+                    else if (
+                        errors.audience ||
+                        errors.site_scope ||
+                        errors.owner_user_id ||
+                        errors.review_due_at ||
+                        errors.related_service_id
+                    )
+                        wizard.goTo(1);
+                    else if (
+                        errors.body ||
+                        Object.keys(errors).some((key) =>
+                            key.startsWith('structured_content'),
+                        )
+                    )
+                        wizard.goTo(2);
+                },
+                onFinish: () => {
+                    if (editing && !commandConfirmed.current) context.refresh();
+                },
                 onSuccess: (page) => {
                     const err = pageFlashError(page);
                     if (err) {
@@ -3117,365 +3169,826 @@ function KbArticleDialog({
         }
     };
 
+    if (!originalAudienceAllowed || (editing && context.status === 'denied'))
+        return null;
+    if (editing && (!current || !contentReady))
+        return (
+            <>
+                <WizardShell
+                    open
+                    onClose={requestClose}
+                    title="Knowledge editor"
+                    description="Confirming the current document and your access."
+                    railIcon={BookOpen}
+                    railTitle="Knowledge"
+                    railSub="Current document"
+                    steps={[]}
+                    stepIndex={0}
+                    onStepClick={() => undefined}
+                    headerLabel="Load current document"
+                    footerStart={
+                        <Button variant="outline" onClick={requestClose}>
+                            Cancel
+                        </Button>
+                    }
+                >
+                    {context.status === 'failed' ? (
+                        <div role="alert" className="space-y-3">
+                            <p>{context.message}</p>
+                            <Button variant="outline" onClick={context.refresh}>
+                                Try again
+                            </Button>
+                        </div>
+                    ) : (
+                        <p role="status">Loading current document…</p>
+                    )}
+                </WizardShell>
+                <ConfirmDialog
+                    open={discard}
+                    onClose={() => setDiscard(false)}
+                    onConfirm={onClose}
+                    title="Discard unsaved document changes?"
+                    description="Your changes in this editor have not been saved."
+                    confirmText="Discard changes"
+                    variant="destructive"
+                />
+            </>
+        );
     return (
-        <WizardShell
-            open
-            onClose={onClose}
-            title={editing ? 'Edit article' : 'New KB article'}
-            description="Write it once, deflect the ticket every time after."
-            railIcon={BookOpen}
-            railTitle="Knowledge"
-            railSub="IT helpdesk"
-            steps={KB_STEPS}
-            stepIndex={wizard.index}
-            onStepClick={wizard.goTo}
-            pct={wizard.progress}
-            success={
-                done ? (
-                    <WizardSuccessPane
-                        title={editing ? 'Article saved' : savedState.title}
-                        blurb={
+        <>
+            <WizardShell
+                open
+                onClose={requestClose}
+                title={editing ? 'Edit article' : 'New KB article'}
+                description="Create support documentation with a clear owner, audience and review date."
+                railIcon={BookOpen}
+                railTitle="Knowledge"
+                railSub="Documentation workspace"
+                steps={KB_STEPS.map((step) => ({
+                    ...step,
+                    disabled: form.processing,
+                }))}
+                stepIndex={wizard.index}
+                onStepClick={wizard.goTo}
+                pct={null}
+                success={
+                    done ? (
+                        <WizardSuccessPane
+                            title={editing ? 'Article saved' : savedState.title}
+                            blurb={
+                                <>
+                                    “{form.data.title}” is in the knowledge base
+                                    {savedState.blurb}.
+                                </>
+                            }
+                            actions={<Button onClick={onClose}>Done</Button>}
+                        />
+                    ) : undefined
+                }
+                footerStart={
+                    wizard.isFirst ? null : (
+                        <Button
+                            variant="outline"
+                            disabled={form.processing}
+                            onClick={wizard.back}
+                        >
+                            Back
+                        </Button>
+                    )
+                }
+                footerEnd={
+                    <>
+                        <Button
+                            variant="ghost"
+                            disabled={form.processing}
+                            onClick={requestClose}
+                        >
+                            Cancel
+                        </Button>
+                        {wizard.isLast ? (
                             <>
-                                “{form.data.title}” is in the knowledge base
-                                {savedState.blurb}.
-                            </>
-                        }
-                        actions={<Button onClick={onClose}>Done</Button>}
-                    />
-                ) : undefined
-            }
-            footerStart={
-                wizard.isFirst ? null : (
-                    <Button variant="outline" onClick={wizard.back}>
-                        Back
-                    </Button>
-                )
-            }
-            footerEnd={
-                <>
-                    <Button variant="ghost" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    {wizard.isLast ? (
-                        <>
-                            {!editing ? (
+                                {!editing ? (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => submit(true)}
+                                        disabled={
+                                            form.processing ||
+                                            editBlocked ||
+                                            !basicsValid ||
+                                            !contentValid
+                                        }
+                                    >
+                                        Save & add another
+                                    </Button>
+                                ) : null}
                                 <Button
-                                    variant="outline"
-                                    onClick={() => submit(true)}
+                                    onClick={() => submit(false)}
                                     disabled={
                                         form.processing ||
+                                        editBlocked ||
                                         !basicsValid ||
                                         !contentValid
                                     }
                                 >
-                                    Save & add another
+                                    {form.processing
+                                        ? 'Saving…'
+                                        : savedState.action}
                                 </Button>
-                            ) : null}
+                            </>
+                        ) : (
                             <Button
-                                onClick={() => submit(false)}
+                                onClick={wizard.next}
                                 disabled={
-                                    form.processing ||
-                                    !basicsValid ||
-                                    !contentValid
+                                    (wizard.index === 0 && !basicsValid) ||
+                                    (wizard.index === 1 &&
+                                        form.data.audience ===
+                                            'specific_sites' &&
+                                        form.data.site_scope.length === 0) ||
+                                    (wizard.index === 2 && !contentValid)
                                 }
                             >
-                                {form.processing
-                                    ? 'Saving…'
-                                    : savedState.action}
+                                Continue
                             </Button>
-                        </>
-                    ) : (
+                        )}
+                    </>
+                }
+            >
+                {Object.keys(form.errors).length > 0 && (
+                    <div
+                        role="alert"
+                        className="mb-4 rounded-lg border border-destructive/30 p-3 text-sm"
+                    >
+                        <p className="font-semibold">Check these details</p>
+                        <ul className="mt-2 list-disc pl-5">
+                            {Object.entries(form.errors).map(
+                                ([key, message]) => (
+                                    <li key={key}>{message}</li>
+                                ),
+                            )}
+                        </ul>
+                    </div>
+                )}
+                {editing && current && (stale || !current.editable) && (
+                    <div
+                        role="alert"
+                        className="mb-4 space-y-3 rounded-lg border border-status-warning/40 bg-status-warning-bg p-4 text-sm"
+                    >
+                        <p>
+                            {current.editable
+                                ? 'The saved document has changed. Your proposal is retained; review the current version before saving.'
+                                : 'The current document is not editable in its lifecycle state. Your permitted proposal text is retained.'}
+                        </p>
                         <Button
-                            onClick={wizard.next}
-                            disabled={
-                                (wizard.index === 0 && !basicsValid) ||
-                                (wizard.index === 1 &&
-                                    form.data.audience === 'specific_sites' &&
-                                    form.data.site_scope.length === 0) ||
-                                (wizard.index === 2 && !contentValid)
-                            }
+                            type="button"
+                            variant="outline"
+                            disabled={form.processing}
+                            onClick={() => {
+                                if (
+                                    current.article.lock_version ===
+                                        form.data.lock_version &&
+                                    current.editable
+                                )
+                                    context.refresh();
+                                else setReviewingCurrent(true);
+                            }}
                         >
-                            Continue
+                            {current.article.lock_version ===
+                                form.data.lock_version && current.editable
+                                ? 'Reload current document'
+                                : 'Review current document'}
                         </Button>
-                    )}
-                </>
-            }
-        >
-            {wizard.index === 0 && (
-                <WizardStepPane>
-                    <StepHead
-                        icon={FileText}
-                        title="Basics"
-                        blurb="What’s it about? New articles start as drafts."
-                    />
-                    <div className="grid gap-3.5">
-                        <Field label="Title" required error={form.errors.title}>
-                            <Input
-                                value={form.data.title}
-                                onChange={(e) =>
-                                    form.setData('title', e.target.value)
-                                }
-                                placeholder="e.g. Reset your work password"
-                                maxLength={255}
-                            />
-                        </Field>
-                        <Field label="Category" error={form.errors.category}>
-                            <TilePicker
-                                value={form.data.category}
-                                onChange={(v) => form.setData('category', v)}
-                                options={[...CATEGORY_OPTIONS]}
-                            />
-                        </Field>
                     </div>
-                </WizardStepPane>
-            )}
-
-            {wizard.index === 1 && (
-                <WizardStepPane>
-                    <StepHead
-                        icon={Users}
-                        title="Ownership & audience"
-                        blurb="Keep the article accountable and show it only where it applies."
+                )}
+                {reviewingCurrent && current && (
+                    <KnowledgeConflictReview
+                        current={current.article}
+                        options={options}
+                        processing={form.processing}
+                        editable={
+                            current.editable &&
+                            current.article.lock_version !==
+                                form.data.lock_version
+                        }
+                        onUseVersion={(version) => {
+                            form.setData('lock_version', version);
+                            form.clearErrors('lock_version');
+                            setReviewingCurrent(false);
+                            wizard.goTo(0);
+                        }}
                     />
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        <Field label="Audience" error={form.errors.audience}>
-                            <SelectInput
-                                value={form.data.audience}
-                                onChange={(value) =>
-                                    form.setData('audience', value)
-                                }
-                                placeholder="Choose who can find it"
-                                options={[
-                                    { value: 'all_staff', label: 'All staff' },
-                                    {
-                                        value: 'specific_sites',
-                                        label: 'Only selected sites',
-                                    },
-                                    {
-                                        value: 'it_agents',
-                                        label: 'IT agents only',
-                                    },
-                                ]}
+                )}
+                <fieldset
+                    disabled={form.processing}
+                    className="min-w-0 border-0 p-0"
+                >
+                    {wizard.index === 0 && (
+                        <WizardStepPane>
+                            <StepHead
+                                icon={FileText}
+                                title="Basics"
+                                blurb="What’s it about? New articles start as drafts."
                             />
-                        </Field>
-                        <Field
-                            label="Article owner"
-                            error={form.errors.owner_user_id}
-                        >
-                            <SelectInput
-                                value={form.data.owner_user_id || UNASSIGNED}
-                                onChange={(value) =>
-                                    form.setData(
-                                        'owner_user_id',
-                                        value === UNASSIGNED ? '' : value,
-                                    )
-                                }
-                                placeholder="Choose an owner"
-                                options={[
-                                    {
-                                        value: UNASSIGNED,
-                                        label: 'Use me as owner',
-                                    },
-                                    ...options.owners.map((owner) => ({
-                                        value: String(owner.id),
-                                        label: owner.name,
-                                    })),
-                                ]}
-                            />
-                        </Field>
-                        <Field
-                            label="Related service"
-                            error={form.errors.related_service_id}
-                        >
-                            <SelectInput
-                                value={
-                                    form.data.related_service_id || UNASSIGNED
-                                }
-                                onChange={(value) =>
-                                    form.setData(
-                                        'related_service_id',
-                                        value === UNASSIGNED ? '' : value,
-                                    )
-                                }
-                                placeholder="Choose a service"
-                                options={[
-                                    {
-                                        value: UNASSIGNED,
-                                        label: 'No related service',
-                                    },
-                                    ...options.services.map((service) => ({
-                                        value: String(service.id),
-                                        label: service.name,
-                                    })),
-                                ]}
-                            />
-                        </Field>
-                        <Field
-                            label="Review due"
-                            error={form.errors.review_due_at}
-                        >
-                            <Input
-                                type="date"
-                                value={form.data.review_due_at}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'review_due_at',
-                                        event.target.value,
-                                    )
-                                }
-                            />
-                        </Field>
-                        {form.data.audience === 'specific_sites' ? (
-                            <fieldset className="rounded-xl border border-border p-3 lg:col-span-2">
-                                <legend className="px-1 text-sm font-medium">
-                                    Sites that can find this article
-                                </legend>
-                                <div className="mt-2 grid gap-1 sm:grid-cols-2">
-                                    {options.sites.map((site) => (
-                                        <label
-                                            key={site.id}
-                                            className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm hover:bg-muted/50"
+                            {form.data.source_ticket_id &&
+                                draft?.source_ticket_id && (
+                                    <section
+                                        aria-label="Source resolution"
+                                        className="mb-4 space-y-2 rounded-lg border border-border p-3"
+                                    >
+                                        <p className="text-sm">
+                                            Source: {draft.source_reference}.
+                                            Write reusable steps; conversation
+                                            and internal verification notes are
+                                            not copied.
+                                        </p>
+                                        <a
+                                            className="frontline-focus inline-flex min-h-11 items-center rounded-md text-sm text-primary"
+                                            href={`/it/tickets/${draft.source_ticket_id}`}
+                                            target="_blank"
+                                            rel="noreferrer"
                                         >
-                                            <input
-                                                type="checkbox"
-                                                checked={form.data.site_scope.includes(
-                                                    site.id,
-                                                )}
-                                                onChange={(event) =>
-                                                    form.setData(
-                                                        'site_scope',
-                                                        event.target.checked
-                                                            ? [
-                                                                  ...form.data
-                                                                      .site_scope,
-                                                                  site.id,
-                                                              ]
-                                                            : form.data.site_scope.filter(
-                                                                  (id) =>
-                                                                      id !==
-                                                                      site.id,
-                                                              ),
+                                            Open source resolution
+                                        </a>
+                                        <Button
+                                            variant="outline"
+                                            disabled={
+                                                sourceLoading || form.processing
+                                            }
+                                            onClick={async () => {
+                                                setSourceLoading(true);
+                                                setSourceError(null);
+                                                setReviewedSourceVersion(null);
+                                                try {
+                                                    const { data } =
+                                                        await axios.get(
+                                                            `/it/knowledge/resolution-documents/${draft.source_ticket_id}`,
+                                                        );
+                                                    if (
+                                                        data.actor_user_id !==
+                                                            actorId ||
+                                                        data.ticket_id !==
+                                                            draft.source_ticket_id ||
+                                                        !data.can_draft ||
+                                                        !Number.isSafeInteger(
+                                                            data.source_version,
+                                                        ) ||
+                                                        data.source_version < 1
                                                     )
+                                                        throw new Error(
+                                                            'Unavailable source',
+                                                        );
+                                                    setReviewedSourceVersion(
+                                                        data.source_version,
+                                                    );
+                                                } catch {
+                                                    setSourceError(
+                                                        'The source cannot be reviewed with your current access. Your document text is retained.',
+                                                    );
+                                                } finally {
+                                                    setSourceLoading(false);
                                                 }
-                                            />
-                                            {site.name}
-                                        </label>
-                                    ))}
-                                </div>
-                                {form.errors.site_scope ? (
-                                    <p className="mt-2 text-xs text-status-critical">
-                                        {form.errors.site_scope}
-                                    </p>
-                                ) : null}
-                            </fieldset>
-                        ) : null}
-                    </div>
-                </WizardStepPane>
-            )}
-
-            {wizard.index === 2 && (
-                <WizardStepPane>
-                    <StepHead
-                        icon={BookOpen}
-                        title="Content"
-                        blurb="Markdown on the left, live preview on the right."
-                    />
-                    <div className="grid gap-3 lg:grid-cols-2">
-                        <Field
-                            label="Article (markdown)"
-                            required
-                            error={form.errors.body}
-                        >
-                            <Textarea
-                                value={form.data.body}
-                                onChange={(e) =>
-                                    form.setData('body', e.target.value)
-                                }
-                                placeholder={
-                                    '# Steps\n1. Open the portal\n2. Click Forgot password\n\n- Check spam for the reset email'
-                                }
-                                rows={14}
-                                className="font-mono text-[12.5px]"
-                            />
-                        </Field>
-                        <div>
-                            <div className="mb-1.5 text-[11.5px] font-semibold tracking-wide text-muted-foreground uppercase">
-                                Preview
-                            </div>
-                            <div className="min-h-[20rem] rounded-xl border border-border bg-muted/30 p-3.5">
-                                {form.data.body.trim() ? (
-                                    <KbPreview body={form.data.body} />
-                                ) : (
-                                    <p className="text-[13px] text-muted-foreground">
-                                        Nothing to preview yet.
-                                    </p>
+                                            }}
+                                        >
+                                            Review current source version
+                                        </Button>
+                                        {sourceError && (
+                                            <p
+                                                role="alert"
+                                                className="text-sm text-destructive"
+                                            >
+                                                {sourceError}
+                                            </p>
+                                        )}
+                                        <Button
+                                            variant="outline"
+                                            disabled={form.processing}
+                                            onClick={() => {
+                                                form.setData(
+                                                    'source_ticket_id',
+                                                    null,
+                                                );
+                                                form.setData(
+                                                    'source_ticket_version',
+                                                    null,
+                                                );
+                                            }}
+                                        >
+                                            Continue without a source link
+                                        </Button>
+                                        {reviewedSourceVersion !== null && (
+                                            <div className="space-y-2">
+                                                <p className="text-subtle">
+                                                    Current ticket version:{' '}
+                                                    {reviewedSourceVersion}.
+                                                    Check the source resolution
+                                                    before applying this
+                                                    reference.
+                                                </p>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        form.setData(
+                                                            'source_ticket_version',
+                                                            reviewedSourceVersion,
+                                                        );
+                                                        setReviewedSourceVersion(
+                                                            null,
+                                                        );
+                                                    }}
+                                                >
+                                                    Use this source version
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </section>
+                                )}
+                            <div className="grid gap-3.5">
+                                <Field
+                                    label="Title"
+                                    required
+                                    error={form.errors.title}
+                                >
+                                    <Input
+                                        value={form.data.title}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'title',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="e.g. Reset your work password"
+                                        maxLength={255}
+                                    />
+                                </Field>
+                                {options.tags_ready && (
+                                    <Field
+                                        label="Tags"
+                                        error={
+                                            form.errors.tags_text ??
+                                            (
+                                                form.errors as Record<
+                                                    string,
+                                                    string
+                                                >
+                                            ).tags
+                                        }
+                                    >
+                                        <Input
+                                            aria-label="Tags"
+                                            value={form.data.tags_text}
+                                            maxLength={510}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'tags_text',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            placeholder="e.g. Email, Onboarding"
+                                        />
+                                        <p className="text-subtle">
+                                            Separate up to 12 tags with commas.
+                                            Each tag can contain up to 40
+                                            characters.
+                                        </p>
+                                    </Field>
+                                )}
+                                <Field
+                                    label="Category"
+                                    error={form.errors.category}
+                                >
+                                    <TilePicker
+                                        value={form.data.category}
+                                        onChange={(v) =>
+                                            form.setData('category', v)
+                                        }
+                                        options={[...CATEGORY_OPTIONS]}
+                                    />
+                                </Field>
+                                {options.revisions_ready && (
+                                    <Field
+                                        label="Document type"
+                                        error={form.errors.document_type}
+                                    >
+                                        <SelectInput
+                                            value={form.data.document_type}
+                                            onChange={(value) =>
+                                                form.setData(
+                                                    'document_type',
+                                                    value,
+                                                )
+                                            }
+                                            placeholder="Select document type"
+                                            options={KNOWLEDGE_DOCUMENT_TYPES}
+                                        />
+                                        <p className="text-subtle">
+                                            {
+                                                options.document_templates?.find(
+                                                    (template) =>
+                                                        template.type ===
+                                                        form.data.document_type,
+                                                )?.description
+                                            }
+                                        </p>
+                                    </Field>
                                 )}
                             </div>
-                        </div>
-                    </div>
-                </WizardStepPane>
-            )}
+                        </WizardStepPane>
+                    )}
 
-            {wizard.index === 3 && (
-                <WizardStepPane>
-                    <StepHead
-                        icon={ClipboardCheck}
-                        title="Review & save"
-                        blurb="A quick check before it lands in the knowledge base."
-                    />
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard
-                            icon={FileText}
-                            title="Basics"
-                            onEdit={() => wizard.goTo(0)}
-                        >
-                            <ReviewRow label="Title" value={form.data.title} />
-                            <ReviewRow
-                                label="Category"
-                                value={
-                                    CATEGORY_OPTIONS.find(
-                                        (c) => c.key === form.data.category,
-                                    )?.label
+                    {wizard.index === 1 && (
+                        <WizardStepPane>
+                            <StepHead
+                                icon={Users}
+                                title="Ownership & audience"
+                                blurb="Keep the article accountable and show it only where it applies."
+                            />
+                            <div className="grid gap-4 lg:grid-cols-2">
+                                <Field
+                                    label="Audience"
+                                    error={form.errors.audience}
+                                >
+                                    <SelectInput
+                                        value={form.data.audience}
+                                        onChange={(value) =>
+                                            form.setData('audience', value)
+                                        }
+                                        placeholder="Choose who can find it"
+                                        options={[
+                                            {
+                                                value: 'all_staff',
+                                                label: 'All staff',
+                                            },
+                                            {
+                                                value: 'specific_sites',
+                                                label: 'Only selected sites',
+                                            },
+                                            {
+                                                value: 'it_agents',
+                                                label: 'IT agents only',
+                                            },
+                                        ]}
+                                    />
+                                </Field>
+                                <Field
+                                    label="Article owner"
+                                    error={form.errors.owner_user_id}
+                                >
+                                    <SelectInput
+                                        value={
+                                            form.data.owner_user_id ||
+                                            UNASSIGNED
+                                        }
+                                        onChange={(value) =>
+                                            form.setData(
+                                                'owner_user_id',
+                                                value === UNASSIGNED
+                                                    ? ''
+                                                    : value,
+                                            )
+                                        }
+                                        placeholder="Choose an owner"
+                                        options={[
+                                            {
+                                                value: UNASSIGNED,
+                                                label: 'Use me as owner',
+                                            },
+                                            ...options.owners.map((owner) => ({
+                                                value: String(owner.id),
+                                                label: owner.name,
+                                            })),
+                                        ]}
+                                    />
+                                </Field>
+                                <Field
+                                    label="Related service"
+                                    error={form.errors.related_service_id}
+                                >
+                                    <SelectInput
+                                        value={
+                                            form.data.related_service_id ||
+                                            UNASSIGNED
+                                        }
+                                        onChange={(value) =>
+                                            form.setData(
+                                                'related_service_id',
+                                                value === UNASSIGNED
+                                                    ? ''
+                                                    : value,
+                                            )
+                                        }
+                                        placeholder="Choose a service"
+                                        options={[
+                                            {
+                                                value: UNASSIGNED,
+                                                label: 'No related service',
+                                            },
+                                            ...options.services.map(
+                                                (service) => ({
+                                                    value: String(service.id),
+                                                    label: service.name,
+                                                }),
+                                            ),
+                                        ]}
+                                    />
+                                </Field>
+                                <Field
+                                    label="Review due"
+                                    error={form.errors.review_due_at}
+                                >
+                                    <Input
+                                        type="date"
+                                        value={form.data.review_due_at}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'review_due_at',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                </Field>
+                                {form.data.audience === 'specific_sites' ? (
+                                    <fieldset className="rounded-xl border border-border p-3 lg:col-span-2">
+                                        <legend className="px-1 text-sm font-medium">
+                                            Sites that can find this article
+                                        </legend>
+                                        <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                                            {options.sites.map((site) => (
+                                                <label
+                                                    key={site.id}
+                                                    className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm hover:bg-muted/50"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={form.data.site_scope.includes(
+                                                            site.id,
+                                                        )}
+                                                        onChange={(event) =>
+                                                            form.setData(
+                                                                'site_scope',
+                                                                event.target
+                                                                    .checked
+                                                                    ? [
+                                                                          ...form
+                                                                              .data
+                                                                              .site_scope,
+                                                                          site.id,
+                                                                      ]
+                                                                    : form.data.site_scope.filter(
+                                                                          (
+                                                                              id,
+                                                                          ) =>
+                                                                              id !==
+                                                                              site.id,
+                                                                      ),
+                                                            )
+                                                        }
+                                                    />
+                                                    {site.name}
+                                                </label>
+                                            ))}
+                                        </div>
+                                        {form.errors.site_scope ? (
+                                            <p className="mt-2 text-xs text-status-critical">
+                                                {form.errors.site_scope}
+                                            </p>
+                                        ) : null}
+                                    </fieldset>
+                                ) : null}
+                            </div>
+                        </WizardStepPane>
+                    )}
+
+                    {wizard.index === 2 && (
+                        <WizardStepPane>
+                            <StepHead
+                                icon={BookOpen}
+                                title="Content"
+                                blurb="Markdown on the left, live preview on the right."
+                            />
+                            <div className="grid gap-3 lg:grid-cols-2">
+                                <Field
+                                    label="Article (markdown)"
+                                    required
+                                    error={form.errors.body}
+                                >
+                                    <Textarea
+                                        value={form.data.body}
+                                        onChange={(e) =>
+                                            form.setData('body', e.target.value)
+                                        }
+                                        placeholder={
+                                            '# Steps\n1. Open the portal\n2. Click Forgot password\n\n- Check spam for the reset email'
+                                        }
+                                        rows={14}
+                                        className="font-mono text-[12.5px]"
+                                    />
+                                </Field>
+                                <div>
+                                    <div className="mb-1.5 text-[11.5px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                        Preview
+                                    </div>
+                                    <div className="min-h-[20rem] rounded-xl border border-border bg-muted/30 p-3.5">
+                                        {form.data.body.trim() ? (
+                                            <KbPreview body={form.data.body} />
+                                        ) : (
+                                            <p className="text-[13px] text-muted-foreground">
+                                                Nothing to preview yet.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </WizardStepPane>
+                    )}
+
+                    {wizard.index === 2 && options.revisions_ready && (
+                        <WizardStepPane>
+                            <StepHead
+                                icon={FileText}
+                                title="Structured documentation"
+                                blurb="Record the steps and checks that someone else needs to operate or recover this system."
+                            />
+                            <div className="grid gap-4">
+                                {knowledgeSectionsFor(
+                                    form.data.document_type,
+                                ).map((field) => (
+                                    <Field
+                                        key={field.key}
+                                        label={field.label}
+                                        error={
+                                            form.errors[
+                                                `structured_content.${field.key}` as keyof typeof form.errors
+                                            ]
+                                        }
+                                    >
+                                        <Textarea
+                                            value={
+                                                form.data.structured_content[
+                                                    field.key
+                                                ] ?? ''
+                                            }
+                                            maxLength={5000}
+                                            rows={
+                                                field.key === 'procedure'
+                                                    ? 6
+                                                    : 3
+                                            }
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'structured_content',
+                                                    {
+                                                        ...form.data
+                                                            .structured_content,
+                                                        [field.key]:
+                                                            event.target.value,
+                                                    },
+                                                )
+                                            }
+                                        />
+                                    </Field>
+                                ))}
+                            </div>
+                        </WizardStepPane>
+                    )}
+
+                    {wizard.index === 2 && options.revisions_ready && (
+                        <WizardStepPane>
+                            <KnowledgeRelationshipEditor
+                                articleId={article?.id}
+                                records={form.data.related_records}
+                                disabled={form.processing}
+                                onChange={(records) =>
+                                    form.setData('related_records', records)
                                 }
                             />
-                            <ReviewRow label="Lifecycle status" value="Draft" />
-                        </ReviewCard>
-                        <ReviewCard
-                            icon={Users}
-                            title="Ownership"
-                            onEdit={() => wizard.goTo(1)}
-                        >
-                            <ReviewRow
-                                label="Audience"
-                                value={form.data.audience.replace(/_/g, ' ')}
+                            <FieldErr>{form.errors.related_records}</FieldErr>
+                        </WizardStepPane>
+                    )}
+
+                    {wizard.index === 3 && (
+                        <WizardStepPane>
+                            <StepHead
+                                icon={ClipboardCheck}
+                                title="Review & save"
+                                blurb="A quick check before it lands in the knowledge base."
                             />
-                            <ReviewRow
-                                label="Sites"
-                                value={
-                                    form.data.audience === 'specific_sites'
-                                        ? `${form.data.site_scope.length} selected`
-                                        : 'Not restricted by site'
-                                }
-                            />
-                            <ReviewRow
-                                label="Review due"
-                                value={form.data.review_due_at || 'Not set'}
-                            />
-                        </ReviewCard>
-                        <ReviewCard
-                            icon={BookOpen}
-                            title="Content"
-                            onEdit={() => wizard.goTo(2)}
-                        >
-                            <ReviewRow
-                                label="Length"
-                                value={`${form.data.body.trim().length} characters`}
-                            />
-                        </ReviewCard>
-                    </div>
-                </WizardStepPane>
-            )}
-        </WizardShell>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <ReviewCard
+                                    icon={FileText}
+                                    title="Basics"
+                                    onEdit={() => wizard.goTo(0)}
+                                >
+                                    <ReviewRow
+                                        label="Title"
+                                        value={form.data.title}
+                                    />
+                                    <ReviewRow
+                                        label="Document type"
+                                        value={
+                                            KNOWLEDGE_DOCUMENT_TYPES.find(
+                                                (kind) =>
+                                                    kind.value ===
+                                                    form.data.document_type,
+                                            )?.label
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Category"
+                                        value={
+                                            CATEGORY_OPTIONS.find(
+                                                (c) =>
+                                                    c.key ===
+                                                    form.data.category,
+                                            )?.label
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Save outcome"
+                                        value={
+                                            currentArticle?.status ===
+                                            'published'
+                                                ? 'Proposed revision; publication remains available'
+                                                : 'Draft'
+                                        }
+                                    />
+                                    <KnowledgeRelatedRecords
+                                        records={form.data.related_records}
+                                    />
+                                </ReviewCard>
+                                <ReviewCard
+                                    icon={Users}
+                                    title="Ownership"
+                                    onEdit={() => wizard.goTo(1)}
+                                >
+                                    <ReviewRow
+                                        label="Audience"
+                                        value={form.data.audience.replace(
+                                            /_/g,
+                                            ' ',
+                                        )}
+                                    />
+                                    <ReviewRow
+                                        label="Sites"
+                                        value={
+                                            form.data.audience ===
+                                            'specific_sites'
+                                                ? `${form.data.site_scope.length} selected`
+                                                : 'Not restricted by site'
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Review due"
+                                        value={formatDateOnly(
+                                            form.data.review_due_at,
+                                            'Not set',
+                                        )}
+                                    />
+                                </ReviewCard>
+                                <ReviewCard
+                                    icon={BookOpen}
+                                    title="Content"
+                                    onEdit={() => wizard.goTo(2)}
+                                >
+                                    <ReviewRow
+                                        label="Length"
+                                        value={`${form.data.body.trim().length} characters`}
+                                    />
+                                    {KNOWLEDGE_SECTIONS.filter(
+                                        (field) =>
+                                            form.data.structured_content[
+                                                field.key
+                                            ],
+                                    ).map((field) => (
+                                        <ReviewRow
+                                            key={field.key}
+                                            label={field.label}
+                                            value={
+                                                <span className="break-words whitespace-pre-wrap">
+                                                    {
+                                                        form.data
+                                                            .structured_content[
+                                                            field.key
+                                                        ]
+                                                    }
+                                                </span>
+                                            }
+                                        />
+                                    ))}
+                                </ReviewCard>
+                            </div>
+                        </WizardStepPane>
+                    )}
+                </fieldset>
+            </WizardShell>
+            <ConfirmDialog
+                open={discard}
+                onClose={() => setDiscard(false)}
+                onConfirm={onClose}
+                title="Discard unsaved document changes?"
+                description="Your changes in this editor have not been saved."
+                confirmText="Discard changes"
+                variant="destructive"
+            />
+        </>
     );
 }
 
@@ -3610,6 +4123,9 @@ function FulfilRequestDialog({
                             .
                         </InfoCard>
                     ) : null}
+                    <ProvisioningSubmittedFiles
+                        files={request.attachments ?? []}
+                    />
                     <Field
                         label="External reference"
                         hint="optional — ticket id / account id"

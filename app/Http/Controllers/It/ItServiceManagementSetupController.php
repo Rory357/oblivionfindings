@@ -309,6 +309,7 @@ class ItServiceManagementSetupController extends Controller
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get()
+                ->filter(fn (ItCatalogItem $item) => app(\App\Domain\It\Services\ItCatalogManagementService::class)->canManage($user, $item))
             : collect();
         $mailboxHealth = app(ItMailboxConnectionPresenter::class)->operations($user);
         $mailboxes = collect($mailboxHealth['connections']);
@@ -386,6 +387,7 @@ class ItServiceManagementSetupController extends Controller
                 'outcome_type' => $item->outcome_type,
                 'category' => $item->category,
                 'provisioning_type' => $item->provisioning_type,
+                'provisioning_template_version_id' => $item->provisioning_template_version_id,
                 'default_priority' => $item->default_priority,
                 'requires_approval' => $item->requires_approval,
                 'is_published' => $item->is_published,

@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinPettyCashFundFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,11 +12,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FinPettyCashFund extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinPettyCashFundFactory::new();
+        return FinPettyCashFundFactory::new();
     }
 
     protected $table = 'fin_petty_cash_funds';
@@ -59,7 +60,7 @@ class FinPettyCashFund extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
+        return $query->when($orgId, fn ($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
     }
 
     public function scopeActive($query)

@@ -55,6 +55,36 @@ afterEach(() => {
     props.onChange.mockClear();
 });
 
+it('rejects requested-for directory results from a different Site or purpose', () => {
+    const context = {
+        ...props,
+        purpose: 'requested-for' as const,
+        siteId: 21,
+        fieldKey: 'requested_for_user_id',
+    };
+    const page = {
+        ...response({
+            actor_user_id: 3,
+            query_uuid: 'query',
+            selected_id: null,
+        }).data,
+        field_key: context.fieldKey,
+        purpose: 'requested-for',
+        site_id: 21,
+    };
+    expect(readCatalogueOptionPage(page, context, 'query')).not.toBeNull();
+    expect(
+        readCatalogueOptionPage({ ...page, site_id: 22 }, context, 'query'),
+    ).toBeNull();
+    expect(
+        readCatalogueOptionPage(
+            { ...page, purpose: 'field' },
+            context,
+            'query',
+        ),
+    ).toBeNull();
+});
+
 it('loads bound permitted pages and preserves the selected label after closing', async () => {
     const post = vi
         .spyOn(axios, 'post')

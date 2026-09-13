@@ -9,7 +9,7 @@ import {
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
 import { formatDateTime } from '@/lib/datetime';
-import { Plus, Ticket } from 'lucide-react';
+import { BarChart3, BookOpen, Plus, Server, Ticket } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export interface ItHeroSummary {
@@ -52,6 +52,12 @@ export interface ItHeroSummary {
  * health gets its own block — every block deep-links to its queue view.
  */
 export function ItHero({
+    workspace = 'desk',
+    workspaceTitle,
+    knowledgeArticles = [],
+    knowledgeSummary,
+    onNewKnowledge,
+    onNewProvisioning,
     summary,
     can,
     onRaise,
@@ -61,6 +67,18 @@ export function ItHero({
     search,
     actions,
 }: {
+    workspace?: 'desk' | 'provisioning' | 'knowledge' | 'reports';
+    workspaceTitle?: string;
+    knowledgeArticles?: { id: number; status?: string }[];
+    knowledgeSummary?: {
+        total?: number;
+        published?: number;
+        in_review?: number;
+        draft?: number;
+        overdue?: number;
+    };
+    onNewKnowledge?: () => void;
+    onNewProvisioning?: () => void;
     summary: ItHeroSummary | null;
     can: { view: boolean; manage: boolean; request: boolean };
     onRaise: () => void;
@@ -70,6 +88,124 @@ export function ItHero({
     search?: ReactNode;
     actions?: ReactNode;
 }) {
+    if (workspace !== 'desk') {
+        const provisioning = summary?.provisioning;
+        const knowledgeCounts = [
+            {
+                label: 'All articles',
+                count: knowledgeSummary?.total ?? knowledgeArticles.length,
+                href: '/it/knowledge',
+            },
+            ...(['published', 'in_review', 'draft'] as const).map((status) => ({
+                label: {
+                    published: 'Published',
+                    in_review: 'In review',
+                    draft: 'Drafts',
+                }[status],
+                count:
+                    knowledgeSummary?.[status] ??
+                    knowledgeArticles.filter(
+                        (article) => (article.status ?? 'published') === status,
+                    ).length,
+                href: `/it/knowledge?status=${status}`,
+            })),
+        ];
+        const provisioningCounts = provisioning
+            ? [
+                  {
+                      label: 'Pending',
+                      count: provisioning.pending,
+                      href: '/it/provisioning?status=pending',
+                  },
+                  {
+                      label: 'In progress',
+                      count: provisioning.in_progress,
+                      href: '/it/provisioning?status=in_progress',
+                  },
+                  {
+                      label: 'Failed',
+                      count: provisioning.failed,
+                      href: '/it/provisioning?status=failed',
+                  },
+              ]
+            : [];
+        const meters =
+            workspace === 'knowledge'
+                ? workspaceTitle === 'Guides'
+                    ? knowledgeCounts.slice(0, 1)
+                    : knowledgeCounts
+                : workspace === 'provisioning'
+                  ? provisioningCounts
+                  : [];
+        const create =
+            workspace === 'knowledge'
+                ? onNewKnowledge
+                : workspace === 'provisioning'
+                  ? onNewProvisioning
+                  : undefined;
+
+        return (
+            <PageHeader
+                className="overflow-clip!"
+                icon={
+                    workspace === 'knowledge'
+                        ? BookOpen
+                        : workspace === 'reports'
+                          ? BarChart3
+                          : Server
+                }
+                title={workspaceTitle ?? workspace}
+                subline={
+                    {
+                        knowledge:
+                            'Systems, runbooks and support guidance · Publications, revisions and review ownership',
+                        provisioning:
+                            'Account, access and equipment requests · Joiner, mover and leaver workflows',
+                        reports:
+                            'Service performance · Ticket demand, response times and delivery outcomes',
+                    }[workspace]
+                }
+                actions={
+                    <>
+                        {search}
+                        {actions}
+                        {create && (
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
+                                onClick={create}
+                            >
+                                {workspace === 'knowledge'
+                                    ? 'New KB article'
+                                    : 'New request'}
+                            </PageHeaderPrimaryButton>
+                        )}
+                    </>
+                }
+                meters={
+                    meters.length > 0 ? (
+                        <>
+                            {meters.map((meter) => (
+                                <PageHeaderMeterBlock
+                                    key={meter.label}
+                                    label={meter.label}
+                                    href={meter.href}
+                                    ariaLabel={`View ${meter.label.toLowerCase()}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {meter.count}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Within your access
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ))}
+                        </>
+                    ) : undefined
+                }
+                filters={filters}
+            />
+        );
+    }
     if (!summary) {
         return (
             <PageHeader
@@ -89,7 +225,6 @@ export function ItHero({
         );
     }
     const tickets = summary.tickets;
-    const prov = summary.provisioning;
     const agent = can.view && tickets;
 
     const slaPercent =
@@ -146,11 +281,11 @@ export function ItHero({
         <PageHeader
             className="overflow-clip!"
             icon={Ticket}
-            title="IT & Support"
+            title="Service Desk"
             titleChip={titleChip}
             subline={
                 can.view
-                    ? 'Service desk · Tickets, requests and service delivery'
+                    ? 'Ticket overview, queues and service requests'
                     : 'Get help · Raise and track your requests'
             }
             actions={
@@ -372,7 +507,7 @@ export function ItHero({
                             </PageHeaderMeterBlock>
                             <PageHeaderMeterBlock
                                 label="SLA watchdog"
-                                href="/it?tab=reports"
+                                href="/it/reports"
                                 ariaLabel="View SLA watchdog freshness in reports"
                                 tone={
                                     watchdog?.state === 'fresh'
@@ -399,29 +534,6 @@ export function ItHero({
                                     Clocks calculated on page load
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
-                            {prov ? (
-                                <PageHeaderMeterBlock
-                                    label="Provisioning"
-                                    tone={
-                                        prov.failed > 0
-                                            ? 'critical'
-                                            : prov.overdue > 0
-                                              ? 'warning'
-                                              : 'brand'
-                                    }
-                                    ariaLabel="View the provisioning queue"
-                                    href="/it?tab=provisioning"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {prov.pending + prov.in_progress}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {prov.failed > 0 || prov.overdue > 0
-                                            ? `${prov.failed} failed · ${prov.overdue} overdue`
-                                            : 'queue healthy'}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            ) : null}
                         </div>
                     </>
                 ) : (

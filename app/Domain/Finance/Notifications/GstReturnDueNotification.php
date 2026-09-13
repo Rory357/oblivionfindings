@@ -39,7 +39,7 @@ class GstReturnDueNotification extends Notification
             ->line("A GST return is due for the period ending {$periodEnd}.")
             ->line('')
             ->line("**Period:** {$return->period_start->format('d M Y')} to {$periodEnd}")
-            ->line("**Filing Frequency:** " . ucfirst(str_replace('_', '-', $return->filing_frequency)))
+            ->line('**Filing Frequency:** '.ucfirst(str_replace('_', '-', $return->filing_frequency)))
             ->line($amountLine)
             ->line("**Filing Deadline:** {$dueFormatted}")
             ->action('View GST Return', url("/finance/gst-returns/{$return->id}"))

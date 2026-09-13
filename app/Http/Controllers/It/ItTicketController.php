@@ -17,6 +17,7 @@ use App\Domain\It\Presenters\ItTicketCommentDeliveryPresenter;
 use App\Domain\It\Presenters\ItTicketContextPresenter;
 use App\Domain\It\Presenters\ItTicketConversationPresenter;
 use App\Domain\It\Presenters\ItTicketRoutingPresenter;
+use App\Domain\It\Services\ItCatalogAttachmentService;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItLinkedContextOptions;
 use App\Domain\It\Services\ItSlaReadService;
@@ -52,6 +53,7 @@ use App\Http\Requests\It\UpdateTicketWatcherRequest;
 use App\Http\Requests\It\ValidateItMergeCandidateRequest;
 use App\Jobs\DispatchItTicketNotifications;
 use App\Models\ItAttachment;
+use App\Models\ItCatalogSubmission;
 use App\Models\ItTicket;
 use App\Models\ItTicketCommandReceipt;
 use App\Models\ItTicketComment;
@@ -359,7 +361,8 @@ class ItTicketController extends Controller
                         'status' => $ticket->provisioningRequest->status,
                     ]
                     : null,
-                'attachments' => $ticket->attachments->map($mapAttachment)->values()->all(),
+                'attachments' => [...$ticket->attachments->map($mapAttachment)->values()->all(),
+                    ...app(ItCatalogAttachmentService::class)->forResult($user, $ticket)],
                 // CSAT result — only once submitted (§K); shown in the rail.
                 'csat' => $ticket->csat_submitted_at
                     ? [
@@ -633,6 +636,8 @@ class ItTicketController extends Controller
             } catch (ItTicketDraftException) {
                 abort(404);
             }
+        } elseif ($parent instanceof ItCatalogSubmission) {
+            abort_unless(app(ItCatalogAttachmentService::class)->canDownload($user, $attachment), 404);
         } elseif ($parent instanceof ItTicketComment) {
             abort_unless($this->workAccess->canView($user, $parent->ticket), 404);
             $this->authorize('view', $parent->ticket);

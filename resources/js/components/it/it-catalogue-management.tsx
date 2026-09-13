@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ProvisioningPicker } from './provisioning-picker';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -61,6 +62,7 @@ export interface CatalogManagementItem {
     outcome_type: string;
     category: string;
     provisioning_type: string | null;
+    provisioning_template_version_id?: number | null;
     default_priority: string;
     requires_approval: boolean;
     is_published: boolean;
@@ -100,6 +102,7 @@ const FIELD_TYPES = [
     'employee',
     'user',
     'asset',
+    'attachment',
 ];
 const OUTCOMES = ['service_request', 'security_request', 'provisioning'];
 const EDITOR_STEPS = [
@@ -206,6 +209,7 @@ export function ItCatalogueManagement({
         outcome_type: 'service_request',
         category: 'other',
         provisioning_type: '',
+        provisioning_template_version_id: null as number | null,
         default_priority: 'normal',
         requires_approval: false,
         internal_only: false,
@@ -353,6 +357,7 @@ export function ItCatalogueManagement({
             outcome_type: item?.outcome_type ?? 'service_request',
             category: item?.category ?? 'other',
             provisioning_type: item?.provisioning_type ?? '',
+            provisioning_template_version_id: item?.provisioning_template_version_id ?? null,
             default_priority: item?.default_priority ?? 'normal',
             requires_approval: item?.requires_approval ?? false,
             internal_only: item?.internal_only ?? false,
@@ -938,6 +943,13 @@ export function ItCatalogueManagement({
                                                     />
                                                 </Field>
                                             ) : null}
+                                            {form.data.outcome_type === 'provisioning' && actorId !== undefined && <div className="space-y-2">
+                                                <ProvisioningPicker actorId={actorId} kind="templates" contextKind="catalogue" label="Published workflow template (optional)"
+                                                    value={form.data.provisioning_template_version_id} onChange={(choice) => form.setData('provisioning_template_version_id', choice?.id ?? null)}
+                                                    onDenied={() => { setEditorOpen(false); form.reset(); }} />
+                                                <p className="text-sm text-muted-foreground">Link a published version to start its full workflow. Existing requests retain their original instructions. A withdrawn template blocks new launches.</p>
+                                                {form.data.provisioning_template_version_id && <Button type="button" variant="ghost" onClick={() => form.setData('provisioning_template_version_id', null)}>Use an individual task instead</Button>}
+                                            </div>}
                                             <Field label="Default priority">
                                                 <Select
                                                     value={
@@ -1423,12 +1435,27 @@ export function ItCatalogueManagement({
                                                         'email',
                                                         'integer',
                                                         'number',
+                                                        'multiselect',
+                                                        'attachment',
                                                     ].includes(field.type) ? (
                                                         <div className="mt-3 grid max-w-md gap-3 sm:grid-cols-2">
-                                                            <Field label="Minimum">
+                                                            <Field
+                                                                label={
+                                                                    field.type ===
+                                                                    'attachment'
+                                                                        ? 'Minimum files'
+                                                                        : 'Minimum'
+                                                                }
+                                                            >
                                                                 <Input
                                                                     type="number"
                                                                     min={0}
+                                                                    max={
+                                                                        field.type ===
+                                                                        'attachment'
+                                                                            ? 5
+                                                                            : undefined
+                                                                    }
                                                                     className="min-h-11"
                                                                     value={
                                                                         field.min ??
@@ -1456,10 +1483,23 @@ export function ItCatalogueManagement({
                                                                     }
                                                                 />
                                                             </Field>
-                                                            <Field label="Maximum">
+                                                            <Field
+                                                                label={
+                                                                    field.type ===
+                                                                    'attachment'
+                                                                        ? 'Maximum files'
+                                                                        : 'Maximum'
+                                                                }
+                                                            >
                                                                 <Input
                                                                     type="number"
                                                                     min={1}
+                                                                    max={
+                                                                        field.type ===
+                                                                        'attachment'
+                                                                            ? 5
+                                                                            : undefined
+                                                                    }
                                                                     className="min-h-11"
                                                                     value={
                                                                         field.max ??

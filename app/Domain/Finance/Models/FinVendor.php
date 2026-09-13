@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinVendorFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,7 +17,7 @@ class FinVendor extends Model
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinVendorFactory::new();
+        return FinVendorFactory::new();
     }
 
     protected $table = 'fin_vendors';

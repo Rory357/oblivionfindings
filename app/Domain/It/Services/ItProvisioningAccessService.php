@@ -3,7 +3,7 @@
 namespace App\Domain\It\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Domain\It\ItStaffDirectory;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItProvisioningWorkflow;
 use App\Models\Site;
@@ -17,7 +17,7 @@ final class ItProvisioningAccessService
 
     public function canManage(User $actor, ItProvisioningRequest $request): bool
     {
-        if ($actor->approved_at === null || ! $actor->canDo('it.manage')) {
+        if (! $this->isCurrent($actor) || ! $actor->canDo('it.manage')) {
             return false;
         }
 
@@ -49,7 +49,7 @@ final class ItProvisioningAccessService
 
     public function canView(User $actor, ItProvisioningRequest $request): bool
     {
-        if ($actor->approved_at === null || (! $actor->canDo('it.view') && ! $actor->canDo('it.manage'))) {
+        if (! $this->isCurrent($actor) || (! $actor->canDo('it.view') && ! $actor->canDo('it.manage'))) {
             return false;
         }
 
@@ -82,16 +82,20 @@ final class ItProvisioningAccessService
             ->whereKey($request->getKey())->exists();
     }
 
-    /** Only catalogue work submitted by this actor, within their current approved Sites. */
+    /** Public catalogue work submitted by or requested for this actor, within current approved Sites. */
     public function applyTrackingScope(Builder $query, User $actor): Builder
     {
-        if ($actor->approved_at === null || (! $actor->canDo('it.request') && ! $actor->canDo('it.manage'))) {
+        if (! $this->isCurrent($actor) || (! $actor->canDo('it.request') && ! $actor->canDo('it.manage'))) {
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where('created_by', $actor->id)
+        return $query->where(function (Builder $owned) use ($actor): void {
+            $owned->where(function (Builder $submitted) use ($actor): void {
+                $submitted->where('created_by', $actor->id)
+                    ->whereHas('catalogSubmissions', fn (Builder $source) => $source->where('requester_user_id', $actor->id));
+            })->orWhereHas('employeeProfile', fn (Builder $profile) => $profile->where('user_id', $actor->id));
+        })
             ->whereHas('catalogSubmissions', function (Builder $submissions) use ($actor): void {
-                $submissions->where('requester_user_id', $actor->id);
                 if (! $actor->canDo('it.manage')) {
                     $submissions->where(function (Builder $public): void {
                         $public->where('contract_snapshot->internal_only', false)
@@ -122,7 +126,7 @@ final class ItProvisioningAccessService
     /** @param Builder<ItProvisioningRequest> $query */
     public function applyRequestScope(Builder $query, User $actor): Builder
     {
-        if ($actor->approved_at === null || (! $actor->canDo('it.view') && ! $actor->canDo('it.manage'))) {
+        if (! $this->isCurrent($actor) || (! $actor->canDo('it.view') && ! $actor->canDo('it.manage'))) {
             return $query->whereRaw('1 = 0');
         }
 
@@ -166,7 +170,7 @@ final class ItProvisioningAccessService
     /** @param Builder<ItProvisioningWorkflow> $query */
     public function applyWorkflowScope(Builder $query, User $actor): Builder
     {
-        if ($actor->approved_at === null || (! $actor->canDo('it.view') && ! $actor->canDo('it.manage'))) {
+        if (! $this->isCurrent($actor) || (! $actor->canDo('it.view') && ! $actor->canDo('it.manage'))) {
             return $query->whereRaw('1 = 0');
         }
 
@@ -201,6 +205,9 @@ final class ItProvisioningAccessService
 
     public function canSelectProfile(User $actor, HrEmployeeProfile $profile): bool
     {
+        if (! $this->isCurrent($actor) || ! $actor->canDo('it.manage')) {
+            return false;
+        }
         $canonical = HrEmployeeProfile::query()
             ->whereKey($profile->getKey())
             ->where('is_active', true)
@@ -219,26 +226,35 @@ final class ItProvisioningAccessService
 
     public function canRequestForProfile(User $actor, HrEmployeeProfile $profile): bool
     {
-        $canonical = HrEmployeeProfile::query()
-            ->whereKey($profile->getKey())
-            ->where('is_active', true)
-            ->first(['id', 'user_id', 'primary_site_id']);
-        if (! $canonical) {
-            return false;
-        }
+        return $this->requestableProfiles($actor)->whereKey($profile->getKey())->exists();
+    }
 
-        if ((int) $canonical->user_id === (int) $actor->id) {
-            return $canonical->primary_site_id !== null
-                && in_array((int) $canonical->primary_site_id, $this->workAccess->approvedSiteIds($actor), true);
+    /** Catalogue beneficiaries share the submission boundary, including self-service. @return Builder<HrEmployeeProfile> */
+    public function requestableProfiles(User $actor): Builder
+    {
+        $query = HrEmployeeProfile::query()->where('is_active', true);
+        if (! $this->isCurrent($actor) || (! $actor->canDo('it.request') && ! $actor->canDo('it.manage'))) {
+            return $query->whereRaw('1 = 0');
         }
+        $manager = $actor->canDo('it.manage');
+        $siteIds = $this->workAccess->approvedSiteIds($actor);
 
-        return $this->canSelectProfile($actor, $canonical);
+        return $query->when(! $manager, fn (Builder $own) => $own->where('user_id', $actor->id))
+            ->where(function (Builder $visible) use ($actor, $manager, $siteIds): void {
+                $visible->whereIn('primary_site_id', $siteIds);
+                if ($manager && $actor->canDo('it.organisationWide')) {
+                    $visible->orWhere(fn (Builder $wide) => $wide->whereNull('primary_site_id')->where('user_id', '!=', $actor->id));
+                }
+            });
     }
 
     /** @return Builder<HrEmployeeProfile> */
     public function selectableProfiles(User $actor): Builder
     {
         $query = HrEmployeeProfile::query()->where('is_active', true);
+        if (! $this->isCurrent($actor) || ! $actor->canDo('it.manage')) {
+            return $query->whereRaw('1 = 0');
+        }
         $siteIds = $this->workAccess->approvedSiteIds($actor);
 
         return $query->where(function (Builder $visible) use ($actor, $siteIds): void {
@@ -255,17 +271,38 @@ final class ItProvisioningAccessService
 
     public function canAssignAgentForRequest(User $agent, ItProvisioningRequest $request): bool
     {
-        return ItStaffDirectory::agents()->contains('id', $agent->id)
-            && $this->canManage($agent, $request);
+        return app(ItProvisioningResponsibilityService::class)->eligible((int) $agent->id, $this->siteIdFor($request)) !== null;
     }
 
     public function canAssignAgentForProfile(User $agent, HrEmployeeProfile $profile): bool
     {
-        return ItStaffDirectory::agents()->contains('id', $agent->id)
-            && $this->agentCoversSite(
-                $agent,
-                $profile->primary_site_id !== null ? (int) $profile->primary_site_id : null,
-            );
+        return app(ItProvisioningResponsibilityService::class)->eligible((int) $agent->id,
+            $profile->primary_site_id !== null ? (int) $profile->primary_site_id : null) !== null;
+    }
+
+    /** A team member seeing one task does not gain control over hidden siblings. */
+    public function canManageWorkflow(User $actor, ItProvisioningWorkflow $workflow): bool
+    {
+        if (! $this->isCurrent($actor) || ! $actor->canDo('it.manage')) {
+            return false;
+        }
+        $workflow = ItProvisioningWorkflow::query()->with('employeeProfile:id,primary_site_id')->find($workflow->id);
+        if (! $workflow) {
+            return false;
+        }
+        $siteId = $workflow->site_id_snapshot ?? $workflow->employeeProfile?->primary_site_id;
+        if ($siteId === null) {
+            return $actor->canDo('it.organisationWide');
+        }
+        if (! $this->siteIsOperational((int) $siteId)) {
+            return false;
+        }
+        if (in_array((int) $siteId, $this->workAccess->approvedSiteIds($actor), true)) {
+            return true;
+        }
+        $requests = $workflow->requests()->get();
+
+        return $requests->isNotEmpty() && $requests->every(fn (ItProvisioningRequest $request) => $this->canManage($actor, $request));
     }
 
     public function siteIdFor(ItProvisioningRequest $request): ?int
@@ -275,6 +312,12 @@ final class ItProvisioningAccessService
             ->find($request->getKey());
 
         return $canonical ? $this->effectiveSiteId($canonical) : null;
+    }
+
+    private function isCurrent(User $actor): bool
+    {
+        return $actor->approved_at !== null
+            && app(HrCurrentStaffService::class)->isCurrent($actor);
     }
 
     private function effectiveSiteId(ItProvisioningRequest $request): ?int

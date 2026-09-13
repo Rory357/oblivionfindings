@@ -611,17 +611,13 @@ function ResolveTicketForm({
                             actions={
                                 <>
                                     {onDraftKb ? (
-                                        <Button
-                                            variant="outline"
-                                            onClick={() =>
-                                                onDraftKb({
-                                                    title: ticket.title,
-                                                    body: `${submitted.current?.note ?? note}\n\nHow it was checked: ${submitted.current?.resolution_verification ?? verification}`,
-                                                })
-                                            }
-                                        >
-                                            <BookOpen className="size-4" />
-                                            Draft KB article
+                                        <Button variant="outline" asChild>
+                                            <a
+                                                href={`/it/knowledge/from-resolution/${ticket.id}`}
+                                            >
+                                                <BookOpen className="size-4" />
+                                                Draft KB article
+                                            </a>
                                         </Button>
                                     ) : null}
                                     <Button asChild variant="outline">

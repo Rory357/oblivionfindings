@@ -2,24 +2,24 @@
 
 namespace App\Http\Controllers\It;
 
-use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Services\ItCatalogAccessService;
 use App\Domain\It\Services\ItCatalogFieldOptionService;
 use App\Domain\It\Services\ItCatalogSubmissionService;
-use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\It\RecoverCatalogSubmissionRequest;
 use App\Http\Requests\It\StoreCatalogRequest;
+use App\Jobs\DispatchItTicketNotifications;
 use App\Models\ItCatalogItem;
 use App\Models\ItTicket;
 use App\Models\User;
-use App\Notifications\It\TicketCreatedNotification;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ItCatalogController extends Controller
 {
     public function __construct(
         private readonly ItCatalogSubmissionService $submissionService,
-        private readonly ItEmailDeliveryService $emailDeliveries,
         private readonly ItCatalogFieldOptionService $fieldOptions,
     ) {}
 
@@ -60,15 +60,25 @@ class ItCatalogController extends Controller
             ->findOrFail($catalogItem);
 
         $outcome = $this->submissionService->submit($item, $user, $request->validated());
+        if ($outcome['cancelled'] ?? false) {
+            if ($request->expectsJson()) {
+                return $this->commandResponse($outcome, $user, (string) $request->validated('idempotency_key'));
+            }
+            throw ValidationException::withMessages(['idempotency_key' => 'This request was cancelled. Start a new request when you are ready.']);
+        }
         $result = $outcome['result'];
 
-        if ($outcome['created'] && $result instanceof ItTicket) {
-            $this->emailDeliveries->send($user, new TicketCreatedNotification($result, 'receipt'));
-            if ($result->priority === 'urgent') {
-                $agents = ItStaffDirectory::agentsForTicket($result)
-                    ->reject(fn (User $agent) => $agent->id === $user->id);
-                $this->emailDeliveries->send($agents, new TicketCreatedNotification($result, 'urgent_alert'));
+        if ($result instanceof ItTicket) {
+            try {
+                DispatchItTicketNotifications::dispatchAfterResponse((int) $result->id);
+            } catch (\Throwable) {
+                // The canonical outbox has committed. The scheduled drain can
+                // recover a lost dispatch without changing the saved outcome.
             }
+        }
+
+        if ($request->expectsJson()) {
+            return $this->commandResponse($outcome, $user, (string) $request->validated('idempotency_key'));
         }
 
         $flash = [
@@ -84,5 +94,56 @@ class ItCatalogController extends Controller
                 ? "Request logged — {$result->reference}."
                 : 'Provisioning request logged.')
             ->with('it_catalog_submission', $flash);
+    }
+
+    public function recover(RecoverCatalogSubmissionRequest $request, int $catalogItem): JsonResponse
+    {
+        $key = (string) $request->validated('idempotency_key');
+        $outcome = $this->submissionService->recover($catalogItem, $request->user(), $key,
+            (int) $request->validated('actor_user_id'));
+        if ($outcome !== null) {
+            return $this->commandResponse($outcome, $request->user(), $key);
+        }
+
+        return response()->json(['status' => 'not_found', 'data' => [
+            'viewer_user_id' => (int) $request->user()->id,
+            'catalog_item_id' => $catalogItem, 'request_uuid' => $key,
+            'retry_same_command' => true,
+        ]])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function cancel(RecoverCatalogSubmissionRequest $request, int $catalogItem): JsonResponse
+    {
+        $key = (string) $request->validated('idempotency_key');
+
+        return $this->commandResponse($this->submissionService->cancel($catalogItem, $request->user(), $key,
+            (int) $request->validated('actor_user_id')), $request->user(), $key);
+    }
+
+    /** Only confirmed canonical identity leaves the command boundary. */
+    private function commandResponse(array $outcome, User $actor, string $key): JsonResponse
+    {
+        if ($outcome['cancelled'] ?? false) {
+            return response()->json(['status' => 'cancelled', 'data' => [
+                'viewer_user_id' => (int) $actor->id, 'catalog_item_id' => $outcome['catalog_item_id'],
+                'request_uuid' => $key, 'cancelled' => true,
+            ]])->header('Cache-Control', 'private, no-store');
+        }
+        $result = $outcome['result'];
+        $submission = $outcome['submission'];
+        $isTicket = $result instanceof ItTicket;
+
+        return response()->json(['status' => 'committed', 'data' => [
+            'viewer_user_id' => (int) $actor->id,
+            'catalog_item_id' => (int) $submission->catalog_item_id,
+            'submission_id' => (int) $submission->id,
+            'schema_version' => (int) $submission->schema_version,
+            'request_uuid' => $key,
+            'result_type' => $isTicket ? 'ticket' : 'provisioning',
+            'id' => (int) $result->getKey(),
+            'reference' => $isTicket ? $result->reference : null,
+            'url' => ($isTicket ? '/it/tickets/' : '/it/provisioning/').$result->getKey(),
+            'replayed' => ! $outcome['created'],
+        ]], $outcome['created'] ? 201 : 200)->header('Cache-Control', 'private, no-store');
     }
 }

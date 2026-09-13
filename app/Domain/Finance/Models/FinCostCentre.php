@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FinCostCentre extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $table = 'fin_cost_centres';
 
@@ -47,7 +47,7 @@ class FinCostCentre extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
+        return $query->when($orgId, fn ($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
     }
 
     public function scopeActive($query)

@@ -36,7 +36,7 @@ class EftposController extends Controller
                 'location' => $terminal->location,
                 'provider' => $terminal->provider,
                 'bank_account_name' => $terminal->bankAccount?->name,
-                'gl_account_name' => $terminal->glAccount ? $terminal->glAccount->code . ' - ' . $terminal->glAccount->name : null,
+                'gl_account_name' => $terminal->glAccount ? $terminal->glAccount->code.' - '.$terminal->glAccount->name : null,
                 'is_active' => $terminal->is_active,
                 'batch_count' => $terminal->batches()->count(),
             ]);

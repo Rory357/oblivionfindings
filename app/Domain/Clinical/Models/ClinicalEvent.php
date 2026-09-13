@@ -11,6 +11,7 @@ use App\Models\HsEvent;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use Database\Factories\Clinical\ClinicalEventFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,11 +20,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClinicalEvent extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Clinical\ClinicalEventFactory::new();
+        return ClinicalEventFactory::new();
     }
 
     protected $table = 'clinical_events';

@@ -131,7 +131,7 @@ class CashFlowForecastController extends Controller
         foreach ($forecast->scenarios as $scenario) {
             $scenarioData = $scenario->forecast_data ?? [];
             $datasets[] = [
-                'label' => $scenario->name . ' (Balance)',
+                'label' => $scenario->name.' (Balance)',
                 'data' => array_map(fn ($p) => (float) ($p['closing_balance'] ?? 0), $scenarioData),
                 'type' => 'line',
             ];

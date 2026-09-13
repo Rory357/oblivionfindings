@@ -83,7 +83,7 @@ const navigation = [
             },
             {
                 label: 'Provisioning',
-                href: '/it?tab=provisioning',
+                href: '/it/provisioning',
                 icon: 'package-check',
             },
         ],
@@ -166,7 +166,7 @@ describe('IT & Support grouped navigation', () => {
         render(
             <ItSideNavigation
                 groups={navigation}
-                currentUrl="/it?status=pending&tab=provisioning"
+                currentUrl="/it/provisioning?status=pending"
             />,
         );
 
@@ -570,7 +570,7 @@ describe('IT & Support grouped navigation', () => {
             screen.getByRole('heading', { name: 'Request VPN access' }),
         ).toBeVisible();
         expect(screen.getByRole('dialog')).toHaveAccessibleDescription(
-            'Complete the published request form. Required fields are marked.',
+            'Complete, review and submit the published request.',
         );
         expect(screen.getByLabelText(/What do you need/)).toBeVisible();
         expect(

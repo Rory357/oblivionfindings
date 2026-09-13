@@ -210,7 +210,7 @@ final class ItKnowledgeRelationships
                 'site' => '/sites/'.$record->id,
                 'vendor' => '/vendors/'.$record->id,
                 'credential' => '/vendors?tab=credentials&credential_id='.$record->id,
-                'article' => '/it/knowledge?article='.$record->id,
+                'article' => '/it/knowledge/'.$record->id,
                 'problem' => '/it/problems/'.$record->id,
                 'service' => $documentationHref,
             },

@@ -22,10 +22,12 @@ final class ItTicketDraftController extends Controller
         $data = $request->validate([
             'purpose' => ['required', Rule::enum(ItTicketDraftPurpose::class)],
             'ticket_id' => ['nullable', 'integer', 'min:1'], 'request_uuid' => ['nullable', 'uuid'],
+            'catalog_item_id' => ['required_if:purpose,catalogue_request', 'integer', 'min:1'],
+            'schema_version' => ['required_if:purpose,catalogue_request', 'integer', 'min:1'],
         ]);
 
         return response()->json(['draft' => $this->drafts->initialize($actor, ItTicketDraftPurpose::from($data['purpose']),
-            isset($data['ticket_id']) ? (int) $data['ticket_id'] : null, $data['request_uuid'] ?? null)]);
+            isset($data['ticket_id']) ? (int) $data['ticket_id'] : null, $data['request_uuid'] ?? null, $data)]);
     }
 
     public function show(Request $request, string $draftUuid): JsonResponse
@@ -106,10 +108,11 @@ final class ItTicketDraftController extends Controller
         $data = $request->validate([
             'expected_revision' => ['required', 'integer', 'min:0'], 'upload_uuid' => ['required', 'uuid'],
             'attachment' => ['required', 'file'],
+            'catalogue_field_key' => ['sometimes', 'nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
         ]);
 
         return response()->json(app(ItTicketDraftAttachmentService::class)->upload(
-            $actor, $draftUuid, (int) $data['expected_revision'], $data['upload_uuid'], $request->file('attachment'),
+            $actor, $draftUuid, (int) $data['expected_revision'], $data['upload_uuid'], $request->file('attachment'), $data['catalogue_field_key'] ?? null,
         ));
     }
 

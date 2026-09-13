@@ -81,7 +81,7 @@ class SiteCostService
     /**
      * Monthly cost trend for a site over a range of months.
      *
-     * @return array<string, string>  month (Y-m) → total cost
+     * @return array<string, string> month (Y-m) → total cost
      */
     public function monthlyTrend(int $siteId, Carbon $from, Carbon $to): array
     {

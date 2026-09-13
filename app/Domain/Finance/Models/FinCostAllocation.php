@@ -29,7 +29,7 @@ class FinCostAllocation extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function journal(): BelongsTo
@@ -48,7 +48,7 @@ class FinCostAllocation extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForSite($query, int $siteId)

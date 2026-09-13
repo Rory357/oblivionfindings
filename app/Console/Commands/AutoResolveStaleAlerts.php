@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\ControlRoomAlert;
 use App\Models\ControlRoom\AlertTask;
+use App\Models\ControlRoomAlert;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +74,7 @@ class AutoResolveStaleAlerts extends Command
                 if ($dryRun) {
                     $this->line("  [DRY RUN] {$alertType}: {$count} stale (>{$ttlHours}h)");
                     $skipped += $count;
+
                     continue;
                 }
 
@@ -101,7 +102,7 @@ class AutoResolveStaleAlerts extends Command
             'skipped_dry_run' => $skipped,
         ]);
 
-        $this->info("Resolved: {$resolved}" . ($dryRun ? " | Would resolve: {$skipped}" : ''));
+        $this->info("Resolved: {$resolved}".($dryRun ? " | Would resolve: {$skipped}" : ''));
 
         return self::SUCCESS;
     }
@@ -110,8 +111,7 @@ class AutoResolveStaleAlerts extends Command
         ControlRoomAlert $alert,
         int $ttlHours,
         ControlRoomAlertLifecycleService $lifecycle,
-    ): bool
-    {
+    ): bool {
         $selectedAlertType = (string) $alert->alert_type;
 
         return DB::transaction(function () use ($alert, $lifecycle, $selectedAlertType, $ttlHours): bool {

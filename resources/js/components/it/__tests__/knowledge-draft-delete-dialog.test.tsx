@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({ delete: vi.fn() }));
 
 vi.mock('@inertiajs/react', () => ({
     router: { delete: mocks.delete },
+    usePage: () => ({ props: { auth: { user: { id: 7 } } } }),
 }));
 
 vi.mock('sonner', () => ({
@@ -18,7 +19,7 @@ describe('KnowledgeDraftDeleteDialog', () => {
     it('requires a reason and sends governed draft deletion evidence', () => {
         render(
             <KnowledgeDraftDeleteDialog
-                article={{ id: 42, title: 'Reset a password' }}
+                article={{ id: 42, title: 'Reset a password', lock_version: 3 }}
                 open
                 onOpenChange={vi.fn()}
             />,
@@ -43,7 +44,11 @@ describe('KnowledgeDraftDeleteDialog', () => {
         expect(mocks.delete).toHaveBeenCalledWith(
             '/it/kb/42',
             expect.objectContaining({
-                data: { reason: 'Duplicate draft created during authoring.' },
+                data: {
+                    reason: 'Duplicate draft created during authoring.',
+                    lock_version: 3,
+                    actor_user_id: 7,
+                },
                 preserveScroll: true,
             }),
         );

@@ -49,6 +49,7 @@ class ArchiveCompletedRosterPeriods extends Command
 
                     if ($dryRun) {
                         $this->line("Would archive roster period {$period->id}.");
+
                         continue;
                     }
 

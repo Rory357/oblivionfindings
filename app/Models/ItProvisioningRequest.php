@@ -28,6 +28,8 @@ class ItProvisioningRequest extends Model
     public const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 
     protected $fillable = [
+        'lock_version', 'due_offset_days', 'primary_approver_user_id', 'cover_approver_user_id',
+        'approval_requested_by', 'approval_expires_at', 'approval_requested_at', 'fulfilment_mode', 'reversal_of_request_id',
         'employee_profile_id',
         'provisioning_workflow_id',
         'provisioning_template_task_id',
@@ -64,6 +66,10 @@ class ItProvisioningRequest extends Model
     ];
 
     protected $casts = [
+        'lock_version' => 'integer',
+        'due_offset_days' => 'integer',
+        'approval_expires_at' => 'datetime',
+        'approval_requested_at' => 'datetime',
         'fulfilled_at' => 'datetime',
         'due_date' => 'date',
         'stage' => 'integer',
@@ -74,6 +80,15 @@ class ItProvisioningRequest extends Model
         'failed_at' => 'datetime',
         'fulfiller_context' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $request): void {
+            if (array_key_exists('lock_version', $request->getAttributes()) && $request->isDirty()) {
+                $request->lock_version = ((int) $request->getOriginal('lock_version')) + 1;
+            }
+        });
+    }
 
     /* ------------------------------------------------------------------ */
     /*  Relationships */

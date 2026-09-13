@@ -1,0 +1,614 @@
+{
+  "base": "v2-rich.json",
+  "cases": [
+    {
+      "name": "future version",
+      "code": "version",
+      "edits": [
+        {
+          "path": [
+            "schema_version"
+          ],
+          "value": 3
+        }
+      ]
+    },
+    {
+      "name": "script field",
+      "code": "unknown_field",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "script"
+          ],
+          "value": "alert(1)"
+        }
+      ]
+    },
+    {
+      "name": "base64 image source",
+      "code": "unknown_field",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            2,
+            "nodes",
+            6,
+            "image"
+          ],
+          "value": "data:image/png;base64,AAAA"
+        }
+      ]
+    },
+    {
+      "name": "external URL field",
+      "code": "unknown_field",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "link"
+          ],
+          "value": "https://example.invalid/"
+        }
+      ]
+    },
+    {
+      "name": "CSS paint",
+      "code": "pattern",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "style",
+            "fill"
+          ],
+          "value": "url(#payload)"
+        }
+      ]
+    },
+    {
+      "name": "numeric string",
+      "code": "number",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "x"
+          ],
+          "value": "40"
+        }
+      ]
+    },
+    {
+      "name": "negative width",
+      "code": "number",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "w"
+          ],
+          "value": -1
+        }
+      ]
+    },
+    {
+      "name": "beyond bounded geometry",
+      "code": "number",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "y"
+          ],
+          "value": 10001
+        }
+      ]
+    },
+    {
+      "name": "duplicate case-folded identity",
+      "code": "duplicate_id",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            1,
+            "id"
+          ],
+          "value": "10000000-0000-4000-8000-00000000000B"
+        }
+      ]
+    },
+    {
+      "name": "cross-page edge",
+      "code": "endpoint",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "edges",
+            0,
+            "to"
+          ],
+          "value": "10000000-0000-4000-8000-000000000021"
+        }
+      ]
+    },
+    {
+      "name": "self edge",
+      "code": "endpoint",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "edges",
+            0,
+            "to"
+          ],
+          "value": "10000000-0000-4000-8000-00000000000e"
+        }
+      ]
+    },
+    {
+      "name": "missing layer",
+      "code": "layer",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "layerId"
+          ],
+          "value": "99999999-9999-4999-8999-999999999999"
+        }
+      ]
+    },
+    {
+      "name": "container cycle through groups",
+      "code": "cycle",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "parentId"
+          ],
+          "value": "10000000-0000-4000-8000-000000000045"
+        }
+      ]
+    },
+    {
+      "name": "cross-page parent",
+      "code": "parent",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "groups",
+            0,
+            "parentId"
+          ],
+          "value": "10000000-0000-4000-8000-000000000021"
+        }
+      ]
+    },
+    {
+      "name": "ordinary shape as parent",
+      "code": "parent",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            5,
+            "parentId"
+          ],
+          "value": "10000000-0000-4000-8000-00000000000f"
+        }
+      ]
+    },
+    {
+      "name": "duplicate property name",
+      "code": "property_key",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "properties"
+          ],
+          "value": [
+            {
+              "key": "Owner",
+              "value": "A"
+            },
+            {
+              "key": "owner",
+              "value": "B"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "reserved property name",
+      "code": "property_key",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "properties"
+          ],
+          "value": [
+            {
+              "key": "constructor",
+              "value": "x"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nested property object",
+      "code": "string",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "properties",
+            0,
+            "value"
+          ],
+          "value": {
+            "nested": "x"
+          }
+        }
+      ]
+    },
+    {
+      "name": "missing percentage property",
+      "code": "data_graphic",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "dataGraphic"
+          ],
+          "value": "missing"
+        }
+      ]
+    },
+    {
+      "name": "percentage above 100",
+      "code": "data_graphic",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            5,
+            "properties",
+            4,
+            "value"
+          ],
+          "value": "100.000001"
+        }
+      ]
+    },
+    {
+      "name": "invalid normalized ink point",
+      "code": "number",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            11,
+            "points",
+            0,
+            "x"
+          ],
+          "value": -0.01
+        }
+      ]
+    },
+    {
+      "name": "ink with one point",
+      "code": "points",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            11,
+            "points"
+          ],
+          "value": [
+            {
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "points on a rectangle",
+      "code": "points",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "points"
+          ],
+          "value": [
+            {
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "image missing file",
+      "code": "image",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            2,
+            "nodes",
+            6,
+            "imageFileId"
+          ],
+          "value": null
+        }
+      ]
+    },
+    {
+      "name": "file on non-image",
+      "code": "image",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "imageFileId"
+          ],
+          "value": 101
+        }
+      ]
+    },
+    {
+      "name": "fractional file ID",
+      "code": "number",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            2,
+            "nodes",
+            6,
+            "imageFileId"
+          ],
+          "value": 101.5
+        }
+      ]
+    },
+    {
+      "name": "unsafe file ID",
+      "code": "number",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            2,
+            "nodes",
+            6,
+            "imageFileId"
+          ],
+          "value": 9007199254740992
+        }
+      ]
+    },
+    {
+      "name": "too many property entries",
+      "code": "count",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "properties"
+          ],
+          "value": [
+            {
+              "key": "Field0",
+              "value": null
+            },
+            {
+              "key": "Field1",
+              "value": null
+            },
+            {
+              "key": "Field2",
+              "value": null
+            },
+            {
+              "key": "Field3",
+              "value": null
+            },
+            {
+              "key": "Field4",
+              "value": null
+            },
+            {
+              "key": "Field5",
+              "value": null
+            },
+            {
+              "key": "Field6",
+              "value": null
+            },
+            {
+              "key": "Field7",
+              "value": null
+            },
+            {
+              "key": "Field8",
+              "value": null
+            },
+            {
+              "key": "Field9",
+              "value": null
+            },
+            {
+              "key": "Field10",
+              "value": null
+            },
+            {
+              "key": "Field11",
+              "value": null
+            },
+            {
+              "key": "Field12",
+              "value": null
+            },
+            {
+              "key": "Field13",
+              "value": null
+            },
+            {
+              "key": "Field14",
+              "value": null
+            },
+            {
+              "key": "Field15",
+              "value": null
+            },
+            {
+              "key": "Field16",
+              "value": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "long Unicode text",
+      "code": "length",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "text"
+          ],
+          "value": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+        }
+      ]
+    },
+    {
+      "name": "control character",
+      "code": "text",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "text"
+          ],
+          "value": "a\u0000b"
+        }
+      ]
+    },
+    {
+      "name": "string boolean",
+      "code": "boolean",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "grid",
+            "enabled"
+          ],
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "name": "missing required points field",
+      "code": "required",
+      "edits": [
+        {
+          "path": [
+            "pages",
+            0,
+            "nodes",
+            0,
+            "points"
+          ],
+          "delete": true
+        }
+      ]
+    }
+  ]
+}

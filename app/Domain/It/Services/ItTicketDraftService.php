@@ -4,6 +4,7 @@ namespace App\Domain\It\Services;
 
 use App\Domain\It\Enums\ItTicketDraftPurpose as Purpose;
 use App\Domain\It\Exceptions\ItTicketDraftException as DraftError;
+use App\Models\ItCatalogSubmission;
 use App\Models\ItTicket;
 use App\Models\ItTicketCommandReceipt;
 use App\Models\ItTicketComment;
@@ -33,7 +34,7 @@ final class ItTicketDraftService
     }
 
     /** Initializes metadata only; never hydrates or overwrites saved fields. */
-    public function initialize(User $actor, Purpose $purpose, ?int $ticketId, ?string $requestUuid): array
+    public function initialize(User $actor, Purpose $purpose, ?int $ticketId, ?string $requestUuid, array $catalogueContext = []): array
     {
         $this->requireEnabled();
         if ($purpose->requiresTicket() ? $ticketId === null || $requestUuid !== null : $ticketId !== null || ! Str::isUuid($requestUuid)) {
@@ -41,11 +42,12 @@ final class ItTicketDraftService
         }
         $requestUuid = $requestUuid !== null ? strtolower($requestUuid) : null;
 
-        return DB::transaction(function () use ($actor, $purpose, $ticketId, $requestUuid): array {
+        return DB::transaction(function () use ($actor, $purpose, $ticketId, $requestUuid, $catalogueContext): array {
             $ticket = $ticketId !== null ? ItTicket::query()->whereKey($ticketId)->lockForUpdate()->first() : null;
             $current = $this->currentActor($actor);
             $this->authorize($current, $purpose, $ticket);
-            $contextKey = $ticketId !== null ? 'ticket:'.$ticketId : 'request:'.$requestUuid;
+            $scope = $purpose === Purpose::CatalogueRequest ? $this->catalogueContext($current, $catalogueContext) : [];
+            $contextKey = $this->contextKey($ticketId, $requestUuid, $scope);
             $draft = ItTicketDraft::query()->where('actor_user_id', $current->id)
                 ->where('purpose', $purpose->value)->where('context_key', $contextKey)
                 ->where('audience', $purpose->audience())->lockForUpdate()->first();
@@ -55,7 +57,7 @@ final class ItTicketDraftService
                     'context_key' => $contextKey, 'audience' => $purpose->audience(),
                     'draft_uuid' => (string) Str::uuid(), 'it_ticket_id' => $ticketId, 'request_uuid' => $requestUuid,
                     'state' => 'active', 'revision' => 0, 'base_ticket_version' => $ticket?->lock_version,
-                    'bound_scope' => [], 'expires_at' => now()->addDays($this->days('retention_days')),
+                    'bound_scope' => $scope, 'expires_at' => now()->addDays($this->days('retention_days')),
                 ]);
                 $this->audit($draft, $current, 'initialized');
             }
@@ -97,6 +99,7 @@ final class ItTicketDraftService
             if (! $metadata['capabilities']['save']) {
                 throw new DraftError('draft_submission_exists', 409, 'Check the saved request before changing this draft.', ['current' => $metadata]);
             }
+            $this->assertOriginalCatalogueFields($draft, $fields);
             $safe = $this->payloads->validate($draft->purpose, $fields);
             $scope = $this->payloads->bind($current, $ticket, $safe, $draft->bound_scope ?? []);
             $baseVersion = $this->baseVersionFor($draft, $ticket, $baseVersion);
@@ -139,6 +142,7 @@ final class ItTicketDraftService
             }
             // Saved metadata may have older bindings than the latest local
             // edit. Authorize both before disclosing even a conflict response.
+            $this->assertOriginalCatalogueFields($draft, $fields);
             $safe = $this->payloads->validate($draft->purpose, $fields);
             $this->assertCandidateScopes($current, $ticket, $boundScopes);
             $this->payloads->bind($current, $ticket, $safe, $draft->bound_scope ?? []);
@@ -191,13 +195,21 @@ final class ItTicketDraftService
             $ticket = $ticketId !== null ? ItTicket::query()->whereKey($ticketId)->lockForUpdate()->first() : null;
             $current = $this->currentActor($actor);
             $this->authorize($current, $purpose, $ticket);
+            $contextScope = $purpose === Purpose::CatalogueRequest ? $this->catalogueContext($current, $fields) : [];
             $safe = $this->payloads->validate($purpose, $fields);
             $this->assertCandidateScopes($current, $ticket, $boundScopes);
             $this->payloads->bind($current, $ticket, $safe);
             if ((! $ticket && $baseVersion !== null) || ($ticket && $baseVersion !== null && ($baseVersion < 1 || $baseVersion > $ticket->lock_version))) {
                 throw ValidationException::withMessages(['base_ticket_version' => 'Keep the original reviewed ticket version with this work.']);
             }
-            if ($requestUuid !== null) {
+            if ($requestUuid !== null && $purpose === Purpose::CatalogueRequest) {
+                $outcome = app(ItCatalogSubmissionService::class)->recover((int) $fields['catalog_item_id'], $current, $requestUuid, (int) $current->id);
+                if ($outcome !== null) {
+                    throw new DraftError('draft_submission_exists', 409, 'Check the original catalogue request before recovering this work.', [
+                        'recovery_url' => '/it/catalog/'.(int) $fields['catalog_item_id'].'/submissions/recover',
+                    ]);
+                }
+            } elseif ($requestUuid !== null) {
                 $receipt = ItTicketCommandReceipt::query()->where('actor_user_id', $current->id)
                     ->where('channel', ItTicketCommandReceipt::CHANNEL)->where('operation', ItTicketCommandReceipt::CREATE_OPERATION)
                     ->where('request_uuid', $requestUuid)->whereNotNull('committed_at')->first();
@@ -223,7 +235,7 @@ final class ItTicketDraftService
             return ['candidate' => [
                 'kind' => 'memory', 'memory_uuid' => $memoryUuid, 'candidate_uuid' => $candidateUuid,
                 'actor_user_id' => (int) $current->id, 'purpose' => $purpose->value,
-                'context_key' => $ticketId !== null ? 'ticket:'.$ticketId : 'request:'.$requestUuid,
+                'context_key' => $this->contextKey($ticketId, $requestUuid, $contextScope),
                 'base_ticket_version' => $baseVersion, 'current_ticket_version' => $ticket?->lock_version,
                 'authorized' => true, 'capabilities' => ['submit' => $blocker === null], 'blocker' => $blocker,
             ]];
@@ -277,7 +289,9 @@ final class ItTicketDraftService
             $draft->forceFill([
                 'draft_uuid' => (string) Str::uuid(), 'state' => 'active', 'revision' => $draft->revision + 1,
                 'last_base_revision' => $expectedRevision, 'last_mutation' => 'restarted',
-                'encrypted_payload' => null, 'payload_hash' => null, 'bound_scope' => [],
+                'encrypted_payload' => null, 'payload_hash' => null,
+                'bound_scope' => $draft->purpose === Purpose::CatalogueRequest
+                    ? $this->catalogueContext($current, $draft->bound_scope['catalogue']) : [],
                 'saved_at' => null, 'consumed_at' => null, 'discarded_at' => null,
                 'base_ticket_version' => $ticket?->lock_version,
                 'expires_at' => now()->addDays($this->days('retention_days')),
@@ -291,7 +305,7 @@ final class ItTicketDraftService
     }
 
     /** Optional adapter used by canonical writers, never a second write endpoint. */
-    public function consumeFromInput(User $actor, array $input, Purpose $purpose, ?int $ticketId = null, ?string $requestUuid = null, ItTicket|ItTicketComment|null $attachmentTarget = null): void
+    public function consumeFromInput(User $actor, array $input, Purpose $purpose, ?int $ticketId = null, ?string $requestUuid = null, ItTicket|ItTicketComment|ItCatalogSubmission|null $attachmentTarget = null): void
     {
         if (array_intersect(['draft_uuid', 'draft_revision', 'draft_actor_user_id'], array_keys($input)) === []) {
             return;
@@ -307,7 +321,7 @@ final class ItTicketDraftService
     }
 
     /** Called only inside a successful canonical write's enclosing transaction. */
-    public function consume(User $actor, string $uuid, int $expectedRevision, Purpose $purpose, ?int $ticketId, ?string $requestUuid, ItTicket|ItTicketComment|null $attachmentTarget = null): void
+    public function consume(User $actor, string $uuid, int $expectedRevision, Purpose $purpose, ?int $ticketId, ?string $requestUuid, ItTicket|ItTicketComment|ItCatalogSubmission|null $attachmentTarget = null): void
     {
         if (DB::transactionLevel() < 1) {
             throw new LogicException('Draft consumption must share the canonical commit transaction.');
@@ -323,7 +337,14 @@ final class ItTicketDraftService
                 $this->conflict($draft, $current, $ticket);
             }
             $metadata = $this->metadata($draft, $current, $ticket);
-            if (! $metadata['capabilities']['submit']) {
+            $ownCatalogueCommit = $purpose === Purpose::CatalogueRequest && $attachmentTarget instanceof ItCatalogSubmission
+                && $attachmentTarget->wasRecentlyCreated
+                && (int) $attachmentTarget->requester_user_id === (int) $current->id
+                && $attachmentTarget->idempotency_key === $draft->request_uuid
+                && (int) $attachmentTarget->catalog_item_id === (int) ($draft->bound_scope['catalogue']['catalog_item_id'] ?? 0)
+                && (int) $attachmentTarget->schema_version === (int) ($draft->bound_scope['catalogue']['schema_version'] ?? 0)
+                && ($metadata['blocker']['code'] ?? null) === 'request_committed';
+            if (! $metadata['capabilities']['submit'] && ! $ownCatalogueCommit) {
                 throw new DraftError('draft_submission_blocked', 409, 'Review the current request before submitting this draft.', ['current' => $metadata]);
             }
             app(ItTicketDraftAttachmentService::class)->transfer($draft, $attachmentTarget);
@@ -401,7 +422,7 @@ final class ItTicketDraftService
     private function currentActor(User $actor): User
     {
         $current = User::query()->whereKey($actor->id)->lockForUpdate()->first();
-        if (! $current || $current->approved_at === null || (! $current->canDo('it.request') && ! $current->canDo('it.view'))) {
+        if (! $current || $current->approved_at === null || (! $current->canDo('it.request') && ! $current->canDo('it.view') && ! $current->canDo('it.manage'))) {
             throw new DraftError('access_unavailable', 403, 'Your staff access is no longer available.');
         }
 
@@ -410,7 +431,11 @@ final class ItTicketDraftService
 
     private function authorize(User $actor, Purpose $purpose, ?ItTicket $ticket): void
     {
-        if ($purpose->requiresTicket()) {
+        if ($purpose === Purpose::CatalogueRequest) {
+            if (! $actor->canDo('it.request') && ! $actor->canDo('it.manage')) {
+                throw DraftError::unavailable();
+            }
+        } elseif ($purpose->requiresTicket()) {
             if (! $ticket || ! ($purpose->requiresManage() ? $this->access->canWork($actor, $ticket) : $this->access->canView($actor, $ticket))) {
                 throw DraftError::unavailable();
             }
@@ -432,7 +457,11 @@ final class ItTicketDraftService
         $blocker = null;
         if ($submission !== null) {
             $blocker = ['code' => 'request_committed', 'message' => 'This request is already saved. Check the saved request.',
-                'recovery_url' => route('it.ticket-commands.show', ['requestUuid' => $draft->request_uuid], false)];
+                'recovery_url' => $draft->purpose === Purpose::CatalogueRequest
+                    ? '/it/catalog/'.(int) $draft->bound_scope['catalogue']['catalog_item_id'].'/submissions/recover'
+                    : route('it.ticket-commands.show', ['requestUuid' => $draft->request_uuid], false)];
+        } elseif ($draft->purpose === Purpose::CatalogueRequest && ($changed = app(ItCatalogueDraftAdapter::class)->blocker($draft))) {
+            $blocker = $changed;
         } elseif ($ticket?->isMerged()) {
             $blocker = ['code' => 'ticket_merged', 'message' => 'Continue on the surviving ticket. This draft stays with its original context.'];
         } elseif ($ticket && ! in_array($ticket->status, ItTicket::OPEN_STATUSES, true)) {
@@ -460,10 +489,17 @@ final class ItTicketDraftService
         ];
     }
 
-    private function submission(ItTicketDraft $draft, User $actor): ?ItTicketCommandReceipt
+    private function submission(ItTicketDraft $draft, User $actor): ItTicketCommandReceipt|ItCatalogSubmission|null
     {
         if ($draft->request_uuid === null) {
             return null;
+        }
+        if ($draft->purpose === Purpose::CatalogueRequest) {
+            $outcome = app(ItCatalogSubmissionService::class)->recover((int) $draft->bound_scope['catalogue']['catalog_item_id'], $actor, $draft->request_uuid, (int) $actor->id);
+
+            return $outcome['submission'] ?? (($outcome['cancelled'] ?? false) ? ItTicketCommandReceipt::query()
+                ->where('actor_user_id', $actor->id)->where('channel', ItTicketCommandReceipt::CHANNEL)
+                ->where('operation', ItTicketCommandReceipt::CATALOGUE_OPERATION)->where('request_uuid', $draft->request_uuid)->first() : null);
         }
         $receipt = ItTicketCommandReceipt::query()->where('actor_user_id', $actor->id)
             ->where('channel', ItTicketCommandReceipt::CHANNEL)->where('operation', ItTicketCommandReceipt::CREATE_OPERATION)
@@ -473,6 +509,33 @@ final class ItTicketDraftService
         }
 
         return $receipt;
+    }
+
+    private function assertOriginalCatalogueFields(ItTicketDraft $draft, array $fields): void
+    {
+        if ($draft->purpose !== Purpose::CatalogueRequest) {
+            return;
+        }
+        $original = $draft->bound_scope['catalogue'] ?? [];
+        if ((int) ($fields['catalog_item_id'] ?? 0) !== (int) ($original['catalog_item_id'] ?? 0)
+            || (int) ($fields['schema_version'] ?? 0) !== (int) ($original['schema_version'] ?? 0)) {
+            throw DraftError::unavailable();
+        }
+    }
+
+    private function catalogueContext(User $actor, array $context): array
+    {
+        $data = Validator::make($context, [
+            'catalog_item_id' => ['required', 'integer', 'min:1'], 'schema_version' => ['required', 'integer', 'min:1'],
+        ])->validate();
+
+        return app(ItCatalogueDraftAdapter::class)->context($actor, (int) $data['catalog_item_id'], (int) $data['schema_version']);
+    }
+
+    private function contextKey(?int $ticketId, ?string $uuid, array $scope): string
+    {
+        return isset($scope['catalogue']) ? 'catalogue:'.$scope['catalogue']['catalog_item_id'].':version:'.$scope['catalogue']['schema_version'].':request:'.$uuid
+            : ($ticketId !== null ? 'ticket:'.$ticketId : 'request:'.$uuid);
     }
 
     private function terminate(ItTicketDraft $draft, User $actor, string $state): void

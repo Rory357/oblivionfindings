@@ -53,6 +53,7 @@ interface FrozenOperation {
     snapshot?: ItDraftSnapshot;
     file?: File;
     uploadUuid?: string;
+    catalogueField?: string;
     attachmentId?: number;
 }
 interface ClientSnapshot {
@@ -289,6 +290,7 @@ export function useItTicketDraft({
                 ? {
                       file: pendingCommand.file,
                       uploadUuid: pendingCommand.uploadUuid,
+                      catalogueField: pendingCommand.catalogueField,
                       revision: pendingCommand.revision,
                   }
                 : undefined,
@@ -367,6 +369,12 @@ export function useItTicketDraft({
                     data = {
                         actor_user_id: actorId,
                         purpose: context.purpose,
+                        ...(context.purpose === 'catalogue_request'
+                            ? {
+                                  catalog_item_id: context.catalogItemId,
+                                  schema_version: context.schemaVersion,
+                              }
+                            : {}),
                         ...(context.ticketId !== undefined
                             ? { ticket_id: context.ticketId }
                             : {
@@ -412,6 +420,11 @@ export function useItTicketDraft({
                     form.set('expected_revision', String(command!.revision));
                     form.set('upload_uuid', command!.uploadUuid!);
                     form.set('attachment', command!.file!);
+                    if (command!.catalogueField)
+                        form.set(
+                            'catalogue_field_key',
+                            command!.catalogueField!,
+                        );
                     data = form;
                 }
                 const response = await axios.request({
@@ -706,6 +719,9 @@ export function useItTicketDraft({
                 if (
                     !attachment ||
                     attachment.upload_uuid !== command.uploadUuid ||
+                    (context.purpose === 'catalogue_request' &&
+                        attachment.catalogue_field_key !==
+                            command.catalogueField) ||
                     attachment.name !== command.file?.name ||
                     attachment.size !== command.file?.size ||
                     attachment.state !== 'ready'
@@ -746,7 +762,7 @@ export function useItTicketDraft({
             });
             return true;
         },
-        [execute, accept, update, unknown],
+        [execute, accept, update, unknown, context.purpose],
     );
 
     const canMutate = useCallback(
@@ -808,7 +824,7 @@ export function useItTicketDraft({
         [allowed, mutate],
     );
     const upload = useCallback(
-        async (file: File) => {
+        async (file: File, catalogueField?: string) => {
             const draft = stateRef.current.draft;
             if (
                 !canMutate() ||
@@ -816,9 +832,16 @@ export function useItTicketDraft({
                 ![
                     'requester_intake',
                     'technician_intake',
+                    'catalogue_request',
                     'public_reply',
                     'internal_note',
                 ].includes(context.purpose)
+            )
+                return false;
+            if (
+                context.purpose === 'catalogue_request' &&
+                (!catalogueField ||
+                    !/^[a-z][a-z0-9_]{0,79}$/.test(catalogueField))
             )
                 return false;
             if (
@@ -865,6 +888,7 @@ export function useItTicketDraft({
                 revision: draft.revision,
                 file,
                 uploadUuid: uuid,
+                catalogueField,
             });
         },
         [canMutate, context.purpose, mutate, update],
@@ -1116,6 +1140,7 @@ export function useItTicketDraft({
                 revision: candidate.pendingUpload.revision,
                 file: candidate.pendingUpload.file,
                 uploadUuid: candidate.pendingUpload.uploadUuid,
+                catalogueField: candidate.pendingUpload.catalogueField,
             };
         const canonicalUnknown =
             candidate.outcomeUnknown &&

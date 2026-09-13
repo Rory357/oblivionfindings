@@ -5,6 +5,7 @@ import type { ItWorkTaskOperation } from './it-work-task-command';
 export type ItDraftPurpose =
     | 'requester_intake'
     | 'technician_intake'
+    | 'catalogue_request'
     | 'public_reply'
     | 'internal_note'
     | 'ticket_edit'
@@ -14,6 +15,13 @@ export type ItDraftPurpose =
     | 'approval_work'
     | 'merge_work';
 export type ItDraftContext =
+    | {
+          purpose: 'catalogue_request';
+          requestUuid: string;
+          catalogItemId: number;
+          schemaVersion: number;
+          ticketId?: never;
+      }
     | {
           purpose: 'requester_intake' | 'technician_intake';
           requestUuid: string;
@@ -54,6 +62,10 @@ export type ItDraftFieldValue =
     | number[]
     | string[];
 export type ItDraftFields = Partial<{
+    catalog_item_id: number;
+    schema_version: number;
+    catalogue_values: string;
+    requested_for_user_id: number | null;
     title: string | null;
     description: string | null;
     category: string | null;
@@ -141,6 +153,7 @@ export interface ItDraftMetadata {
     cleanup?: { deleted: number; failed: number };
 }
 export interface ItDraftAttachment {
+    catalogue_field_key?: string | null;
     id: number;
     upload_uuid: string;
     name: string;
@@ -196,6 +209,8 @@ export function draftAudience(purpose: ItDraftPurpose): 'public' | 'internal' {
         : 'public';
 }
 export function draftContextKey(context: ItDraftContext): string {
+    if (context.purpose === 'catalogue_request')
+        return `catalogue:${context.catalogItemId}:version:${context.schemaVersion}:request:${context.requestUuid.toLowerCase()}`;
     if (context.purpose === 'approval_work')
         return `ticket:${context.ticketId}:approval:${context.approvalId ?? 'new'}:operation:${context.operation}`;
     if (context.purpose === 'task_work')
@@ -214,6 +229,13 @@ export function validDraftContext(
     actorId: number | undefined,
     context: ItDraftContext,
 ): boolean {
+    if (context.purpose === 'catalogue_request')
+        return (
+            positive(actorId) &&
+            positive(context.catalogItemId) &&
+            positive(context.schemaVersion) &&
+            IT_DRAFT_UUID.test(context.requestUuid)
+        );
     if (context.purpose === 'approval_work')
         return (
             positive(actorId) &&
@@ -294,7 +316,9 @@ export function readDraftMetadata(
             blocker.message.length > 2000 ||
             (blocker.recovery_url !== undefined &&
                 blocker.recovery_url !==
-                    `/it/ticket-commands/${context.requestUuid?.toLowerCase()}`))
+                    (context.purpose === 'catalogue_request'
+                        ? `/it/catalog/${context.catalogItemId}/submissions/recover`
+                        : `/it/ticket-commands/${context.requestUuid?.toLowerCase()}`)))
     )
         return null;
     if (
@@ -379,6 +403,13 @@ const triage = [
     'asset_id',
 ];
 const fieldsByPurpose: Record<ItDraftPurpose, string[]> = {
+    catalogue_request: [
+        'catalog_item_id',
+        'schema_version',
+        'catalogue_values',
+        'site_id',
+        'requested_for_user_id',
+    ],
     merge_work: ['reason', 'target_ticket_id', 'target_version'],
     approval_work: [
         'reason',
@@ -497,11 +528,17 @@ export function readDraftPayload(
                         field.length <= (key === 'watchers' ? 100 : 1000) &&
                         field.every(positive) &&
                         new Set(field).size === field.length
-                      : key.endsWith('_id') || key === 'target_version'
+                      : key.endsWith('_id') ||
+                          key === 'target_version' ||
+                          key === 'schema_version'
                         ? positive(field)
                         : typeof field === 'string' &&
                           field.length <=
-                              (['work_payload', 'work_form'].includes(key)
+                              ([
+                                  'catalogue_values',
+                                  'work_payload',
+                                  'work_form',
+                              ].includes(key)
                                   ? 60000
                                   : 5000));
         if (!valid) return null;
@@ -515,6 +552,10 @@ export function readDraftAttachment(value: unknown): ItDraftAttachment | null {
     if (
         !draftRecord(value) ||
         !positive(value.id) ||
+        (value.catalogue_field_key !== undefined &&
+            value.catalogue_field_key !== null &&
+            (typeof value.catalogue_field_key !== 'string' ||
+                !/^[a-z][a-z0-9_]{0,79}$/.test(value.catalogue_field_key))) ||
         typeof value.upload_uuid !== 'string' ||
         !IT_DRAFT_UUID.test(value.upload_uuid) ||
         typeof value.name !== 'string' ||
@@ -536,6 +577,10 @@ export function readDraftAttachment(value: unknown): ItDraftAttachment | null {
         size: value.size,
         state: value.state as ItDraftAttachment['state'],
         download_url: value.download_url as string | null,
+        catalogue_field_key: value.catalogue_field_key as
+            | string
+            | null
+            | undefined,
     };
 }
 export function draftSnapshotKey(snapshot: ItDraftSnapshot): string {

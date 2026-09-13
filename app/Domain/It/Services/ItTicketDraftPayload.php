@@ -29,6 +29,9 @@ final class ItTicketDraftPayload
 
     public function validate(Purpose $purpose, array $fields): array
     {
+        if ($purpose === Purpose::CatalogueRequest) {
+            return app(ItCatalogueDraftAdapter::class)->validate($fields);
+        }
         $text = fn (int $max): array => ['sometimes', 'nullable', 'string', 'max:'.$max];
         $id = ['sometimes', 'nullable', 'integer', 'min:1'];
         $boolean = ['sometimes', 'boolean'];
@@ -90,6 +93,9 @@ final class ItTicketDraftPayload
         if (isset($fields['work_payload']) || isset($fields['work_form'])) {
             $scope['ticket_work'] = true;
         }
+        if (isset($fields['catalog_item_id'], $fields['schema_version'], $fields['catalogue_values'])) {
+            $scope['catalogue'] = app(ItCatalogueDraftAdapter::class)->bind($actor, $fields, $old);
+        }
         foreach (['site_id', 'is_organisation_wide', 'assigned_to_user_id', 'owner_user_id', 'requester_user_id', 'asset_id', 'device_id', 'it_service_id', 'provisioning_request_id', 'queue_id', 'watchers'] as $field) {
             if (array_key_exists($field, $fields) && $fields[$field] !== null && $fields[$field] !== '' && $fields[$field] !== []) {
                 $scope[$field] = $fields[$field];
@@ -113,8 +119,19 @@ final class ItTicketDraftPayload
     public function validateScope(array $scope): array
     {
         $ids = ['site_id', 'assigned_to_user_id', 'owner_user_id', 'requester_user_id', 'asset_id', 'device_id', 'it_service_id', 'provisioning_request_id', 'queue_id'];
-        $rules = ['scope' => ['present', 'array:'.implode(',', [...$ids, 'is_organisation_wide', 'watchers', 'ticket_work'])],
+        $rules = ['scope' => ['present', 'array:'.implode(',', [...$ids, 'is_organisation_wide', 'watchers', 'catalogue', 'catalog_item_id', 'schema_version', 'catalogue_values', 'requested_for_user_id', 'ticket_work'])],
             'scope.ticket_work' => ['sometimes', 'boolean'],
+            'scope.catalog_item_id' => ['required_with:scope.catalogue_values,scope.schema_version', 'integer', 'min:1'],
+            'scope.schema_version' => ['required_with:scope.catalog_item_id', 'integer', 'min:1'],
+            'scope.catalogue_values' => ['required_with:scope.catalog_item_id', 'string', 'max:60000', 'json'],
+            'scope.requested_for_user_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'scope.catalogue' => ['sometimes', 'array:catalog_item_id,schema_version,entities,internal,requested_for_user_id'],
+            'scope.catalogue.catalog_item_id' => ['required_with:scope.catalogue', 'integer', 'min:1'],
+            'scope.catalogue.schema_version' => ['required_with:scope.catalogue', 'integer', 'min:1'],
+            'scope.catalogue.entities' => ['sometimes', 'array', 'max:100'], 'scope.catalogue.entities.*' => ['array:type,id'],
+            'scope.catalogue.entities.*.type' => ['required', Rule::in(ItCatalogFieldOptionService::TYPES)],
+            'scope.catalogue.entities.*.id' => ['required', 'integer', 'min:1'], 'scope.catalogue.internal' => ['sometimes', 'boolean'],
+            'scope.catalogue.requested_for_user_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'scope.is_organisation_wide' => ['sometimes', 'boolean'],
             'scope.watchers' => ['sometimes', 'nullable', 'array', 'max:100'],
             'scope.watchers.*' => ['integer', 'min:1', 'distinct']];
@@ -129,6 +146,18 @@ final class ItTicketDraftPayload
     {
         if (! empty($scope['ticket_work']) && (! $ticket || ! $this->access->canWork($actor, $ticket))) {
             throw ItTicketDraftException::unavailable();
+        }
+        if (isset($scope['catalog_item_id'], $scope['schema_version'], $scope['catalogue_values'])) {
+            $adapter = app(ItCatalogueDraftAdapter::class);
+            $context = $adapter->context($actor, (int) $scope['catalog_item_id'], (int) $scope['schema_version']);
+            $fields = array_intersect_key($scope, array_flip(['catalog_item_id', 'schema_version', 'catalogue_values', 'site_id', 'requested_for_user_id']));
+            $scope['catalogue'] = $adapter->bind($actor, $adapter->validate($fields), $context);
+            if (($scope['site_id'] ?? null) === null) {
+                unset($scope['site_id']);
+            }
+        }
+        if (isset($scope['catalogue'])) {
+            app(ItCatalogueDraftAdapter::class)->authorize($actor, $scope['catalogue']);
         }
         if (array_key_exists('site_id', $scope) || ! empty($scope['is_organisation_wide'])) {
             if (! $this->access->canAssignScope($actor, isset($scope['site_id']) ? (int) $scope['site_id'] : null, (bool) ($scope['is_organisation_wide'] ?? false))) {

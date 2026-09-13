@@ -107,7 +107,7 @@ class SyncAccountingIntegrationJob implements ShouldQueue
             $integration->update([
                 'last_sync_at' => now(),
                 'last_sync_status' => 'failed',
-                'last_error' => 'Sync job failed after all retries: ' . $exception->getMessage(),
+                'last_error' => 'Sync job failed after all retries: '.$exception->getMessage(),
             ]);
         }
     }

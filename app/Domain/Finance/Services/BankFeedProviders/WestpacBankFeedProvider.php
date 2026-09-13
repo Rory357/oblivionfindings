@@ -20,7 +20,7 @@ class WestpacBankFeedProvider implements BankFeedProviderInterface
         $clientId = config('services.bank_feeds.westpac.client_id');
 
         if (empty($clientId)) {
-            throw new \RuntimeException('API credentials not configured for Westpac. Configure in finance settings.');
+            throw new RuntimeException('API credentials not configured for Westpac. Configure in finance settings.');
         }
 
         $redirectUri = config('services.bank_feeds.westpac.redirect_uri');
@@ -41,7 +41,7 @@ class WestpacBankFeedProvider implements BankFeedProviderInterface
         $clientId = config('services.bank_feeds.westpac.client_id');
 
         if (empty($clientId)) {
-            throw new \RuntimeException('API credentials not configured for Westpac. Configure in finance settings.');
+            throw new RuntimeException('API credentials not configured for Westpac. Configure in finance settings.');
         }
 
         $feed->update([
@@ -55,7 +55,7 @@ class WestpacBankFeedProvider implements BankFeedProviderInterface
         $clientId = config('services.bank_feeds.westpac.client_id');
 
         if (empty($clientId)) {
-            throw new \RuntimeException('API credentials not configured for Westpac. Configure in finance settings.');
+            throw new RuntimeException('API credentials not configured for Westpac. Configure in finance settings.');
         }
 
         $feed->update([

@@ -53,6 +53,8 @@ export interface ThreadAttachment {
     name: string;
     size: number;
     url: string;
+    catalogue_field_label?: string;
+    is_internal?: boolean;
 }
 
 export interface ThreadComment {
@@ -152,10 +154,19 @@ function AttachmentChips({ attachments }: { attachments: ThreadAttachment[] }) {
                     href={a.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-card px-2 py-1 text-[11.5px] font-semibold text-primary hover:border-primary/50"
+                    className="frontline-focus inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-card px-2 py-1 text-[11.5px] font-semibold text-primary hover:border-primary/50"
                 >
                     <Paperclip className="h-3 w-3 flex-none" />
                     <span className="min-w-0 truncate">{a.name}</span>
+                    {a.is_internal && (
+                        <StatusBadge variant="warning">Internal</StatusBadge>
+                    )}
+                    {a.catalogue_field_label && (
+                        <span className="sr-only">
+                            {' '}
+                            · {a.catalogue_field_label}
+                        </span>
+                    )}
                     <span className="flex-none text-muted-foreground">
                         {formatFileSize(a.size)}
                     </span>

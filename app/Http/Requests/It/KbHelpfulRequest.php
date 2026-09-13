@@ -5,6 +5,7 @@ namespace App\Http\Requests\It;
 use App\Domain\It\Services\ItKbAccessService;
 use App\Models\ItKbArticle;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * "Was this helpful?" vote on a published KB article (§I). Reachable by
@@ -37,6 +38,9 @@ class KbHelpfulRequest extends FormRequest
     {
         return [
             'helpful' => ['required', 'boolean'],
+            'solved' => ['sometimes', 'boolean'],
+            'lock_version' => [Rule::requiredIf(fn () => $this->boolean('solved')), 'integer', 'min:1'],
+            'actor_user_id' => ['sometimes', 'integer', 'min:1'],
         ];
     }
 }

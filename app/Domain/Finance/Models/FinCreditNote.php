@@ -5,6 +5,7 @@ namespace App\Domain\Finance\Models;
 use App\Models\Client;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinCreditNoteFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,11 +14,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FinCreditNote extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinCreditNoteFactory::new();
+        return FinCreditNoteFactory::new();
     }
 
     protected $table = 'fin_credit_notes';
@@ -87,7 +88,7 @@ class FinCreditNote extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
+        return $query->when($orgId, fn ($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
     }
 
     public function scopePayable($query)

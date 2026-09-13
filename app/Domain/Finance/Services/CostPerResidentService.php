@@ -105,7 +105,7 @@ class CostPerResidentService
         $trend = [];
 
         foreach ($monthlyCosts as $month => $totalCost) {
-            $monthStart = Carbon::parse($month . '-01')->startOfMonth();
+            $monthStart = Carbon::parse($month.'-01')->startOfMonth();
             $monthEnd = $monthStart->copy()->endOfMonth();
 
             [$avgResidents, $method] = $this->getAverageOccupancy($siteId, $monthStart, $monthEnd);

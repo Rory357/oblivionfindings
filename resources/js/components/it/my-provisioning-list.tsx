@@ -1,4 +1,5 @@
 import { EntityCard, EntityCardGrid } from '@/components/lists/entity-card';
+import { EntityChip } from '@/components/lists/entity-cells';
 import {
     EntityContextMenu,
     useEntityContextMenu,
@@ -17,6 +18,12 @@ export interface MyProvisioningRow {
     type: string;
     status: string;
     approval_status: string;
+    progress?: {
+        total: number;
+        done: number;
+        failed: number;
+        cancelled: number;
+    };
     created_at: string | null;
     updated_at: string | null;
     due_date: string | null;
@@ -38,6 +45,12 @@ export const provisioningStatus = (status: string) =>
         done: 'Completed',
         cancelled: 'Cancelled',
     })[status] ?? status.replaceAll('_', ' ');
+
+export function provisioningProgress(row: MyProvisioningRow): string {
+    if (!row.progress) return 'Current work status';
+    const { done, total, cancelled } = row.progress;
+    return `${done} of ${total} ${total === 1 ? 'task' : 'tasks'} completed${cancelled ? ` · ${cancelled} cancelled` : ''}`;
+}
 
 export function MyProvisioningList({
     page,
@@ -88,10 +101,17 @@ export function MyProvisioningList({
                             label: 'Status',
                             width: '1fr',
                             cell: (row) => (
-                                <StatusBadge
-                                    status={row.status}
-                                    label={provisioningStatus(row.status)}
-                                />
+                                <div className="space-y-1">
+                                    <StatusBadge
+                                        status={row.status}
+                                        label={provisioningStatus(row.status)}
+                                    />
+                                    {row.progress && (
+                                        <p className="text-caption">
+                                            {provisioningProgress(row)}
+                                        </p>
+                                    )}
+                                </div>
                             ),
                         },
                         {
@@ -138,6 +158,11 @@ export function MyProvisioningList({
                                         status={row.approval_status}
                                         label={`Approval: ${row.approval_status.replaceAll('_', ' ')}`}
                                     />
+                                    {row.progress && (
+                                        <EntityChip>
+                                            {provisioningProgress(row)}
+                                        </EntityChip>
+                                    )}
                                 </>
                             }
                             footer={{

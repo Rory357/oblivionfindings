@@ -1,17 +1,20 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItProvisioningTemplatePublicationService;
 use App\Domain\It\Services\ItProvisioningTemplateService;
 use App\Domain\It\Services\ItProvisioningWorkflowService;
 use App\Models\ItProvisioningTemplate;
 use App\Models\User;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 require dirname(__DIR__, 3).'/vendor/autoload.php';
 
@@ -20,7 +23,7 @@ try {
     if (getenv('APP_ENV') !== 'testing' || getenv('DB_HOST') !== '127.0.0.1'
         || preg_match('/^it_[a-f0-9]{16}$/D', $token) !== 1
         || getenv('DB_DATABASE') !== 'oblivion_it_support_test_'.$token
-        || count($argv) !== 8 || ! in_array($argv[1], ['edit', 'launch'], true)
+        || count($argv) !== 8 || ! in_array($argv[1], ['edit', 'launch', 'publish'], true)
         || ! ctype_digit($argv[2]) || ! ctype_digit($argv[3]) || ! ctype_digit($argv[4]) || ! ctype_digit($argv[5])
         || ! in_array($argv[6], ['first', 'second'], true)) {
         throw new RuntimeException('Template worker requires its exact parent disposable schema.');
@@ -64,6 +67,12 @@ try {
                 'expected_version' => (int) $expectedVersion, 'tasks' => $tasks,
             ]);
             $result = ['version_id' => $saved->current_version_id];
+        } elseif ($operation === 'publish') {
+            $published = app(ItProvisioningTemplatePublicationService::class)->publish($template, $actor, true, [
+                'expected_version' => (int) $expectedVersion, 'expected_published_version_id' => $template->published_version_id,
+                'reason' => 'Synthetic concurrent explicit publication.',
+            ]);
+            $result = ['version_id' => $published->published_version_id];
         } else {
             $profile = HrEmployeeProfile::query()->findOrFail((int) $profileId);
             $workflow = app(ItProvisioningWorkflowService::class)->launch($profile, 'joiner', 'synthetic_race',
@@ -81,6 +90,27 @@ try {
     echo json_encode(['status' => $status, 'waiting' => $waiting, 'operation' => $operation,
         'completed_at' => microtime(true), 'transaction_level' => DB::transactionLevel(), ...$result], JSON_THROW_ON_ERROR);
 } catch (Throwable $exception) {
-    fwrite(STDERR, 'Template worker failed: '.$exception::class.PHP_EOL);
+    // Failure metadata only: never print exception messages, SQL or bindings.
+    $root = str_replace('\\', '/', dirname(__DIR__, 3)).'/';
+    $locations = [];
+    foreach ([$exception, ...$exception->getTrace()] as $frame) {
+        $file = str_replace('\\', '/', $frame instanceof Throwable ? $frame->getFile() : ($frame['file'] ?? ''));
+        if (str_starts_with($file, $root.'app/') || str_starts_with($file, $root.'tests/')) {
+            $locations[] = ['file' => substr($file, strlen($root)),
+                'line' => $frame instanceof Throwable ? $frame->getLine() : ($frame['line'] ?? null)];
+        }
+    }
+    $failure = ['exception_class' => $exception::class, 'locations' => array_slice($locations, 0, 8)];
+    if ($exception instanceof ValidationException) {
+        $failure['validation_keys'] = array_keys($exception->errors());
+    }
+    if ($exception instanceof QueryException) {
+        $failure['sql_state'] = $exception->errorInfo[0] ?? null;
+        $failure['driver_error'] = $exception->errorInfo[1] ?? null;
+    }
+    if ($exception instanceof HttpExceptionInterface) {
+        $failure['http_status'] = $exception->getStatusCode();
+    }
+    fwrite(STDERR, json_encode(['failure' => $failure], JSON_THROW_ON_ERROR).PHP_EOL);
     exit(1);
 }

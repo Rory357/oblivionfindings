@@ -2,10 +2,10 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
-use App\Domain\Finance\Models\FinAccount;
-use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Http\Requests\StoreBankAccountRequest;
 use App\Domain\Finance\Http\Requests\UpdateBankAccountRequest;
+use App\Domain\Finance\Models\FinAccount;
+use App\Domain\Finance\Models\FinBankAccount;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -26,7 +26,7 @@ class BankAccountController extends Controller
             }])
             ->orderBy('name')
             ->get()
-            ->map(fn($account) => [
+            ->map(fn ($account) => [
                 'id' => $account->id,
                 'name' => $account->name,
                 'bank_name' => $account->bank_name,
@@ -78,7 +78,7 @@ class BankAccountController extends Controller
             ->orderByDesc('id')
             ->limit(50)
             ->get()
-            ->map(fn($txn) => [
+            ->map(fn ($txn) => [
                 'id' => $txn->id,
                 'transaction_date' => $txn->transaction_date->format('Y-m-d'),
                 'amount' => (float) $txn->amount,
@@ -92,7 +92,7 @@ class BankAccountController extends Controller
             ->orderByDesc('statement_date')
             ->limit(10)
             ->get()
-            ->map(fn($recon) => [
+            ->map(fn ($recon) => [
                 'id' => $recon->id,
                 'statement_date' => $recon->statement_date->format('Y-m-d'),
                 'statement_balance' => (float) $recon->statement_balance,
@@ -104,8 +104,8 @@ class BankAccountController extends Controller
         $balanceHistory = $bankAccount->transactions()
             ->orderBy('transaction_date')
             ->get()
-            ->groupBy(fn($t) => $t->transaction_date->format('d M'))
-            ->map(fn($group, $date) => [
+            ->groupBy(fn ($t) => $t->transaction_date->format('d M'))
+            ->map(fn ($group, $date) => [
                 'date' => $date,
                 'amount' => $group->sum('amount'),
             ])

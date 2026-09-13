@@ -31,7 +31,7 @@ class PettyCashController extends Controller
                 'float_amount' => (float) $fund->float_amount,
                 'current_balance' => (float) $fund->current_balance,
                 'custodian_name' => $fund->custodian->name ?? null,
-                'gl_account_name' => $fund->glAccount ? $fund->glAccount->code . ' - ' . $fund->glAccount->name : null,
+                'gl_account_name' => $fund->glAccount ? $fund->glAccount->code.' - '.$fund->glAccount->name : null,
                 'is_active' => $fund->is_active,
             ]);
 

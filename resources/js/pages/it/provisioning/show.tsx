@@ -1,4 +1,5 @@
 import {
+    provisioningProgress,
     provisioningStatus,
     type MyProvisioningRow,
 } from '@/components/it/my-provisioning-list';
@@ -17,6 +18,7 @@ import {
     PageHeaderSearch,
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
+import { formatFileSize } from '@/components/ui/file-dropzone';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
@@ -29,6 +31,13 @@ interface TrackingRequest extends MyProvisioningRow {
     catalogue_version: number;
     submitted_at: string | null;
     answers: { label: string; value: string }[];
+    attachments?: {
+        id: number;
+        name: string;
+        size: number;
+        url: string;
+        catalogue_field_label: string;
+    }[];
     events: { id: number; label: string; at: string | null }[];
 }
 
@@ -61,6 +70,11 @@ export default function ProvisioningTracking({
     );
     const events = request.events.filter((event) =>
         event.label.toLocaleLowerCase().includes(needle),
+    );
+    const attachments = (request.attachments ?? []).filter((file) =>
+        `${file.catalogue_field_label} ${file.name}`
+            .toLocaleLowerCase()
+            .includes(needle),
     );
     const refresh = () => {
         if (refreshing) return;
@@ -130,7 +144,7 @@ export default function ProvisioningTracking({
                                 {provisioningStatus(request.status)}
                             </PageHeaderMeterBig>
                             <PageHeaderMeterCaption>
-                                Current work status
+                                {provisioningProgress(request)}
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
@@ -248,6 +262,40 @@ export default function ProvisioningTracking({
                                         ? 'No submitted details match this search.'
                                         : 'This form did not require any additional details.'}
                                 </p>
+                            )}
+                            {attachments.length > 0 && (
+                                <section
+                                    className="mt-5"
+                                    aria-label="Submitted files"
+                                >
+                                    <h3 className="text-sm font-semibold">
+                                        Submitted files
+                                    </h3>
+                                    <ul className="mt-3 divide-y divide-border">
+                                        {attachments.map((file) => (
+                                            <li key={file.id} className="py-3">
+                                                <a
+                                                    className="frontline-focus rounded-sm text-sm font-semibold break-words text-primary hover:underline"
+                                                    href={file.url}
+                                                    aria-label={`${file.name} (opens in a new tab)`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    {file.name}
+                                                    <span className="sr-only">
+                                                        {' '}
+                                                        (opens in a new tab)
+                                                    </span>
+                                                </a>
+                                                <p className="text-caption mt-1">
+                                                    {file.catalogue_field_label}{' '}
+                                                    ·{' '}
+                                                    {formatFileSize(file.size)}
+                                                </p>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </section>
                             )}
                         </>
                     ) : events.length ? (

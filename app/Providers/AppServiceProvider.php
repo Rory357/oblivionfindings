@@ -470,6 +470,7 @@ class AppServiceProvider extends ServiceProvider
             'it_major_incident_update' => ItMajorIncidentUpdate::class,
             'it_problem' => ItProblem::class,
             'it_ticket_comment' => ItTicketComment::class,
+            'it_catalog_submission' => \App\Models\ItCatalogSubmission::class,
             'it_inbound_email' => ItInboundEmail::class,
             'it_team' => ItTeam::class,
             'it_queue' => ItQueue::class,

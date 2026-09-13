@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Models;
 
+use App\Domain\Governance\Models\SpendApproval;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Database\Factories\Finance\FinBillFactory;
@@ -78,7 +79,7 @@ class FinBill extends Model
      */
     public function spendApproval(): BelongsTo
     {
-        return $this->belongsTo(\App\Domain\Governance\Models\SpendApproval::class, 'spend_approval_id');
+        return $this->belongsTo(SpendApproval::class, 'spend_approval_id');
     }
 
     public function lines(): HasMany

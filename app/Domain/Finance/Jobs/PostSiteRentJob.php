@@ -40,7 +40,7 @@ class PostSiteRentJob implements ShouldQueue
     public function handle(FinancialEventService $service): void
     {
         $period = $this->periodMonth
-            ? Carbon::parse($this->periodMonth . '-01')
+            ? Carbon::parse($this->periodMonth.'-01')
             : Carbon::now()->subMonthNoOverflow()->startOfMonth();
 
         $periodStr = $period->format('Y-m');
@@ -104,7 +104,7 @@ class PostSiteRentJob implements ShouldQueue
 
         if ($errors !== []) {
             $failedSummary = implode('; ', $errors);
-            Log::error("PostSiteRentJob: Completed with partial failures ({$posted} posted, " . count($errors) . " failed): {$failedSummary}");
+            Log::error("PostSiteRentJob: Completed with partial failures ({$posted} posted, ".count($errors)." failed): {$failedSummary}");
             throw new \RuntimeException("PostSiteRentJob encountered partial failures: {$failedSummary}");
         }
 
@@ -160,14 +160,14 @@ class PostSiteRentJob implements ShouldQueue
             // Full month: use normalised monthly (annual / 12) for cleaner numbers
             $amount = bcdiv((string) $annualRent, '12', 2);
             $description = "Rent: {$site->name} — {$periodStr}"
-                . ($site->landlord_name ? " ({$site->landlord_name})" : '');
+                .($site->landlord_name ? " ({$site->landlord_name})" : '');
         } else {
             // Partial month: exact day-based proration
             $amount = bcmul($dailyRate, (string) $billableDays, 2);
             $description = "Rent: {$site->name} — {$periodStr}"
-                . " [prorated: {$billableStart->format('d M')}–{$billableEnd->format('d M')},"
-                . " {$billableDays}/{$daysInMonth} days]"
-                . ($site->landlord_name ? " ({$site->landlord_name})" : '');
+                ." [prorated: {$billableStart->format('d M')}–{$billableEnd->format('d M')},"
+                ." {$billableDays}/{$daysInMonth} days]"
+                .($site->landlord_name ? " ({$site->landlord_name})" : '');
         }
 
         return [$amount, $description];

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FinAuditExport extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $table = 'fin_audit_exports';
 
@@ -55,13 +55,13 @@ class FinAuditExport extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
+        return $query->when($orgId, fn ($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
     }
 
     public function getFormattedFileSizeAttribute(): string
     {
         $bytes = $this->file_size_bytes;
-        if (!$bytes) {
+        if (! $bytes) {
             return '-';
         }
 
@@ -72,6 +72,6 @@ class FinAuditExport extends Model
             $i++;
         }
 
-        return round($bytes, 2) . ' ' . $units[$i];
+        return round($bytes, 2).' '.$units[$i];
     }
 }

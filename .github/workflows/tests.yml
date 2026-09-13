@@ -101,6 +101,10 @@ jobs:
       - name: Build Assets
         run: npm run build
 
+      - name: Guard retired Today navigation
+        if: matrix.suite == 'foundation'
+        run: npx vitest run resources/js/components/today-retirement.test.tsx
+
       - name: Copy Environment File
         run: cp .env.example .env
 

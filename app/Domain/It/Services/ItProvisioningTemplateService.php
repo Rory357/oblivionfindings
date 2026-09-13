@@ -2,6 +2,7 @@
 
 namespace App\Domain\It\Services;
 
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\ItProvisioningTemplate;
 use App\Models\ItTeam;
 use App\Models\Site;
@@ -64,8 +65,7 @@ final class ItProvisioningTemplateService
                 ->lockForUpdate()
                 ->firstOrFail();
             // Check the existing record before considering a replacement Site.
-            abort_unless($template->site_id === null || $actor->canDo('it.organisationWide')
-                || in_array((int) $template->site_id, $this->workAccess->approvedSiteIds($actor), true), 404);
+            abort_unless(app(ItProvisioningTemplatePublicationService::class)->canView($actor, $template), 404);
             if (! isset($data['expected_version']) || (int) $data['expected_version'] !== $template->lock_version) {
                 throw ValidationException::withMessages(['expected_version' => 'This template has changed. Reload the saved version and review your changes before saving.']);
             }
@@ -113,7 +113,8 @@ final class ItProvisioningTemplateService
 
     private function guard(User $actor): void
     {
-        if ($actor->approved_at === null || ! $actor->canDo('it.manage')) {
+        if ($actor->approved_at === null || ! $actor->canDo('it.manage')
+            || ! app(HrCurrentStaffService::class)->isCurrent($actor)) {
             throw new DomainException('You are not allowed to manage provisioning templates.');
         }
     }

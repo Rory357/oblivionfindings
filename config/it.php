@@ -45,6 +45,7 @@ return [
         'malware_scanner' => [
             'binary' => env('IT_INBOUND_MALWARE_SCANNER_BINARY'),
             'name' => env('IT_INBOUND_MALWARE_SCANNER_NAME', 'clamav'),
+            'database_path' => env('IT_INBOUND_MALWARE_SCANNER_DATABASE'),
             'fd_pass' => env('IT_INBOUND_MALWARE_SCANNER_FD_PASS', false),
             'timeout_seconds' => env('IT_INBOUND_MALWARE_SCANNER_TIMEOUT', 30),
         ],

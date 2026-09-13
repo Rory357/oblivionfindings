@@ -27,6 +27,7 @@ class SaveItCatalogItemRequest extends FormRequest
         'employee',
         'user',
         'asset',
+        'attachment',
     ];
 
     public function authorize(): bool
@@ -60,6 +61,7 @@ class SaveItCatalogItemRequest extends FormRequest
             'requires_approval' => ['required', 'boolean'],
             'internal_only' => ['required', 'boolean'],
             'site_scope' => ['sometimes', 'nullable', 'array', 'min:1', 'max:100'],
+            'provisioning_template_version_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'site_scope.*' => ['integer', 'min:1', 'distinct'],
             'search_terms' => ['present', 'array', 'max:20'],
             'search_terms.*' => ['string', 'max:100', 'distinct:strict'],
@@ -120,6 +122,9 @@ class SaveItCatalogItemRequest extends FormRequest
 
                 $min = $field['min'] ?? null;
                 $max = $field['max'] ?? null;
+                if ($type === 'attachment' && ((is_numeric($max) && (int) $max > 5) || (is_numeric($min) && (int) $min > 5))) {
+                    $validator->errors()->add("form_schema.fields.{$index}.max", 'Attachment fields allow at most five files per request.');
+                }
                 if (is_numeric($min) && is_numeric($max) && (int) $max < (int) $min) {
                     $validator->errors()->add(
                         "form_schema.fields.{$index}.max",

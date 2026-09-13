@@ -43,7 +43,22 @@ import {
     type SlaPolicyGrid,
     type TicketRow,
 } from '@/components/it/it-wizards';
+import {
+    KNOWLEDGE_DOCUMENT_TYPES,
+    KNOWLEDGE_SECTIONS,
+} from '@/components/it/knowledge-document';
 import { KnowledgeDraftDeleteDialog } from '@/components/it/knowledge-draft-delete-dialog';
+import {
+    KnowledgeLibrary,
+    type KnowledgePage,
+} from '@/components/it/knowledge-library';
+import { knowledgeDocumentHref } from '@/components/it/knowledge-navigation';
+import {
+    KnowledgeRecordSearch,
+    KnowledgeRelatedRecords,
+    type KnowledgeRecord,
+} from '@/components/it/knowledge-related-records';
+import { KnowledgeRevisionDialog } from '@/components/it/knowledge-revision-dialog';
 import {
     MyProvisioningList,
     type MyProvisioningPage,
@@ -52,7 +67,6 @@ import {
     MyTicketsList,
     type MyTicketRow,
 } from '@/components/it/my-tickets-list';
-import { ProvisioningCancelDialog } from '@/components/it/provisioning-cancel-dialog';
 import { TicketAdvancedFilters } from '@/components/it/ticket-advanced-filters';
 import { TicketCloseDialog } from '@/components/it/ticket-close-dialog';
 import { TicketDrawer } from '@/components/it/ticket-drawer';
@@ -80,16 +94,6 @@ import {
     PageHeaderSearch,
     PageHeaderViewToggle,
 } from '@/components/page/page-header';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -114,7 +118,6 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     Archive,
-    BarChart3,
     BookMarked,
     BookOpen,
     CheckCircle2,
@@ -130,13 +133,10 @@ import {
     List,
     Mail,
     MessageSquare,
-    MoreHorizontal,
     Pencil,
     Play,
-    Plus,
     RotateCcw,
     Send,
-    Server,
     Star,
     ThumbsDown,
     ThumbsUp,
@@ -200,6 +200,10 @@ interface Filters {
 
 /** A published KB article as browsed by a requester (§I). */
 interface KbPublishedRow {
+    content_loaded?: boolean;
+    related_records?: KnowledgeRecord[];
+    document_type?: string;
+    structured_content?: Record<string, string | null> | null;
     id: number;
     title: string;
     category: string;
@@ -212,7 +216,8 @@ interface KbPublishedRow {
     related_service: string | null;
 }
 
-interface Props {
+export interface ItWorkspaceProps {
+    workspace?: 'desk' | 'provisioning' | 'knowledge' | 'reports';
     /** Agent-only props — absent from self-service (requester) payloads. */
     requests?: Paginated<RequestRow> | null;
     bulkResult?: ItBulkResult | null;
@@ -233,6 +238,17 @@ interface Props {
     /** Knowledge-base catalogue for the agent Knowledge tab (§I). */
     kbArticles?: KbRow[];
     kbOptions?: KbOptions;
+    knowledgePage?: KnowledgePage | null;
+    knowledgeContext?: KnowledgeRecord | null;
+    knowledgeSummary?: {
+        total?: number;
+        published?: number;
+        in_review?: number;
+        draft?: number;
+        overdue?: number;
+        awaiting_review?: number;
+    };
+    selectedKbArticle?: KbRow | null;
     filters?: Filters;
     /** User-owned queue filters; their filter JSON never leaves the server. */
     savedTicketFilters?: SavedTicketFilterRow[];
@@ -276,11 +292,6 @@ interface ProvisioningWorkflowRow {
     employee: { id: number; name: string; role: string | null };
     progress: { total: number; completed: number; failed: number };
 }
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Home', href: '/dashboard' },
-    { title: 'IT & Support', href: '/it' },
-];
 
 /** Sentinel — Radix <SelectItem value=""> crashes at runtime. */
 const ALL = 'all';
@@ -355,20 +366,15 @@ const TICKET_STATUSES = [
 const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 const TICKET_CATEGORIES = ['hardware', 'account', 'network', 'other'];
 const SLA_STATES = ['ok', 'at_risk', 'breached', 'met', 'paused', 'unmeasured'];
-const VIEW_TABS = new Set([
-    'overview',
-    'tickets',
-    'provisioning',
-    'knowledge',
-    'reports',
-]);
-const REQUEST_TABS = new Set(['catalog', 'my-tickets', 'knowledge']);
+const VIEW_TABS = new Set(['overview', 'tickets']);
+const REQUEST_TABS = new Set(['catalog', 'my-tickets']);
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
 export default function ItIndex({
+    workspace = 'desk',
     requests,
     bulkResult,
     provisioningWorkflows = [],
@@ -382,6 +388,10 @@ export default function ItIndex({
     intakePolicy,
     kbArticles = [],
     kbOptions = { owners: [], sites: [], services: [] },
+    knowledgePage,
+    knowledgeContext = null,
+    knowledgeSummary,
+    selectedKbArticle = null,
     filters,
     savedTicketFilters = [],
     draftRecovery = { enabled: false },
@@ -397,7 +407,22 @@ export default function ItIndex({
     kbPublished = [],
     summary,
     can,
-}: Props) {
+}: ItWorkspaceProps) {
+    const workspaceTitle = {
+        desk: 'Service Desk',
+        provisioning: 'Provisioning',
+        knowledge:
+            can.view || can.knowledge_author || can.knowledge_review
+                ? 'Knowledge & Documentation'
+                : 'Guides',
+        reports: 'IT Reports',
+    }[workspace];
+    const workspacePath = workspace === 'desk' ? '/it' : `/it/${workspace}`;
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
+        { title: 'IT & Support', href: '/it' },
+        { title: workspaceTitle, href: workspacePath },
+    ];
     // Default landing tab (§O): a right-click "Set as default view" persists to
     // localStorage; a `?tab=` deep link always wins over it. Validate the stored
     // id against what this user can actually see before trusting it.
@@ -407,6 +432,14 @@ export default function ItIndex({
     );
     const canAuthorKnowledge = can.knowledge_author === true;
     const canReviewKnowledge = can.knowledge_review === true;
+    const canEditKnowledge = (article: KbRow) =>
+        canAuthorKnowledge &&
+        article.can.author &&
+        article.can.edit !== false &&
+        (article.status === 'draft' ||
+            (article.revision_ready === true &&
+                article.status === 'published' &&
+                article.working_copy?.status !== 'in_review'));
     const showKnowledgeCatalogue =
         can.view || canAuthorKnowledge || canReviewKnowledge;
     const capabilityDefault = can.view
@@ -416,7 +449,7 @@ export default function ItIndex({
           : 'knowledge';
     const tabIsAllowed = (id: string | null): id is string => {
         if (!id) return false;
-        if (id === 'knowledge') return showKnowledgeCatalogue || can.request;
+        if (workspace !== 'desk') return id === workspace;
         if (VIEW_TABS.has(id)) return can.view;
         if (REQUEST_TABS.has(id)) return can.request;
 
@@ -440,7 +473,9 @@ export default function ItIndex({
     });
     const [defaultTab, setDefaultTab] = useState<string | null>(storedDefault);
     const requestedTab =
-        pageQuery.get('tab') ?? storedDefault ?? capabilityDefault;
+        workspace !== 'desk'
+            ? workspace
+            : (pageQuery.get('tab') ?? storedDefault ?? capabilityDefault);
     const setTab = (id: string) => navigate({ tab: id });
     const tab = tabIsAllowed(requestedTab) ? requestedTab : capabilityDefault;
     const [modal, setModal] = useState<ItModal | null>(null);
@@ -489,29 +524,6 @@ export default function ItIndex({
                       tone: 'info',
                       badge: summary?.tickets?.open ?? 0,
                   },
-                  {
-                      id: 'provisioning',
-                      label: 'Provisioning',
-                      icon: Server,
-                      tone: 'primary',
-                      badge:
-                          (summary?.provisioning?.pending ?? 0) +
-                          (summary?.provisioning?.in_progress ?? 0) +
-                          (summary?.provisioning?.failed ?? 0),
-                  },
-                  {
-                      id: 'knowledge',
-                      label: 'Knowledge',
-                      icon: BookOpen,
-                      tone: 'primary',
-                      badge: kbArticles.length,
-                  },
-                  {
-                      id: 'reports',
-                      label: 'Reports',
-                      icon: BarChart3,
-                      tone: 'primary',
-                  },
               ] as HrTabItem[])
             : []),
         ...(can.request
@@ -532,30 +544,7 @@ export default function ItIndex({
                           (summary?.my.total ?? myTickets.length) +
                           (myProvisioning?.total ?? 0),
                   },
-                  // Requester-only Knowledge browse — agents get the manage
-                  // version in their own (can.view) Knowledge tab above.
-                  ...(!showKnowledgeCatalogue
-                      ? [
-                            {
-                                id: 'knowledge',
-                                label: 'Knowledge',
-                                icon: BookOpen,
-                                tone: 'primary' as const,
-                            },
-                        ]
-                      : []),
               ] as HrTabItem[])
-            : []),
-        ...(!can.view && showKnowledgeCatalogue
-            ? [
-                  {
-                      id: 'knowledge',
-                      label: 'Knowledge',
-                      icon: BookOpen,
-                      tone: 'primary' as const,
-                      badge: kbArticles.length,
-                  },
-              ]
             : []),
     ];
 
@@ -610,24 +599,36 @@ export default function ItIndex({
     const navigate = (
         patch: Record<string, string | undefined>,
         replace = false,
+        onSuccess?: () => void,
     ) => {
         if (searchTimer.current) clearTimeout(searchTimer.current);
         const query = new URLSearchParams(pageQuery);
-        if (!Object.keys(patch).every((key) => key === 'list_view')) {
+        if (
+            !Object.keys(patch).every(
+                (key) => key === 'list_view' || key === 'article',
+            )
+        ) {
             query.delete('tickets_page');
             query.delete('requests_page');
             query.delete('my_provisioning_page');
+            query.delete('page');
         }
+        if (workspace === 'knowledge') query.delete('article');
         Object.entries(patch).forEach(([key, value]) =>
             value === undefined || value === ''
                 ? query.delete(key)
                 : query.set(key, value),
         );
-        if (!query.has('tab')) query.set('tab', tab);
-        router.get('/it', Object.fromEntries(query), {
+        if (workspace === 'desk') {
+            if (!query.has('tab')) query.set('tab', tab);
+        } else {
+            query.delete('tab');
+        }
+        router.get(workspacePath, Object.fromEntries(query), {
             preserveState: true,
             preserveScroll: true,
             replace,
+            ...(onSuccess ? { onSuccess } : {}),
         });
     };
 
@@ -680,18 +681,22 @@ export default function ItIndex({
             { preserveState: false, preserveScroll: true },
         );
 
-    const [search, setSearch] = useState(filters?.q ?? '');
+    const currentSearch =
+        workspace === 'knowledge'
+            ? (pageQuery.get('q') ?? '')
+            : (filters?.q ?? '');
+    const [search, setSearch] = useState(currentSearch);
     const myQuery = pageQuery.get('my_q') ?? '';
     const myStatus = pageQuery.get('my_status') ?? ALL;
     const [mySearch, setMySearch] = useState(myQuery);
     useEffect(() => {
         if (searchTimer.current) clearTimeout(searchTimer.current);
-        setSearch(filters?.q ?? '');
+        setSearch(currentSearch);
         setMySearch(myQuery);
         return () => {
             if (searchTimer.current) clearTimeout(searchTimer.current);
         };
-    }, [page.url, filters?.q, myQuery]);
+    }, [page.url, currentSearch, myQuery]);
     const updateSearch = (value: string, mine = false) => {
         (mine ? setMySearch : setSearch)(value);
         if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -839,8 +844,6 @@ export default function ItIndex({
     } | null>(null);
     const [waitingSelectedTickets, setWaitingSelectedTickets] = useState(false);
     const [waitingTicket, setWaitingTicket] = useState<TicketRow | null>(null);
-    const [confirmBulkFulfil, setConfirmBulkFulfil] = useState(false);
-    const [cancelRequest, setCancelRequest] = useState<RequestRow | null>(null);
     const [bulkBusy, setBulkBusy] = useState(false);
     const [bulkOutcome, setBulkOutcome] = useState<{
         actorId: number | undefined;
@@ -883,17 +886,54 @@ export default function ItIndex({
         });
     };
     const [confirmKbDelete, setConfirmKbDelete] = useState<KbRow | null>(null);
+    const [historyArticleId, setHistoryArticleId] = useState<number | null>(
+        null,
+    );
+    const [recordBrowserOpen, setRecordBrowserOpen] = useState(false);
+    const createKnowledge = () =>
+        setModal({
+            type: 'kb',
+            draft: knowledgeContext
+                ? {
+                      related_records: [
+                          { ...knowledgeContext, relation: 'documents' },
+                      ],
+                  }
+                : undefined,
+        });
+    const historyArticle = kbArticles.find(
+        (article) => article.id === historyArticleId && article.can.manage,
+    );
     const [confirmKbRetire, setConfirmKbRetire] = useState<KbRow | null>(null);
     const [retirementReason, setRetirementReason] = useState('');
+    const [retirementActor, setRetirementActor] = useState(actorId);
+    const [retirementBusy, setRetirementBusy] = useState(false);
+    const [retirementError, setRetirementError] = useState('');
 
     /* ---------------- requester KB browse (§I) ---------------- */
-    const [readerArticleId, setReaderArticleId] = useState<number | null>(null);
-    const [kbSearch, setKbSearch] = useState('');
-    const [kbCategory, setKbCategory] = useState<string>(ALL);
-    const [kbStatus, setKbStatus] = useState<string>(ALL);
+    const [readerArticleId, setReaderArticleId] = useState<number | null>(
+        () => {
+            const article = pageQuery.get('article');
+            return article && /^\d+$/.test(article) ? Number(article) : null;
+        },
+    );
+    const kbSearch = search;
+    const setKbSearch = (q: string) => updateSearch(q);
+    const kbCategory = pageQuery.get('category') ?? ALL;
+    const setKbCategory = (category: string) =>
+        navigate({ category: category === ALL ? undefined : category });
+    const kbStatus = pageQuery.get('status') ?? ALL;
+    const setKbStatus = (status: string) =>
+        navigate({ status: status === ALL ? undefined : status });
     // Every rail view carries its own header filter pills (PAGE_HEADER_STYLE_GUIDE.md §6).
     const [overviewPriority, setOverviewPriority] = useState<string>(ALL);
-    const [reportDays, setReportDays] = useState(30);
+    const reportDays = REPORT_RANGES.some(
+        (range) => range.days === Number(pageQuery.get('days')),
+    )
+        ? Number(pageQuery.get('days'))
+        : 30;
+    const setReportDays = (days: number) =>
+        navigate({ days: String(days), from: undefined, to: undefined });
     const [catalogQuery, setCatalogQuery] = useState('');
     const [catalogCategory, setCatalogCategory] = useState<string>(ALL);
     // The server is canonical; this local overlay keeps the open reader in
@@ -923,30 +963,55 @@ export default function ItIndex({
             setReopenTicket(null);
     }, [can.manage, tickets, modal, closeTicket, waitingTicket, reopenTicket]);
 
-    const filteredKb = kbPublished.filter((a) => {
-        const q = kbSearch.trim().toLowerCase();
-        return (
-            (kbCategory === ALL || a.category === kbCategory) &&
-            (q === '' ||
-                a.title.toLowerCase().includes(q) ||
-                (a.body ?? '').toLowerCase().includes(q))
-        );
-    });
+    const filteredKb = knowledgePage
+        ? kbPublished
+        : kbPublished.filter((a) => {
+              const q = kbSearch.trim().toLowerCase();
+              return (
+                  (kbCategory === ALL || a.category === kbCategory) &&
+                  (q === '' ||
+                      a.title.toLowerCase().includes(q) ||
+                      (a.body ?? '').toLowerCase().includes(q))
+              );
+          });
     /** Agent knowledge list, narrowed by the header search + pills. */
-    const agentKb = kbArticles.filter((a) => {
-        const q = kbSearch.trim().toLowerCase();
-        return (
-            (kbCategory === ALL || a.category === kbCategory) &&
-            (kbStatus === ALL || a.status === kbStatus) &&
-            (q === '' ||
-                a.title.toLowerCase().includes(q) ||
-                (a.body ?? '').toLowerCase().includes(q))
-        );
-    });
-    const currentReaderArticle =
+    const agentKb = knowledgePage
+        ? kbArticles
+        : kbArticles.filter((a) => {
+              const q = kbSearch.trim().toLowerCase();
+              return (
+                  (kbCategory === ALL || a.category === kbCategory) &&
+                  (kbStatus === ALL ||
+                      (a.working_copy?.status ?? a.status) === kbStatus) &&
+                  (!pageQuery.get('document_type') ||
+                      a.document_type === pageQuery.get('document_type')) &&
+                  (q === '' ||
+                      a.title.toLowerCase().includes(q) ||
+                      (a.body ?? '').toLowerCase().includes(q))
+              );
+          });
+    const readerCandidate =
+        (selectedKbArticle?.id === readerArticleId
+            ? selectedKbArticle
+            : null) ??
         (showKnowledgeCatalogue ? kbArticles : kbPublished).find(
             (article) => article.id === readerArticleId,
-        ) ?? null;
+        ) ??
+        null;
+    const currentReaderArticle =
+        readerCandidate?.content_loaded === false ? null : readerCandidate;
+    const openKnowledgeReader = (article: KbRow) => {
+        router.visit(knowledgeDocumentHref(article.id, page.url));
+    };
+    useEffect(() => {
+        const selectedId = new URL(
+            page.url,
+            'http://local.invalid',
+        ).searchParams.get('article');
+        setReaderArticleId(
+            selectedId && /^\d+$/.test(selectedId) ? Number(selectedId) : null,
+        );
+    }, [page.url]);
     useEffect(() => {
         if (readerArticleId !== null && currentReaderArticle === null) {
             setReaderArticleId(null);
@@ -957,11 +1022,8 @@ export default function ItIndex({
             modal?.type === 'kb' &&
             (!canAuthorKnowledge ||
                 (modal.article &&
-                    !kbArticles.some(
-                        (a) =>
-                            a.id === modal.article?.id &&
-                            a.can.author &&
-                            a.status === 'draft',
+                    kbArticles.some(
+                        (a) => a.id === modal.article?.id && !a.can.author,
                     )))
         ) {
             setModal(null);
@@ -980,7 +1042,8 @@ export default function ItIndex({
         }
         if (
             confirmKbRetire &&
-            (!canReviewKnowledge ||
+            (retirementActor !== actorId ||
+                !canReviewKnowledge ||
                 !kbArticles.some(
                     (a) =>
                         a.id === confirmKbRetire.id &&
@@ -998,6 +1061,8 @@ export default function ItIndex({
         modal,
         confirmKbDelete,
         confirmKbRetire,
+        retirementActor,
+        actorId,
     ]);
     const readerVote = currentReaderArticle
         ? (submittedKbVotes[currentReaderArticle.id] ??
@@ -1008,27 +1073,41 @@ export default function ItIndex({
 
     /** Open the reader and count the read (server guards publication and access). */
     const openArticle = (a: KbPublishedRow) => {
-        if (!kbPublished.some((article) => article.id === a.id)) return;
-        setReaderArticleId(a.id);
-        router.post(
-            `/it/kb/${a.id}/view`,
-            {},
-            {
-                preserveScroll: true,
-                preserveState: true,
-                only: ['kbPublished'],
-            },
-        );
+        if (workspace === 'knowledge') {
+            router.visit(knowledgeDocumentHref(a.id, page.url));
+            return;
+        }
+        if (
+            !kbPublished.some((article) => article.id === a.id) &&
+            selectedKbArticle?.id !== a.id
+        )
+            return;
+        const recordView = () =>
+            router.post(
+                `/it/kb/${a.id}/view`,
+                {},
+                {
+                    preserveScroll: true,
+                    preserveState: true,
+                    only: ['kbPublished', 'selectedKbArticle'],
+                },
+            );
+        if (a.content_loaded === false) {
+            navigate({ article: String(a.id) }, false, recordView);
+        } else {
+            setReaderArticleId(a.id);
+            recordView();
+        }
     };
 
     const voteHelpful = (a: Pick<KbPublishedRow, 'id'>, helpful: boolean) => {
-        const serverArticle = kbPublished.find(
-            (article) => article.id === a.id,
-        );
+        const serverArticle =
+            kbPublished.find((article) => article.id === a.id) ??
+            (selectedKbArticle?.id === a.id ? selectedKbArticle : null);
         if (
             !serverArticle ||
             submittingKbVoteFor !== null ||
-            (submittedKbVotes[a.id] ?? serverArticle.user_vote) !== null
+            (submittedKbVotes[a.id] ?? serverArticle.user_vote ?? null) !== null
         )
             return;
         setSubmittingKbVoteFor(a.id);
@@ -1038,15 +1117,25 @@ export default function ItIndex({
             {
                 preserveScroll: true,
                 preserveState: true,
-                only: ['kbPublished'],
+                only: ['kbPublished', 'selectedKbArticle'],
                 onSuccess: (page) => {
                     const flash = page.props.flash as
                         | { success?: string }
                         | undefined;
                     if (flash?.success) toast.success(flash.success);
-                    const canonicalVote = (
-                        page.props.kbPublished as KbPublishedRow[] | undefined
-                    )?.find((article) => article.id === a.id)?.user_vote;
+                    const refreshedSelected = page.props.selectedKbArticle as
+                        | KbRow
+                        | null
+                        | undefined;
+                    const canonicalVote =
+                        (
+                            page.props.kbPublished as
+                                | KbPublishedRow[]
+                                | undefined
+                        )?.find((article) => article.id === a.id)?.user_vote ??
+                        (refreshedSelected?.id === a.id
+                            ? refreshedSelected.user_vote
+                            : null);
                     if (typeof canonicalVote === 'boolean') {
                         setSubmittedKbVotes((current) => ({
                             ...current,
@@ -1140,8 +1229,6 @@ export default function ItIndex({
                 expected_versions: ticketSel.versions,
             });
     };
-    const runProvisioningBulk = (payload: Record<string, unknown>) =>
-        runBulkTo('/it/provisioning/bulk', reqSel, payload);
 
     /** CSV export of the provisioning queue, carrying the active filters so the
      *  download matches what the agent is looking at (streamed, agent-only). */
@@ -1163,10 +1250,15 @@ export default function ItIndex({
     const act = (
         method: 'post' | 'patch',
         url: string,
-        data: Record<string, string> = {},
+        data: Record<string, string | number> = {},
     ) => {
         router[method](url, data, {
             preserveScroll: true,
+            onError: (errors) =>
+                toast.error(
+                    Object.values(errors)[0] ??
+                        'The change could not be saved.',
+                ),
             onSuccess: (page) => {
                 const flash = page.props.flash as
                     | { error?: string; success?: string }
@@ -1188,6 +1280,8 @@ export default function ItIndex({
     const runKbRetire = () => {
         if (
             !confirmKbRetire ||
+            retirementBusy ||
+            retirementActor !== actorId ||
             !canReviewKnowledge ||
             !kbArticles.some(
                 (a) =>
@@ -1201,113 +1295,152 @@ export default function ItIndex({
             toast.error('Add a reason so the retirement remains auditable.');
             return;
         }
-        act('post', `/it/kb/${confirmKbRetire.id}/retire`, {
-            reason: retirementReason.trim(),
-        });
-        setConfirmKbRetire(null);
-        setRetirementReason('');
+        setRetirementBusy(true);
+        setRetirementError('');
+        router.post(
+            `/it/kb/${confirmKbRetire.id}/retire`,
+            {
+                actor_user_id: retirementActor,
+                reason: retirementReason.trim(),
+                lock_version: confirmKbRetire.lock_version ?? 1,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: (response) => {
+                    const error = (
+                        response.props.flash as { error?: string } | undefined
+                    )?.error;
+                    if (error) {
+                        setRetirementError(error);
+                        return;
+                    }
+                    setConfirmKbRetire(null);
+                    setRetirementReason('');
+                },
+                onError: (errors) =>
+                    setRetirementError(
+                        Object.values(errors)[0] ??
+                            'The document was not retired. Your reason is retained.',
+                    ),
+                onFinish: () => setRetirementBusy(false),
+            },
+        );
     };
 
-    const kbMenu = (a: KbRow) => {
-        const canAuthor = canAuthorKnowledge && a.can.author;
-        const canReview = canReviewKnowledge && a.can.review;
-        const lifecycleActions =
-            a.status === 'draft' && canAuthor
-                ? [
-                      {
-                          kind: 'item' as const,
-                          label: 'Send for review',
-                          icon: Send,
-                          onSelect: () =>
-                              act('post', `/it/kb/${a.id}/submit-review`),
-                      },
-                  ]
-                : a.status === 'in_review'
-                  ? [
-                        ...(canReview
-                            ? [
-                                  {
-                                      kind: 'item' as const,
-                                      label: 'Approve & publish',
-                                      icon: CheckCircle2,
-                                      tone: 'success' as const,
-                                      onSelect: () =>
-                                          act('post', `/it/kb/${a.id}/publish`),
-                                  },
-                              ]
-                            : []),
-                        ...(canAuthor
-                            ? [
-                                  {
-                                      kind: 'item' as const,
-                                      label: 'Return to draft',
-                                      icon: RotateCcw,
-                                      onSelect: () =>
-                                          act('post', `/it/kb/${a.id}/restore`),
-                                  },
-                              ]
-                            : []),
-                    ]
-                  : a.status === 'published' && canReview
-                    ? [
-                          {
-                              kind: 'item' as const,
-                              label: 'Retire article',
-                              icon: Archive,
-                              onSelect: () => setConfirmKbRetire(a),
-                          },
-                      ]
-                    : a.status === 'retired' && canAuthor
-                      ? [
-                            {
-                                kind: 'item' as const,
-                                label: 'Restore as draft',
-                                icon: RotateCcw,
-                                onSelect: () =>
-                                    act('post', `/it/kb/${a.id}/restore`),
-                            },
-                        ]
-                      : [];
-
-        const deleteDraft =
-            a.status === 'draft' && canAuthor
-                ? [
-                      { kind: 'divider' as const },
-                      {
-                          kind: 'item' as const,
-                          label: 'Delete draft',
-                          icon: XCircle,
-                          tone: 'critical' as const,
-                          onSelect: () => setConfirmKbDelete(a),
-                      },
-                  ]
-                : [];
-
-        return ctx.open([
-            ...(a.status === 'draft' && canAuthor
-                ? [
-                      {
-                          kind: 'item' as const,
-                          label: 'Edit',
-                          icon: Pencil,
-                          onSelect: () => setModal({ type: 'kb', article: a }),
-                      },
-                  ]
-                : []),
-            ...lifecycleActions,
-            ...deleteDraft,
+    const kbActions = (article: KbRow) => {
+        if (actorId === undefined) return [];
+        const author = canAuthorKnowledge && article.can.author;
+        const reviewer = canReviewKnowledge && article.can.review;
+        const state = article.working_copy?.status ?? article.status;
+        const version = {
+            actor_user_id: actorId,
+            lock_version: article.lock_version ?? 1,
+        };
+        return compactMenu([
+            {
+                label: 'Read document',
+                icon: BookOpen,
+                onClick: () => openKnowledgeReader(article),
+            },
+            {
+                label: 'Copy document link',
+                icon: Copy,
+                onClick: () =>
+                    copyText(
+                        new URL(
+                            `/it/knowledge/${article.id}`,
+                            window.location.origin,
+                        ).href,
+                        'Document link',
+                    ),
+            },
+            canEditKnowledge(article) && {
+                label:
+                    article.status === 'published'
+                        ? 'Edit proposed revision'
+                        : 'Edit',
+                icon: Pencil,
+                onClick: () =>
+                    router.visit(
+                        knowledgeDocumentHref(article.id, page.url, true),
+                    ),
+            },
+            author &&
+                state === 'draft' && {
+                    label: 'Send for review',
+                    icon: Send,
+                    onClick: () =>
+                        act(
+                            'post',
+                            `/it/kb/${article.id}/submit-review`,
+                            version,
+                        ),
+                },
+            reviewer &&
+                state === 'in_review' && {
+                    label: 'Review & publish',
+                    icon: CheckCircle2,
+                    onClick: () =>
+                        article.revision_ready
+                            ? setHistoryArticleId(article.id)
+                            : act(
+                                  'post',
+                                  `/it/kb/${article.id}/publish`,
+                                  version,
+                              ),
+                },
+            author &&
+                state === 'in_review' && {
+                    label: 'Return to draft',
+                    icon: RotateCcw,
+                    onClick: () =>
+                        act('post', `/it/kb/${article.id}/restore`, version),
+                },
+            article.revision_ready &&
+                article.can.manage && {
+                    label: 'Revisions & review',
+                    icon: BookOpen,
+                    onClick: () => setHistoryArticleId(article.id),
+                },
+            reviewer &&
+                article.can.retire !== false &&
+                article.status === 'published' &&
+                !article.working_copy && {
+                    label: 'Retire article',
+                    icon: Archive,
+                    onClick: () => {
+                        setRetirementActor(actorId);
+                        setRetirementError('');
+                        setRetirementReason('');
+                        setConfirmKbRetire(article);
+                    },
+                },
+            author &&
+                article.status === 'retired' && {
+                    label: 'Restore as draft',
+                    icon: RotateCcw,
+                    onClick: () =>
+                        act('post', `/it/kb/${article.id}/restore`, version),
+                },
+            author &&
+                article.status === 'draft' && {
+                    label: 'Delete draft',
+                    icon: XCircle,
+                    danger: true,
+                    onClick: () => setConfirmKbDelete(article),
+                },
         ]);
     };
 
     /* ---------------- row context menus ---------------- */
 
     const requestActions = (r: RequestRow) => {
-        const open =
-            can.manage &&
-            (r.status === 'pending' ||
-                r.status === 'in_progress' ||
-                r.status === 'failed');
         return compactMenu([
+            {
+                label: 'Open task',
+                icon: Inbox,
+                onClick: () => router.visit(`/it/provisioning/tasks/${r.id}`),
+            },
             // Available on any request — a fulfilled item can still arrive broken.
             {
                 label: 'Copy request summary',
@@ -1344,52 +1477,6 @@ export default function ItIndex({
                               ),
                       },
                   ]
-                : []),
-            ...(open
-                ? ([
-                      { separator: true },
-                      {
-                          label: 'Fulfil…',
-                          icon: CheckCircle2,
-
-                          onClick: () =>
-                              setModal({ type: 'fulfil', request: r }),
-                      },
-                      ...(r.approval_required &&
-                      r.approval_status !== 'approved'
-                          ? [
-                                {
-                                    label: 'Approve step',
-                                    icon: UserCog,
-                                    onClick: () =>
-                                        act(
-                                            'post',
-                                            `/it/provisioning/${r.id}/approve`,
-                                        ),
-                                },
-                            ]
-                          : []),
-                      {
-                          label: r.assignee ? 'Reassign…' : 'Assign…',
-                          icon: UserCog,
-                          onClick: () =>
-                              setModal({ type: 'assign-request', request: r }),
-                      },
-                      {
-                          label: 'Record failure…',
-                          icon: XCircle,
-                          danger: true,
-                          onClick: () =>
-                              setModal({ type: 'fail-request', request: r }),
-                      },
-                      { separator: true },
-                      {
-                          label: 'Cancel request',
-                          icon: XCircle,
-                          danger: true,
-                          onClick: () => setCancelRequest(r),
-                      },
-                  ] as const)
                 : []),
         ]);
     };
@@ -1558,7 +1645,7 @@ export default function ItIndex({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="IT & Support" />
+            <Head title={workspaceTitle} />
             {propertyMutation.recovery}
             <TicketTriageReasonDialog
                 open={
@@ -1611,14 +1698,7 @@ export default function ItIndex({
             <ItWizard
                 modal={
                     modal?.type === 'kb'
-                        ? canAuthorKnowledge &&
-                          (!modal.article ||
-                              kbArticles.some(
-                                  (a) =>
-                                      a.id === modal.article?.id &&
-                                      a.can.author &&
-                                      a.status === 'draft',
-                              ))
+                        ? canAuthorKnowledge
                             ? modal
                             : null
                         : (modal?.type === 'assign-ticket' ||
@@ -1663,11 +1743,61 @@ export default function ItIndex({
                     }
                 }}
             />
+            {historyArticle && actorId !== undefined && (
+                <KnowledgeRevisionDialog
+                    key={`${actorId}:${historyArticle.id}`}
+                    article={historyArticle}
+                    actorId={actorId}
+                    onClose={() => setHistoryArticleId(null)}
+                />
+            )}
+            <Dialog
+                open={
+                    recordBrowserOpen &&
+                    workspace === 'knowledge' &&
+                    showKnowledgeCatalogue
+                }
+                onOpenChange={setRecordBrowserOpen}
+            >
+                <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Find documentation by record</DialogTitle>
+                        <DialogDescription>
+                            Choose a system, asset, device, Site, vendor or
+                            document to see its linked documentation.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <KnowledgeRecordSearch
+                        key={actorId}
+                        actionLabel="Show documentation"
+                        onSelect={(record) => {
+                            setRecordBrowserOpen(false);
+                            navigate({
+                                related_type: record.type,
+                                related_id: String(record.id),
+                                article: undefined,
+                                q: undefined,
+                                category: undefined,
+                                status: undefined,
+                                document_type: undefined,
+                                review: undefined,
+                                owner: undefined,
+                            });
+                        }}
+                    />
+                </DialogContent>
+            </Dialog>
 
             {/* KB reader (requester browse) */}
             <Dialog
                 open={currentReaderArticle !== null}
-                onOpenChange={(open) => !open && setReaderArticleId(null)}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setReaderArticleId(null);
+                        if (pageQuery.has('article'))
+                            navigate({ article: undefined }, true);
+                    }
+                }}
             >
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
@@ -1700,6 +1830,30 @@ export default function ItIndex({
                                 <KbPreview
                                     body={currentReaderArticle.body ?? ''}
                                 />
+                                <KnowledgeRelatedRecords
+                                    records={
+                                        currentReaderArticle.related_records
+                                    }
+                                />
+                                {KNOWLEDGE_SECTIONS.filter(
+                                    (field) =>
+                                        currentReaderArticle
+                                            .structured_content?.[field.key],
+                                ).map((field) => (
+                                    <section key={field.key} className="mt-5">
+                                        <h3 className="text-section-title">
+                                            {field.label}
+                                        </h3>
+                                        <KbPreview
+                                            body={
+                                                currentReaderArticle
+                                                    .structured_content?.[
+                                                    field.key
+                                                ] ?? ''
+                                            }
+                                        />
+                                    </section>
+                                ))}
                             </div>
                             {!showKnowledgeCatalogue && (
                                 <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
@@ -1836,12 +1990,6 @@ export default function ItIndex({
                 }
             />
 
-            <ProvisioningCancelDialog
-                request={cancelRequest}
-                open={cancelRequest !== null}
-                onOpenChange={(open) => !open && setCancelRequest(null)}
-            />
-
             <KnowledgeDraftDeleteDialog
                 article={canAuthorKnowledge ? confirmKbDelete : null}
                 open={
@@ -1857,37 +2005,10 @@ export default function ItIndex({
                 onOpenChange={(open) => !open && setConfirmKbDelete(null)}
             />
 
-            <AlertDialog
-                open={confirmBulkFulfil}
-                onOpenChange={setConfirmBulkFulfil}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            Fulfil {reqSel.selected.size} request
-                            {reqSel.selected.size === 1 ? '' : 's'}?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Each request is marked done and any linked
-                            onboarding task is completed. This can’t be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() =>
-                                runProvisioningBulk({ action: 'fulfil' })
-                            }
-                        >
-                            Fulfil requests
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
             <Dialog
                 open={
                     confirmKbRetire !== null &&
+                    retirementActor === actorId &&
                     canReviewKnowledge &&
                     kbArticles.some(
                         (a) =>
@@ -1897,6 +2018,7 @@ export default function ItIndex({
                     )
                 }
                 onOpenChange={(open) => {
+                    if (retirementBusy) return;
                     if (!open) {
                         setConfirmKbRetire(null);
                         setRetirementReason('');
@@ -1913,8 +2035,17 @@ export default function ItIndex({
                         Staff will no longer find this article. Record why it is
                         being retired so the knowledge history stays auditable.
                     </p>
+                    {retirementError && (
+                        <p
+                            role="alert"
+                            className="rounded-lg border border-destructive/30 p-3 text-sm"
+                        >
+                            {retirementError}
+                        </p>
+                    )}
                     <Textarea
                         aria-label="Retirement reason"
+                        disabled={retirementBusy}
                         value={retirementReason}
                         onChange={(event) =>
                             setRetirementReason(event.target.value)
@@ -1929,10 +2060,18 @@ export default function ItIndex({
                                 setConfirmKbRetire(null);
                                 setRetirementReason('');
                             }}
+                            disabled={retirementBusy}
                         >
                             Keep published
                         </Button>
-                        <Button onClick={runKbRetire}>Retire article</Button>
+                        <Button
+                            disabled={
+                                retirementBusy || !retirementReason.trim()
+                            }
+                            onClick={runKbRetire}
+                        >
+                            {retirementBusy ? 'Retiring…' : 'Retire article'}
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>
@@ -1940,6 +2079,20 @@ export default function ItIndex({
             <ItModuleShell>
                 <div className="flex flex-col gap-5">
                     <ItHero
+                        workspace={workspace}
+                        workspaceTitle={workspaceTitle}
+                        knowledgeSummary={knowledgeSummary}
+                        knowledgeArticles={
+                            showKnowledgeCatalogue ? kbArticles : kbPublished
+                        }
+                        onNewKnowledge={
+                            canAuthorKnowledge ? createKnowledge : undefined
+                        }
+                        onNewProvisioning={
+                            can.manage
+                                ? () => setModal({ type: 'new-request' })
+                                : undefined
+                        }
                         summary={summary}
                         can={can}
                         onRaise={() => setModal({ type: 'raise' })}
@@ -1957,11 +2110,16 @@ export default function ItIndex({
                             ) : undefined
                         }
                         search={
-                            can.view && tab === 'tickets' ? (
+                            can.view &&
+                            (tab === 'tickets' || tab === 'provisioning') ? (
                                 <PageHeaderSearch
                                     value={search}
                                     onChange={(value) => updateSearch(value)}
-                                    placeholder="Search reference, title, requester…"
+                                    placeholder={
+                                        tab === 'provisioning'
+                                            ? 'Search provisioning steps…'
+                                            : 'Search reference, title, requester…'
+                                    }
                                 />
                             ) : can.request && tab === 'my-tickets' ? (
                                 <PageHeaderSearch
@@ -2274,6 +2432,136 @@ export default function ItIndex({
                             ) : showKnowledgeCatalogue &&
                               tab === 'knowledge' ? (
                                 <>
+                                    {layoutToggle}
+                                    <PageHeaderFilterSelect
+                                        label="Document type"
+                                        value={
+                                            pageQuery.get('document_type') ??
+                                            ALL
+                                        }
+                                        allValue={ALL}
+                                        options={KNOWLEDGE_DOCUMENT_TYPES}
+                                        onChange={(value) =>
+                                            navigate({
+                                                document_type:
+                                                    value === ALL
+                                                        ? undefined
+                                                        : value,
+                                            })
+                                        }
+                                    />
+                                    {pageQuery.get('tag') && (
+                                        <PageHeaderGlassButton
+                                            onClick={() =>
+                                                navigate({ tag: undefined })
+                                            }
+                                        >
+                                            Clear tag: {pageQuery.get('tag')}
+                                        </PageHeaderGlassButton>
+                                    )}
+                                    <PageHeaderGlassButton
+                                        icon={BookOpen}
+                                        onClick={() =>
+                                            setRecordBrowserOpen(true)
+                                        }
+                                    >
+                                        Browse records
+                                    </PageHeaderGlassButton>
+                                    {knowledgeContext && (
+                                        <PageHeaderGlassButton
+                                            onClick={() =>
+                                                navigate({
+                                                    related_type: undefined,
+                                                    related_id: undefined,
+                                                })
+                                            }
+                                        >
+                                            Clear record:{' '}
+                                            {knowledgeContext.label}
+                                        </PageHeaderGlassButton>
+                                    )}
+                                    <PageHeaderFilterSelect
+                                        label="Review"
+                                        value={pageQuery.get('review') ?? ALL}
+                                        allValue={ALL}
+                                        options={[
+                                            {
+                                                value: 'overdue',
+                                                label: 'Review overdue',
+                                            },
+                                            ...(canAuthorKnowledge ||
+                                            canReviewKnowledge
+                                                ? [
+                                                      {
+                                                          value: 'awaiting',
+                                                          label: 'Awaiting review',
+                                                      },
+                                                  ]
+                                                : []),
+                                        ]}
+                                        onChange={(value) =>
+                                            navigate({
+                                                review:
+                                                    value === ALL
+                                                        ? undefined
+                                                        : value,
+                                            })
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Owner"
+                                        value={pageQuery.get('owner') ?? ALL}
+                                        allValue={ALL}
+                                        options={[
+                                            {
+                                                value: 'me',
+                                                label: 'Owned by me',
+                                            },
+                                            {
+                                                value: 'unassigned',
+                                                label: 'Owner not set',
+                                            },
+                                        ]}
+                                        onChange={(value) =>
+                                            navigate({
+                                                owner:
+                                                    value === ALL
+                                                        ? undefined
+                                                        : value,
+                                            })
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Sort"
+                                        value={
+                                            pageQuery.get('sort') ??
+                                            'updated_at'
+                                        }
+                                        allValue="updated_at"
+                                        options={[
+                                            {
+                                                value: 'updated_at',
+                                                label: 'Recently updated',
+                                            },
+                                            {
+                                                value: 'title',
+                                                label: 'Title A–Z',
+                                            },
+                                            {
+                                                value: 'review_due_at',
+                                                label: 'Review due first',
+                                            },
+                                        ]}
+                                        onChange={(value) =>
+                                            navigate({
+                                                sort: value,
+                                                dir:
+                                                    value === 'updated_at'
+                                                        ? 'desc'
+                                                        : 'asc',
+                                            })
+                                        }
+                                    />
                                     <PageHeaderFilterSelect
                                         label="Category"
                                         value={kbCategory}
@@ -2285,13 +2573,14 @@ export default function ItIndex({
                                         onChange={setKbCategory}
                                     />
                                     <PageHeaderFilterSelect
-                                        label="Status"
+                                        label="Publication status"
                                         value={kbStatus}
                                         allValue={ALL}
                                         options={[
-                                            ...new Set(
-                                                kbArticles.map((a) => a.status),
-                                            ),
+                                            'draft',
+                                            'in_review',
+                                            'published',
+                                            'retired',
                                         ].map((v) => ({
                                             value: v,
                                             label: label(v),
@@ -2364,35 +2653,40 @@ export default function ItIndex({
                             ) : !showKnowledgeCatalogue &&
                               can.request &&
                               tab === 'knowledge' ? (
-                                <PageHeaderFilterSelect
-                                    label="Category"
-                                    value={kbCategory}
-                                    allValue={ALL}
-                                    options={TICKET_CATEGORIES.map((v) => ({
-                                        value: v,
-                                        label: label(v),
-                                    }))}
-                                    onChange={setKbCategory}
-                                />
+                                <>
+                                    {layoutToggle}
+                                    <PageHeaderFilterSelect
+                                        label="Category"
+                                        value={kbCategory}
+                                        allValue={ALL}
+                                        options={TICKET_CATEGORIES.map((v) => ({
+                                            value: v,
+                                            label: label(v),
+                                        }))}
+                                        onChange={setKbCategory}
+                                    />
+                                </>
                             ) : undefined
                         }
                         rail={
-                            <PageHeaderRail
-                                value={tab}
-                                onSelect={setTab}
-                                items={tabItems.map((item) => ({
-                                    key: item.id,
-                                    label: item.label,
-                                    icon: item.icon,
-                                    count:
-                                        typeof item.badge === 'number'
-                                            ? item.badge
-                                            : undefined,
-                                }))}
-                                ariaLabel="IT views"
-                                onItemContextMenu={tabMenu}
-                                decorations={tabDecorations}
-                            />
+                            workspace === 'desk' ? (
+                                <PageHeaderRail
+                                    value={tab}
+                                    onSelect={setTab}
+                                    items={tabItems.map((item) => ({
+                                        key: item.id,
+                                        label: item.label,
+                                        icon: item.icon,
+                                        count:
+                                            typeof item.badge === 'number'
+                                                ? item.badge
+                                                : undefined,
+                                    }))}
+                                    ariaLabel="IT views"
+                                    onItemContextMenu={tabMenu}
+                                    decorations={tabDecorations}
+                                />
+                            ) : undefined
                         }
                     />
                     {can.view &&
@@ -2430,10 +2724,17 @@ export default function ItIndex({
                                 assignmentBusy={propertyMutation.busy}
                                 onClearPriority={() => setOverviewPriority(ALL)}
                                 onAssign={(ticket) => {
-                                    if (can.manage && ticket.can_manage && actorId) {
-                                        propertyMutation.submit(ticket.id, ticket.lock_version,
-                                            {assigned_to_user_id: actorId},
-                                            {assigned_to_user_id: 'You'});
+                                    if (
+                                        can.manage &&
+                                        ticket.can_manage &&
+                                        actorId
+                                    ) {
+                                        propertyMutation.submit(
+                                            ticket.id,
+                                            ticket.lock_version,
+                                            { assigned_to_user_id: actorId },
+                                            { assigned_to_user_id: 'You' },
+                                        );
                                     }
                                 }}
                             />
@@ -2441,7 +2742,11 @@ export default function ItIndex({
 
                     {/* ── Reports (agents, §L) ── */}
                     {can.view && tab === 'reports' && (
-                        <ItReports days={reportDays} />
+                        <ItReports
+                            days={reportDays}
+                            from={pageQuery.get('from') ?? undefined}
+                            to={pageQuery.get('to') ?? undefined}
+                        />
                     )}
 
                     {/* ── Provisioning queue (agents) ── */}
@@ -2626,20 +2931,6 @@ export default function ItIndex({
                                             Export CSV
                                         </a>
                                     </Button>
-                                    {can.manage ? (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                setModal({
-                                                    type: 'new-request',
-                                                })
-                                            }
-                                        >
-                                            <Plus className="h-3.5 w-3.5" /> New
-                                            request
-                                        </Button>
-                                    ) : null}
                                 </div>
                             </div>
 
@@ -2653,43 +2944,15 @@ export default function ItIndex({
                                         className="mx-1 h-5 w-px bg-border"
                                         aria-hidden
                                     />
-                                    <Select
-                                        disabled={bulkBusy || bulkBlocked}
-                                        value=""
-                                        onValueChange={(v) =>
-                                            runProvisioningBulk({
-                                                action: 'assign',
-                                                assigned_to_user_id: Number(v),
-                                            })
-                                        }
-                                    >
-                                        <SelectTrigger
-                                            className="h-8 w-[160px]"
-                                            aria-label="Assign selected requests to"
-                                        >
-                                            <SelectValue placeholder="Assign to…" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {assignees.map((a) => (
-                                                <SelectItem
-                                                    key={a.id}
-                                                    value={String(a.id)}
-                                                >
-                                                    {a.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        disabled={bulkBusy}
                                         onClick={() =>
-                                            setConfirmBulkFulfil(true)
+                                            router.visit('/it/provisioning')
                                         }
                                     >
-                                        <CheckCircle2 className="h-3.5 w-3.5" />{' '}
-                                        Fulfil
+                                        <Inbox className="h-3.5 w-3.5" /> Open
+                                        provisioning workspace
                                     </Button>
                                     <Button
                                         size="sm"
@@ -2961,6 +3224,9 @@ export default function ItIndex({
                         <ItServiceCatalogue
                             key={actorId}
                             actorId={actorId ?? 0}
+                            draftRecoveryEnabled={
+                                draftRecovery.enabled === true
+                            }
                             items={catalogItems}
                             fieldOptions={catalogFieldOptions}
                             query={catalogQuery}
@@ -3072,234 +3338,71 @@ export default function ItIndex({
                         </>
                     )}
 
-                    {/* ── Knowledge base (agents) ── */}
                     {showKnowledgeCatalogue && tab === 'knowledge' && (
-                        <>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-[12.5px] text-muted-foreground">
-                                    Articles that deflect repeat tickets —
-                                    publish the fixes people keep asking for.
-                                </p>
-                                {canAuthorKnowledge ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="ml-auto"
-                                        onClick={() => setModal({ type: 'kb' })}
-                                    >
-                                        <BookOpen className="h-3.5 w-3.5" /> New
-                                        KB article
-                                    </Button>
-                                ) : null}
-                            </div>
-
-                            <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-                                <div className="grid min-w-[920px] grid-cols-[2.5fr_1.15fr_1.6fr_1.1fr_1.1fr_44px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
-                                    <span>Title</span>
-                                    <span>Lifecycle</span>
-                                    <span>Ownership</span>
-                                    <span>Impact</span>
-                                    <span>Review</span>
-                                    <span />
-                                </div>
-                                {agentKb.map((a) => (
-                                    <div
-                                        key={a.id}
-                                        onContextMenu={
-                                            (canAuthorKnowledge &&
-                                                a.can.author) ||
-                                            (canReviewKnowledge && a.can.review)
-                                                ? kbMenu(a)
-                                                : undefined
-                                        }
-                                        className="grid min-w-[920px] grid-cols-[2.5fr_1.15fr_1.6fr_1.1fr_1.1fr_44px] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
-                                    >
-                                        <div className="flex min-w-0 items-center gap-2">
-                                            <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
-                                                <BookOpen className="h-3.5 w-3.5" />
-                                            </span>
-                                            <span className="min-w-0">
-                                                <Button
-                                                    variant="link"
-                                                    className="h-auto max-w-full justify-start truncate p-0 text-[13px] font-semibold"
-                                                    onClick={() =>
-                                                        setReaderArticleId(a.id)
-                                                    }
-                                                >
-                                                    {a.title}
-                                                </Button>
-                                                {a.author ? (
-                                                    <span className="block truncate text-[11px] text-muted-foreground">
-                                                        by {a.author}
-                                                    </span>
-                                                ) : null}
-                                            </span>
-                                        </div>
-                                        <span className="space-y-1">
-                                            <StatusBadge
-                                                variant={
-                                                    a.status === 'published'
-                                                        ? 'success'
-                                                        : a.status ===
-                                                            'in_review'
-                                                          ? 'warning'
-                                                          : 'neutral'
-                                                }
-                                                size="sm"
-                                            >
-                                                {label(a.status)}
-                                            </StatusBadge>
-                                            <span className="block text-[11px] text-muted-foreground">
-                                                {label(a.audience)}
-                                            </span>
-                                        </span>
-                                        <span className="min-w-0 text-[12px]">
-                                            <span className="block truncate font-semibold">
-                                                {a.owner ?? 'Owner not set'}
-                                            </span>
-                                            <span className="block truncate text-[11px] text-muted-foreground">
-                                                {a.related_service ??
-                                                    label(a.category)}
-                                            </span>
-                                        </span>
-                                        <span className="text-[12px] text-muted-foreground">
-                                            <span className="block tabular-nums">
-                                                {a.views} views ·{' '}
-                                                {a.deflections} deflections
-                                            </span>
-                                            <span className="block text-[11px]">
-                                                {a.helpful_percent != null
-                                                    ? `${a.helpful_percent}% helpful`
-                                                    : 'No helpfulness score'}
-                                            </span>
-                                        </span>
-                                        <span className="text-[12px] text-muted-foreground">
-                                            <span className="block">
-                                                {a.review_due_at ??
-                                                    'No review due'}
-                                            </span>
-                                            <span className="block text-[11px]">
-                                                Updated {a.updated ?? '—'}
-                                            </span>
-                                        </span>
-                                        <span className="flex justify-end">
-                                            {(canAuthorKnowledge &&
-                                                a.can.author &&
-                                                a.status !== 'published') ||
-                                            (canReviewKnowledge &&
-                                                a.can.review &&
-                                                [
-                                                    'in_review',
-                                                    'published',
-                                                ].includes(a.status)) ? (
-                                                <button
-                                                    type="button"
-                                                    aria-label={`Actions for ${a.title}`}
-                                                    onClick={kbMenu(a)}
-                                                    className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                >
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </button>
-                                            ) : null}
-                                        </span>
-                                    </div>
-                                ))}
-                                {kbArticles.length === 0 ? (
-                                    <EmptyState
-                                        icon={BookOpen}
-                                        title="No articles yet"
-                                        blurb={
-                                            canAuthorKnowledge
-                                                ? 'Write the first fix people keep asking for — it deflects the ticket every time after.'
-                                                : 'The knowledge base is empty.'
-                                        }
-                                        action={
-                                            canAuthorKnowledge
-                                                ? {
-                                                      label: 'New KB article',
-                                                      onClick: () =>
-                                                          setModal({
-                                                              type: 'kb',
-                                                          }),
-                                                  }
-                                                : undefined
-                                        }
-                                    />
-                                ) : null}
-                            </div>
-                        </>
+                        <KnowledgeLibrary
+                            rows={agentKb}
+                            paginationDisabled={
+                                search.trim() !== currentSearch.trim()
+                            }
+                            page={knowledgePage}
+                            view={listView}
+                            governance
+                            actionsFor={kbActions}
+                            hrefFor={(article) =>
+                                knowledgeDocumentHref(article.id, page.url)
+                            }
+                            onOpen={openKnowledgeReader}
+                            emptyState={
+                                <EmptyState
+                                    icon={BookOpen}
+                                    title={
+                                        knowledgeSummary?.total === 0
+                                            ? 'No documents yet'
+                                            : 'No matching documents'
+                                    }
+                                    blurb="Try another search or filter, or create a document for your team."
+                                    action={
+                                        canAuthorKnowledge
+                                            ? {
+                                                  label: 'New document',
+                                                  onClick: createKnowledge,
+                                              }
+                                            : undefined
+                                    }
+                                />
+                            }
+                        />
                     )}
-
-                    {/* ── Knowledge browse (requesters) ── */}
                     {!showKnowledgeCatalogue &&
                         can.request &&
                         tab === 'knowledge' && (
-                            <>
-                                {filteredKb.length === 0 ? (
-                                    <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                                        <EmptyState
-                                            icon={BookOpen}
-                                            title={
-                                                kbPublished.length === 0
-                                                    ? 'No articles yet'
-                                                    : 'No matches'
-                                            }
-                                            blurb={
-                                                kbPublished.length === 0
-                                                    ? 'IT will publish fixes here — check back, or raise a ticket and they’ll sort it.'
-                                                    : 'Nothing matches your search. Try a different word or category.'
-                                            }
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                        {filteredKb.map((a) => (
-                                            <button
-                                                key={a.id}
-                                                type="button"
-                                                onClick={() => openArticle(a)}
-                                                className="flex flex-col rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/40"
-                                            >
-                                                <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-primary">
-                                                    <BookOpen className="h-4 w-4" />
-                                                </span>
-                                                <span className="mt-2 text-[14px] font-semibold">
-                                                    {a.title}
-                                                </span>
-                                                <span className="mt-1 line-clamp-2 text-[12.5px] text-muted-foreground">
-                                                    {(a.body ?? '')
-                                                        .replace(
-                                                            /[#>*\-\n]+/g,
-                                                            ' ',
-                                                        )
-                                                        .trim()}
-                                                </span>
-                                                <span className="mt-3 flex items-center gap-2 text-[11.5px] text-muted-foreground">
-                                                    <StatusBadge
-                                                        variant="info"
-                                                        size="sm"
-                                                    >
-                                                        {label(a.category)}
-                                                    </StatusBadge>
-                                                    {a.helpful_percent !=
-                                                    null ? (
-                                                        <span>
-                                                            {a.helpful_percent}%
-                                                            helpful
-                                                        </span>
-                                                    ) : null}
-                                                </span>
-                                                {a.related_service ? (
-                                                    <span className="mt-2 text-[11.5px] text-muted-foreground">
-                                                        Service:{' '}
-                                                        {a.related_service}
-                                                    </span>
-                                                ) : null}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </>
+                            <KnowledgeLibrary
+                                rows={filteredKb}
+                                paginationDisabled={
+                                    search.trim() !== currentSearch.trim()
+                                }
+                                page={knowledgePage}
+                                view={listView}
+                                governance={false}
+                                actionsFor={(article) => [
+                                    {
+                                        label: 'Read guide',
+                                        icon: BookOpen,
+                                        onClick: () => openArticle(article),
+                                    },
+                                ]}
+                                hrefFor={(article) =>
+                                    knowledgeDocumentHref(article.id, page.url)
+                                }
+                                onOpen={openArticle}
+                                emptyState={
+                                    <EmptyState
+                                        icon={BookOpen}
+                                        title="No matching guides"
+                                        blurb="Try another search or category. You can also raise a ticket from Service Desk."
+                                    />
+                                }
+                            />
                         )}
                 </div>
             </ItModuleShell>

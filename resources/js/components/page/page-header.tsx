@@ -477,6 +477,7 @@ export function PageHeaderMeterBlock({
             href={href}
             preserveState={preserveState}
             preserveScroll={preserveScroll}
+            onClick={onClick}
             {...shared}
         >
             {body}

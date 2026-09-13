@@ -1,584 +1,129 @@
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Textarea } from '@/components/ui/textarea';
-import { useForm } from '@inertiajs/react';
-import { BookOpen, Send } from 'lucide-react';
-import { type FormEvent, useMemo, useState } from 'react';
-import { CatalogueEntityPicker } from './catalogue-entity-picker';
-
-type CatalogValue = string | number | boolean | string[] | null;
-type CatalogOption = string | { label: string; value: string | number };
-
-export interface CatalogField {
-    key: string;
-    label: string;
-    type?: string;
-    required?: boolean;
-    visibility?: string;
-    options?: CatalogOption[];
-    default?: CatalogValue;
-    max?: number;
-    min?: number;
-    help?: string;
-}
-
-export interface CatalogItem {
-    id: number;
-    name: string;
-    slug: string;
-    description: string | null;
-    outcome_type: string;
-    category: string;
-    default_priority: string;
-    requires_approval: boolean;
-    form_schema_version: number;
-    form_schema: { fields?: CatalogField[] };
-    site_options?: { id: number; name: string }[];
-}
-
-export interface CatalogFieldOption {
-    id: number;
-    name: string;
-    detail: string | null;
-}
-
-export type CatalogEntityFieldType = 'employee' | 'user' | 'asset';
-export type CatalogFieldOptions = Record<
+import { useMemo, useState } from 'react';
+import type {
+    CatalogFieldOptions,
+    CatalogItem,
+} from './catalogue-request-fields';
+import { CatalogueRequestWizard } from './catalogue-request-wizard';
+export type {
     CatalogEntityFieldType,
-    CatalogFieldOption[]
->;
+    CatalogField,
+    CatalogFieldOption,
+    CatalogFieldOptions,
+    CatalogItem,
+} from './catalogue-request-fields';
 
 interface Props {
     actorId: number;
     items: CatalogItem[];
     fieldOptions: CatalogFieldOptions;
-    /** Scoped search + category pill — owned by the page header
-     *  (PAGE_HEADER_STYLE_GUIDE.md §4/§6), never an in-content bar. */
     query: string;
     category: string | null;
+    draftRecoveryEnabled?: boolean;
 }
-
 const humanize = (value: string) =>
-    value
-        .replace(/_/g, ' ')
-        .replace(/^\w/, (character) => character.toUpperCase());
-
-const submissionKey = () =>
-    `catalog-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
-
-function initialValues(item: CatalogItem): Record<string, CatalogValue> {
-    return Object.fromEntries(
-        (item.form_schema.fields ?? []).map((field) => [
-            field.key,
-            field.default ??
-                (field.type === 'boolean'
-                    ? false
-                    : field.type === 'multiselect'
-                      ? []
-                      : ''),
-        ]),
-    );
+    value.replace(/_/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase());
+export function ItServiceCatalogue(props: Props) {
+    return <CatalogueRequestView key={props.actorId} {...props} />;
 }
-
-export function ItServiceCatalogue({
+function CatalogueRequestView({
     actorId,
     items,
     fieldOptions,
     query,
     category,
+    draftRecoveryEnabled = false,
 }: Props) {
     const [selected, setSelected] = useState<CatalogItem | null>(null);
-    const form = useForm<{
-        schema_version: number;
-        idempotency_key: string;
-        values: Record<string, CatalogValue>;
-        site_id: number | null;
-    }>({
-        schema_version: 1,
-        idempotency_key: '',
-        values: {},
-        site_id: null,
-    });
-
+    const [concealed, setConcealed] = useState(false);
+    const open = (item: CatalogItem) => setSelected(item);
     const filtered = useMemo(() => {
         const needle = query.trim().toLocaleLowerCase();
         return items.filter(
             (item) =>
-                (category == null || item.category === category) &&
+                (category === null || item.category === category) &&
                 (!needle ||
                     [
                         item.name,
                         item.description,
                         item.category,
                         item.outcome_type,
-                    ]
-                        .filter(Boolean)
-                        .some((value) =>
-                            String(value).toLocaleLowerCase().includes(needle),
-                        )),
+                    ].some((value) =>
+                        value?.toLocaleLowerCase().includes(needle),
+                    )),
         );
     }, [items, query, category]);
-
-    const open = (item: CatalogItem) => {
-        setSelected(item);
-        form.clearErrors();
-        form.setData({
-            schema_version: item.form_schema_version,
-            idempotency_key: submissionKey(),
-            values: initialValues(item),
-            site_id:
-                item.outcome_type === 'provisioning'
-                    ? null
-                    : (item.site_options?.[0]?.id ?? null),
-        });
-    };
-
-    const close = () => {
-        if (!form.processing) setSelected(null);
-    };
-
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        if (!selected) return;
-
-        form.post(`/it/catalog/${selected.id}/submissions`, {
-            preserveScroll: true,
-            onSuccess: () => setSelected(null),
-        });
-    };
-
-    const setValue = (key: string, value: CatalogValue) => {
-        form.setData('values', { ...form.data.values, [key]: value });
-    };
-
     return (
         <section
             className="space-y-4"
             aria-labelledby="service-catalogue-title"
         >
-            <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="flex items-start gap-3">
-                    <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-primary/10 text-primary">
-                        <BookOpen className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                        <h2
-                            id="service-catalogue-title"
-                            className="text-xl font-bold tracking-tight"
-                        >
-                            Service catalogue
-                        </h2>
-                        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                            Choose a supported request. The right form,
-                            approval, priority, and fulfilment workflow are
-                            applied automatically.
+            <h2 id="service-catalogue-title" className="sr-only">
+                Service catalogue
+            </h2>
+
+            {!concealed &&
+                (filtered.length ? (
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {filtered.map((item) => (
+                            <article
+                                key={item.id}
+                                className="flex min-h-56 flex-col rounded-2xl border border-border bg-card p-5 shadow-sm"
+                            >
+                                <div className="flex flex-wrap gap-2">
+                                    <StatusBadge variant="info" size="sm">
+                                        {humanize(item.outcome_type)}
+                                    </StatusBadge>
+                                    <StatusBadge variant="neutral" size="sm">
+                                        {humanize(item.category)}
+                                    </StatusBadge>
+                                    {item.requires_approval ? (
+                                        <StatusBadge
+                                            variant="warning"
+                                            size="sm"
+                                        >
+                                            Approval required
+                                        </StatusBadge>
+                                    ) : null}
+                                </div>
+                                <h3 className="mt-4 font-semibold">
+                                    {item.name}
+                                </h3>
+                                <p className="mt-1 flex-1 text-sm leading-relaxed text-muted-foreground">
+                                    {item.description ??
+                                        'Use this form to start the supported workflow.'}
+                                </p>
+                                <Button
+                                    className="mt-5 min-h-11 w-full"
+                                    onClick={() => open(item)}
+                                >
+                                    {item.name}
+                                </Button>
+                            </article>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-14 text-center">
+                        <p className="font-semibold">No matching requests</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Try a system name or a broader description of what
+                            you need.
                         </p>
                     </div>
-                </div>
-            </header>
-
-            {filtered.length ? (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {filtered.map((item) => (
-                        <article
-                            key={item.id}
-                            className="flex min-h-56 flex-col rounded-2xl border border-border bg-card p-5 shadow-sm"
-                        >
-                            <div className="flex flex-wrap gap-2">
-                                <StatusBadge variant="info" size="sm">
-                                    {humanize(item.outcome_type)}
-                                </StatusBadge>
-                                <StatusBadge variant="neutral" size="sm">
-                                    {humanize(item.category)}
-                                </StatusBadge>
-                                {item.requires_approval ? (
-                                    <StatusBadge variant="warning" size="sm">
-                                        Approval required
-                                    </StatusBadge>
-                                ) : null}
-                            </div>
-                            <h3 className="mt-4 font-semibold">{item.name}</h3>
-                            <p className="mt-1 flex-1 text-sm leading-relaxed text-muted-foreground">
-                                {item.description ??
-                                    'Use this form to start the supported workflow.'}
-                            </p>
-                            <Button
-                                className="mt-5 min-h-11 w-full"
-                                onClick={() => open(item)}
-                            >
-                                {item.name}
-                            </Button>
-                        </article>
-                    ))}
-                </div>
-            ) : (
-                <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-14 text-center">
-                    <p className="font-semibold">No matching requests</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Try a system name or a broader description of what you
-                        need.
-                    </p>
-                </div>
-            )}
-
-            <Dialog
-                open={selected !== null}
-                onOpenChange={(openState) => !openState && close()}
-            >
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>
-                            {selected?.name ?? 'Service request'}
-                        </DialogTitle>
-                        <DialogDescription>
-                            Complete the published request form. Required fields
-                            are marked.
-                        </DialogDescription>
-                    </DialogHeader>
-                    {selected ? (
-                        <form onSubmit={submit}>
-                            {Object.keys(form.errors).length ? (
-                                <div
-                                    role="alert"
-                                    className="mt-4 rounded-xl border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical"
-                                >
-                                    <p className="font-semibold">
-                                        Check the request details below.
-                                    </p>
-                                    <ul className="mt-1 list-disc pl-5">
-                                        {Object.values(form.errors).map(
-                                            (error) => (
-                                                <li key={error}>{error}</li>
-                                            ),
-                                        )}
-                                    </ul>
-                                </div>
-                            ) : null}
-
-                            <div className="mt-5 space-y-4">
-                                {selected.outcome_type !== 'provisioning' ? (
-                                    <label className="block space-y-1 text-sm font-medium">
-                                        <span>Request site</span>
-                                        <select
-                                            required
-                                            className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                            value={form.data.site_id ?? ''}
-                                            onChange={(event) =>
-                                                form.setData(
-                                                    'site_id',
-                                                    event.target.value
-                                                        ? Number(
-                                                              event.target
-                                                                  .value,
-                                                          )
-                                                        : null,
-                                                )
-                                            }
-                                        >
-                                            <option value="">
-                                                Choose an approved site
-                                            </option>
-                                            {(selected.site_options ?? []).map(
-                                                (site) => (
-                                                    <option
-                                                        key={site.id}
-                                                        value={site.id}
-                                                    >
-                                                        {site.name}
-                                                    </option>
-                                                ),
-                                            )}
-                                        </select>
-                                    </label>
-                                ) : null}
-                                {(selected.form_schema.fields ?? []).map(
-                                    (field) => (
-                                        <CatalogFieldControl
-                                            key={field.key}
-                                            actorId={actorId}
-                                            itemId={selected.id}
-                                            schemaVersion={
-                                                selected.form_schema_version
-                                            }
-                                            disabled={form.processing}
-                                            field={field}
-                                            options={
-                                                fieldOptions[
-                                                    field.type as CatalogEntityFieldType
-                                                ] ?? []
-                                            }
-                                            value={form.data.values[field.key]}
-                                            error={
-                                                form.errors[
-                                                    `values.${field.key}`
-                                                ]
-                                            }
-                                            onChange={(value) =>
-                                                setValue(field.key, value)
-                                            }
-                                        />
-                                    ),
-                                )}
-                            </div>
-
-                            <DialogFooter className="mt-6">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="min-h-11"
-                                    onClick={close}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    className="min-h-11"
-                                    disabled={form.processing}
-                                >
-                                    <Send
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />
-                                    Submit request
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    ) : null}
-                </DialogContent>
-            </Dialog>
-        </section>
-    );
-}
-
-function optionValue(option: CatalogOption): string {
-    return String(typeof option === 'string' ? option : option.value);
-}
-
-function optionLabel(option: CatalogOption): string {
-    return typeof option === 'string' ? option : option.label;
-}
-
-function CatalogFieldControl({
-    actorId,
-    itemId,
-    schemaVersion,
-    disabled,
-    field,
-    options,
-    value,
-    error,
-    onChange,
-}: {
-    actorId: number;
-    itemId: number;
-    schemaVersion: number;
-    disabled: boolean;
-    field: CatalogField;
-    options: CatalogFieldOption[];
-    value: CatalogValue | undefined;
-    error?: string;
-    onChange: (value: CatalogValue) => void;
-}) {
-    const id = `catalog-field-${field.key}`;
-    const describedBy = [
-        field.help ? `${id}-help` : null,
-        error ? `${id}-error` : null,
-    ]
-        .filter(Boolean)
-        .join(' ');
-    const shared = {
-        id,
-        required: field.required,
-        'aria-invalid': Boolean(error),
-        'aria-describedby': describedBy || undefined,
-    };
-
-    let control;
-    if (field.type === 'textarea') {
-        control = (
-            <Textarea
-                {...shared}
-                value={String(value ?? '')}
-                maxLength={field.max}
-                rows={4}
-                onChange={(event) => onChange(event.target.value)}
-            />
-        );
-    } else if (field.type === 'select') {
-        control = (
-            <select
-                {...shared}
-                className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={String(value ?? '')}
-                onChange={(event) => onChange(event.target.value)}
-            >
-                <option value="">Select an option</option>
-                {(field.options ?? []).map((option) => (
-                    <option
-                        key={optionValue(option)}
-                        value={optionValue(option)}
-                    >
-                        {optionLabel(option)}
-                    </option>
                 ))}
-            </select>
-        );
-    } else if (field.type === 'multiselect') {
-        const selected = Array.isArray(value) ? value.map(String) : [];
-        control = (
-            <div
-                id={id}
-                className="space-y-1 rounded-xl border border-border p-2"
-            >
-                {(field.options ?? []).map((option) => {
-                    const optionId = `${id}-${optionValue(option).replace(/\W+/g, '-')}`;
-                    const checked = selected.includes(optionValue(option));
-                    return (
-                        <label
-                            key={optionId}
-                            htmlFor={optionId}
-                            className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm hover:bg-muted/50"
-                        >
-                            <input
-                                id={optionId}
-                                type="checkbox"
-                                checked={checked}
-                                onChange={(event) =>
-                                    onChange(
-                                        event.target.checked
-                                            ? [...selected, optionValue(option)]
-                                            : selected.filter(
-                                                  (item) =>
-                                                      item !==
-                                                      optionValue(option),
-                                              ),
-                                    )
-                                }
-                            />
-                            {optionLabel(option)}
-                        </label>
-                    );
-                })}
-            </div>
-        );
-    } else if (['employee', 'user', 'asset'].includes(field.type ?? '')) {
-        control = (
-            <CatalogueEntityPicker
-                actorId={actorId}
-                itemId={itemId}
-                schemaVersion={schemaVersion}
-                fieldKey={field.key}
-                label={field.label}
-                id={id}
-                required={field.required}
-                disabled={disabled}
-                invalid={Boolean(error)}
-                describedBy={describedBy || undefined}
-                value={
-                    value === '' || value === null || value === undefined
-                        ? null
-                        : Number(value)
-                }
-                initialSelected={options.find(
-                    (option) => option.id === Number(value),
-                )}
-                onChange={(next) => onChange(next ?? '')}
-            />
-        );
-    } else if (field.type === 'boolean') {
-        control = (
-            <label htmlFor={id} className="flex min-h-11 items-center gap-2">
-                <input
-                    id={id}
-                    type="checkbox"
-                    checked={Boolean(value)}
-                    onChange={(event) => onChange(event.target.checked)}
+
+            {selected && (
+                <CatalogueRequestWizard
+                    key={`${actorId}:${selected.id}:${selected.form_schema_version}`}
+                    actorId={actorId}
+                    item={selected}
+                    fieldOptions={fieldOptions}
+                    draftRecoveryEnabled={draftRecoveryEnabled}
+                    onClose={() => setSelected(null)}
+                    onPrivateHidden={() => setConcealed(true)}
                 />
-                <span className="text-sm">Yes</span>
-            </label>
-        );
-    } else {
-        const numeric = ['integer', 'number'].includes(field.type ?? '');
-        control = (
-            <Input
-                {...shared}
-                type={
-                    field.type === 'email' || field.type === 'date'
-                        ? field.type
-                        : numeric
-                          ? 'number'
-                          : 'text'
-                }
-                value={String(value ?? '')}
-                min={field.min}
-                max={numeric ? field.max : undefined}
-                maxLength={!numeric ? field.max : undefined}
-                onChange={(event) =>
-                    onChange(
-                        numeric && event.target.value !== ''
-                            ? Number(event.target.value)
-                            : event.target.value,
-                    )
-                }
-            />
-        );
-    }
-
-    if (field.type === 'multiselect') {
-        return (
-            <fieldset
-                className="space-y-1.5"
-                aria-invalid={Boolean(error)}
-                aria-describedby={describedBy || undefined}
-            >
-                <legend className="text-sm font-medium">
-                    {field.label}
-                    {field.required ? <span aria-hidden="true"> *</span> : null}
-                </legend>
-                {control}
-                {field.help ? (
-                    <p
-                        id={`${id}-help`}
-                        className="text-xs text-muted-foreground"
-                    >
-                        {field.help}
-                    </p>
-                ) : null}
-                {error ? (
-                    <p id={`${id}-error`} className="text-xs text-destructive">
-                        {error}
-                    </p>
-                ) : null}
-            </fieldset>
-        );
-    }
-
-    return (
-        <div className="space-y-1.5">
-            <label htmlFor={id} className="block text-sm font-medium">
-                {field.label}
-                {field.required ? <span aria-hidden="true"> *</span> : null}
-            </label>
-            {control}
-            {field.help ? (
-                <p id={`${id}-help`} className="text-xs text-muted-foreground">
-                    {field.help}
-                </p>
-            ) : null}
-            {error ? (
-                <p id={`${id}-error`} className="text-xs text-destructive">
-                    {error}
-                </p>
-            ) : null}
-        </div>
+            )}
+        </section>
     );
 }

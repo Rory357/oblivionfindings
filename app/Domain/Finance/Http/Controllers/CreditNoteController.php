@@ -2,11 +2,11 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
+use App\Domain\Finance\Http\Requests\StoreCreditNoteRequest;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinCreditNote;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Services\AccountsPayableService;
-use App\Domain\Finance\Http\Requests\StoreCreditNoteRequest;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use Illuminate\Database\Eloquent\Builder;
@@ -148,7 +148,7 @@ class CreditNoteController extends Controller
             ->get(['id', 'first_name', 'last_name'])
             ->map(fn (Client $client) => [
                 'id' => $client->id,
-                'name' => trim($client->first_name . ' ' . $client->last_name),
+                'name' => trim($client->first_name.' '.$client->last_name),
             ])
             ->values();
     }
@@ -197,7 +197,7 @@ class CreditNoteController extends Controller
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['credit_note' => $e->getMessage()]);
         } catch (\Exception $e) {
-            return back()->withErrors(['credit_note' => 'Failed to approve credit note: ' . $e->getMessage()]);
+            return back()->withErrors(['credit_note' => 'Failed to approve credit note: '.$e->getMessage()]);
         }
 
         return redirect()->route('finance.credit-notes.show', $creditNote)

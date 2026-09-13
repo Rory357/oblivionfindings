@@ -6,6 +6,7 @@ enum ItTicketDraftPurpose: string
 {
     case RequesterIntake = 'requester_intake';
     case TechnicianIntake = 'technician_intake';
+    case CatalogueRequest = 'catalogue_request';
     case PublicReply = 'public_reply';
     case InternalNote = 'internal_note';
     case TicketEdit = 'ticket_edit';
@@ -14,7 +15,7 @@ enum ItTicketDraftPurpose: string
 
     public function requiresTicket(): bool
     {
-        return ! in_array($this, [self::RequesterIntake, self::TechnicianIntake], true);
+        return ! in_array($this, [self::RequesterIntake, self::TechnicianIntake, self::CatalogueRequest], true);
     }
 
     public function requiresManage(): bool

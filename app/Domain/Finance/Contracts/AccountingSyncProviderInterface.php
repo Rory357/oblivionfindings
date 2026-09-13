@@ -2,7 +2,11 @@
 
 namespace App\Domain\Finance\Contracts;
 
+use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinAccountingIntegration;
+use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Finance\Models\FinVendor;
 use Illuminate\Support\Collection;
 
 interface AccountingSyncProviderInterface
@@ -10,7 +14,7 @@ interface AccountingSyncProviderInterface
     /**
      * Push local chart-of-accounts entries to the external system.
      *
-     * @param  Collection<int, \App\Domain\Finance\Models\FinAccount>  $accounts
+     * @param  Collection<int, FinAccount>  $accounts
      * @return array{success: int, errors: array<int, array{id: int, message: string}>}
      */
     public function pushAccounts(FinAccountingIntegration $integration, Collection $accounts): array;
@@ -25,7 +29,7 @@ interface AccountingSyncProviderInterface
     /**
      * Push local journals to the external system.
      *
-     * @param  Collection<int, \App\Domain\Finance\Models\FinJournal>  $journals
+     * @param  Collection<int, FinJournal>  $journals
      * @return array{success: int, errors: array<int, array{id: int, message: string}>}
      */
     public function pushJournals(FinAccountingIntegration $integration, Collection $journals): array;
@@ -40,7 +44,7 @@ interface AccountingSyncProviderInterface
     /**
      * Push local bills as invoices to the external system.
      *
-     * @param  Collection<int, \App\Domain\Finance\Models\FinBill>  $bills
+     * @param  Collection<int, FinBill>  $bills
      * @return array{success: int, errors: array<int, array{id: int, message: string}>}
      */
     public function pushInvoices(FinAccountingIntegration $integration, Collection $bills): array;
@@ -55,7 +59,7 @@ interface AccountingSyncProviderInterface
     /**
      * Push local vendors as contacts to the external system.
      *
-     * @param  Collection<int, \App\Domain\Finance\Models\FinVendor>  $vendors
+     * @param  Collection<int, FinVendor>  $vendors
      * @return array{success: int, errors: array<int, array{id: int, message: string}>}
      */
     public function pushContacts(FinAccountingIntegration $integration, Collection $vendors): array;

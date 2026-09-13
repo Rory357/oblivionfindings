@@ -97,7 +97,7 @@ class AccountingIntegrationController extends Controller
         ]);
 
         return redirect()->route('finance.integrations.index')
-            ->with('success', ucfirst($integration->provider) . ' integration created successfully.');
+            ->with('success', ucfirst($integration->provider).' integration created successfully.');
     }
 
     /**
@@ -117,7 +117,7 @@ class AccountingIntegrationController extends Controller
         $integration->update($validated);
 
         return redirect()->route('finance.integrations.index')
-            ->with('success', ucfirst($integration->provider) . ' integration updated successfully.');
+            ->with('success', ucfirst($integration->provider).' integration updated successfully.');
     }
 
     /**
@@ -134,7 +134,7 @@ class AccountingIntegrationController extends Controller
         SyncAccountingIntegrationJob::dispatch($integration->id);
 
         return redirect()->route('finance.integrations.index')
-            ->with('success', ucfirst($integration->provider) . ' sync has been queued.');
+            ->with('success', ucfirst($integration->provider).' sync has been queued.');
     }
 
     /**
@@ -149,12 +149,12 @@ class AccountingIntegrationController extends Controller
             $connected = $provider->testConnection($integration);
 
             if ($connected) {
-                return back()->with('success', ucfirst($integration->provider) . ' connection test successful.');
+                return back()->with('success', ucfirst($integration->provider).' connection test successful.');
             }
 
-            return back()->withErrors(['connection' => ucfirst($integration->provider) . ' connection test failed. Please check your credentials.']);
+            return back()->withErrors(['connection' => ucfirst($integration->provider).' connection test failed. Please check your credentials.']);
         } catch (\Throwable $e) {
-            return back()->withErrors(['connection' => 'Connection test failed: ' . $e->getMessage()]);
+            return back()->withErrors(['connection' => 'Connection test failed: '.$e->getMessage()]);
         }
     }
 
@@ -169,7 +169,7 @@ class AccountingIntegrationController extends Controller
         $integration->delete();
 
         return redirect()->route('finance.integrations.index')
-            ->with('success', ucfirst($provider) . ' integration disconnected successfully.');
+            ->with('success', ucfirst($provider).' integration disconnected successfully.');
     }
 
     /**

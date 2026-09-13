@@ -24,7 +24,7 @@ class BudgetActualsController extends Controller
             ->get(['id', 'fiscal_year', 'title', 'status'])
             ->map(fn (Budget $b) => [
                 'id' => $b->id,
-                'label' => ($b->title ?: 'Budget') . ' - FY' . $b->fiscal_year,
+                'label' => ($b->title ?: 'Budget').' - FY'.$b->fiscal_year,
                 'fiscal_year' => $b->fiscal_year,
                 'status' => $b->status,
             ]);

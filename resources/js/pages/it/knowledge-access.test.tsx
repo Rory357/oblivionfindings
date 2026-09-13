@@ -5,10 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { KbRow, TicketRow } from '@/components/it/it-wizards';
 import ItIndex from './index';
+import KnowledgeIndex from './knowledge';
+import ProvisioningIndex from './provisioning';
 
 const mocks = vi.hoisted(() => ({
     post: vi.fn(),
     get: vi.fn(),
+    visit: vi.fn(),
     setTab: vi.fn(),
     menu: vi.fn(),
     wizard: vi.fn(),
@@ -22,13 +25,15 @@ vi.mock('@inertiajs/react', () => ({
         url: mocks.url ?? `/it?tab=${mocks.tab}`,
         props: { auth: { user: { id: 1 } } },
     }),
-    Link: ({ children, href }: { children: ReactNode; href: string }) => (
-        <a href={href}>{children}</a>
+    Link: ({ children, href, ...attributes }: ComponentProps<'a'>) => (
+        <a href={href} {...attributes}>
+            {children}
+        </a>
     ),
     router: {
         post: mocks.post,
         get: mocks.get,
-        visit: vi.fn(),
+        visit: mocks.visit,
         reload: vi.fn(),
     },
 }));
@@ -43,23 +48,6 @@ vi.mock('@/components/hr/leave-context-menu', () => ({
         element: null,
         open: (items: LeaveCtxItem[]) => () => mocks.menu(items),
     }),
-}));
-vi.mock('@/components/it/it-hero', () => ({
-    ItHero: ({
-        search,
-        filters,
-        rail,
-    }: {
-        search: ReactNode;
-        filters: ReactNode;
-        rail: ReactNode;
-    }) => (
-        <header>
-            {search}
-            {filters}
-            {rail}
-        </header>
-    ),
 }));
 vi.mock('@/components/it/it-wizards', () => ({
     ItWizard: (props: unknown) => {
@@ -102,6 +90,8 @@ const article = {
     related_service: null,
 };
 const props = (): PageProps => ({
+    workspace:
+        mocks.url === null && mocks.tab === 'knowledge' ? 'knowledge' : 'desk',
     myTickets: [],
     catalogItems: [],
     kbPublished: [article],
@@ -139,6 +129,162 @@ describe('Knowledge current audience presentation', () => {
         mocks.url = null;
         localStorage.clear();
         sessionStorage.clear();
+    });
+
+    it('keeps the Service Desk rail focused on tickets and request entry points', () => {
+        render(
+            <ItIndex
+                {...props()}
+                workspace="desk"
+                can={{ view: true, manage: true, request: true }}
+            />,
+        );
+        expect(
+            screen.getByRole('heading', { name: 'Service Desk' }),
+        ).toBeVisible();
+        for (const name of [
+            'Overview',
+            'Tickets',
+            'Service catalogue',
+            'My requests',
+        ]) {
+            expect(
+                screen.getByRole('tab', { name: new RegExp(name) }),
+            ).toBeVisible();
+        }
+        for (const name of ['Provisioning', 'Knowledge', 'Reports']) {
+            expect(
+                screen.queryByRole('tab', { name: new RegExp(name) }),
+            ).not.toBeInTheDocument();
+        }
+    });
+
+    it('closes a reader without losing its page and keeps a racing layout change free of the closed article', () => {
+        mocks.url = '/it/knowledge?article=41&page=2&q=guide&list_view=cards';
+        const selected = agentArticle(41, 'Approved guide', true);
+        render(
+            <KnowledgeIndex
+                {...props()}
+                kbArticles={[selected]}
+                selectedKbArticle={selected}
+                can={{ view: true, manage: true, request: true }}
+            />,
+        );
+        fireEvent.click(
+            within(screen.getByRole('dialog')).getByRole('button', {
+                name: 'Close',
+            }),
+        );
+        expect(mocks.get).toHaveBeenLastCalledWith(
+            '/it/knowledge',
+            { page: '2', q: 'guide', list_view: 'cards' },
+            expect.objectContaining({ replace: true, preserveScroll: true }),
+        );
+        // The close response has not arrived; current page props still carry article=41.
+        fireEvent.click(screen.getByRole('radio', { name: 'Table' }));
+        expect(mocks.get).toHaveBeenLastCalledWith(
+            '/it/knowledge',
+            { page: '2', q: 'guide', list_view: 'table' },
+            expect.objectContaining({ preserveState: true }),
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('preserves provisioning filters and pagination when changing its dedicated page layout', () => {
+        mocks.url = '/it/provisioning?status=failed&page=2&list_view=cards';
+        render(
+            <ProvisioningIndex
+                actorId={1}
+                canManage={false}
+                storageReady
+                filters={{
+                    view: 'tasks',
+                    status: 'failed',
+                    list_view: 'cards',
+                }}
+                summary={{
+                    open: 0,
+                    awaiting_approval: 0,
+                    failed: 0,
+                    overdue: 0,
+                }}
+                records={{ data: [], total: 0, links: [] }}
+                templates={[]}
+            />,
+        );
+        expect(
+            screen.getByRole('heading', { name: 'Provisioning' }),
+        ).toBeVisible();
+        expect(
+            screen.queryByRole('tab', { name: 'Tickets' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('radio', { name: 'Table' }));
+        expect(mocks.get).toHaveBeenCalledWith(
+            '/it/provisioning',
+            { status: 'failed', page: '2', list_view: 'table' },
+            expect.objectContaining({
+                preserveState: true,
+                preserveScroll: true,
+            }),
+        );
+    });
+
+    it('opens only an authorized article from a dedicated Knowledge deep link', () => {
+        mocks.url = '/it/knowledge?article=41';
+        const { rerender } = render(<KnowledgeIndex {...props()} />);
+        expect(
+            screen.getByRole('heading', { name: 'Guides', hidden: true }),
+        ).toBeVisible();
+        expect(
+            within(screen.getByRole('dialog')).getByText(article.body),
+        ).toBeVisible();
+        rerender(<KnowledgeIndex {...props()} kbPublished={[]} />);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryByText(article.body)).not.toBeInTheDocument();
+    });
+
+    it('reads the separately loaded publication instead of its metadata-only library row', () => {
+        mocks.url = '/it/knowledge?page=2';
+        const loaded = {
+            ...agentArticle(41, 'Approved guide', true),
+            content_loaded: true,
+        };
+        const metadata = { ...loaded, body: null, content_loaded: false };
+        const { rerender } = render(
+            <KnowledgeIndex
+                {...props()}
+                kbArticles={[metadata]}
+                selectedKbArticle={null}
+                can={{ view: true, manage: true, request: true }}
+            />,
+        );
+        fireEvent.click(screen.getByRole('row', { name: /Approved guide/ }));
+        expect(mocks.visit).toHaveBeenCalledWith(
+            '/it/knowledge/41?library=page%3D2',
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        mocks.url = '/it/knowledge?article=41&page=2';
+        rerender(
+            <KnowledgeIndex
+                {...props()}
+                kbArticles={[metadata]}
+                selectedKbArticle={loaded}
+                can={{ view: true, manage: true, request: true }}
+            />,
+        );
+        expect(
+            within(screen.getByRole('dialog')).getByText(article.body),
+        ).toBeVisible();
+        rerender(
+            <KnowledgeIndex
+                {...props()}
+                kbArticles={[metadata]}
+                selectedKbArticle={null}
+                can={{ view: true, manage: true, request: true }}
+            />,
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryByText(article.body)).not.toBeInTheDocument();
     });
 
     it('restores URL search after Back without a stale debounce changing the history entry', () => {
@@ -180,6 +326,70 @@ describe('Knowledge current audience presentation', () => {
                 screen.getByRole('radio', { name: 'Table' }),
             ).toHaveAttribute('aria-checked', 'true');
             expect(mocks.get).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('keeps the Knowledge URL search visible and pauses paging while it changes', () => {
+        vi.useFakeTimers();
+        try {
+            mocks.url = '/it/knowledge?q=current';
+            const page = {
+                total: 27,
+                from: 1,
+                to: 24,
+                current_page: 1,
+                last_page: 2,
+                links: [
+                    { url: null, label: 'Previous', active: false },
+                    {
+                        url: '/it/knowledge?q=current&page=1',
+                        label: '1',
+                        active: true,
+                    },
+                    {
+                        url: '/it/knowledge?q=current&page=2',
+                        label: '2',
+                        active: false,
+                    },
+                    {
+                        url: '/it/knowledge?q=current&page=2',
+                        label: 'Next',
+                        active: false,
+                    },
+                ],
+            };
+            const content = (
+                <KnowledgeIndex
+                    {...props()}
+                    knowledgePage={page}
+                    can={{ view: true, manage: true, request: true }}
+                />
+            );
+            const { rerender } = render(content);
+            const search = screen.getByPlaceholderText(
+                'Search the knowledge base…',
+            );
+            expect(search).toHaveValue('current');
+            fireEvent.change(search, { target: { value: 'revised' } });
+            expect(
+                screen.getByRole('button', { name: 'Next page' }),
+            ).toBeDisabled();
+            act(() => vi.advanceTimersByTime(400));
+            expect(mocks.get).toHaveBeenCalled();
+            mocks.url = '/it/knowledge?q=revised';
+            rerender(
+                <KnowledgeIndex
+                    {...props()}
+                    knowledgePage={page}
+                    can={{ view: true, manage: true, request: true }}
+                />,
+            );
+            expect(search).toHaveValue('revised');
+            expect(
+                screen.getByRole('button', { name: 'Next page' }),
+            ).toBeEnabled();
         } finally {
             vi.useRealTimers();
         }
@@ -376,17 +586,12 @@ describe('Knowledge current audience presentation', () => {
         ).not.toBeInTheDocument();
     });
 
-    it('conceals an open reader when refreshed authorized articles remove it and does not reopen from stale selection', () => {
+    it('removes a revoked library entry without retaining its body or opening a stale reader', () => {
         const { rerender } = render(<ItIndex {...props()} />);
-        fireEvent.click(screen.getByRole('button', { name: /Approved guide/ }));
-        expect(
-            within(screen.getByRole('dialog')).getByText(article.body),
-        ).toBeVisible();
-        expect(mocks.post).toHaveBeenCalledWith(
-            '/it/kb/41/view',
-            {},
-            expect.objectContaining({ only: ['kbPublished'] }),
-        );
+        fireEvent.click(screen.getByRole('row', { name: /^Approved guide/ }));
+        expect(mocks.visit).toHaveBeenCalledWith('/it/knowledge/41');
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(mocks.post).not.toHaveBeenCalled();
 
         rerender(<ItIndex {...props()} kbPublished={[]} />);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -399,9 +604,9 @@ describe('Knowledge current audience presentation', () => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    it('renders a refreshed authorized publication instead of its previously selected body', () => {
+    it('refreshes the library identity while keeping the document body on its dedicated page', () => {
         const { rerender } = render(<ItIndex {...props()} />);
-        fireEvent.click(screen.getByRole('button', { name: /Approved guide/ }));
+        fireEvent.click(screen.getByRole('row', { name: /^Approved guide/ }));
         rerender(
             <ItIndex
                 {...props()}
@@ -415,16 +620,15 @@ describe('Knowledge current audience presentation', () => {
             />,
         );
 
-        const reader = within(screen.getByRole('dialog'));
-        expect(reader.getByText('Updated approved guide')).toBeVisible();
-        expect(reader.getByText('Revised canonical guide body.')).toBeVisible();
-        expect(reader.queryByText(article.body)).not.toBeInTheDocument();
-        fireEvent.click(reader.getByRole('button', { name: 'Yes' }));
-        expect(mocks.post).toHaveBeenLastCalledWith(
-            '/it/kb/41/helpful',
-            { helpful: true },
-            expect.any(Object),
+        expect(screen.getByText('Updated approved guide')).toBeVisible();
+        expect(
+            screen.queryByText('Revised canonical guide body.'),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText(article.body)).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('row', { name: /^Updated approved guide/ }),
         );
+        expect(mocks.visit).toHaveBeenLastCalledWith('/it/knowledge/41');
     });
 
     it('shows mutation controls only for articles whose current capability permits management', () => {
@@ -449,11 +653,13 @@ describe('Knowledge current audience presentation', () => {
                 name: 'Actions for Approved Site guide',
             }),
         ).toBeVisible();
+        fireEvent.contextMenu(
+            screen.getByRole('row', { name: /^Shared readable guide/ }),
+        );
         expect(
-            screen.queryByRole('button', {
-                name: 'Actions for Shared readable guide',
-            }),
-        ).not.toBeInTheDocument();
+            screen.getAllByRole('menuitem').map((item) => item.textContent),
+        ).toEqual(['Read document', 'Copy document link']);
+        fireEvent.keyDown(window, { key: 'Escape' });
         expect(screen.getByText('Shared readable guide')).toBeVisible();
 
         rerender(
@@ -472,9 +678,13 @@ describe('Knowledge current audience presentation', () => {
                 ]}
             />,
         );
+        fireEvent.contextMenu(
+            screen.getByRole('row', { name: /^Approved Site guide/ }),
+        );
         expect(
-            screen.queryByRole('button', { name: /Actions for/ }),
-        ).not.toBeInTheDocument();
+            screen.getAllByRole('menuitem').map((item) => item.textContent),
+        ).toEqual(['Read document', 'Copy document link']);
+        fireEvent.keyDown(window, { key: 'Escape' });
     });
 
     it('lets a knowledge-only author read current draft content and use author actions without reviewer or ticket controls', () => {
@@ -504,28 +714,24 @@ describe('Knowledge current audience presentation', () => {
         expect(
             screen.queryByRole('button', { name: /My tickets/ }),
         ).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Author draft' }));
-        expect(
-            within(screen.getByRole('dialog')).getByText(draft.body!),
-        ).toBeVisible();
-        expect(
-            within(screen.getByRole('dialog')).queryByText('Was this helpful?'),
-        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('row', { name: /^Author draft/ }));
+        expect(mocks.visit).toHaveBeenCalledWith('/it/knowledge/61');
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(mocks.post).not.toHaveBeenCalled();
-        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Actions for Author draft' }),
+        fireEvent.contextMenu(
+            screen.getByRole('row', { name: /^Author draft/ }),
         );
-        const actions = mocks.menu.mock.lastCall?.[0] as LeaveCtxItem[];
         expect(
-            actions.filter((a) => a.kind === 'item').map((a) => a.label),
-        ).toEqual(['Edit', 'Send for review', 'Delete draft']);
-        const edit = actions.find(
-            (a) => a.kind === 'item' && a.label === 'Edit',
-        );
-        if (edit?.kind !== 'item')
-            throw new Error('Expected permitted draft edit.');
-        act(() => edit.onSelect());
+            screen.getAllByRole('menuitem').map((item) => item.textContent),
+        ).toEqual([
+            'Read document',
+            'Copy document link',
+            'Edit',
+            'Send for review',
+            'Delete draft',
+        ]);
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+        expect(mocks.visit).toHaveBeenLastCalledWith('/it/knowledge/61?edit=1');
         rerender(
             <ItIndex
                 {...props()}
@@ -572,21 +778,17 @@ describe('Knowledge current audience presentation', () => {
         expect(
             screen.queryByRole('button', { name: 'New KB article' }),
         ).not.toBeInTheDocument();
-        fireEvent.click(
-            screen.getByRole('button', {
-                name: 'Actions for Review-ready guide',
-            }),
-        );
-        const actions = mocks.menu.mock.lastCall?.[0] as LeaveCtxItem[];
-        expect(
-            actions.filter((a) => a.kind === 'item').map((a) => a.label),
-        ).toEqual(['Approve & publish']);
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Review-ready guide' }),
+        fireEvent.contextMenu(
+            screen.getByRole('row', { name: /^Review-ready guide/ }),
         );
         expect(
-            within(screen.getByRole('dialog')).getByText(article.body!),
-        ).toBeVisible();
+            screen.getAllByRole('menuitem').map((item) => item.textContent),
+        ).toEqual(['Read document', 'Copy document link', 'Review & publish']);
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: 'Read document' }),
+        );
+        expect(mocks.visit).toHaveBeenCalledWith('/it/knowledge/62');
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         rerender(
             <ItIndex
                 {...props()}

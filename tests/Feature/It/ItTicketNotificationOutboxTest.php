@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\It\InboundEmailIngestor;
+use App\Domain\It\Services\ItEmailDeliveryFailure;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItTicketIntakeService;
 use App\Domain\It\Services\ItTicketTriageService;
@@ -233,7 +234,10 @@ test('a local failure after a provider callback never regresses the authoritativ
     expect($delivery->status)->toBe($providerStatus)
         ->and($delivery->provider_status_at)->not->toBeNull()
         ->and($delivery->provider_message_id)->toBe('synthetic-provider-acknowledgement')
-        ->and($delivery->last_error)->toBe($providerStatus === 'delivered' ? null : 'Synthetic authoritative provider failure')
+        ->and($delivery->last_error)->toBe($providerStatus === 'delivered' ? null : ItEmailDeliveryFailure::MESSAGES[
+            $providerStatus === 'bounced' ? 'provider_bounced' : 'provider_failed'
+        ])
+        ->and((string) $delivery->getRawOriginal('last_error'))->not->toContain('Synthetic authoritative provider failure')
         ->and($delivery->attempt_count)->toBe(1)
         ->and(Mail::mailer('array')->getSymfonyTransport()->messages())->toHaveCount(0);
 })->with(['delivered', 'bounced', 'failed']);
@@ -258,7 +262,8 @@ test('only an authoritative provider failure unlocks retry after a lost acknowle
     $this->deliveries->recordProviderStatus($delivery->notification_uuid, 'failed', 'Synthetic confirmed rejection', 'synthetic-rejected');
     Event::dispatch($failure);
     expect($delivery->fresh()->status)->toBe('failed')
-        ->and($delivery->fresh()->last_error)->toBe('Synthetic confirmed rejection');
+        ->and($delivery->fresh()->last_error)->toBe(ItEmailDeliveryFailure::MESSAGES['provider_failed'])
+        ->and((string) $delivery->fresh()->getRawOriginal('last_error'))->not->toContain('Synthetic confirmed rejection');
     Notification::fake();
     $retry = $this->deliveries->retry($delivery, $actor);
     expect($delivery->fresh()->status)->toBe('retried')

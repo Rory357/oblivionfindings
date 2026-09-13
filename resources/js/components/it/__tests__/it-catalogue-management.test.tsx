@@ -515,7 +515,28 @@ it('lets an author remove an unavailable saved Site without concealing its restr
     );
 });
 
-it('shows approved request Sites and submits the staff-selected Site with the request', () => {
+it('shows approved request Sites and reviews the staff-selected Site before submitting', async () => {
+    const transport = vi
+        .spyOn(axios, 'post')
+        .mockImplementation(async (_url, body) => ({
+            data: {
+                status: 'committed',
+                data: {
+                    viewer_user_id: (body as { actor_user_id: number })
+                        .actor_user_id,
+                    catalog_item_id: 12,
+                    request_uuid: (body as { idempotency_key: string })
+                        .idempotency_key,
+                    schema_version: 3,
+                    submission_id: 8,
+                    id: 9,
+                    result_type: 'ticket',
+                    reference: 'IT-000009',
+                    url: '/it/tickets/9',
+                    replayed: false,
+                },
+            },
+        }));
     render(
         <ItServiceCatalogue
             actorId={3}
@@ -542,13 +563,85 @@ it('shows approved request Sites and submits the staff-selected Site with the re
     fireEvent.change(screen.getByRole('combobox', { name: 'Request site' }), {
         target: { value: '22' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(transport).not.toHaveBeenCalled();
+    expect(screen.getByText('Cover house')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
-    expect(state.post).toHaveBeenCalledWith(
+    expect(transport).toHaveBeenCalledWith(
         '/it/catalog/12/submissions',
         expect.objectContaining({
+            actor_user_id: 3,
             site_id: 22,
             schema_version: item.form_schema_version,
         }),
+        expect.objectContaining({ headers: { Accept: 'application/json' } }),
+    );
+    await waitFor(() =>
+        expect(
+            screen.getByRole('button', { name: 'View request' }),
+        ).toBeVisible(),
+    );
+});
+
+it('clears the private request form when the current browser account changes', async () => {
+    const transport = vi
+        .spyOn(axios, 'post')
+        .mockImplementation(async (_url, body) => ({
+            data: {
+                status: 'committed',
+                data: {
+                    viewer_user_id: (body as { actor_user_id: number })
+                        .actor_user_id,
+                    catalog_item_id: 12,
+                    request_uuid: (body as { idempotency_key: string })
+                        .idempotency_key,
+                    schema_version: 3,
+                    submission_id: 8,
+                    id: 9,
+                    result_type: 'provisioning',
+                    reference: null,
+                    url: '/it/provisioning/9',
+                    replayed: false,
+                },
+            },
+        }));
+    const requestItem = {
+        ...item,
+        form_schema: {
+            fields: [
+                { key: 'details', label: 'Request details', type: 'text' },
+            ],
+        },
+    };
+    const props = {
+        items: [requestItem],
+        fieldOptions: { employee: [], user: [], asset: [] },
+        query: '',
+        category: null,
+    };
+    const { rerender } = render(<ItServiceCatalogue actorId={3} {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Equipment request' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Request details' }), {
+        target: { value: 'Original account private request' },
+    });
+    rerender(<ItServiceCatalogue actorId={4} {...props} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(transport).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Equipment request' }));
+    expect(
+        screen.getByRole('textbox', { name: 'Request details' }),
+    ).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    expect(transport).toHaveBeenCalledWith(
+        '/it/catalog/12/submissions',
+        expect.objectContaining({ actor_user_id: 4, values: { details: '' } }),
+        expect.objectContaining({ headers: { Accept: 'application/json' } }),
+    );
+    await waitFor(() =>
+        expect(
+            screen.getByRole('button', { name: 'View request' }),
+        ).toBeVisible(),
     );
 });
 

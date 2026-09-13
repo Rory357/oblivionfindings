@@ -5,11 +5,11 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\Role;
-use App\Models\ServiceContext;
 use App\Models\Shift;
-use App\Models\Timesheet;
 use App\Models\TimelineEvent;
+use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,15 +18,18 @@ class DashboardControllerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $manager;
+
     protected User $staff;
+
     protected Client $client;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -201,12 +204,21 @@ class DashboardControllerTest extends TestCase
         );
     }
 
-    public function test_today_page_works(): void
+    public function test_retired_today_redirects_staff_managers_and_admins_to_my_day(): void
     {
-        $response = $this->actingAs($this->staff)->get('/today');
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->component('dashboard/today')
-        );
+        foreach ([$this->staff, $this->manager, $this->admin] as $user) {
+            $this->actingAs($user)->get(route('today'))
+                ->assertStatus(301)
+                ->assertRedirect(route('my-day'));
+
+            $this->head(route('today'))
+                ->assertStatus(301)
+                ->assertRedirect(route('my-day'));
+        }
+    }
+
+    public function test_retired_today_still_requires_authentication(): void
+    {
+        $this->get(route('today'))->assertRedirect(route('login'));
     }
 }

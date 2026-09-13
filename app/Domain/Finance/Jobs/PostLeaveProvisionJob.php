@@ -140,7 +140,7 @@ class PostLeaveProvisionJob implements ShouldQueue
                         'source_id' => $balance->id,
                         'event_type' => 'leave_provision',
                         'description' => "Leave provision {$balance->leave_type}: {$balanceHours}hrs × \${$hourlyRate}/hr"
-                            . " (delta: \${$delta})",
+                            ." (delta: \${$delta})",
                         'amount' => $absAmount,
                         'event_date' => $snapshotDateStr,
                         'debit_account_code' => $debitCode,
@@ -163,7 +163,7 @@ class PostLeaveProvisionJob implements ShouldQueue
         }
 
         Log::info("PostLeaveProvisionJob: Org #{$orgId} — processed {$processedCount} provisions"
-            . " (increase: \${$totalIncrease}, decrease: \${$totalDecrease})");
+            ." (increase: \${$totalIncrease}, decrease: \${$totalDecrease})");
     }
 
     private function saveSnapshot(

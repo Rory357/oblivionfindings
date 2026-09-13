@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinBankAccountFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,11 +13,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FinBankAccount extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinBankAccountFactory::new();
+        return FinBankAccountFactory::new();
     }
 
     protected $table = 'fin_bank_accounts';
@@ -76,7 +77,7 @@ class FinBankAccount extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
+        return $query->when($orgId, fn ($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
     }
 
     public function scopeActive($query)

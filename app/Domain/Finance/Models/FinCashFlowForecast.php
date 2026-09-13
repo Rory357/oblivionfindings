@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinCashFlowForecastFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,11 +13,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FinCashFlowForecast extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinCashFlowForecastFactory::new();
+        return FinCashFlowForecastFactory::new();
     }
 
     protected $table = 'fin_cash_flow_forecasts';

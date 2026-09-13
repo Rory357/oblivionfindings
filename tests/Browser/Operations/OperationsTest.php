@@ -350,11 +350,11 @@ test('operations availability page loads', function () {
     });
 });
 
-test('operations calendar sync page loads', function () {
+test('calendar sync settings page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/calendar-sync')
+            ->visit('/settings/calendar-sync')
             ->waitForText('Calendar', 10)
             ->assertSee('Calendar');
     });
@@ -420,13 +420,13 @@ test('finance billing entries page loads', function () {
     });
 });
 
-test('operations calendar sync create page loads', function () {
+test('old operations calendar sync bookmark opens settings', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/operations/calendar-sync/create')
             ->waitForText('Calendar', 10)
-            ->assertPathIs('/operations/calendar-sync/create');
+            ->assertPathIs('/settings/calendar-sync');
     });
 });
 

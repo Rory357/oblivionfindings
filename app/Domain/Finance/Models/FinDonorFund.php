@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinDonorFundFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,11 +14,11 @@ use Illuminate\Support\Carbon;
 
 class FinDonorFund extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinDonorFundFactory::new();
+        return FinDonorFundFactory::new();
     }
 
     protected $table = 'fin_donor_funds';

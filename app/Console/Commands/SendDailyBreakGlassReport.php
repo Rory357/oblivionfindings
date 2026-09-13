@@ -10,6 +10,7 @@ use Illuminate\Console\Command;
 class SendDailyBreakGlassReport extends Command
 {
     protected $signature = 'breakglass:daily-report {--date= : YYYY-MM-DD (defaults to yesterday)}';
+
     protected $description = 'Send a daily summary of break-glass access usage to managers.';
 
     public function handle(): int
@@ -28,8 +29,8 @@ class SendDailyBreakGlassReport extends Command
 
         $lines = [];
         foreach ($items as $a) {
-            $client = $a->client ? ($a->client->first_name . ' ' . $a->client->last_name) : ('Client #' . $a->client_id);
-            $user = $a->user ? $a->user->name : ('User #' . $a->user_id);
+            $client = $a->client ? ($a->client->first_name.' '.$a->client->last_name) : ('Client #'.$a->client_id);
+            $user = $a->user ? $a->user->name : ('User #'.$a->user_id);
             $expires = $a->expires_at ? $a->expires_at->format('Y-m-d H:i') : 'n/a';
             $lines[] = "• {$a->created_at->format('H:i')} — {$user} → {$client} (expires {$expires}) — {$a->reason}";
         }
@@ -37,7 +38,7 @@ class SendDailyBreakGlassReport extends Command
         $title = "Break-glass daily report ({$start->toDateString()})";
         $body = $count === 0
             ? 'No break-glass access was used.'
-            : "Total uses: {$count}\n\n" . implode("\n", $lines);
+            : "Total uses: {$count}\n\n".implode("\n", $lines);
 
         // Notify managers via the existing internal notification stream.
         app(NotificationService::class)->notifyCrud(null, 'daily', 'break-glass report', null, null, [

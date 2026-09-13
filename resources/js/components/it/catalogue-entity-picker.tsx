@@ -32,6 +32,11 @@ interface Props {
     invalid?: boolean;
     describedBy?: string;
     onChange: (value: number | null) => void;
+    onSelectedOption?: (value: CatalogFieldOption | null) => void;
+    onAccessLost?: () => void;
+    onSessionLost?: () => void;
+    purpose?: 'field' | 'requested-for';
+    siteId?: number | null;
 }
 interface Page {
     options: CatalogFieldOption[];
@@ -50,7 +55,13 @@ export function readCatalogueOptionPage(
     data: unknown,
     props: Pick<
         Props,
-        'actorId' | 'itemId' | 'schemaVersion' | 'fieldKey' | 'value'
+        | 'actorId'
+        | 'itemId'
+        | 'schemaVersion'
+        | 'fieldKey'
+        | 'value'
+        | 'purpose'
+        | 'siteId'
     >,
     uuid: string,
 ): Page | null {
@@ -61,6 +72,9 @@ export function readCatalogueOptionPage(
         data.catalog_item_id !== props.itemId ||
         data.schema_version !== props.schemaVersion ||
         data.field_key !== props.fieldKey ||
+        (props.purpose === 'requested-for' &&
+            (data.purpose !== 'requested-for' ||
+                data.site_id !== (props.siteId ?? null))) ||
         data.selected_id !== props.value ||
         !Array.isArray(data.options) ||
         data.options.length > 50 ||
@@ -88,6 +102,8 @@ export function CatalogueEntityPicker(props: Props) {
                 props.itemId,
                 props.schemaVersion,
                 props.fieldKey,
+                props.purpose,
+                props.siteId,
             ])}
             {...props}
         />
@@ -137,7 +153,9 @@ function PickerBody(props: Props) {
         if (after === null) setItems([]);
         try {
             const response = await axios.post(
-                `/it/catalog/${context.itemId}/fields/${encodeURIComponent(context.fieldKey)}/options`,
+                context.purpose === 'requested-for'
+                    ? `/it/catalog/${context.itemId}/requested-for/options`
+                    : `/it/catalog/${context.itemId}/fields/${encodeURIComponent(context.fieldKey)}/options`,
                 {
                     actor_user_id: context.actorId,
                     query_uuid: uuid,
@@ -145,6 +163,9 @@ function PickerBody(props: Props) {
                     query: search,
                     after,
                     selected_id: context.value,
+                    ...(context.purpose === 'requested-for'
+                        ? { site_id: context.siteId ?? null }
+                        : {}),
                 },
                 {
                     signal: controller.signal,
@@ -175,6 +196,7 @@ function PickerBody(props: Props) {
             );
             setNext(page.next_cursor);
             setSelected(page.selected);
+            context.onSelectedOption?.(page.selected);
             setState('ready');
             if (context.value !== null && page.selected === null)
                 setMessage(
@@ -188,12 +210,14 @@ function PickerBody(props: Props) {
             setItems([]);
             setNext(null);
             if (status === 401 || status === 419) {
+                context.onSessionLost?.();
                 setSelected(null);
                 setState('session');
                 setMessage(
                     'Sign in with the original account, then retry the search.',
                 );
             } else if (status === 403 || status === 404) {
+                context.onAccessLost?.();
                 setSelected(null);
                 setState('access');
                 setMessage(
@@ -293,6 +317,7 @@ function PickerBody(props: Props) {
                                     onSelect={() => {
                                         setSelected(item);
                                         props.onChange(item.id);
+                                        props.onSelectedOption?.(item);
                                         changeOpen(false);
                                     }}
                                 >
@@ -389,6 +414,7 @@ function PickerBody(props: Props) {
                                     variant="ghost"
                                     onClick={() => {
                                         props.onChange(null);
+                                        props.onSelectedOption?.(null);
                                         setSelected(null);
                                         changeOpen(false);
                                     }}

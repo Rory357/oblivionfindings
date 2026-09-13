@@ -41,7 +41,7 @@ final class ItModuleNavigation
                     $canRequest
                         ? self::item('Service catalogue', '/it?tab=catalog', 'book-open')
                         : null,
-                    self::item('Provisioning', '/it?tab=provisioning', 'package-check'),
+                    self::item('Provisioning', '/it/provisioning', 'package-check'),
                     self::item('Work planning', '/it/work', 'calendar-clock'),
                     self::item('Knowledge & Documentation', '/it/knowledge', 'library'),
                     self::item('Reports', '/it/reports', 'chart-no-axes-column'),
