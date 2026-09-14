@@ -1193,13 +1193,14 @@ test('the automation catalogue remains visible when console routes are not loade
     $definitions = $catalog->definitions();
 
     expect($definitions)
-        ->toHaveCount(8)
+        ->toHaveCount(9)
         ->and($definitions[0])->toMatchArray(['key' => 'it.check-sla', 'label' => 'SLA watchdog'])
         ->and($definitions[1])->toMatchArray(['key' => 'it.close-resolved'])
-        ->and($definitions[2])->toMatchArray(['key' => 'it.run-recurrence', 'expression' => '*/15 * * * *'])
-        ->and($definitions[3])->toMatchArray(['key' => 'it.poll-mailbox'])
-        ->and($definitions[4])->toMatchArray(['key' => 'it.dispatch-notifications', 'expression' => '* * * * *'])
-        ->and($definitions[5])->toMatchArray(['key' => 'it.retry-attachment-cleanup', 'expression' => '*/5 * * * *', 'overlap_minutes' => 10])
-        ->and($definitions[6])->toMatchArray(['key' => 'it.check-approval-deadlines', 'expression' => '* * * * *', 'overlap_minutes' => 10])
-        ->and($definitions[7])->toMatchArray(['key' => 'it.expire-provisioning-approvals', 'expression' => '*/10 * * * *', 'overlap_minutes' => 10]);
+        ->and($definitions[2])->toMatchArray(['key' => 'it.prune-knowledge-uploads', 'expression' => '40 3 * * *'])
+        ->and($definitions[3])->toMatchArray(['key' => 'it.run-recurrence', 'expression' => '*/15 * * * *'])
+        ->and($definitions[4])->toMatchArray(['key' => 'it.poll-mailbox'])
+        ->and($definitions[5])->toMatchArray(['key' => 'it.dispatch-notifications', 'expression' => '* * * * *'])
+        ->and($definitions[6])->toMatchArray(['key' => 'it.retry-attachment-cleanup', 'expression' => '*/5 * * * *', 'overlap_minutes' => 10])
+        ->and($definitions[7])->toMatchArray(['key' => 'it.check-approval-deadlines', 'expression' => '* * * * *', 'overlap_minutes' => 10])
+        ->and($definitions[8])->toMatchArray(['key' => 'it.expire-provisioning-approvals', 'expression' => '*/10 * * * *', 'overlap_minutes' => 10]);
 });
