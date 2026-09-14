@@ -1,6 +1,9 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ItAutomationRegister } from '@/components/it/it-automation-register';
+import { EntityChip, EntityStatusChip } from '@/components/lists/entity-cells';
+import type { MenuItem } from '@/components/lists/entity-menu';
+import type { EntityTableColumn } from '@/components/lists/entity-table';
 import { Button } from '@/components/ui/button';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -9,19 +12,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { formatDateTime } from '@/lib/datetime';
 import { router, useForm } from '@inertiajs/react';
-import {
-    CalendarClock,
-    Pause,
-    Pencil,
-    Play,
-    Plus,
-    Trash2,
-} from 'lucide-react';
+import { CalendarClock, Pause, Pencil, Play, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 interface Option {
@@ -83,20 +78,27 @@ export function describeCron(expression: string): string {
     return expression;
 }
 
-/** W20: recurring maintenance plans that create one routed ticket per due occurrence. */
+/** W20 recurrence plans on the shared register contract. */
 export function ItRecurrencePlans({
     plans,
+    total,
     sites,
     services,
     agents,
+    layout,
+    creating,
+    onCreatingChange,
 }: {
     plans: RecurrencePlanRow[];
+    total: number;
     sites: Option[];
     services: Option[];
     agents: Option[];
+    layout: 'cards' | 'table';
+    creating: boolean;
+    onCreatingChange: (open: boolean) => void;
 }) {
     const [editing, setEditing] = useState<RecurrencePlanRow | null>(null);
-    const [creating, setCreating] = useState(false);
     const [retiring, setRetiring] = useState<RecurrencePlanRow | null>(null);
 
     const setStatus = (plan: RecurrencePlanRow, status: string) =>
@@ -106,116 +108,114 @@ export function ItRecurrencePlans({
             { preserveScroll: true },
         );
 
-    return (
-        <section aria-label="Recurring tickets" className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                    Scheduled maintenance creates one routed ticket per due
-                    occurrence. Missed runs are recorded and never storm the
-                    queue.
-                </p>
-                <Button onClick={() => setCreating(true)}>
-                    <Plus className="h-4 w-4" /> New plan
-                </Button>
-            </div>
+    const actionsFor = (plan: RecurrencePlanRow): MenuItem[] =>
+        plan.status === 'retired'
+            ? []
+            : [
+                  {
+                      label: 'Edit',
+                      icon: Pencil,
+                      onClick: () => setEditing(plan),
+                  },
+                  plan.status === 'active'
+                      ? {
+                            label: 'Pause',
+                            icon: Pause,
+                            onClick: () => setStatus(plan, 'paused'),
+                        }
+                      : {
+                            label: 'Resume',
+                            icon: Play,
+                            onClick: () => setStatus(plan, 'active'),
+                        },
+                  {
+                      label: 'Retire',
+                      icon: Trash2,
+                      onClick: () => setRetiring(plan),
+                  },
+              ];
 
-            {plans.length === 0 ? (
-                <EmptyState
-                    icon={CalendarClock}
-                    title="No recurring plans yet"
-                    description="Schedule repeating maintenance — certificate renewals, backup checks, printer servicing — and each due date creates exactly one routed ticket."
-                    action={
-                        <Button onClick={() => setCreating(true)}>
-                            <Plus className="h-4 w-4" /> New plan
-                        </Button>
-                    }
-                />
-            ) : (
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {plans.map((plan) => (
-                        <article
-                            key={plan.id}
-                            className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4"
-                        >
-                            <div className="flex items-start justify-between gap-2">
-                                <h3 className="text-sm font-semibold">
-                                    {plan.name}
-                                </h3>
-                                <StatusBadge
-                                    variant={
-                                        plan.status === 'active'
-                                            ? 'success'
-                                            : plan.status === 'paused'
-                                              ? 'warning'
-                                              : 'neutral'
-                                    }
-                                    label={
-                                        plan.status.charAt(0).toUpperCase() +
-                                        plan.status.slice(1)
-                                    }
-                                />
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                {describeCron(plan.cron_expression)}
-                                {plan.next_due_at
-                                    ? ` · next ${formatDateTime(plan.next_due_at)}`
-                                    : ''}
-                            </p>
-                            <p className="line-clamp-2 text-sm">
-                                {plan.ticket_template.title}
-                            </p>
-                            <p className="mt-auto text-xs text-muted-foreground">
-                                {plan.owner
-                                    ? `Owned by ${plan.owner.name}`
-                                    : 'No owner'}
-                                {` · ${plan.run_count} run${plan.run_count === 1 ? '' : 's'}`}
-                            </p>
-                            {plan.status !== 'retired' && (
-                                <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setEditing(plan)}
-                                    >
-                                        <Pencil className="h-3.5 w-3.5" /> Edit
-                                    </Button>
-                                    {plan.status === 'active' ? (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() =>
-                                                setStatus(plan, 'paused')
-                                            }
-                                        >
-                                            <Pause className="h-3.5 w-3.5" />{' '}
-                                            Pause
-                                        </Button>
-                                    ) : (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() =>
-                                                setStatus(plan, 'active')
-                                            }
-                                        >
-                                            <Play className="h-3.5 w-3.5" />{' '}
-                                            Resume
-                                        </Button>
-                                    )}
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setRetiring(plan)}
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />{' '}
-                                        Retire
-                                    </Button>
-                                </div>
-                            )}
-                        </article>
-                    ))}
-                </div>
-            )}
+    const state = (plan: RecurrencePlanRow) => (
+        <EntityStatusChip
+            variant={
+                plan.status === 'active'
+                    ? 'success'
+                    : plan.status === 'paused'
+                      ? 'warning'
+                      : 'neutral'
+            }
+        >
+            {plan.status.charAt(0).toUpperCase() + plan.status.slice(1)}
+        </EntityStatusChip>
+    );
+    const schedule = (plan: RecurrencePlanRow) =>
+        `${describeCron(plan.cron_expression)}${plan.next_due_at ? ` · next ${formatDateTime(plan.next_due_at)}` : ''}`;
+
+    const columns: EntityTableColumn<RecurrencePlanRow>[] = [
+        { key: 'state', label: 'Status', width: '110px', cell: state },
+        {
+            key: 'schedule',
+            label: 'Schedule',
+            width: '1.4fr',
+            cell: (plan) => (
+                <span className="text-xs text-muted-foreground">
+                    {schedule(plan)}
+                </span>
+            ),
+        },
+        {
+            key: 'owner',
+            label: 'Owner',
+            width: '1fr',
+            cell: (plan) => (
+                <span className="text-xs text-muted-foreground">
+                    {plan.owner?.name ?? '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'runs',
+            label: 'Runs',
+            width: '80px',
+            cell: (plan) => <EntityChip>{plan.run_count}</EntityChip>,
+        },
+    ];
+
+    return (
+        <>
+            <ItAutomationRegister
+                title="Recurring plans"
+                rows={plans}
+                total={total}
+                layout={layout}
+                icon={CalendarClock}
+                subline={(plan) => plan.ticket_template.title}
+                chips={(plan) => (
+                    <>
+                        {state(plan)}
+                        <EntityChip>{schedule(plan)}</EntityChip>
+                        <EntityChip>
+                            {plan.run_count}{' '}
+                            {plan.run_count === 1 ? 'run' : 'runs'}
+                        </EntityChip>
+                    </>
+                )}
+                meridian={(plan) =>
+                    plan.status === 'active' ? 'success' : 'warning'
+                }
+                muted={(plan) => plan.status === 'retired'}
+                footer={(plan) => ({
+                    personName: plan.owner?.name,
+                    primary: plan.owner?.name ?? 'No owner',
+                    secondary: 'Plan owner',
+                })}
+                columns={columns}
+                actionsFor={actionsFor}
+                onOpen={(plan) => {
+                    if (plan.status !== 'retired') setEditing(plan);
+                }}
+                emptyCopy="No recurring plans yet. Use the header action to schedule repeating maintenance — each due date creates exactly one routed ticket."
+            />
 
             {(creating || editing) && (
                 <RecurrencePlanDialog
@@ -224,7 +224,7 @@ export function ItRecurrencePlans({
                     services={services}
                     agents={agents}
                     onClose={() => {
-                        setCreating(false);
+                        onCreatingChange(false);
                         setEditing(null);
                     }}
                 />
@@ -241,7 +241,7 @@ export function ItRecurrencePlans({
                     setRetiring(null);
                 }}
             />
-        </section>
+        </>
     );
 }
 
@@ -326,8 +326,7 @@ function RecurrencePlanDialog({
     const form = useForm({
         name: plan?.name ?? '',
         cron_expression: plan?.cron_expression ?? '0 9 * * 1',
-        starts_on:
-            plan?.starts_on ?? new Date().toISOString().slice(0, 10),
+        starts_on: plan?.starts_on ?? new Date().toISOString().slice(0, 10),
         ends_on: plan?.ends_on ?? '',
         owner_user_id: plan?.owner?.id ? String(plan.owner.id) : '',
         ticket_template: {
@@ -380,7 +379,10 @@ function RecurrencePlanDialog({
 
     const fieldError = (key: string) =>
         errors[key] ? (
-            <p role="alert" className="text-sm font-normal text-status-critical">
+            <p
+                role="alert"
+                className="text-sm font-normal text-status-critical"
+            >
                 {errors[key]}
             </p>
         ) : null;

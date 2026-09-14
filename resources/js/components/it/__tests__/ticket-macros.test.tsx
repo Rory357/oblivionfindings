@@ -62,31 +62,66 @@ describe('ItTicketMacros management register', () => {
         lock_version: 2,
     };
 
-    it('lists macros with their ordered action summaries and governed archive', () => {
-        render(
-            <ItTicketMacros
-                macros={[macro]}
-                agents={lookups.agents}
-                queues={lookups.queues}
-                templates={lookups.templates}
-            />,
-        );
+    const registerProps = {
+        total: 1,
+        layout: 'cards' as const,
+        creating: false,
+        onCreatingChange: vi.fn(),
+        agents: lookups.agents,
+        queues: lookups.queues,
+        templates: lookups.templates,
+    };
 
+    it('lists macros on the shared register with ordered action summaries and governed archive', () => {
+        render(<ItTicketMacros {...registerProps} macros={[macro]} />);
+
+        expect(screen.getByText('1 of 1 shown')).toBeVisible();
         expect(screen.getByText('Pick up and escalate')).toBeVisible();
         expect(
             screen.getByText('Assign to the applying technician'),
         ).toBeVisible();
-        expect(
-            screen.getByText('Override priority to high'),
-        ).toBeVisible();
+        expect(screen.getByText('Override priority to high')).toBeVisible();
+        expect(screen.getByText('2 steps')).toBeVisible();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+        fireEvent.contextMenu(screen.getByText('Pick up and escalate'));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
         fireEvent.click(screen.getByRole('button', { name: 'Archive macro' }));
         expect(inertia.routerPost).toHaveBeenCalledWith(
             '/it/setup/macros/7/active',
             { active: false, lock_version: 2 },
             { preserveScroll: true },
         );
+    });
+});
+
+describe('ItTicketMacros table layout', () => {
+    it('renders the same rows and actions as a table', () => {
+        render(
+            <ItTicketMacros
+                total={1}
+                layout="table"
+                creating={false}
+                onCreatingChange={vi.fn()}
+                agents={lookups.agents}
+                queues={lookups.queues}
+                templates={lookups.templates}
+                macros={[
+                    {
+                        id: 7,
+                        name: 'Pick up and escalate',
+                        description: null,
+                        actions: [{ type: 'assign_to_me' }],
+                        is_active: false,
+                        lock_version: 1,
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByRole('table')).toBeVisible();
+        expect(screen.getByText('Archived')).toBeVisible();
+        fireEvent.contextMenu(screen.getByText('Pick up and escalate'));
+        expect(screen.getByRole('menuitem', { name: 'Restore' })).toBeVisible();
     });
 });
 
@@ -108,7 +143,9 @@ describe('TicketMacros apply control', () => {
                         name: 'Broken macro',
                         description: null,
                         changes: [],
-                        blockers: ['A configured reply template is archived or missing.'],
+                        blockers: [
+                            'A configured reply template is archived or missing.',
+                        ],
                     },
                 ],
             },
@@ -120,9 +157,7 @@ describe('TicketMacros apply control', () => {
     it('previews every change and applies with the fetched ticket version', async () => {
         render(<TicketMacros ticketId={12} />);
 
-        fireEvent.pointerEnter(
-            screen.getByLabelText('Ticket macros'),
-        );
+        fireEvent.pointerEnter(screen.getByLabelText('Ticket macros'));
         const trigger = await screen.findByRole('combobox', {
             name: 'Apply macro',
         });

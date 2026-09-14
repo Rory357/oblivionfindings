@@ -1,6 +1,9 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ItAutomationRegister } from '@/components/it/it-automation-register';
+import { EntityChip, EntityStatusChip } from '@/components/lists/entity-cells';
+import type { MenuItem } from '@/components/lists/entity-menu';
+import type { EntityTableColumn } from '@/components/lists/entity-table';
 import { Button } from '@/components/ui/button';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -9,7 +12,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { router, useForm } from '@inertiajs/react';
@@ -18,7 +20,6 @@ import {
     ArchiveRestore,
     MessageSquareText,
     Pencil,
-    Plus,
 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
@@ -35,137 +36,165 @@ export interface ReplyTemplateRow {
     updated_at: string | null;
 }
 
-/** Governed reusable replies: create, revise (versioned) and retire. */
+function reviewOverdue(template: ReplyTemplateRow): boolean {
+    return (
+        template.is_active &&
+        template.review_due_at !== null &&
+        template.review_due_at < new Date().toISOString().slice(0, 10)
+    );
+}
+
+/** Governed reusable replies on the shared register contract. */
 export function ItReplyTemplates({
     templates,
+    total,
     placeholders,
+    layout,
+    creating,
+    onCreatingChange,
 }: {
     templates: ReplyTemplateRow[];
+    total: number;
     placeholders: Record<string, string>;
+    layout: 'cards' | 'table';
+    creating: boolean;
+    onCreatingChange: (open: boolean) => void;
 }) {
     const [editing, setEditing] = useState<ReplyTemplateRow | null>(null);
-    const [creating, setCreating] = useState(false);
     const [archiving, setArchiving] = useState<ReplyTemplateRow | null>(null);
 
-    return (
-        <section aria-label="Reply templates" className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                    Reusable replies technicians can insert into a ticket
-                    conversation. Placeholders fill from the ticket when
-                    inserted; an unresolved placeholder blocks insertion.
-                </p>
-                <Button onClick={() => setCreating(true)}>
-                    <Plus className="h-4 w-4" /> New template
-                </Button>
-            </div>
+    const setActive = (template: ReplyTemplateRow, active: boolean) =>
+        router.post(
+            `/it/setup/reply-templates/${template.id}/active`,
+            { active, lock_version: template.lock_version },
+            { preserveScroll: true },
+        );
 
-            {templates.length === 0 ? (
-                <EmptyState
-                    icon={MessageSquareText}
-                    title="No reply templates yet"
-                    description="Create governed, reusable replies your technicians can insert into ticket conversations."
-                    action={
-                        <Button onClick={() => setCreating(true)}>
-                            <Plus className="h-4 w-4" /> New template
-                        </Button>
-                    }
-                />
-            ) : (
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {templates.map((template) => (
-                        <article
-                            key={template.id}
-                            className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4"
-                        >
-                            <div className="flex items-start justify-between gap-2">
-                                <h3 className="text-sm font-semibold">
-                                    {template.name}
-                                </h3>
-                                <div className="flex shrink-0 gap-1.5">
-                                    <StatusBadge
-                                        variant={
-                                            template.audience === 'internal'
-                                                ? 'warning'
-                                                : 'info'
-                                        }
-                                        label={
-                                            template.audience === 'internal'
-                                                ? 'Internal'
-                                                : 'Public'
-                                        }
-                                    />
-                                    {!template.is_active && (
-                                        <StatusBadge
-                                            variant="neutral"
-                                            label="Archived"
-                                        />
-                                    )}
-                                </div>
-                            </div>
-                            <p className="line-clamp-3 text-sm whitespace-pre-line text-muted-foreground">
-                                {template.body}
-                            </p>
-                            <p className="mt-auto text-xs text-muted-foreground">
-                                {template.owner
-                                    ? `Owned by ${template.owner.name}`
-                                    : 'No owner'}
-                                {template.review_due_at
-                                    ? ` · review ${template.review_due_at}`
-                                    : ''}
-                                {` · v${template.lock_version}`}
-                            </p>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setEditing(template)}
-                                >
-                                    <Pencil className="h-3.5 w-3.5" /> Edit
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                        if (template.is_active) {
-                                            setArchiving(template);
-                                        } else {
-                                            router.post(
-                                                `/it/setup/reply-templates/${template.id}/active`,
-                                                {
-                                                    active: true,
-                                                    lock_version:
-                                                        template.lock_version,
-                                                },
-                                                { preserveScroll: true },
-                                            );
-                                        }
-                                    }}
-                                >
-                                    {template.is_active ? (
-                                        <>
-                                            <Archive className="h-3.5 w-3.5" />{' '}
-                                            Archive
-                                        </>
-                                    ) : (
-                                        <>
-                                            <ArchiveRestore className="h-3.5 w-3.5" />{' '}
-                                            Restore
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </article>
-                    ))}
-                </div>
-            )}
+    const actionsFor = (template: ReplyTemplateRow): MenuItem[] => [
+        { label: 'Edit', icon: Pencil, onClick: () => setEditing(template) },
+        template.is_active
+            ? {
+                  label: 'Archive',
+                  icon: Archive,
+                  onClick: () => setArchiving(template),
+              }
+            : {
+                  label: 'Restore',
+                  icon: ArchiveRestore,
+                  onClick: () => setActive(template, true),
+              },
+    ];
+
+    const state = (template: ReplyTemplateRow) => (
+        <EntityStatusChip
+            variant={
+                !template.is_active
+                    ? 'neutral'
+                    : reviewOverdue(template)
+                      ? 'warning'
+                      : 'success'
+            }
+        >
+            {!template.is_active
+                ? 'Archived'
+                : reviewOverdue(template)
+                  ? 'Review overdue'
+                  : 'Active'}
+        </EntityStatusChip>
+    );
+
+    const columns: EntityTableColumn<ReplyTemplateRow>[] = [
+        { key: 'state', label: 'Status', width: '130px', cell: state },
+        {
+            key: 'audience',
+            label: 'Audience',
+            width: '110px',
+            cell: (template) => (
+                <EntityChip>
+                    {template.audience === 'internal' ? 'Internal' : 'Public'}
+                </EntityChip>
+            ),
+        },
+        {
+            key: 'owner',
+            label: 'Owner',
+            width: '1fr',
+            cell: (template) => (
+                <span className="text-xs text-muted-foreground">
+                    {template.owner?.name ?? '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'review',
+            label: 'Review due',
+            width: '120px',
+            cell: (template) => (
+                <span className="text-xs text-muted-foreground">
+                    {template.review_due_at ?? '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'version',
+            label: 'Version',
+            width: '90px',
+            cell: (template) => (
+                <EntityChip>v{template.lock_version}</EntityChip>
+            ),
+        },
+    ];
+
+    return (
+        <>
+            <ItAutomationRegister
+                title="Reply templates"
+                rows={templates}
+                total={total}
+                layout={layout}
+                icon={MessageSquareText}
+                subline={(template) => template.body}
+                chips={(template) => (
+                    <>
+                        {state(template)}
+                        <EntityChip>
+                            {template.audience === 'internal'
+                                ? 'Internal note'
+                                : 'Public reply'}
+                        </EntityChip>
+                        <EntityChip>v{template.lock_version}</EntityChip>
+                        {template.review_due_at && (
+                            <EntityChip>
+                                Review {template.review_due_at}
+                            </EntityChip>
+                        )}
+                    </>
+                )}
+                meridian={(template) =>
+                    !template.is_active
+                        ? 'warning'
+                        : reviewOverdue(template)
+                          ? 'warning'
+                          : 'success'
+                }
+                muted={(template) => !template.is_active}
+                footer={(template) => ({
+                    personName: template.owner?.name,
+                    primary: template.owner?.name ?? 'No owner',
+                    secondary: 'Template owner',
+                })}
+                columns={columns}
+                actionsFor={actionsFor}
+                onOpen={setEditing}
+                emptyCopy="No reply templates yet. Use the header action to create a governed, reusable reply."
+            />
 
             {(creating || editing) && (
                 <ReplyTemplateDialog
                     template={editing}
                     placeholders={placeholders}
                     onClose={() => {
-                        setCreating(false);
+                        onCreatingChange(false);
                         setEditing(null);
                     }}
                 />
@@ -178,20 +207,11 @@ export function ItReplyTemplates({
                 confirmText="Archive template"
                 onClose={() => setArchiving(null)}
                 onConfirm={() => {
-                    if (archiving) {
-                        router.post(
-                            `/it/setup/reply-templates/${archiving.id}/active`,
-                            {
-                                active: false,
-                                lock_version: archiving.lock_version,
-                            },
-                            { preserveScroll: true },
-                        );
-                    }
+                    if (archiving) setActive(archiving, false);
                     setArchiving(null);
                 }}
             />
-        </section>
+        </>
     );
 }
 

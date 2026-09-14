@@ -57,35 +57,68 @@ const templates = [
     },
 ];
 
+const registerProps = {
+    total: 2,
+    layout: 'cards' as const,
+    creating: false,
+    onCreatingChange: vi.fn(),
+    placeholders: { 'ticket.reference': 'Ticket reference' },
+};
+
 describe('ItReplyTemplates management register', () => {
-    it('lists templates with audience, ownership and archive state', () => {
+    it('lists templates on the shared register with audience, ownership and archive state', () => {
+        render(<ItReplyTemplates {...registerProps} templates={templates} />);
+
+        expect(screen.getByText('2 of 2 shown')).toBeVisible();
+        expect(screen.getByText('Password reset confirmation')).toBeVisible();
+        expect(screen.getByText('Public reply')).toBeVisible();
+        expect(screen.getByText('Internal note')).toBeVisible();
+        expect(screen.getByText('Archived')).toBeVisible();
+        expect(screen.getByText('Review 2026-12-01')).toBeVisible();
+        expect(screen.getByText('v3')).toBeVisible();
+        expect(screen.getByText('Ari Tech')).toBeVisible();
+
+        fireEvent.contextMenu(screen.getByText('Escalation note'));
+        expect(screen.getByRole('menuitem', { name: 'Restore' })).toBeVisible();
+        expect(
+            screen.queryByRole('menuitem', { name: 'Archive' }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('switches to the table layout with the same row actions', () => {
         render(
             <ItReplyTemplates
+                {...registerProps}
+                layout="table"
                 templates={templates}
-                placeholders={{ 'ticket.reference': 'Ticket reference' }}
             />,
         );
 
+        expect(screen.getByRole('table')).toBeVisible();
         expect(
-            screen.getByText('Password reset confirmation'),
+            screen.getByRole('button', {
+                name: 'Actions for Password reset confirmation',
+            }),
         ).toBeVisible();
-        expect(screen.getByText('Public')).toBeVisible();
-        expect(screen.getByText('Internal')).toBeVisible();
-        expect(screen.getByText('Archived')).toBeVisible();
-        expect(
-            screen.getByText('Owned by Ari Tech · review 2026-12-01 · v3'),
-        ).toBeVisible();
-        expect(
-            screen.getByRole('button', { name: 'Restore' }),
-        ).toBeVisible();
+    });
+
+    it('opens the create wizard from the page-owned creating state', () => {
+        render(<ItReplyTemplates {...registerProps} creating templates={[]} />);
+
+        expect(screen.getByText('New reply template')).toBeVisible();
     });
 
     it('archives only through the governed confirmation with the current version', () => {
         render(
-            <ItReplyTemplates templates={[templates[0]]} placeholders={{}} />,
+            <ItReplyTemplates
+                {...registerProps}
+                total={1}
+                templates={[templates[0]]}
+            />,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+        fireEvent.contextMenu(screen.getByText('Password reset confirmation'));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
         expect(screen.getByText('Archive reply template?')).toBeVisible();
         fireEvent.click(
             screen.getByRole('button', { name: 'Archive template' }),

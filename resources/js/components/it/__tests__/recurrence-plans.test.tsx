@@ -47,6 +47,16 @@ const plan: RecurrencePlanRow = {
     lock_version: 5,
 };
 
+const registerProps = {
+    total: 1,
+    layout: 'cards' as const,
+    creating: false,
+    onCreatingChange: vi.fn(),
+    sites: [{ id: 4, name: 'Kauri House' }],
+    services: [],
+    agents: [{ id: 9, name: 'Ari Tech' }],
+};
+
 describe('describeCron', () => {
     it('summarises the supported schedule shapes in plain language', () => {
         expect(describeCron('0 9 * * *')).toBe('Daily at 09:00');
@@ -57,42 +67,53 @@ describe('describeCron', () => {
 });
 
 describe('ItRecurrencePlans', () => {
-    it('lists plans with schedule, ownership and lifecycle actions', () => {
-        render(
-            <ItRecurrencePlans
-                plans={[plan]}
-                sites={[{ id: 4, name: 'Kauri House' }]}
-                services={[]}
-                agents={[{ id: 9, name: 'Ari Tech' }]}
-            />,
-        );
+    it('lists plans on the shared register with schedule, ownership and row actions', () => {
+        render(<ItRecurrencePlans {...registerProps} plans={[plan]} />);
 
+        expect(screen.getByText('1 of 1 shown')).toBeVisible();
         expect(screen.getByText('Monthly printer service')).toBeVisible();
         expect(
             screen.getByText(/Monthly on day 1 at 09:00 · next/),
         ).toBeVisible();
-        expect(screen.getByText('Owned by Ari Tech · 8 runs')).toBeVisible();
-        expect(screen.getByRole('button', { name: 'Pause' })).toBeVisible();
+        expect(screen.getByText('8 runs')).toBeVisible();
+        expect(screen.getByText('Ari Tech')).toBeVisible();
+        expect(
+            screen.getByRole('button', {
+                name: 'Actions for Monthly printer service',
+            }),
+        ).toBeVisible();
     });
 
-    it('pauses with the current version and retires only through the governed confirmation', () => {
+    it('honours the table layout with the same actions', () => {
         render(
             <ItRecurrencePlans
+                {...registerProps}
+                layout="table"
                 plans={[plan]}
-                sites={[]}
-                services={[]}
-                agents={[]}
             />,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+        expect(screen.getByRole('table')).toBeVisible();
+        expect(
+            screen.getByRole('button', {
+                name: 'Actions for Monthly printer service',
+            }),
+        ).toBeVisible();
+    });
+
+    it('pauses with the current version and retires only through the governed confirmation', () => {
+        render(<ItRecurrencePlans {...registerProps} plans={[plan]} />);
+
+        fireEvent.contextMenu(screen.getByText('Monthly printer service'));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Pause' }));
         expect(inertia.routerPost).toHaveBeenCalledWith(
             '/it/setup/recurrence-plans/3/status',
             { status: 'paused', lock_version: 5 },
             { preserveScroll: true },
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Retire' }));
+        fireEvent.contextMenu(screen.getByText('Monthly printer service'));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Retire' }));
         expect(screen.getByText('Retire recurrence plan?')).toBeVisible();
         fireEvent.click(screen.getByRole('button', { name: 'Retire plan' }));
         expect(inertia.routerPost).toHaveBeenCalledWith(
@@ -105,19 +126,29 @@ describe('ItRecurrencePlans', () => {
     it('never offers lifecycle actions on a retired plan', () => {
         render(
             <ItRecurrencePlans
+                {...registerProps}
                 plans={[{ ...plan, status: 'retired', next_due_at: null }]}
-                sites={[]}
-                services={[]}
-                agents={[]}
             />,
         );
 
         expect(screen.getByText('Retired')).toBeVisible();
         expect(
-            screen.queryByRole('button', { name: 'Edit' }),
+            screen.queryByRole('button', {
+                name: 'Actions for Monthly printer service',
+            }),
         ).not.toBeInTheDocument();
-        expect(
-            screen.queryByRole('button', { name: 'Resume' }),
-        ).not.toBeInTheDocument();
+        fireEvent.contextMenu(screen.getByText('Monthly printer service'));
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    });
+
+    it('distinguishes an empty register from an empty search', () => {
+        const { rerender } = render(
+            <ItRecurrencePlans {...registerProps} total={0} plans={[]} />,
+        );
+        expect(screen.getByText(/No recurring plans yet/)).toBeVisible();
+
+        rerender(<ItRecurrencePlans {...registerProps} plans={[]} />);
+        expect(screen.getByText('0 of 1 shown')).toBeVisible();
+        expect(screen.getByText(/No matching records/)).toBeVisible();
     });
 });

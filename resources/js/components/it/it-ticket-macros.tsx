@@ -1,7 +1,10 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ItAutomationRegister } from '@/components/it/it-automation-register';
+import { EntityChip, EntityStatusChip } from '@/components/lists/entity-cells';
+import type { MenuItem } from '@/components/lists/entity-menu';
+import type { EntityTableColumn } from '@/components/lists/entity-table';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -10,7 +13,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { router, useForm } from '@inertiajs/react';
 import {
@@ -58,6 +60,12 @@ export interface MacroRow {
     lock_version: number;
 }
 
+export type MacroLookups = {
+    agents: Option[];
+    queues: Option[];
+    templates: Option[];
+};
+
 const ACTION_LABELS: Record<MacroAction['type'], string> = {
     set_status: 'Set status',
     set_waiting: 'Mark waiting',
@@ -70,7 +78,7 @@ const ACTION_LABELS: Record<MacroAction['type'], string> = {
 
 export function summariseMacroAction(
     action: MacroAction,
-    lookups: { agents: Option[]; queues: Option[]; templates: Option[] },
+    lookups: MacroLookups,
 ): string {
     switch (action.type) {
         case 'set_status':
@@ -90,121 +98,112 @@ export function summariseMacroAction(
     }
 }
 
-/** W18 macros: governed multi-action presets applied from a ticket with a preview. */
+/** W18 macros on the shared register contract. */
 export function ItTicketMacros({
     macros,
+    total,
     agents,
     queues,
     templates,
+    layout,
+    creating,
+    onCreatingChange,
 }: {
     macros: MacroRow[];
+    total: number;
     agents: Option[];
     queues: Option[];
     templates: Option[];
+    layout: 'cards' | 'table';
+    creating: boolean;
+    onCreatingChange: (open: boolean) => void;
 }) {
     const [editing, setEditing] = useState<MacroRow | null>(null);
-    const [creating, setCreating] = useState(false);
     const [archiving, setArchiving] = useState<MacroRow | null>(null);
     const lookups = { agents, queues, templates };
 
-    return (
-        <section aria-label="Ticket macros" className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                    Multi-action presets technicians apply from a ticket. The
-                    preview names every resulting change before anything is
-                    posted.
-                </p>
-                <Button onClick={() => setCreating(true)}>
-                    <Plus className="h-4 w-4" /> New macro
-                </Button>
-            </div>
+    const setActive = (macro: MacroRow, active: boolean) =>
+        router.post(
+            `/it/setup/macros/${macro.id}/active`,
+            { active, lock_version: macro.lock_version },
+            { preserveScroll: true },
+        );
 
-            {macros.length === 0 ? (
-                <EmptyState
-                    icon={Wand2}
-                    title="No macros yet"
-                    description="Bundle the routine — assign to me, escalate, send the standard reply — into one governed action."
-                    action={
-                        <Button onClick={() => setCreating(true)}>
-                            <Plus className="h-4 w-4" /> New macro
-                        </Button>
-                    }
-                />
-            ) : (
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {macros.map((macro) => (
-                        <article
-                            key={macro.id}
-                            className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4"
-                        >
-                            <div className="flex items-start justify-between gap-2">
-                                <h3 className="text-sm font-semibold">
-                                    {macro.name}
-                                </h3>
-                                {!macro.is_active && (
-                                    <StatusBadge
-                                        variant="neutral"
-                                        label="Archived"
-                                    />
-                                )}
-                            </div>
-                            {macro.description && (
-                                <p className="text-sm text-muted-foreground">
-                                    {macro.description}
-                                </p>
-                            )}
-                            <ul className="list-disc space-y-0.5 pl-4 text-sm text-muted-foreground">
-                                {macro.actions.map((action, index) => (
-                                    <li key={index}>
-                                        {summariseMacroAction(action, lookups)}
-                                    </li>
-                                ))}
-                            </ul>
-                            <div className="mt-auto flex gap-2 pt-1">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setEditing(macro)}
-                                >
-                                    <Pencil className="h-3.5 w-3.5" /> Edit
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                        if (macro.is_active) {
-                                            setArchiving(macro);
-                                        } else {
-                                            router.post(
-                                                `/it/setup/macros/${macro.id}/active`,
-                                                {
-                                                    active: true,
-                                                    lock_version:
-                                                        macro.lock_version,
-                                                },
-                                                { preserveScroll: true },
-                                            );
-                                        }
-                                    }}
-                                >
-                                    {macro.is_active ? (
-                                        <>
-                                            <Archive className="h-3.5 w-3.5" />{' '}
-                                            Archive
-                                        </>
-                                    ) : (
-                                        <>
-                                            <ArchiveRestore className="h-3.5 w-3.5" />{' '}
-                                            Restore
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </article>
-                    ))}
-                </div>
-            )}
+    const actionsFor = (macro: MacroRow): MenuItem[] => [
+        { label: 'Edit', icon: Pencil, onClick: () => setEditing(macro) },
+        macro.is_active
+            ? {
+                  label: 'Archive',
+                  icon: Archive,
+                  onClick: () => setArchiving(macro),
+              }
+            : {
+                  label: 'Restore',
+                  icon: ArchiveRestore,
+                  onClick: () => setActive(macro, true),
+              },
+    ];
+
+    const state = (macro: MacroRow) => (
+        <EntityStatusChip variant={macro.is_active ? 'success' : 'neutral'}>
+            {macro.is_active ? 'Active' : 'Archived'}
+        </EntityStatusChip>
+    );
+    const summary = (macro: MacroRow) =>
+        macro.actions
+            .map((action) => summariseMacroAction(action, lookups))
+            .join(' · ');
+
+    const columns: EntityTableColumn<MacroRow>[] = [
+        { key: 'state', label: 'Status', width: '110px', cell: state },
+        {
+            key: 'actions',
+            label: 'Actions, in order',
+            width: '1.6fr',
+            cell: (macro) => (
+                <span className="text-xs text-muted-foreground">
+                    {summary(macro)}
+                </span>
+            ),
+        },
+        {
+            key: 'count',
+            label: 'Steps',
+            width: '80px',
+            cell: (macro) => <EntityChip>{macro.actions.length}</EntityChip>,
+        },
+    ];
+
+    return (
+        <>
+            <ItAutomationRegister
+                title="Macros"
+                rows={macros}
+                total={total}
+                layout={layout}
+                icon={Wand2}
+                subline={(macro) => macro.description || summary(macro)}
+                chips={(macro) => (
+                    <>
+                        {state(macro)}
+                        {macro.actions.map((action, index) => (
+                            <EntityChip key={index}>
+                                {summariseMacroAction(action, lookups)}
+                            </EntityChip>
+                        ))}
+                    </>
+                )}
+                meridian={(macro) => (macro.is_active ? 'success' : 'warning')}
+                muted={(macro) => !macro.is_active}
+                footer={(macro) => ({
+                    primary: `${macro.actions.length} ${macro.actions.length === 1 ? 'step' : 'steps'}`,
+                    secondary: 'Previewed before every apply',
+                })}
+                columns={columns}
+                actionsFor={actionsFor}
+                onOpen={setEditing}
+                emptyCopy="No macros yet. Use the header action to bundle the routine — assign to me, escalate, send the standard reply — into one governed action."
+            />
 
             {(creating || editing) && (
                 <MacroDialog
@@ -213,7 +212,7 @@ export function ItTicketMacros({
                     queues={queues}
                     templates={templates}
                     onClose={() => {
-                        setCreating(false);
+                        onCreatingChange(false);
                         setEditing(null);
                     }}
                 />
@@ -226,20 +225,11 @@ export function ItTicketMacros({
                 confirmText="Archive macro"
                 onClose={() => setArchiving(null)}
                 onConfirm={() => {
-                    if (archiving) {
-                        router.post(
-                            `/it/setup/macros/${archiving.id}/active`,
-                            {
-                                active: false,
-                                lock_version: archiving.lock_version,
-                            },
-                            { preserveScroll: true },
-                        );
-                    }
+                    if (archiving) setActive(archiving, false);
                     setArchiving(null);
                 }}
             />
-        </section>
+        </>
     );
 }
 
@@ -388,9 +378,7 @@ function MacroDialog({
                         />
                     </label>
                     <div className="space-y-2.5">
-                        <p className="text-sm font-medium">
-                            Actions, in order
-                        </p>
+                        <p className="text-sm font-medium">Actions, in order</p>
                         {form.data.actions.map((action, index) => (
                             <div
                                 key={index}
