@@ -31,7 +31,19 @@ class GovernanceWorkflowService
         return $this->workQuery;
     }
 
-    public function dashboardWorkflow(User|int|null $user = null, int $limit = 100): array
+    /** Priority tabs the dashboard panel can page through. */
+    public const PRIORITY_TABS = ['all', 'meetings', 'actions', 'risks', 'compliance', 'policies'];
+
+    /**
+     * Ranked board priorities for one viewer.
+     *
+     * `actions` is one page of the ranked list for `$tab` (`$limit` per page).
+     * `summary` always describes the viewer's complete population, and
+     * `pagination` states exactly how much of the tab has been returned so a
+     * client can reach every counted item — a total is never a promise the
+     * payload cannot keep.
+     */
+    public function dashboardWorkflow(User|int|null $user = null, int $limit = 100, int $page = 1, string $tab = 'all'): array
     {
         if (is_int($user)) {
             $user = User::find($user);
@@ -50,18 +62,25 @@ class GovernanceWorkflowService
         $overdue = $actions->where('status', 'overdue')->count();
         $actionItemsOverdue = $actions->filter(fn (array $a) => ($a['source']['type'] ?? null) === 'action_item' && ($a['status'] ?? null) === 'overdue')->count();
 
+        $byTab = collect(self::PRIORITY_TABS)
+            ->mapWithKeys(fn (string $key) => [$key => $actions->filter(fn (array $a) => $this->matchesPriorityTab($key, $a))->count()])
+            ->all();
+
+        $tab = in_array($tab, self::PRIORITY_TABS, true) ? $tab : 'all';
+        $perPage = max(1, $limit);
+        $page = max(1, $page);
+
+        // Stable sort: filtering the ranked population and ranking the filtered
+        // subset give the same order, so tab pages agree with the "all" ranking.
         $ranked = $actions
+            ->filter(fn (array $a) => $this->matchesPriorityTab($tab, $a))
             ->sortByDesc(fn (array $action) => $this->actionRank($action))
             ->values();
 
-        $byTab = [
-            'all' => $total,
-            'meetings' => $actions->filter(fn (array $a) => ($a['area_key'] ?? null) === 'meetings' || ($a['area'] ?? null) === 'Meetings')->count(),
-            'actions' => $actions->filter(fn (array $a) => in_array(($a['area_key'] ?? null), ['action_items', 'actions'], true) || ($a['area'] ?? null) === 'Action Items')->count(),
-            'risks' => $actions->filter(fn (array $a) => ($a['area_key'] ?? null) === 'risks' || in_array(($a['area'] ?? null), ['Risks', 'Risk Register'], true))->count(),
-            'compliance' => $actions->filter(fn (array $a) => ($a['area_key'] ?? null) === 'compliance' || ($a['area'] ?? null) === 'Compliance')->count(),
-            'policies' => $actions->filter(fn (array $a) => ($a['area_key'] ?? null) === 'policies' || ($a['area'] ?? null) === 'Policies')->count(),
-        ];
+        $tabTotal = $ranked->count();
+        $lastPage = max(1, (int) ceil($tabTotal / $perPage));
+        $pageItems = $ranked->slice(($page - 1) * $perPage, $perPage)->values();
+        $from = $pageItems->isEmpty() ? 0 : (($page - 1) * $perPage) + 1;
 
         return [
             'summary' => [
@@ -71,8 +90,37 @@ class GovernanceWorkflowService
                 'action_items_overdue' => $actionItemsOverdue,
                 'by_tab' => $byTab,
             ],
-            'actions' => $ranked->take($limit)->values()->all(),
+            'actions' => $pageItems->all(),
+            'pagination' => [
+                'tab' => $tab,
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $tabTotal,
+                'last_page' => $lastPage,
+                'from' => $from,
+                'to' => $from === 0 ? 0 : $from + $pageItems->count() - 1,
+                'has_more' => $page < $lastPage,
+            ],
         ];
+    }
+
+    /**
+     * Single definition of which ranked priorities belong to a dashboard tab;
+     * used for both the tab counts and the paged tab lists.
+     */
+    protected function matchesPriorityTab(string $tab, array $action): bool
+    {
+        $areaKey = $action['area_key'] ?? null;
+        $area = $action['area'] ?? null;
+
+        return match ($tab) {
+            'meetings' => $areaKey === 'meetings' || $area === 'Meetings',
+            'actions' => in_array($areaKey, ['action_items', 'actions'], true) || $area === 'Action Items',
+            'risks' => in_array($areaKey, ['risks', 'risk_register'], true) || in_array($area, ['Risks', 'Risk Register'], true),
+            'compliance' => $areaKey === 'compliance' || $area === 'Compliance',
+            'policies' => $areaKey === 'policies' || $area === 'Policies',
+            default => true,
+        };
     }
 
     public function meetingChecklist(GovernanceMeeting $meeting, ?User $user = null): array
@@ -86,7 +134,17 @@ class GovernanceWorkflowService
             'resolutions',
         ]);
 
-        $agendaCount = $meeting->agendaItems->count();
+        // Counts and completed steps come from the same permitted records the
+        // viewer's meeting workspace renders — a confidential agenda item or a
+        // resolution the viewer cannot open never makes a step look ready.
+        $agendaCount = app(ExecutiveMeetingAccessService::class)
+            ->visibleAgendaItems($user, $meeting)
+            ->count();
+        $visibleResolutions = $user !== null
+            ? $meeting->resolutions->filter(
+                fn (Resolution $resolution) => app(GovernanceRecordAccessService::class)->canViewResolution($user, $resolution)
+            )
+            : $meeting->resolutions;
         $attendanceCount = $meeting->attendances->count();
         $quorum = $meeting->calculateQuorum();
         $pack = $user
@@ -96,7 +154,7 @@ class GovernanceWorkflowService
             && ($this->boardPackAccess->canManage($user) || $pack !== null);
         $ceoReport = $meeting->ceoReport;
         $minutes = $meeting->minutes;
-        $resolutions = $meeting->resolutions->whereIn('status', ['draft', 'open'])->count();
+        $resolutions = $visibleResolutions->whereIn('status', ['draft', 'open'])->count();
         $isPastMeeting = $meeting->scheduled_at?->isPast() ?? false;
         $previousMeeting = $this->previousMeeting($meeting);
         $previousOpenActions = $this->previousMeetingOpenActions($previousMeeting);
@@ -267,7 +325,7 @@ class GovernanceWorkflowService
                     'blocked_by' => null,
                 ];
             } else {
-                $openResolutions = $meeting->resolutions->whereIn('status', ['open', 'voting_open']);
+                $openResolutions = $visibleResolutions->whereIn('status', ['open', 'voting_open']);
                 if ($openResolutions->isNotEmpty()) {
                     $votedCount = \App\Domain\Governance\Models\ResolutionVote::whereIn('resolution_id', $openResolutions->pluck('id'))
                         ->where('board_member_id', $boardMember->id)
@@ -379,7 +437,16 @@ class GovernanceWorkflowService
             $isPast = $daysToMeeting < 0;
             $quorum = $meeting->calculateQuorum();
 
-            if ($meeting->agenda_items_count === 0) {
+            // Meeting administration tasks are priorities only for people who
+            // can carry them out (the same abilities the meeting workspace
+            // uses); ordinary members never see "Record attendance" or
+            // "Draft minutes" work they cannot do. No viewer = board-wide.
+            $canAdminister = $user === null || $user->can('update', $meeting);
+            $canDraftMinutes = $user === null || $user->can('manageMinutes', $meeting);
+            $canApproveMinutes = $user === null || $user->can('approveMinutes', $meeting);
+            $canSignMinutes = $user === null || $user->can('signMinutes', $meeting);
+
+            if ($canAdminister && $meeting->agenda_items_count === 0) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:agenda",
                     'Meetings',
@@ -424,7 +491,7 @@ class GovernanceWorkflowService
                 ));
             }
 
-            if (! $quorum['met'] && $isSoon) {
+            if ($canAdminister && ! $quorum['met'] && $isSoon) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:quorum",
                     'Meetings',
@@ -439,7 +506,7 @@ class GovernanceWorkflowService
                 ));
             }
 
-            if ($isPast && $meeting->minutes === null) {
+            if ($canDraftMinutes && $isPast && $meeting->minutes === null) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:minutes-draft",
                     'Meetings',
@@ -454,7 +521,7 @@ class GovernanceWorkflowService
                 ));
             }
 
-            if ($meeting->minutes !== null && $meeting->minutes->status === 'draft') {
+            if ($canApproveMinutes && $meeting->minutes !== null && $meeting->minutes->status === 'draft') {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:minutes-approve",
                     'Meetings',
@@ -469,7 +536,7 @@ class GovernanceWorkflowService
                 ));
             }
 
-            if ($meeting->minutes !== null && $meeting->minutes->status === 'approved') {
+            if ($canSignMinutes && $meeting->minutes !== null && $meeting->minutes->status === 'approved') {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:minutes-sign",
                     'Meetings',

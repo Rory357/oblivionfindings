@@ -1,29 +1,41 @@
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import {
+    EmptyValue,
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    PersonCell,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderFilterSelect,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
-import { cn } from '@/lib/utils';
+import { formatDateLong } from '@/lib/datetime';
 import { PageProps } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import { BookOpen, FileText, Pencil, Plus, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import {
-    AlertCircle,
-    Calendar,
-    CheckCircle2,
-    FileText,
-    Plus,
-    Search,
-} from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { CeoReportDialog, type MeetingOption } from './_dialogs';
+    CeoReportWizardDialog,
+    ceoReportStatusLabel,
+    ceoReportStatusVariant,
+    type MeetingOption,
+} from './_dialogs';
 
 interface Report {
     id: number;
@@ -32,6 +44,7 @@ interface Report {
     meeting: { id: number; title: string; scheduled_at: string } | null;
     author: { id: number; name: string } | null;
     period_label?: string | null;
+    deadline?: string | null;
     is_overdue?: boolean;
     days_until_deadline?: number | null;
     submitted_at?: string | null;
@@ -43,339 +56,345 @@ interface Props extends PageProps {
     reports: {
         data: Report[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
+        last_page?: number;
+        total?: number;
     };
     meetings: MeetingOption[];
+    can_create?: boolean;
+    filters?: { status: string | null; search: string | null };
+    summary?: {
+        total: number;
+        draft: number;
+        submitted: number;
+        presented: number;
+        overdue: number;
+    };
 }
 
-type StatusFilter = 'all' | 'draft' | 'submitted' | 'presented' | 'overdue';
+const ALL = '__all';
 
-function statusVerb(report: Report): string {
-    switch (report.status) {
-        case 'draft':
-            return 'Continue draft';
-        case 'submitted':
-            return 'Read report';
-        case 'presented':
-            return 'Read report';
-        default:
-            return 'Read report';
-    }
-}
+const STATUS_OPTIONS = [
+    { value: ALL, label: 'Any status' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'submitted', label: 'Submitted' },
+    { value: 'presented', label: 'Presented' },
+    { value: 'overdue', label: 'Overdue drafts' },
+];
 
-function deadlineLabel(report: Report): string | null {
+function deadlineChip(report: Report) {
     if (report.status !== 'draft') return null;
-    if (report.is_overdue) return 'Overdue';
+    if (report.is_overdue) {
+        return <EntityStatusChip variant="critical">Overdue</EntityStatusChip>;
+    }
     if (report.days_until_deadline == null) return null;
-    if (report.days_until_deadline <= 0) return 'Due today';
-    return `Due in ${report.days_until_deadline} day${report.days_until_deadline === 1 ? '' : 's'}`;
+    const label =
+        report.days_until_deadline <= 0
+            ? 'Due today'
+            : `Due in ${report.days_until_deadline} day${report.days_until_deadline === 1 ? '' : 's'}`;
+    return (
+        <EntityStatusChip
+            variant={report.days_until_deadline <= 7 ? 'warning' : 'neutral'}
+        >
+            {label}
+        </EntityStatusChip>
+    );
 }
 
-function submittedLabel(report: Report): string | null {
-    if (report.status === 'submitted' && report.submitted_at) {
-        return `Submitted ${new Date(report.submitted_at).toLocaleDateString('en-NZ')}`;
-    }
-    if (report.status === 'presented' && report.presented_at) {
-        return `Presented ${new Date(report.presented_at).toLocaleDateString('en-NZ')}`;
-    }
-    return null;
-}
+export default function CeoReportsIndex({
+    reports,
+    meetings,
+    can_create = false,
+    filters = { status: null, search: null },
+    summary,
+}: Props) {
+    const [search, setSearch] = useState(filters.search ?? '');
+    const [createOpen, setCreateOpen] = useDialogDeepLink('create', can_create);
+    const ctxMenu = useEntityContextMenu<Report>();
 
-export default function CeoReportsIndex({ auth, reports, meetings }: Props) {
-    const [newOpen, setNewOpen] = useState(false);
-    const [query, setQuery] = useState('');
-    const [filter, setFilter] = useState<StatusFilter>('all');
+    const counts = summary ?? {
+        total: reports.data.length,
+        draft: reports.data.filter((r) => r.status === 'draft').length,
+        submitted: reports.data.filter((r) => r.status === 'submitted').length,
+        presented: reports.data.filter((r) => r.status === 'presented').length,
+        overdue: reports.data.filter((r) => r.is_overdue).length,
+    };
 
-    const counts = useMemo(() => {
-        const c = {
-            total: reports.data.length,
-            draft: 0,
-            submitted: 0,
-            presented: 0,
-            overdue: 0,
-        };
-        for (const r of reports.data) {
-            if (r.status === 'draft') c.draft += 1;
-            else if (r.status === 'submitted') c.submitted += 1;
-            else if (r.status === 'presented') c.presented += 1;
-            if (r.is_overdue) c.overdue += 1;
-        }
-        return c;
-    }, [reports.data]);
+    useEffect(() => {
+        setSearch(filters.search ?? '');
+    }, [filters.search]);
 
-    const visible = useMemo(() => {
-        return reports.data.filter((r) => {
-            if (filter === 'draft' && r.status !== 'draft') return false;
-            if (filter === 'submitted' && r.status !== 'submitted')
-                return false;
-            if (filter === 'presented' && r.status !== 'presented')
-                return false;
-            if (filter === 'overdue' && !r.is_overdue) return false;
-            if (query) {
-                const q = query.toLowerCase();
-                const haystack =
-                    `${r.title} ${r.meeting?.title ?? ''} ${r.author?.name ?? ''}`.toLowerCase();
-                if (!haystack.includes(q)) return false;
-            }
-            return true;
+    const go = (next: Partial<NonNullable<Props['filters']>>) => {
+        const merged = { ...filters, ...next };
+        const query = Object.fromEntries(
+            Object.entries(merged).filter(([, value]) => value),
+        );
+        router.get('/governance/ceo-reports', query, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
         });
-    }, [reports.data, filter, query]);
+    };
 
-    const getStatusColor = (status: string) => governanceStatusColor(status);
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            if ((filters.search ?? '') !== search) {
+                go({ search: search.trim() || null });
+            }
+        }, 350);
+        return () => clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
 
-    const FILTER_CHIPS: Array<{
-        key: StatusFilter;
-        label: string;
-        count?: number;
-        tone?: string;
-    }> = [
-        { key: 'all', label: 'All', count: counts.total },
-        { key: 'draft', label: 'Draft', count: counts.draft },
-        { key: 'submitted', label: 'Submitted', count: counts.submitted },
-        { key: 'presented', label: 'Presented', count: counts.presented },
-        {
-            key: 'overdue',
-            label: 'Overdue',
-            count: counts.overdue,
-            tone: counts.overdue > 0 ? 'critical' : undefined,
-        },
-    ];
+    const hasFilters = Boolean(filters.status || filters.search);
+    const open = (report: Report) =>
+        router.visit(`/governance/ceo-reports/${report.id}`);
+    const actionsFor = (report: Report): MenuItem[] =>
+        compactMenu([
+            {
+                label: report.status === 'draft' ? 'Continue draft' : 'Read report',
+                icon: report.status === 'draft' ? Pencil : BookOpen,
+                onClick: () => open(report),
+            },
+        ]);
+
+    const header = (
+        <PageHeader
+            icon={FileText}
+            title="CEO Board Reports"
+            subline="CEO updates for the board — narrative, KPIs, decisions sought and matters arising"
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search meetings or authors…"
+                    />
+                    {can_create ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                            dusk="new-ceo-report-button"
+                        >
+                            New report
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Drafts"
+                        href="/governance/ceo-reports?status=draft"
+                    >
+                        <PageHeaderMeterBig>{counts.draft}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Being prepared
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Overdue"
+                        href="/governance/ceo-reports?status=overdue"
+                        tone={counts.overdue > 0 ? 'critical' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>{counts.overdue}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Drafts past their deadline
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Submitted"
+                        href="/governance/ceo-reports?status=submitted"
+                    >
+                        <PageHeaderMeterBig>
+                            {counts.submitted}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Ready for the board
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Presented"
+                        href="/governance/ceo-reports?status=presented"
+                        tone={counts.presented > 0 ? 'success' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>
+                            {counts.presented}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            of {counts.total} reports
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    label="Status"
+                    value={filters.status ?? ALL}
+                    allValue={ALL}
+                    options={STATUS_OPTIONS}
+                    onChange={(value) =>
+                        go({ status: value === ALL ? null : value })
+                    }
+                />
+            }
+            rail={<GovernanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'CEO Reports', href: '/governance/ceo-reports' },
+                { title: 'CEO reports', href: '/governance/ceo-reports' },
             ]}
         >
             <Head title="CEO Board Reports" />
-            <PageLayout
-                hero={
-                    <PageHeader
-                        icon={FileText}
-                        title="CEO Board Reports"
-                        subline="Monthly CEO updates for the board — narrative, KPIs, decisions sought, and matters arising."
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Total reports"
-                                    href="/governance/ceo-reports"
-                                >
-                                    <PageHeaderMeterBig>{counts.total}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Board updates</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Submitted"
-                                    href="/governance/ceo-reports?tab=submitted"
-                                    tone="brand"
-                                >
-                                    <PageHeaderMeterBig>{counts.submitted}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Ready for review</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Overdue"
-                                    href="/governance/ceo-reports?tab=overdue"
-                                    tone={counts.overdue > 0 ? 'critical' : undefined}
-                                >
-                                    <PageHeaderMeterBig>{counts.overdue}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Requires action</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
-                        }
-                        actions={
-                            <Button
-                                size="sm"
-                                onClick={() => setNewOpen(true)}
-                                dusk="new-ceo-report-button"
-                            >
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New Report
-                            </Button>
-                        }
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Reports"
+                        caption={`${reports.data.length} of ${reports.total ?? reports.data.length} shown`}
                     />
-                }
-            >
-                <CeoReportDialog
-                    isOpen={newOpen}
-                    onClose={() => setNewOpen(false)}
-                    meetings={meetings ?? []}
-                />
 
-                <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative max-w-md min-w-[240px] flex-1">
-                            <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                placeholder="Search reports, meetings, authors…"
-                                className="pl-9"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            {FILTER_CHIPS.map((chip) => (
-                                <Button
-                                    unstyled
-                                    key={chip.key}
-                                    type="button"
-                                    onClick={() => setFilter(chip.key)}
-                                    className={cn(
-                                        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition',
-                                        filter === chip.key
-                                            ? 'border-primary bg-primary/10 text-primary'
-                                            : 'border-border text-muted-foreground hover:text-foreground',
-                                        chip.tone === 'critical' &&
-                                            filter !== chip.key &&
-                                            'text-status-critical',
-                                    )}
-                                >
-                                    <span>{chip.label}</span>
-                                    {chip.count != null && (
-                                        <span
-                                            className={cn(
-                                                'rounded-full px-1.5 text-[10px]',
-                                                filter === chip.key
-                                                    ? 'bg-primary/20'
-                                                    : 'bg-muted',
+                    {reports.data.length === 0 ? (
+                        <EmptyState
+                            icon={FileText}
+                            title={
+                                hasFilters
+                                    ? 'No CEO reports match your filters'
+                                    : 'No CEO reports yet'
+                            }
+                            description={
+                                hasFilters
+                                    ? 'Try clearing a filter or search term.'
+                                    : 'CEO reports are prepared for each board meeting.'
+                            }
+                            action={
+                                hasFilters ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearch('');
+                                            go({ status: null, search: null });
+                                        }}
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                        Clear filters
+                                    </Button>
+                                ) : can_create ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
+                                        <Plus className="h-3.5 w-3.5" />
+                                        New report
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={reports.data}
+                            rowKey={(report) => report.id}
+                            identityLabel="Report"
+                            identity={(report) => ({
+                                icon: FileText,
+                                name: report.title,
+                                subline: report.meeting?.scheduled_at
+                                    ? `Meeting ${formatDateLong(report.meeting.scheduled_at)}`
+                                    : 'No meeting linked',
+                            })}
+                            hrefFor={(report) =>
+                                `/governance/ceo-reports/${report.id}`
+                            }
+                            onOpen={open}
+                            onRowContextMenu={ctxMenu.open}
+                            actionsFor={actionsFor}
+                            columns={[
+                                {
+                                    key: 'status',
+                                    label: 'Status',
+                                    width: '0.8fr',
+                                    cell: (report) => (
+                                        <EntityStatusChip
+                                            variant={ceoReportStatusVariant(
+                                                report.status,
                                             )}
                                         >
-                                            {chip.count}
-                                        </span>
-                                    )}
-                                </Button>
-                            ))}
-                        </div>
-                    </div>
+                                            {ceoReportStatusLabel(
+                                                report.status,
+                                            )}
+                                        </EntityStatusChip>
+                                    ),
+                                },
+                                {
+                                    key: 'period',
+                                    label: 'Period',
+                                    width: '0.9fr',
+                                    cell: (report) =>
+                                        report.period_label ?? <EmptyValue />,
+                                },
+                                {
+                                    key: 'deadline',
+                                    label: 'Deadline',
+                                    width: '0.9fr',
+                                    cell: (report) =>
+                                        deadlineChip(report) ?? <EmptyValue />,
+                                },
+                                {
+                                    key: 'author',
+                                    label: 'Author',
+                                    width: '1fr',
+                                    cell: (report) => (
+                                        <PersonCell name={report.author?.name} />
+                                    ),
+                                },
+                                {
+                                    key: 'milestone',
+                                    label: 'Submitted / presented',
+                                    width: '1fr',
+                                    cell: (report) =>
+                                        report.status === 'presented' &&
+                                        report.presented_at ? (
+                                            `Presented ${formatDateLong(report.presented_at)}`
+                                        ) : report.submitted_at ? (
+                                            `Submitted ${formatDateLong(report.submitted_at)}`
+                                        ) : (
+                                            <EmptyValue />
+                                        ),
+                                },
+                            ]}
+                        />
+                    )}
 
-                    <div className="grid gap-3">
-                        {visible.map((report) => {
-                            const deadline = deadlineLabel(report);
-                            const submitted = submittedLabel(report);
-                            return (
-                                <Card
-                                    key={report.id}
-                                    className="transition hover:border-primary/40"
-                                >
-                                    <CardContent className="p-4">
-                                        <div className="flex flex-wrap items-start justify-between gap-3">
-                                            <div className="flex min-w-0 flex-1 items-start gap-3">
-                                                <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                                                    <FileText className="h-5 w-5" />
-                                                </div>
-                                                <div className="min-w-0 flex-1 space-y-1">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <Link
-                                                            href={`/governance/ceo-reports/${report.id}`}
-                                                            className="truncate text-base font-semibold text-foreground hover:text-primary"
-                                                        >
-                                                            {report.title}
-                                                        </Link>
-                                                        <Badge
-                                                            className={cn(
-                                                                'text-[10px] uppercase',
-                                                                getStatusColor(
-                                                                    report.status,
-                                                                ),
-                                                            )}
-                                                        >
-                                                            {report.status}
-                                                        </Badge>
-                                                        {report.period_label && (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="text-[10px]"
-                                                            >
-                                                                <Calendar className="mr-1 h-3 w-3" />
-                                                                {
-                                                                    report.period_label
-                                                                }
-                                                            </Badge>
-                                                        )}
-                                                        {deadline && (
-                                                            <Badge
-                                                                className={cn(
-                                                                    'text-[10px]',
-                                                                    report.is_overdue
-                                                                        ? 'border border-status-critical/30 bg-status-critical-bg text-status-critical'
-                                                                        : 'border border-status-warning/30 bg-status-warning-bg text-status-warning',
-                                                                )}
-                                                            >
-                                                                {report.is_overdue ? (
-                                                                    <AlertCircle className="mr-1 h-3 w-3" />
-                                                                ) : null}
-                                                                {deadline}
-                                                            </Badge>
-                                                        )}
-                                                        {submitted && (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="text-[10px]"
-                                                            >
-                                                                <CheckCircle2 className="mr-1 h-3 w-3 text-status-success" />
-                                                                {submitted}
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                                        {report.meeting && (
-                                                            <span>
-                                                                For:{' '}
-                                                                {
-                                                                    report
-                                                                        .meeting
-                                                                        .title
-                                                                }
-                                                            </span>
-                                                        )}
-                                                        {report.author && (
-                                                            <span>
-                                                                By:{' '}
-                                                                {
-                                                                    report
-                                                                        .author
-                                                                        .name
-                                                                }
-                                                            </span>
-                                                        )}
-                                                        <span>
-                                                            Created{' '}
-                                                            {new Date(
-                                                                report.created_at,
-                                                            ).toLocaleDateString(
-                                                                'en-NZ',
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                asChild
-                                            >
-                                                <Link
-                                                    href={`/governance/ceo-reports/${report.id}`}
-                                                >
-                                                    {statusVerb(report)}
-                                                </Link>
-                                            </Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-
-                        {visible.length === 0 && (
-                            <Card>
-                                <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                                    No CEO reports match the current filter.
-                                </CardContent>
-                            </Card>
-                        )}
-                    </div>
+                    <LaravelPagination
+                        links={reports.links}
+                        lastPage={reports.last_page}
+                        preserveScroll
+                    />
                 </div>
             </PageLayout>
+
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={FileText}
+                    title={ctxMenu.ctx.record.title}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
+
+            {can_create ? (
+                <CeoReportWizardDialog
+                    isOpen={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    meetings={meetings ?? []}
+                />
+            ) : null}
         </AppLayout>
     );
 }

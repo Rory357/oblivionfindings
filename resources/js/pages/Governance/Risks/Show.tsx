@@ -4,13 +4,15 @@ import {
 } from '@/components/governance/GovernanceAttachmentsPanel';
 import {
     PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
@@ -18,47 +20,43 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { riskScoreColor, riskScoreLevel } from '@/lib/governance-status';
-import { cn } from '@/lib/utils';
-import { accept as acceptRisk } from '@/routes/governance/risks';
-import { add as addTreatment } from '@/routes/governance/risks/treatments';
+import { formatDateOnly } from '@/lib/datetime';
+import { riskScoreLevel } from '@/lib/governance-status';
 import { PageProps } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
-import axios from 'axios';
+import { Head, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
     CheckCircle,
+    Link2,
     Paperclip,
-    ShieldAlert,
+    Pencil,
+    Plus,
+    ShieldCheck,
     User,
+    Wrench,
 } from 'lucide-react';
+import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
 import { useState } from 'react';
+
+import {
+    AcceptRiskDialog,
+    AddTreatmentDialog,
+    riskCategoryIcon,
+    RiskWizardDialog,
+    STRATEGY_OPTIONS,
+    type RiskFormOptions,
+} from './_dialogs';
+import { riskLevelVariant, riskStatusLabel, riskStatusVariant } from './_shared';
 
 interface Treatment {
     id: number;
     action_description: string;
-    assigned_to: { name: string };
-    due_date: string;
+    assigned_to: { name: string } | null;
+    due_date: string | null;
     status: string;
     expected_score_reduction: number | null;
     evidence_required?: boolean;
@@ -69,17 +67,17 @@ interface Acceptance {
     id: number;
     acceptance_type: string;
     justification: string;
-    accepted_by: { name: string };
+    accepted_by: { name: string } | null;
     accepted_at: string;
-    expires_at: string;
+    expires_at: string | null;
 }
 
 interface EventLink {
     id: number;
     event_type: string;
-    event_reference: string;
+    event_reference: string | null;
     event_severity: string;
-    link_rationale: string;
+    link_rationale: string | null;
     linked_at: string;
 }
 
@@ -97,9 +95,10 @@ interface Risk {
     within_appetite: boolean;
     appetite_threshold: number;
     status: string;
-    mitigation_strategy: string;
-    review_frequency: string;
-    next_review_date: string;
+    mitigation_strategy: string | null;
+    review_frequency: string | null;
+    next_review_date: string | null;
+    risk_owner_id?: number | null;
     risk_owner: { id: number; name: string } | null;
     treatments: Treatment[];
     acceptances: Acceptance[];
@@ -111,37 +110,56 @@ interface Props extends PageProps {
     assignees: Array<{ id: number; name: string; email: string }>;
     canEdit: boolean;
     canAccept: boolean;
+    formOptions?: RiskFormOptions | null;
+}
+
+const TREATMENT_VARIANTS: Record<string, StatusVariant> = {
+    complete: 'success',
+    in_progress: 'info',
+    overdue: 'critical',
+    planned: 'neutral',
+};
+
+const SEVERITY_VARIANTS: Record<string, StatusVariant> = {
+    critical: 'critical',
+    high: 'warning',
+    medium: 'warning',
+    low: 'success',
+};
+
+function dateOnly(value: string | null | undefined): string {
+    return formatDateOnly(value ? value.slice(0, 10) : null);
+}
+
+function humanise(value: string | null | undefined): string {
+    if (!value) return '—';
+    return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function scrollTo(id: string) {
+    document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 export default function RiskShow({
-    auth,
     risk,
     assignees,
     canEdit,
     canAccept,
+    formOptions = null,
 }: Props) {
-    const { labels: pageLabels } = usePage().props as any;
+    const { labels: pageLabels } = usePage().props as {
+        labels?: Record<string, string>;
+    };
     const clientSingular = pageLabels?.['client.singular'] ?? 'Client';
-    const [showTreatmentDialog, setShowTreatmentDialog] = useState(false);
-    const [showAcceptDialog, setShowAcceptDialog] = useState(false);
-    const [treatmentForm, setTreatmentForm] = useState({
-        action_description: '',
-        assigned_to: '',
-        due_date: '',
-        expected_score_reduction: '',
-        evidence_required: false,
-    });
-    const [acceptForm, setAcceptForm] = useState({
-        justification: '',
-        expiry_months: 12,
-        conditions: [],
-    });
-    const [submitting, setSubmitting] = useState(false);
+    const [treatmentOpen, setTreatmentOpen] = useState(false);
+    const [acceptOpen, setAcceptOpen] = useState(false);
+    const canOpenEdit = canEdit && formOptions != null;
+    // Retired /risks/{id}/edit deep links arrive as ?edit=1.
+    const [editOpen, setEditOpen] = useDialogDeepLink('edit', canOpenEdit);
 
-    const getRiskColor = riskScoreColor;
-    const getRiskLevel = riskScoreLevel;
-
-    const getCategoryLabel = (category: string) => {
+    const categoryLabel = (category: string) => {
         const labels: Record<string, string> = {
             client_safety: `${clientSingular} Safety`,
             reputational: 'Reputational',
@@ -152,383 +170,181 @@ export default function RiskShow({
             operational: 'Operational',
             clinical: 'Clinical',
         };
-        return labels[category] || category;
+        return labels[category] || humanise(category);
     };
 
-    const submitTreatment = async () => {
-        setSubmitting(true);
-        try {
-            await axios.post(
-                addTreatment.url({ risk: risk.id }),
-                treatmentForm,
-            );
-            router.reload();
-            setShowTreatmentDialog(false);
-        } catch (error) {
-            console.error('Failed to add treatment:', error);
-        } finally {
-            setSubmitting(false);
-        }
-    };
+    const canAcceptNow =
+        canEdit &&
+        canAccept &&
+        !risk.within_appetite &&
+        risk.status === 'active';
+    const completeTreatments = risk.treatments.filter(
+        (t) => t.status === 'complete',
+    ).length;
+    const overdueTreatments = risk.treatments.filter(
+        (t) => t.status === 'overdue',
+    ).length;
+    const strategyLabel =
+        STRATEGY_OPTIONS.find((s) => s.key === risk.mitigation_strategy)
+            ?.label ?? humanise(risk.mitigation_strategy);
 
-    const submitAcceptance = async () => {
-        setSubmitting(true);
-        try {
-            await axios.post(acceptRisk.url({ risk: risk.id }), acceptForm);
-            router.reload();
-            setShowAcceptDialog(false);
-        } catch (error) {
-            console.error('Failed to accept risk:', error);
-        } finally {
-            setSubmitting(false);
-        }
-    };
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/governance/risks"
+            icon={riskCategoryIcon(risk.category)}
+            title={risk.title}
+            titleDusk="risk-heading"
+            wrapTitle
+            titleChip={
+                !risk.within_appetite ? (
+                    <PageHeaderStatusChip variant="critical">
+                        Above appetite
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip
+                        variant={riskStatusVariant(risk.status)}
+                    >
+                        {riskStatusLabel(risk.status)}
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={`${risk.risk_reference} · ${categoryLabel(risk.category)} · ${riskStatusLabel(risk.status)} · ${riskScoreLevel(risk.residual_score)} residual risk (${risk.residual_score})`}
+            actions={
+                <>
+                    {canEdit ? (
+                        <PageHeaderGlassButton
+                            icon={Plus}
+                            onClick={() => setTreatmentOpen(true)}
+                        >
+                            Add treatment
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {canAcceptNow ? (
+                        <PageHeaderGlassButton
+                            icon={ShieldCheck}
+                            onClick={() => setAcceptOpen(true)}
+                        >
+                            Accept risk
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {canOpenEdit ? (
+                        <PageHeaderPrimaryButton
+                            icon={Pencil}
+                            onClick={() => setEditOpen(true)}
+                        >
+                            Edit risk
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Residual score"
+                        value={`${risk.residual_score}/25`}
+                        ariaLabel="View the risk assessment"
+                        onClick={() => scrollTo('risk-assessment')}
+                        tone={
+                            risk.residual_score >= 20
+                                ? 'critical'
+                                : risk.residual_score >= 10
+                                  ? 'warning'
+                                  : 'brand'
+                        }
+                    >
+                        <PageHeaderMeterBar
+                            percent={(risk.residual_score / 25) * 100}
+                        />
+                        <PageHeaderMeterCaption>
+                            {riskScoreLevel(risk.residual_score)} · appetite{' '}
+                            {risk.appetite_threshold}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Inherent score"
+                        ariaLabel="View the risk assessment"
+                        onClick={() => scrollTo('risk-assessment')}
+                    >
+                        <PageHeaderMeterBig>{risk.inherent_score}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Likelihood {risk.likelihood_score} × impact{' '}
+                            {risk.impact_score}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Appetite"
+                        ariaLabel="View appetite details"
+                        onClick={() => scrollTo('risk-assessment')}
+                        tone={risk.within_appetite ? 'success' : 'critical'}
+                    >
+                        <PageHeaderMeterBig>
+                            {risk.appetite_threshold}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {risk.within_appetite
+                                ? 'Within appetite'
+                                : 'Above appetite · acceptance needed'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Treatments"
+                        value={risk.treatments.length}
+                        ariaLabel="View treatment actions"
+                        onClick={() => scrollTo('risk-treatments')}
+                        tone={overdueTreatments > 0 ? 'critical' : 'brand'}
+                    >
+                        <PageHeaderMeterBar
+                            percent={
+                                risk.treatments.length > 0
+                                    ? (completeTreatments /
+                                          risk.treatments.length) *
+                                      100
+                                    : 0
+                            }
+                        />
+                        <PageHeaderMeterCaption>
+                            {overdueTreatments > 0
+                                ? `${overdueTreatments} overdue · ${completeTreatments} complete`
+                                : `${completeTreatments} of ${risk.treatments.length} complete`}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Next review"
+                        ariaLabel="View review details"
+                        onClick={() => scrollTo('risk-details')}
+                    >
+                        <PageHeaderMeterBig>
+                            <span className="text-base">
+                                {dateOnly(risk.next_review_date)}
+                            </span>
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {humanise(risk.review_frequency)} review
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+        />
+    );
 
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Risks', href: '/governance/risks' },
-                { title: risk.risk_reference, href: `/governance/risks/${risk.id}` },
+                { title: 'Risk register', href: '/governance/risks' },
+                {
+                    title: risk.risk_reference,
+                    href: `/governance/risks/${risk.id}`,
+                },
             ]}
         >
             <Head title={risk.title} />
 
-            <PageLayout
-                hero={
-                    <PageHeader
-                        variant="profile"
-                        backHref="/governance/risks"
-                        icon={ShieldAlert}
-                        title={risk.title}
-                        titleDusk="risk-heading"
-                        titleChip={
-                            <div className="flex items-center gap-1.5">
-                                <Badge variant="outline">
-                                    {risk.risk_reference}
-                                </Badge>
-                                {!risk.within_appetite && (
-                                    <Badge className="border border-status-critical/30 bg-status-critical-bg text-status-critical">
-                                        Above appetite
-                                    </Badge>
-                                )}
-                                <Badge variant="outline">{risk.status}</Badge>
-                            </div>
-                        }
-                        subline={`${getCategoryLabel(risk.category)} · ${getRiskLevel(risk.residual_score)} residual risk (${risk.residual_score})`}
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Residual"
-                                    href={`/governance/risks/${risk.id}`}
-                                    tone={risk.residual_score >= 20 ? 'critical' : risk.residual_score >= 12 ? 'warning' : 'brand'}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {risk.residual_score}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Current score</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Inherent"
-                                    href={`/governance/risks/${risk.id}`}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {risk.inherent_score}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Raw score</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Appetite"
-                                    href={`/governance/risks/${risk.id}`}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {risk.appetite_threshold}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Threshold</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Treatments"
-                                    href={`/governance/risks/${risk.id}`}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {risk.treatments.length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Active actions</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
-                        }
-                        actions={
-                            canEdit ? (
-                                <div className="flex gap-2">
-                                    <Dialog
-                                        open={showTreatmentDialog}
-                                        onOpenChange={setShowTreatmentDialog}
-                                    >
-                                        <DialogTrigger asChild>
-                                            <Button variant="outline">
-                                                Add Treatment
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>
-                                                    Add Treatment Action
-                                                </DialogTitle>
-                                            </DialogHeader>
-                                            <div className="space-y-4 py-4">
-                                                <div>
-                                                    <Label>
-                                                        Action Description
-                                                    </Label>
-                                                    <Textarea
-                                                        value={
-                                                            treatmentForm.action_description
-                                                        }
-                                                        onChange={(e) =>
-                                                            setTreatmentForm({
-                                                                ...treatmentForm,
-                                                                action_description:
-                                                                    e.target
-                                                                        .value,
-                                                            })
-                                                        }
-                                                        placeholder="Describe the treatment action..."
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label>Assign To</Label>
-                                                    <Select
-                                                        value={
-                                                            treatmentForm.assigned_to ||
-                                                            undefined
-                                                        }
-                                                        onValueChange={(v) =>
-                                                            setTreatmentForm({
-                                                                ...treatmentForm,
-                                                                assigned_to: v,
-                                                            })
-                                                        }
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Choose staff member..." />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {assignees.map(
-                                                                (user) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            user.id
-                                                                        }
-                                                                        value={String(
-                                                                            user.id,
-                                                                        )}
-                                                                    >
-                                                                        {
-                                                                            user.name
-                                                                        }{' '}
-                                                                        (
-                                                                        {
-                                                                            user.email
-                                                                        }
-                                                                        )
-                                                                    </SelectItem>
-                                                                ),
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div>
-                                                    <Label>Due Date</Label>
-                                                    <Input
-                                                        type="date"
-                                                        value={
-                                                            treatmentForm.due_date
-                                                        }
-                                                        onChange={(e) =>
-                                                            setTreatmentForm({
-                                                                ...treatmentForm,
-                                                                due_date:
-                                                                    e.target
-                                                                        .value,
-                                                            })
-                                                        }
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label>
-                                                        Expected Score Reduction
-                                                    </Label>
-                                                    <Input
-                                                        type="number"
-                                                        min={1}
-                                                        max={24}
-                                                        value={
-                                                            treatmentForm.expected_score_reduction
-                                                        }
-                                                        onChange={(e) =>
-                                                            setTreatmentForm({
-                                                                ...treatmentForm,
-                                                                expected_score_reduction:
-                                                                    e.target
-                                                                        .value,
-                                                            })
-                                                        }
-                                                        placeholder="e.g., 5"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <DialogFooter>
-                                                <Button
-                                                    onClick={submitTreatment}
-                                                    disabled={submitting}
-                                                >
-                                                    {submitting
-                                                        ? 'Saving...'
-                                                        : 'Add Treatment'}
-                                                </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
-                                    {canAccept &&
-                                        !risk.within_appetite &&
-                                        risk.status === 'active' && (
-                                            <Dialog
-                                                open={showAcceptDialog}
-                                                onOpenChange={
-                                                    setShowAcceptDialog
-                                                }
-                                            >
-                                                <DialogTrigger asChild>
-                                                    <Button>Accept Risk</Button>
-                                                </DialogTrigger>
-                                                <DialogContent>
-                                                    <DialogHeader>
-                                                        <DialogTitle>
-                                                            Accept Risk Above
-                                                            Appetite
-                                                        </DialogTitle>
-                                                    </DialogHeader>
-                                                    <div className="space-y-4 py-4">
-                                                        <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-4">
-                                                            <p className="text-sm text-status-warning">
-                                                                This risk is
-                                                                currently above
-                                                                the appetite
-                                                                threshold (
-                                                                {
-                                                                    risk.appetite_threshold
-                                                                }
-                                                                ). Board
-                                                                acceptance is
-                                                                required to
-                                                                formally
-                                                                acknowledge and
-                                                                accept this
-                                                                risk.
-                                                            </p>
-                                                        </div>
-                                                        <div>
-                                                            <Label>
-                                                                Justification
-                                                                (min 50
-                                                                characters)
-                                                            </Label>
-                                                            <Textarea
-                                                                value={
-                                                                    acceptForm.justification
-                                                                }
-                                                                onChange={(e) =>
-                                                                    setAcceptForm(
-                                                                        {
-                                                                            ...acceptForm,
-                                                                            justification:
-                                                                                e
-                                                                                    .target
-                                                                                    .value,
-                                                                        },
-                                                                    )
-                                                                }
-                                                                placeholder="Provide detailed justification for accepting this risk..."
-                                                                rows={4}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <Label>
-                                                                Acceptance
-                                                                Period (months)
-                                                            </Label>
-                                                            <Select
-                                                                value={String(
-                                                                    acceptForm.expiry_months,
-                                                                )}
-                                                                onValueChange={(
-                                                                    v,
-                                                                ) =>
-                                                                    setAcceptForm(
-                                                                        {
-                                                                            ...acceptForm,
-                                                                            expiry_months:
-                                                                                parseInt(
-                                                                                    v,
-                                                                                ),
-                                                                        },
-                                                                    )
-                                                                }
-                                                            >
-                                                                <SelectTrigger>
-                                                                    <SelectValue />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="3">
-                                                                        3 months
-                                                                    </SelectItem>
-                                                                    <SelectItem value="6">
-                                                                        6 months
-                                                                    </SelectItem>
-                                                                    <SelectItem value="12">
-                                                                        12
-                                                                        months
-                                                                    </SelectItem>
-                                                                    <SelectItem value="24">
-                                                                        24
-                                                                        months
-                                                                    </SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                    </div>
-                                                    <DialogFooter>
-                                                        <Button
-                                                            onClick={
-                                                                submitAcceptance
-                                                            }
-                                                            disabled={
-                                                                submitting ||
-                                                                acceptForm
-                                                                    .justification
-                                                                    .length < 50
-                                                            }
-                                                        >
-                                                            {submitting
-                                                                ? 'Submitting...'
-                                                                : 'Accept Risk'}
-                                                        </Button>
-                                                    </DialogFooter>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
-                                </div>
-                            ) : null
-                        }
-                    />
-                }
-            >
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    {/* Main Content */}
-                    <div className="space-y-6 lg:col-span-2">
-                        {/* Description */}
+            <PageLayout hero={header}>
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                    <div className="flex flex-col gap-5 lg:col-span-2">
                         <Card>
                             <CardHeader>
                                 <CardTitle>Description</CardTitle>
@@ -540,125 +356,117 @@ export default function RiskShow({
                             </CardContent>
                         </Card>
 
-                        {/* Risk Scoring */}
-                        <Card>
+                        <Card id="risk-assessment">
                             <CardHeader>
-                                <CardTitle>Risk Assessment</CardTitle>
+                                <CardTitle>Risk assessment</CardTitle>
+                                <CardDescription>
+                                    5×5 likelihood × impact, adjusted for
+                                    control effectiveness
+                                </CardDescription>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="flex flex-col gap-4">
                                 <div className="grid grid-cols-3 gap-4">
-                                    <div className="rounded-lg bg-muted p-4 text-center">
-                                        <p className="text-3xl font-bold text-foreground">
-                                            {risk.likelihood_score}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Likelihood
-                                        </p>
-                                    </div>
-                                    <div className="rounded-lg bg-muted p-4 text-center">
-                                        <p className="text-3xl font-bold text-foreground">
-                                            {risk.impact_score}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Impact
-                                        </p>
-                                    </div>
-                                    <div className="rounded-lg bg-muted p-4 text-center">
-                                        <p className="text-3xl font-bold text-foreground">
-                                            {risk.inherent_score}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Inherent Score
-                                        </p>
-                                    </div>
+                                    {[
+                                        {
+                                            label: 'Likelihood',
+                                            value: risk.likelihood_score,
+                                        },
+                                        {
+                                            label: 'Impact',
+                                            value: risk.impact_score,
+                                        },
+                                        {
+                                            label: 'Inherent score',
+                                            value: risk.inherent_score,
+                                        },
+                                    ].map((tile) => (
+                                        <div
+                                            key={tile.label}
+                                            className="rounded-lg bg-muted p-4 text-center"
+                                        >
+                                            <p className="text-page-title tabular-nums">
+                                                {tile.value}
+                                            </p>
+                                            <p className="text-subtle">
+                                                {tile.label}
+                                            </p>
+                                        </div>
+                                    ))}
                                 </div>
-                                <div className="mt-4 grid grid-cols-2 gap-4">
-                                    <div className="rounded-lg border p-4">
-                                        <p className="text-sm text-muted-foreground">
-                                            Control Effectiveness
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="rounded-lg border border-border p-4">
+                                        <p className="text-subtle">
+                                            Control effectiveness
                                         </p>
                                         <p className="font-medium capitalize">
                                             {risk.control_effectiveness}
                                         </p>
                                     </div>
-                                    <div className="rounded-lg border p-4">
-                                        <p className="text-sm text-muted-foreground">
-                                            Residual Score
+                                    <div className="rounded-lg border border-border p-4">
+                                        <p className="text-subtle">
+                                            Residual score
                                         </p>
-                                        <div className="flex items-center gap-2">
-                                            <span
-                                                className={cn(
-                                                    'h-3 w-3 rounded-full',
-                                                    getRiskColor(
-                                                        risk.residual_score,
-                                                    ),
-                                                )}
-                                            />
-                                            <p className="font-medium">
-                                                {risk.residual_score} (
-                                                {getRiskLevel(
-                                                    risk.residual_score,
-                                                )}
-                                                )
-                                            </p>
-                                        </div>
+                                        <StatusBadge
+                                            variant={riskLevelVariant(
+                                                risk.residual_score,
+                                            )}
+                                            className="mt-1"
+                                        >
+                                            {risk.residual_score} ·{' '}
+                                            {riskScoreLevel(risk.residual_score)}
+                                        </StatusBadge>
                                     </div>
                                 </div>
-                                <div className="mt-4 rounded-lg border p-4">
+                                <div className="rounded-lg border border-border p-4">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-muted-foreground">
-                                            Appetite Threshold
+                                        <span className="text-subtle">
+                                            Appetite threshold
                                         </span>
-                                        <span className="font-medium">
+                                        <span className="font-medium tabular-nums">
                                             {risk.appetite_threshold}
                                         </span>
                                     </div>
                                     <div className="mt-2">
                                         {risk.within_appetite ? (
-                                            <div className="flex items-center gap-2 text-status-success">
-                                                <CheckCircle className="h-4 w-4" />
-                                                <span className="text-sm">
-                                                    Within appetite
-                                                </span>
-                                            </div>
+                                            <StatusBadge variant="success">
+                                                <CheckCircle className="h-3.5 w-3.5" />
+                                                Within appetite
+                                            </StatusBadge>
                                         ) : (
-                                            <div className="flex items-center gap-2 text-primary">
-                                                <AlertTriangle className="h-4 w-4" />
-                                                <span className="text-sm">
-                                                    Above appetite - requires
-                                                    acceptance
-                                                </span>
-                                            </div>
+                                            <StatusBadge variant="critical">
+                                                <AlertTriangle className="h-3.5 w-3.5" />
+                                                Above appetite — requires
+                                                acceptance
+                                            </StatusBadge>
                                         )}
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
 
-                        {/* Treatments */}
-                        <Card>
+                        <Card id="risk-treatments">
                             <CardHeader>
-                                <CardTitle>Treatment Actions</CardTitle>
+                                <CardTitle>Treatment actions</CardTitle>
                                 <CardDescription>
                                     Active mitigation measures
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 {risk.treatments.length > 0 ? (
-                                    <div className="space-y-3">
+                                    <div className="flex flex-col gap-3">
                                         {risk.treatments.map((treatment) => (
                                             <div
                                                 key={treatment.id}
-                                                className="rounded-lg border p-4"
+                                                className="rounded-lg border border-border p-4"
                                             >
-                                                <div className="flex items-start justify-between">
+                                                <div className="flex items-start justify-between gap-3">
                                                     <div>
                                                         <p className="font-medium">
                                                             {
                                                                 treatment.action_description
                                                             }
                                                         </p>
-                                                        <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
+                                                        <div className="text-subtle mt-2 flex flex-wrap items-center gap-4">
                                                             <span className="flex items-center gap-1">
                                                                 <User className="h-4 w-4" />
                                                                 {treatment
@@ -668,40 +476,33 @@ export default function RiskShow({
                                                             </span>
                                                             <span className="flex items-center gap-1">
                                                                 <Calendar className="h-4 w-4" />
-                                                                {
-                                                                    treatment.due_date
-                                                                }
+                                                                {dateOnly(
+                                                                    treatment.due_date,
+                                                                )}
                                                             </span>
                                                         </div>
                                                     </div>
-                                                    <Badge
-                                                        className={cn(
-                                                            treatment.status ===
-                                                                'complete' &&
-                                                                'bg-status-success-bg text-status-success',
-                                                            treatment.status ===
-                                                                'in_progress' &&
-                                                                'bg-status-info-bg text-status-info',
-                                                            treatment.status ===
-                                                                'overdue' &&
-                                                                'bg-status-critical-bg text-status-critical',
-                                                            treatment.status ===
-                                                                'planned' &&
-                                                                'bg-muted text-foreground',
-                                                        )}
+                                                    <StatusBadge
+                                                        variant={
+                                                            TREATMENT_VARIANTS[
+                                                                treatment.status
+                                                            ] ?? 'neutral'
+                                                        }
                                                     >
-                                                        {treatment.status}
-                                                    </Badge>
+                                                        {humanise(
+                                                            treatment.status,
+                                                        )}
+                                                    </StatusBadge>
                                                 </div>
-                                                {treatment.expected_score_reduction && (
+                                                {treatment.expected_score_reduction ? (
                                                     <p className="mt-2 text-sm text-status-success">
                                                         Expected score
-                                                        reduction: -
+                                                        reduction: −
                                                         {
                                                             treatment.expected_score_reduction
                                                         }
                                                     </p>
-                                                )}
+                                                ) : null}
 
                                                 <details
                                                     className="group mt-3"
@@ -714,20 +515,19 @@ export default function RiskShow({
                                                             .evidence_attachments
                                                             ?.length ?? 0}
                                                         )
-                                                        {treatment.evidence_required && (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="ml-1 border-status-warning/30 text-[10px] text-status-warning"
+                                                        {treatment.evidence_required ? (
+                                                            <StatusBadge
+                                                                variant="warning"
+                                                                size="sm"
+                                                                className="ml-1"
                                                             >
                                                                 Required
-                                                            </Badge>
-                                                        )}
+                                                            </StatusBadge>
+                                                        ) : null}
                                                     </summary>
                                                     <div className="mt-3 border-t border-border pt-3">
                                                         <GovernanceAttachmentsPanel
-                                                            canManage={
-                                                                !!canEdit
-                                                            }
+                                                            canManage={!!canEdit}
                                                             attachments={
                                                                 treatment.evidence_attachments ??
                                                                 []
@@ -752,146 +552,156 @@ export default function RiskShow({
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-muted-foreground">
-                                        No treatment actions defined yet.
-                                    </p>
+                                    <EmptyState
+                                        variant="compact"
+                                        icon={Wrench}
+                                        title="No treatment actions yet"
+                                        description={
+                                            canEdit
+                                                ? 'Add a treatment to record how this risk will be reduced.'
+                                                : 'Treatment actions added by the risk owner will appear here.'
+                                        }
+                                    />
                                 )}
                             </CardContent>
                         </Card>
 
-                        {/* Linked Events */}
-                        {risk.events.length > 0 && (
+                        {risk.events.length > 0 ? (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Linked Events</CardTitle>
+                                    <CardTitle>Linked events</CardTitle>
                                     <CardDescription>
                                         Related incidents, alerts, and concerns
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-2">
-                                        {risk.events.map((event) => (
-                                            <div
-                                                key={event.id}
-                                                className="flex items-center justify-between rounded-lg border p-3"
-                                            >
-                                                <div>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="capitalize"
-                                                    >
-                                                        {event.event_type}
-                                                    </Badge>
-                                                    <span className="ml-2 text-sm">
-                                                        {event.event_reference}
-                                                    </span>
-                                                </div>
-                                                <Badge
-                                                    className={cn(
-                                                        event.event_severity ===
-                                                            'critical' &&
-                                                            'bg-status-critical-bg text-status-critical',
-                                                        event.event_severity ===
-                                                            'high' &&
-                                                            'bg-status-warning-bg text-status-warning',
-                                                        event.event_severity ===
-                                                            'medium' &&
-                                                            'bg-status-warning-bg text-status-warning',
-                                                    )}
-                                                >
-                                                    {event.event_severity}
-                                                </Badge>
+                                <CardContent className="flex flex-col gap-2">
+                                    {risk.events.map((event) => (
+                                        <div
+                                            key={event.id}
+                                            className="flex items-center justify-between gap-3 rounded-lg border border-border p-3"
+                                        >
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                <Link2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                <StatusBadge variant="neutral">
+                                                    {humanise(event.event_type)}
+                                                </StatusBadge>
+                                                <span className="truncate text-sm">
+                                                    {event.event_reference ??
+                                                        '—'}
+                                                </span>
                                             </div>
-                                        ))}
-                                    </div>
+                                            <StatusBadge
+                                                variant={
+                                                    SEVERITY_VARIANTS[
+                                                        event.event_severity
+                                                    ] ?? 'neutral'
+                                                }
+                                            >
+                                                {humanise(event.event_severity)}
+                                            </StatusBadge>
+                                        </div>
+                                    ))}
                                 </CardContent>
                             </Card>
-                        )}
+                        ) : null}
                     </div>
 
-                    {/* Sidebar */}
-                    <div className="space-y-6">
-                        {/* Details */}
-                        <Card>
+                    <div className="flex flex-col gap-5">
+                        <Card id="risk-details">
                             <CardHeader>
                                 <CardTitle>Details</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent className="flex flex-col gap-4">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Risk Owner
-                                    </p>
+                                    <p className="text-subtle">Risk owner</p>
                                     <p className="font-medium">
                                         {risk.risk_owner?.name ||
                                             'Not assigned'}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Mitigation Strategy
-                                    </p>
-                                    <p className="font-medium capitalize">
-                                        {risk.mitigation_strategy}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Review Frequency
-                                    </p>
-                                    <p className="font-medium capitalize">
-                                        {risk.review_frequency}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Next Review
+                                    <p className="text-subtle">
+                                        Mitigation strategy
                                     </p>
                                     <p className="font-medium">
-                                        {risk.next_review_date}
+                                        {strategyLabel}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-subtle">
+                                        Review frequency
+                                    </p>
+                                    <p className="font-medium">
+                                        {humanise(risk.review_frequency)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-subtle">Next review</p>
+                                    <p className="font-medium">
+                                        {dateOnly(risk.next_review_date)}
                                     </p>
                                 </div>
                             </CardContent>
                         </Card>
 
-                        {/* Acceptances */}
-                        {risk.acceptances.length > 0 && (
+                        {risk.acceptances.length > 0 ? (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Risk Acceptances</CardTitle>
+                                    <CardTitle>Risk acceptances</CardTitle>
                                 </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3">
-                                        {risk.acceptances.map((acceptance) => (
-                                            <div
-                                                key={acceptance.id}
-                                                className="rounded-lg border border-primary bg-primary/10 p-3"
-                                            >
-                                                <p className="text-sm font-medium text-primary capitalize">
-                                                    {acceptance.acceptance_type.replace(
-                                                        '_',
-                                                        ' ',
-                                                    )}
-                                                </p>
-                                                <p className="mt-1 text-xs text-primary">
-                                                    Accepted by{' '}
-                                                    {
-                                                        acceptance.accepted_by
-                                                            ?.name
-                                                    }
-                                                </p>
-                                                <p className="text-xs text-primary">
-                                                    Expires:{' '}
-                                                    {acceptance.expires_at}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
+                                <CardContent className="flex flex-col gap-3">
+                                    {risk.acceptances.map((acceptance) => (
+                                        <div
+                                            key={acceptance.id}
+                                            className="rounded-lg border border-primary/40 bg-primary/10 p-3"
+                                        >
+                                            <p className="text-sm font-medium text-primary">
+                                                {humanise(
+                                                    acceptance.acceptance_type,
+                                                )}
+                                            </p>
+                                            <p className="text-caption mt-1">
+                                                Accepted by{' '}
+                                                {acceptance.accepted_by?.name ??
+                                                    '—'}
+                                            </p>
+                                            <p className="text-caption">
+                                                Expires{' '}
+                                                {dateOnly(acceptance.expires_at)}
+                                            </p>
+                                        </div>
+                                    ))}
                                 </CardContent>
                             </Card>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             </PageLayout>
+
+            {canEdit ? (
+                <AddTreatmentDialog
+                    open={treatmentOpen}
+                    onClose={() => setTreatmentOpen(false)}
+                    riskId={risk.id}
+                    assignees={assignees}
+                />
+            ) : null}
+            {canAcceptNow ? (
+                <AcceptRiskDialog
+                    open={acceptOpen}
+                    onClose={() => setAcceptOpen(false)}
+                    riskId={risk.id}
+                    appetiteThreshold={risk.appetite_threshold}
+                />
+            ) : null}
+            {canOpenEdit && formOptions ? (
+                <RiskWizardDialog
+                    open={editOpen}
+                    onClose={() => setEditOpen(false)}
+                    options={formOptions}
+                    risk={risk}
+                />
+            ) : null}
         </AppLayout>
     );
 }

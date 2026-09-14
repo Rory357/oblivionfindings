@@ -8,6 +8,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Link } from '@inertiajs/react';
 import { ChevronDown, ChevronUp, History } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -64,7 +65,10 @@ export function GovernanceTimeline({
 }: GovernanceTimelineProps) {
     const [expanded, setExpanded] = useState(false);
     const isArray = Array.isArray(timeline?.events);
-    const events = isArray ? timeline.events : [];
+    const events = useMemo(
+        () => (isArray ? timeline.events : []),
+        [isArray, timeline],
+    );
 
     const grouped = useMemo(() => {
         if (!isArray) return [];
@@ -86,7 +90,7 @@ export function GovernanceTimeline({
             <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                        <CardTitle className="text-lg">
+                        <CardTitle className="text-section-title">
                             Governance Timeline
                         </CardTitle>
                         <CardDescription>
@@ -133,23 +137,12 @@ export function GovernanceTimeline({
                         )}
                     </div>
                 ) : events.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                        <History
-                            className="mx-auto h-5 w-5 text-muted-foreground"
-                            aria-hidden="true"
-                        />
-                        <p className="mt-2 text-sm font-medium text-foreground">
-                            Nothing has changed
-                            {timeline.since
-                                ? ` since ${timeline.since.title}`
-                                : ' recently'}
-                            .
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            New governance activity will appear here
-                            automatically.
-                        </p>
-                    </div>
+                    <EmptyState
+                        variant="compact"
+                        icon={History}
+                        title={`Nothing has changed${timeline.since ? ` since ${timeline.since.title}` : ' recently'}.`}
+                        description="New governance activity will appear here automatically."
+                    />
                 ) : (
                     <div className="space-y-5">
                         {grouped.map(([day, dayEvents]) => (

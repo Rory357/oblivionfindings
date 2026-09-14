@@ -1,54 +1,47 @@
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import {
+    EmptyValue,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    PersonCell,
+    ProgressValue,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderFilterCheck,
+    PageHeaderFilterSelect,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
-import { cn } from '@/lib/utils';
+import { formatDateOnly } from '@/lib/datetime';
 import { show as showAction } from '@/routes/governance/actions';
 import { PageProps } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { ClipboardList, Link2, ListChecks, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import {
-    AlertCircle,
-    CheckSquare,
-    Plus,
-    Search,
-    User as UserIcon,
-} from 'lucide-react';
-import React, { useState } from 'react';
+    actionPriorityLabel,
+    actionPriorityVariant,
+    actionStatusLabel,
+    actionStatusVariant,
+    daysUntilDue,
+    isActionOverdue,
+} from './_helpers';
 
-interface UserRef {
-    id: number;
-    name: string;
-    email?: string | null;
-}
-
-interface ActionItem {
+interface ActionRow {
     id: number;
     action_reference: string;
     title?: string | null;
@@ -56,484 +49,482 @@ interface ActionItem {
     due_date: string;
     status: string;
     priority: string;
-    assigned_to: UserRef;
+    assigned_to?: { id: number; name: string } | null;
     source_type?: string | null;
     source_id?: number | null;
-    progress_pct?: number;
-    blocked_at?: string | null;
-    blocked_reason?: string | null;
+    progress_pct?: number | null;
     evidence_required?: boolean;
+}
+
+interface Filters {
+    status: string | null;
+    priority: string | null;
+    source_type: string | null;
+    assignee: string | null;
+    assigned_to_me: boolean;
+    search: string | null;
 }
 
 interface Props extends PageProps {
     items: {
-        data: ActionItem[];
+        data: ActionRow[];
         total: number;
-        current_page: number;
         last_page: number;
-        links: Array<{
-            url: string | null;
-            label: string;
-            active: boolean;
-        }>;
+        links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     summary: {
         total_open: number;
         overdue: number;
         my_open: number;
         high_priority: number;
+        blocked: number;
     };
-    filters: {
-        status?: string;
-        priority?: string;
-        source_type?: string;
-        assigned_to_me?: boolean;
-        search?: string;
-    };
-    assignees: UserRef[];
+    filters: Filters;
+    source_types: Array<{ value: string; label: string }>;
+    assignees: Array<{ id: number; name: string }>;
 }
 
-export default function ActionsIndex({ auth, items, summary, filters, assignees }: Props) {
-    const [search, setSearch] = useState(filters.search || '');
-    const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
-    const [priorityFilter, setPriorityFilter] = useState(filters.priority || 'all');
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
+const ALL = '__all';
 
-    const { data: createData, setData: setCreateData, post: postCreate, processing: createProcessing, reset: resetCreate, errors: createErrors } = useForm({
-        title: '',
-        description: '',
-        assigned_to: assignees[0]?.id ? String(assignees[0].id) : '',
-        due_date: '',
-        priority: 'medium',
-        evidence_required: false,
-    });
+const STATUS_OPTIONS = [
+    { value: ALL, label: 'Any status' },
+    { value: 'active', label: 'All open' },
+    { value: 'open', label: 'Not started' },
+    { value: 'in_progress', label: 'In progress' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'blocked', label: 'Blocked' },
+    { value: 'complete', label: 'Completed' },
+];
 
-    const applyFilter = (key: string, value: string) => {
-        const query: Record<string, any> = {
-            ...filters,
-            search: search,
-            [key]: value,
-        };
-        if (value === 'all' || !value) {
-            delete query[key];
-        }
-        router.get('/governance/actions', query, { preserveState: true, replace: true });
-    };
+const PRIORITY_OPTIONS = [
+    { value: ALL, label: 'Any priority' },
+    { value: 'elevated', label: 'High or critical' },
+    { value: 'critical', label: 'Critical' },
+    { value: 'high', label: 'High' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'low', label: 'Low' },
+];
 
-    const handleSearchSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        applyFilter('search', search);
-    };
-
-    const getStatusColor = (status: string) => governanceStatusColor(status);
-
-    const getPriorityColor = (priority: string) => {
+function dueCell(row: ActionRow) {
+    if (row.status === 'complete') {
         return (
-            {
-                low: 'bg-muted text-foreground',
-                medium: 'bg-status-info-bg text-status-info',
-                high: 'bg-status-warning-bg text-status-warning',
-                critical: 'bg-status-critical-bg text-status-critical',
-            }[priority] || 'bg-muted text-foreground'
+            <span className="text-muted-foreground">
+                {formatDateOnly(row.due_date.slice(0, 10))}
+            </span>
         );
-    };
+    }
+    const days = daysUntilDue(row.due_date);
+    const overdue = isActionOverdue(row.status, row.due_date);
+    return (
+        <span className="flex min-w-0 flex-col">
+            <span className="truncate">
+                {formatDateOnly(row.due_date.slice(0, 10))}
+            </span>
+            {days != null ? (
+                <span
+                    className={
+                        overdue
+                            ? 'text-[11.5px] font-semibold text-status-critical'
+                            : days <= 3
+                              ? 'text-[11.5px] font-semibold text-status-warning'
+                              : 'text-[11.5px] text-muted-foreground'
+                    }
+                >
+                    {overdue
+                        ? `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`
+                        : days === 0
+                          ? 'Due today'
+                          : days > 0
+                            ? `${days} day${days === 1 ? '' : 's'} left`
+                            : 'Past due'}
+                </span>
+            ) : null}
+        </span>
+    );
+}
 
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        const days = Math.ceil(
-            (date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24),
-        );
+export default function ActionsIndex({
+    items,
+    summary,
+    filters,
+    source_types,
+    assignees,
+}: Props) {
+    const page = usePage<{ auth?: { user?: { id?: number } } }>();
+    const [search, setSearch] = useState(filters.search ?? '');
+    const ctxMenu = useEntityContextMenu<ActionRow>();
 
-        if (days < 0)
-            return {
-                text: `${Math.abs(days)} days overdue`,
-                color: 'text-status-critical font-medium',
-            };
-        if (days === 0)
-            return { text: 'Due today', color: 'text-status-warning font-medium' };
-        return {
-            text: `${days} days left`,
-            color: days <= 3 ? 'text-status-warning' : 'text-muted-foreground',
-        };
-    };
+    useEffect(() => {
+        setSearch(filters.search ?? '');
+    }, [filters.search]);
 
-    const handleCreateSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        postCreate('/governance/actions', {
-            onSuccess: () => {
-                setIsCreateOpen(false);
-                resetCreate();
-            },
+    const go = (next: Partial<Filters>) => {
+        const merged = { ...filters, ...next };
+        const query: Record<string, string> = {};
+        if (merged.status) query.status = merged.status;
+        if (merged.priority) query.priority = merged.priority;
+        if (merged.source_type) query.source_type = merged.source_type;
+        if (merged.assignee) query.assignee = merged.assignee;
+        if (merged.assigned_to_me) query.assigned_to_me = '1';
+        if (merged.search) query.search = merged.search;
+        router.get('/governance/actions', query, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
         });
     };
 
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            if ((filters.search ?? '') !== search) {
+                go({ search: search.trim() || null });
+            }
+        }, 350);
+        return () => clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
+
+    const hasFilters = Boolean(
+        filters.status ||
+        filters.priority ||
+        filters.source_type ||
+        filters.assignee ||
+        filters.assigned_to_me ||
+        filters.search,
+    );
+
+    const sourceLabel = (type: string | null | undefined) =>
+        source_types.find((option) => option.value === type)?.label ?? null;
+
+    const open = (row: ActionRow) =>
+        router.visit(showAction.url({ action: row.id }));
+
+    const actionsFor = (row: ActionRow): MenuItem[] =>
+        compactMenu([
+            {
+                label:
+                    row.status === 'complete' ? 'View receipt' : 'Open action',
+                icon: ClipboardList,
+                onClick: () => open(row),
+            },
+        ]);
+
+    const myId = page.props.auth?.user?.id;
+
+    const header = (
+        <PageHeader
+            icon={ListChecks}
+            title="Actions"
+            subline={`Board decisions and follow-ups tracked to completion · ${summary.total_open} open`}
+            actions={
+                <PageHeaderSearch
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search references, titles or descriptions…"
+                />
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Open"
+                        href="/governance/actions?status=active"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.total_open}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {summary.blocked > 0
+                                ? `${summary.blocked} blocked`
+                                : 'Active actions'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Overdue"
+                        href="/governance/actions?status=overdue"
+                        tone={summary.overdue > 0 ? 'critical' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.overdue}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Past their due date
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Mine"
+                        href="/governance/actions?assigned_to_me=1&status=active"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.my_open}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Assigned to you
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="High priority"
+                        href="/governance/actions?priority=elevated&status=active"
+                        tone={summary.high_priority > 0 ? 'warning' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.high_priority}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            High or critical, still open
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterCheck
+                        label="Assigned to me"
+                        checked={filters.assigned_to_me}
+                        onChange={(checked) =>
+                            go({ assigned_to_me: checked, assignee: null })
+                        }
+                    />
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={filters.status ?? ALL}
+                        allValue={ALL}
+                        options={STATUS_OPTIONS}
+                        onChange={(value) =>
+                            go({ status: value === ALL ? null : value })
+                        }
+                    />
+                    <PageHeaderFilterSelect
+                        label="Priority"
+                        value={filters.priority ?? ALL}
+                        allValue={ALL}
+                        options={PRIORITY_OPTIONS}
+                        onChange={(value) =>
+                            go({ priority: value === ALL ? null : value })
+                        }
+                    />
+                    {source_types.length > 0 ? (
+                        <PageHeaderFilterSelect
+                            icon={Link2}
+                            label="Source"
+                            value={filters.source_type ?? ALL}
+                            allValue={ALL}
+                            options={[
+                                { value: ALL, label: 'Any source' },
+                                ...source_types,
+                            ]}
+                            onChange={(value) =>
+                                go({
+                                    source_type: value === ALL ? null : value,
+                                })
+                            }
+                        />
+                    ) : null}
+                    {assignees.length > 0 ? (
+                        <PageHeaderFilterSelect
+                            label="Owner"
+                            value={filters.assignee ?? ALL}
+                            allValue={ALL}
+                            options={[
+                                { value: ALL, label: 'Anyone' },
+                                ...assignees.map((user) => ({
+                                    value: String(user.id),
+                                    label:
+                                        user.id === myId
+                                            ? `${user.name} (you)`
+                                            : user.name,
+                                })),
+                            ]}
+                            onChange={(value) =>
+                                go({
+                                    assignee: value === ALL ? null : value,
+                                    assigned_to_me: false,
+                                })
+                            }
+                        />
+                    ) : null}
+                </>
+            }
+            rail={<GovernanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Actions', href: '/governance/actions' },
             ]}
         >
-            <Head title="Action Items" />
-
-            <PageLayout
-                hero={
-                    <PageHeader
-                        title="Actions"
-                        subline="Track board decisions and follow-ups through to completion."
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock label="Open">
-                                    <PageHeaderMeterBig>{summary.total_open}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Active items</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock label="Overdue" tone={summary.overdue > 0 ? 'critical' : 'brand'}>
-                                    <PageHeaderMeterBig>{summary.overdue}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Needs attention</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock label="My Open">
-                                    <PageHeaderMeterBig>{summary.my_open}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Assigned to you</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock label="High Priority" tone={summary.high_priority > 0 ? 'warning' : 'brand'}>
-                                    <PageHeaderMeterBig>{summary.high_priority}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Escalated items</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
-                        }
+            <Head title="Actions" />
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5" dusk="actions-list-card">
+                    <ListCaption
+                        title="Action register"
+                        caption={`${items.data.length} of ${items.total ?? items.data.length} shown`}
                     />
-                }
-            >
-                {/* Control bar: search, filters & create button */}
-                <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <form onSubmit={handleSearchSubmit} className="flex flex-1 items-center gap-2 max-w-md">
-                        <div className="relative w-full">
-                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search by reference or description..."
-                                className="pl-9"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
-                        </div>
-                        <Button type="submit" variant="secondary" size="sm">
-                            Search
-                        </Button>
-                    </form>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        {/* Status Filter */}
-                        <select
-                            aria-label="Filter by Status"
-                            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            value={statusFilter}
-                            onChange={(e) => {
-                                setStatusFilter(e.target.value);
-                                applyFilter('status', e.target.value);
-                            }}
-                        >
-                            <option value="all">All Statuses</option>
-                            <option value="open">Open</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="overdue">Overdue</option>
-                            <option value="blocked">Blocked</option>
-                            <option value="complete">Completed</option>
-                        </select>
-
-                        {/* Priority Filter */}
-                        <select
-                            aria-label="Filter by Priority"
-                            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            value={priorityFilter}
-                            onChange={(e) => {
-                                setPriorityFilter(e.target.value);
-                                applyFilter('priority', e.target.value);
-                            }}
-                        >
-                            <option value="all">All Priorities</option>
-                            <option value="critical">Critical</option>
-                            <option value="high">High</option>
-                            <option value="medium">Medium</option>
-                            <option value="low">Low</option>
-                        </select>
-
-                        {/* Assigned to Me Button */}
-                        <Button
-                            variant={filters.assigned_to_me ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => {
-                                const newVal = filters.assigned_to_me ? '' : '1';
-                                applyFilter('assigned_to_me', newVal);
-                            }}
-                        >
-                            <UserIcon className="mr-1.5 h-3.5 w-3.5" />
-                            My Actions
-                        </Button>
-
-                        <Button size="sm" onClick={() => setIsCreateOpen(true)}>
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            New Action
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Table */}
-                <Card dusk="actions-list-card">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-lg font-semibold flex items-center justify-between">
-                            <span>Action Register ({items.total ?? items.data.length})</span>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[120px]">Reference</TableHead>
-                                    <TableHead>Description</TableHead>
-                                    <TableHead className="w-[150px]">Assignee</TableHead>
-                                    <TableHead className="w-[140px]">Due Date</TableHead>
-                                    <TableHead className="w-[100px]">Priority</TableHead>
-                                    <TableHead className="w-[120px]">Progress</TableHead>
-                                    <TableHead className="w-[120px]">Status</TableHead>
-                                    <TableHead className="w-[80px] text-right">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {items.data.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                                            No action items found matching criteria.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    items.data.map((item) => {
-                                        const dateInfo = formatDate(item.due_date);
-                                        const isBlocked = item.status === 'blocked';
-                                        return (
-                                            <TableRow key={item.id} className={cn(isBlocked && 'bg-status-warning-bg/10')}>
-                                                <TableCell className="font-mono text-xs font-semibold text-muted-foreground">
-                                                    {item.action_reference}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="space-y-1">
-                                                        <Link
-                                                            href={showAction.url({ action: item.id })}
-                                                            className="font-medium hover:underline text-foreground"
-                                                        >
-                                                            {item.title || item.description}
-                                                        </Link>
-                                                        {item.title && item.title !== item.description && (
-                                                            <p className="text-xs text-muted-foreground line-clamp-1">
-                                                                {item.description}
-                                                            </p>
-                                                        )}
-                                                        {item.source_type && (
-                                                            <span className="inline-block text-[11px] font-mono text-muted-foreground uppercase">
-                                                                From {item.source_type.replace(/.*\\/, '')} #{item.source_id}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-1.5 text-sm">
-                                                        <UserIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                                        <span className="truncate">{item.assigned_to?.name ?? 'Unassigned'}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="text-xs">
-                                                        <span className={dateInfo.color}>{dateInfo.text}</span>
-                                                        <div className="text-muted-foreground">{item.due_date}</div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge className={cn('capitalize text-[11px]', getPriorityColor(item.priority))}>
-                                                        {item.priority}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center justify-between text-xs">
-                                                            <span className="text-muted-foreground">{item.progress_pct ?? 0}%</span>
-                                                        </div>
-                                                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                                                            <div
-                                                                className={cn(
-                                                                    'h-full transition-all',
-                                                                    (item.progress_pct ?? 0) >= 100
-                                                                        ? 'bg-status-success'
-                                                                        : 'bg-primary',
-                                                                )}
-                                                                style={{ width: `${item.progress_pct ?? 0}%` }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="space-y-0.5">
-                                                        <Badge className={cn('capitalize text-[11px]', getStatusColor(item.status))}>
-                                                            {item.status === 'complete' ? 'Completed' : item.status.replace('_', ' ')}
-                                                        </Badge>
-                                                        {isBlocked && (
-                                                            <div className="flex items-center gap-1 text-[11px] text-status-warning font-medium">
-                                                                <AlertCircle className="h-3 w-3" />
-                                                                Blocked
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button variant="ghost" size="sm" asChild>
-                                                        <Link href={showAction.url({ action: item.id })}>
-                                                            View &rarr;
-                                                        </Link>
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })
-                                )}
-                            </TableBody>
-                        </Table>
-
-                        {/* Pagination */}
-                        {items.links && items.links.length > 3 && (
-                            <div className="flex items-center justify-between border-t px-4 py-3 text-sm">
-                                <span className="text-muted-foreground">
-                                    Page {items.current_page} of {items.last_page}
-                                </span>
-                                <div className="flex items-center gap-1">
-                                    {items.links.map((link, i) => (
-                                        <Button
-                                            key={i}
-                                            variant={link.active ? 'default' : 'outline'}
-                                            size="sm"
-                                            disabled={!link.url}
-                                            asChild={!!link.url}
-                                        >
-                                            {link.url ? (
-                                                <Link href={link.url} dangerouslySetInnerHTML={{ __html: link.label }} />
-                                            ) : (
-                                                <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                    {items.data.length === 0 ? (
+                        <EmptyState
+                            icon={ListChecks}
+                            title={
+                                hasFilters
+                                    ? 'No actions match your filters'
+                                    : 'No actions yet'
+                            }
+                            description={
+                                hasFilters
+                                    ? 'Try clearing a filter or search term.'
+                                    : 'Actions are created from carried decisions and meeting follow-ups.'
+                            }
+                            action={
+                                hasFilters ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearch('');
+                                            router.get(
+                                                '/governance/actions',
+                                                {},
+                                                { replace: true },
+                                            );
+                                        }}
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                        Clear filters
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={items.data}
+                            rowKey={(row) => row.id}
+                            identityLabel="Action"
+                            identity={(row) => ({
+                                icon: ClipboardList,
+                                name: row.title || row.description,
+                                subline: [
+                                    row.action_reference,
+                                    sourceLabel(row.source_type),
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · '),
+                            })}
+                            hrefFor={(row) =>
+                                showAction.url({ action: row.id })
+                            }
+                            onOpen={open}
+                            onRowContextMenu={ctxMenu.open}
+                            actionsFor={actionsFor}
+                            mutedFor={(row) => row.status === 'complete'}
+                            columns={[
+                                {
+                                    key: 'status',
+                                    label: 'Status',
+                                    width: '0.9fr',
+                                    cell: (row) =>
+                                        isActionOverdue(
+                                            row.status,
+                                            row.due_date,
+                                        ) ? (
+                                            <EntityStatusChip variant="critical">
+                                                Overdue
+                                            </EntityStatusChip>
+                                        ) : (
+                                            <EntityStatusChip
+                                                variant={actionStatusVariant(
+                                                    row.status,
+                                                )}
+                                            >
+                                                {actionStatusLabel(row.status)}
+                                            </EntityStatusChip>
+                                        ),
+                                },
+                                {
+                                    key: 'owner',
+                                    label: 'Owner',
+                                    width: '1fr',
+                                    cell: (row) => (
+                                        <PersonCell
+                                            name={row.assigned_to?.name}
+                                        />
+                                    ),
+                                },
+                                {
+                                    key: 'due',
+                                    label: 'Due',
+                                    width: '0.9fr',
+                                    cell: dueCell,
+                                },
+                                {
+                                    key: 'priority',
+                                    label: 'Priority',
+                                    width: '0.7fr',
+                                    cell: (row) => (
+                                        <EntityStatusChip
+                                            variant={actionPriorityVariant(
+                                                row.priority,
                                             )}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                                        >
+                                            {actionPriorityLabel(row.priority)}
+                                        </EntityStatusChip>
+                                    ),
+                                },
+                                {
+                                    key: 'progress',
+                                    label: 'Progress',
+                                    width: '0.8fr',
+                                    cell: (row) => (
+                                        <ProgressValue
+                                            percent={row.progress_pct ?? 0}
+                                            tone={
+                                                row.status === 'complete'
+                                                    ? 'success'
+                                                    : 'brand'
+                                            }
+                                        >
+                                            {row.progress_pct ?? 0}%
+                                        </ProgressValue>
+                                    ),
+                                },
+                                {
+                                    key: 'evidence',
+                                    label: 'Evidence',
+                                    width: '0.7fr',
+                                    cell: (row) =>
+                                        row.evidence_required ? (
+                                            <EntityChip>Required</EntityChip>
+                                        ) : (
+                                            <EmptyValue />
+                                        ),
+                                },
+                            ]}
+                        />
+                    )}
+
+                    <LaravelPagination
+                        links={items.links}
+                        lastPage={items.last_page}
+                        preserveScroll
+                    />
+                </div>
             </PageLayout>
 
-            {/* Create Action Item Dialog */}
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                        <DialogTitle>New Governance Action Item</DialogTitle>
-                        <DialogDescription>
-                            Create a standalone action item or follow-up task.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <form onSubmit={handleCreateSubmit} className="space-y-4 py-2">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="create-title">Title / Summary</Label>
-                            <Input
-                                id="create-title"
-                                placeholder="E.g. Conduct IT compliance audit"
-                                value={createData.title}
-                                onChange={(e) => setCreateData('title', e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label htmlFor="create-description">Detailed Description <span className="text-status-critical">*</span></Label>
-                            <Textarea
-                                id="create-description"
-                                placeholder="State the required deliverables, scope, and expected outcome..."
-                                rows={3}
-                                value={createData.description}
-                                onChange={(e) => setCreateData('description', e.target.value)}
-                                required
-                            />
-                            {createErrors.description && (
-                                <p className="text-xs text-status-critical">{createErrors.description}</p>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                                <Label htmlFor="create-assignee">Assignee <span className="text-status-critical">*</span></Label>
-                                <select
-                                    id="create-assignee"
-                                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
-                                    value={createData.assigned_to}
-                                    onChange={(e) => setCreateData('assigned_to', e.target.value)}
-                                    required
-                                >
-                                    {assignees.map((u) => (
-                                        <option key={u.id} value={u.id}>
-                                            {u.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label htmlFor="create-due">Due Date <span className="text-status-critical">*</span></Label>
-                                <Input
-                                    id="create-due"
-                                    type="date"
-                                    value={createData.due_date}
-                                    onChange={(e) => setCreateData('due_date', e.target.value)}
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                                <Label htmlFor="create-priority">Priority</Label>
-                                <select
-                                    id="create-priority"
-                                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
-                                    value={createData.priority}
-                                    onChange={(e) => setCreateData('priority', e.target.value)}
-                                >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                    <option value="critical">Critical</option>
-                                </select>
-                            </div>
-
-                            <div className="flex items-center space-x-2 pt-6">
-                                <input
-                                    type="checkbox"
-                                    id="create-evidence"
-                                    className="rounded border-input text-primary"
-                                    checked={createData.evidence_required}
-                                    onChange={(e) => setCreateData('evidence_required', e.target.checked)}
-                                />
-                                <Label htmlFor="create-evidence" className="text-xs cursor-pointer">
-                                    Evidence documentation required
-                                </Label>
-                            </div>
-                        </div>
-
-                        <DialogFooter className="pt-2">
-                            <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={createProcessing || !createData.description}>
-                                Create Action Item
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={ClipboardList}
+                    title={
+                        ctxMenu.ctx.record.title ||
+                        ctxMenu.ctx.record.action_reference
+                    }
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
         </AppLayout>
     );
 }

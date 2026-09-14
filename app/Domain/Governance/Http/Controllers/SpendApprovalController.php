@@ -35,7 +35,12 @@ class SpendApprovalController extends Controller
             ->latest('id');
 
         if ($status = $request->string('status')->toString()) {
-            $query->where('status', $status);
+            if ($status === 'pending') {
+                // Matches the header "Pending" meter (draft + submitted).
+                $query->whereIn('status', [SpendApproval::STATUS_DRAFT, SpendApproval::STATUS_SUBMITTED]);
+            } else {
+                $query->where('status', $status);
+            }
         }
         if ($category = $request->string('category')->toString()) {
             $query->where('category', $category);
@@ -58,6 +63,14 @@ class SpendApprovalController extends Controller
                 ->whereYear('decided_at', now()->year)->sum('amount'),
         ];
 
+        // The request wizard lives on this page (the old create page redirects
+        // here with ?create=1). Its site picker is only built for viewers the
+        // create gate and the canonical site scope both allow.
+        $siteOptions = Gate::forUser($request->user())->allows('create', SpendApproval::class)
+            ? $this->commands->accessibleSiteOptions($request->user())
+            : [];
+        $canCreate = $siteOptions !== [];
+
         return Inertia::render('Governance/SpendApprovals/Index', [
             'approvals' => [
                 'data' => $approvals->items(),
@@ -74,49 +87,43 @@ class SpendApprovalController extends Controller
             ],
             'summary' => $summary,
             'categories' => SpendApproval::categories(),
-            'thresholds' => [
-                'capex' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_CAPEX),
-                'opex' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_OPEX),
-                'supplier_contract' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_SUPPLIER_CONTRACT),
-                'donor_restricted' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_DONOR_RESTRICTED),
-            ],
+            'thresholds' => $this->thresholds(),
+            'can_create' => $canCreate,
+            'form_options' => $canCreate ? ['sites' => $siteOptions] : null,
         ]);
     }
 
-    public function create(Request $request): Response
+    /**
+     * Legacy deep link: the request wizard is a dialog on the index. Authorise
+     * exactly as the retired page did, then open the dialog there.
+     */
+    public function create(Request $request): RedirectResponse
     {
         $this->authorize('create', SpendApproval::class);
         $this->commands->assertHasAccessibleSite($request->user());
 
-        return Inertia::render('Governance/SpendApprovals/Create', [
-            'sites' => $this->commands->accessibleSiteOptions($request->user()),
-            'categories' => SpendApproval::categories(),
-            'thresholds' => [
-                'capex' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_CAPEX),
-                'opex' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_OPEX),
-                'supplier_contract' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_SUPPLIER_CONTRACT),
-                'donor_restricted' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_DONOR_RESTRICTED),
-            ],
-        ]);
+        return redirect()->route('governance.spend-approvals.index', ['create' => 1]);
     }
 
-    public function edit(Request $request, SpendApproval $approval): Response
+    /** Legacy deep link: the edit wizard is a dialog on the show page. */
+    public function edit(Request $request, SpendApproval $approval): RedirectResponse
     {
         $this->authorize('requestAny', SpendApproval::class);
         $approval = $this->commands->resolveAccessibleApproval($request->user(), $approval->id);
         $this->authorize('update', $approval);
 
-        return Inertia::render('Governance/SpendApprovals/Edit', [
-            'approval' => $approval,
-            'sites' => $this->commands->accessibleSiteOptions($request->user()),
-            'categories' => SpendApproval::categories(),
-            'thresholds' => [
-                'capex' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_CAPEX),
-                'opex' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_OPEX),
-                'supplier_contract' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_SUPPLIER_CONTRACT),
-                'donor_restricted' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_DONOR_RESTRICTED),
-            ],
-        ]);
+        return redirect()->route('governance.spend-approvals.show', ['approval' => $approval->id, 'edit' => 1]);
+    }
+
+    /** @return array<string, float|int> */
+    private function thresholds(): array
+    {
+        return [
+            'capex' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_CAPEX),
+            'opex' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_OPEX),
+            'supplier_contract' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_SUPPLIER_CONTRACT),
+            'donor_restricted' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_DONOR_RESTRICTED),
+        ];
     }
 
     public function show(Request $request, SpendApproval $approval): Response
@@ -132,17 +139,24 @@ class SpendApprovalController extends Controller
             'budget:id,fiscal_year,title',
         ]);
 
+        $authority = [
+            'update' => Gate::forUser($request->user())->allows('update', $approval),
+            'submit' => Gate::forUser($request->user())->allows('submit', $approval),
+            'decide' => Gate::forUser($request->user())->allows('decide', $approval),
+            'manage_attachments' => Gate::forUser($request->user())->allows('manageAttachments', $approval),
+        ];
+
         return Inertia::render('Governance/SpendApprovals/Show', [
             'approval' => $approval,
             'categories' => SpendApproval::categories(),
             'threshold' => SpendApproval::thresholdFor($approval->category),
             'attachments' => $this->presentAttachments($approval),
-            'authority' => [
-                'update' => Gate::forUser($request->user())->allows('update', $approval),
-                'submit' => Gate::forUser($request->user())->allows('submit', $approval),
-                'decide' => Gate::forUser($request->user())->allows('decide', $approval),
-                'manage_attachments' => Gate::forUser($request->user())->allows('manageAttachments', $approval),
-            ],
+            'authority' => $authority,
+            // Edit wizard options — only for viewers who may edit this draft.
+            'form_options' => $authority['update'] ? [
+                'sites' => $this->commands->accessibleSiteOptions($request->user()),
+                'thresholds' => $this->thresholds(),
+            ] : null,
         ]);
     }
 

@@ -19,6 +19,7 @@ class GovernanceDocumentController extends Controller
             ->when($request->search, fn ($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->orderByDesc('updated_at')
             ->paginate(20)
+            ->withQueryString()
             ->through(fn (GovernanceDocument $document) => [
                 'id' => $document->id,
                 'title' => $document->title,
@@ -30,8 +31,24 @@ class GovernanceDocumentController extends Controller
                 'updated_at' => $document->updated_at?->toIso8601String(),
             ]);
 
+        $typeCounts = GovernanceDocument::query()
+            ->selectRaw('document_type, count(*) as aggregate')
+            ->groupBy('document_type')
+            ->pluck('aggregate', 'document_type');
+
         return Inertia::render('Governance/Documents/Index', [
             'documents' => $documents,
+            'filters' => [
+                'search' => $request->query('search'),
+                'document_type' => $request->query('document_type'),
+            ],
+            'summary' => [
+                'total' => (int) $typeCounts->sum(),
+                'by_type' => $typeCounts->map(fn ($count) => (int) $count),
+                'updated_last_30_days' => GovernanceDocument::query()
+                    ->where('updated_at', '>=', now()->subDays(30))
+                    ->count(),
+            ],
             'categories' => [
                 ['value' => 'constitution', 'label' => 'Constitution / Charter'],
                 ['value' => 'terms_of_reference', 'label' => 'Terms Of Reference'],
@@ -122,6 +139,8 @@ class GovernanceDocumentController extends Controller
 
         $document->delete();
 
-        return redirect()->back()->with('success', 'Document removed.');
+        // Return to the register: going "back" from the removed record's own
+        // page would land on a document that no longer exists.
+        return redirect()->route('governance.documents.index')->with('success', 'Document removed.');
     }
 }

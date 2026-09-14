@@ -21,16 +21,19 @@ class RiskRegisterController extends Controller
         protected RiskScoringService $riskService
     ) {}
 
+    /**
+     * The full-page create form was retired for the shared wizard dialog on the
+     * register index; old deep links open that dialog instead.
+     */
     public function create()
     {
-        return Inertia::render('Governance/Risks/Create', [
-            'categories' => $this->getCategories(),
-        ]);
+        return redirect()->route('governance.risks.index', ['create' => 1]);
     }
 
     public function index(Request $request)
     {
-        $query = RiskRegisterEntry::with(['riskOwner', 'treatments', 'acceptances']);
+        $query = RiskRegisterEntry::with(['riskOwner', 'treatments', 'acceptances'])
+            ->withCount('treatments');
 
         // Filters
         if ($request->has('category')) {
@@ -49,14 +52,30 @@ class RiskRegisterController extends Controller
             };
         }
 
+        if ($request->boolean('above_appetite')) {
+            $query->aboveAppetite();
+        }
+
+        if ($request->filled('search')) {
+            $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim((string) $request->search)).'%';
+            $query->where(fn ($q) => $q->where('title', 'like', $term)
+                ->orWhere('risk_reference', 'like', $term));
+        }
+
         $risks = $query->orderByDesc('residual_score')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
+
+        $canCreate = $this->canCreateRisks($request->user());
 
         return Inertia::render('Governance/Risks/Index', [
             'risks' => $risks,
             'categories' => $this->getCategories(),
             'summary' => $this->riskService->getCategorySummary(),
-            'filters' => $request->only(['category', 'status', 'severity']),
+            'filters' => $request->only(['category', 'status', 'severity', 'above_appetite', 'search']),
+            'canCreate' => $canCreate,
+            // Wizard reference data — only for users who can actually register a risk.
+            'formOptions' => $canCreate ? fn () => $this->riskFormOptions() : null,
         ]);
     }
 
@@ -69,7 +88,9 @@ class RiskRegisterController extends Controller
             'events',
         ]);
 
-        $canEdit = auth()->user()->can('update', $risk);
+        // Mirrors the update route (governance.risks.manage) and the policy.
+        $canEdit = auth()->user()->can('update', $risk)
+            && auth()->user()->canDo('governance.risks.manage');
 
         $treatmentsPayload = $risk->treatments->map(function ($treatment) use ($risk) {
             return [
@@ -94,6 +115,8 @@ class RiskRegisterController extends Controller
                 ->get(),
             'canEdit' => $canEdit,
             'canAccept' => auth()->user()->can('accept', $risk),
+            // Edit wizard reference data — only for users who can edit this risk.
+            'formOptions' => $canEdit ? fn () => $this->riskFormOptions() : null,
         ]);
     }
 
@@ -137,6 +160,12 @@ class RiskRegisterController extends Controller
                 }
             ),
         ]);
+
+        // The register's wizard dialog stays on the page and shows its success
+        // pane — preserve that context instead of redirecting to the record.
+        if ($request->boolean('_modal')) {
+            return back()->with('success', "Risk {$risk->risk_reference} registered successfully.");
+        }
 
         return redirect()->route('governance.risks.show', $risk)
             ->with('success', 'Risk registered successfully.');
@@ -248,18 +277,31 @@ class RiskRegisterController extends Controller
         return redirect()->back()->with('success', 'Event linked to risk.');
     }
 
+    /**
+     * The full-page edit form was retired for the shared wizard dialog on the
+     * risk record; old deep links open that dialog instead.
+     */
     public function edit(RiskRegisterEntry $risk)
     {
-        return Inertia::render('Governance/Risks/Edit', [
-            'risk' => $risk,
-        ]);
+        return redirect()->route('governance.risks.show', ['risk' => $risk, 'edit' => 1]);
     }
 
-    public function heatmap()
+    public function heatmap(Request $request)
     {
+        $validCategories = array_column($this->getCategories(), 'value');
+        $category = in_array($request->query('category'), $validCategories, true)
+            ? $request->query('category')
+            : null;
+        $activeOnly = $request->boolean('active');
+
         return Inertia::render('Governance/Risks/Heatmap', [
-            'heatmap' => $this->riskService->generateHeatmapData(),
-            'trend' => $this->riskService->getTrendAnalysis(),
+            'heatmap' => $this->heatmapCells($category, $activeOnly),
+            'trend' => $this->newRiskTrend($category),
+            'categories' => $this->getCategories(),
+            'filters' => array_filter([
+                'category' => $category,
+                'active' => $activeOnly ? '1' : null,
+            ]),
         ]);
     }
 
@@ -296,6 +338,89 @@ class RiskRegisterController extends Controller
             'committee' => $committee,
             'risks' => $risks,
         ]);
+    }
+
+    protected function canCreateRisks(?User $user): bool
+    {
+        return $user !== null
+            && $user->can('create', RiskRegisterEntry::class)
+            && $user->canDo('governance.risks.manage');
+    }
+
+    /**
+     * Reference data for the risk wizard dialog (add on the index, edit on the record).
+     *
+     * @return array<string, mixed>
+     */
+    protected function riskFormOptions(): array
+    {
+        return [
+            'categories' => $this->getCategories(),
+            'owners' => User::staff()
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get(),
+        ];
+    }
+
+    /**
+     * The 5×5 likelihood × impact matrix (rows: likelihood 5→1, columns:
+     * impact 1→5). Each cell counts the risks assessed at exactly that
+     * likelihood and impact, so a risk is never counted in two cells.
+     *
+     * @return array<int, array<int, array{score: int, count: int, color: string}>>
+     */
+    protected function heatmapCells(?string $category, bool $activeOnly): array
+    {
+        $counts = RiskRegisterEntry::query()
+            ->when($category, fn ($q) => $q->byCategory($category))
+            ->when($activeOnly, fn ($q) => $q->active())
+            ->selectRaw('likelihood_score, impact_score, COUNT(*) as aggregate')
+            ->groupBy('likelihood_score', 'impact_score')
+            ->get()
+            ->mapWithKeys(fn ($row) => ["{$row->likelihood_score}:{$row->impact_score}" => (int) $row->aggregate]);
+
+        $heatmap = [];
+        for ($likelihood = 5; $likelihood >= 1; $likelihood--) {
+            $row = [];
+            for ($impact = 1; $impact <= 5; $impact++) {
+                $score = $this->riskService->calculateInherentScore($likelihood, $impact);
+                $row[] = [
+                    'score' => $score,
+                    'count' => $counts["{$likelihood}:{$impact}"] ?? 0,
+                    'color' => $this->riskService->getRiskColor($score),
+                ];
+            }
+            $heatmap[] = $row;
+        }
+
+        return $heatmap;
+    }
+
+    /**
+     * New risks identified per month over the last 12 months.
+     *
+     * @return array<int, array{month: string, new_risks: int}>
+     */
+    protected function newRiskTrend(?string $category): array
+    {
+        if ($category === null) {
+            return $this->riskService->getTrendAnalysis();
+        }
+
+        $trend = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $date = now()->subMonths($i);
+            $trend[] = [
+                'month' => $date->format('Y-m'),
+                'new_risks' => RiskRegisterEntry::byCategory($category)
+                    ->whereYear('created_at', $date->year)
+                    ->whereMonth('created_at', $date->month)
+                    ->count(),
+            ];
+        }
+
+        return $trend;
     }
 
     protected function getCategories(): array

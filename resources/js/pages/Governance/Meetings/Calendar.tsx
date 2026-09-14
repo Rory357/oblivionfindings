@@ -1,5 +1,5 @@
-import { canDoGovernance } from '@/lib/governance-permissions';
 import AppLayout from '@/layouts/app-layout';
+import { toDateInput } from '@/lib/datetime';
 import {
     createGovernanceCalendarAdapter,
     GOVERNANCE_CALENDAR_SOURCES,
@@ -7,7 +7,8 @@ import {
 import SiteCalendar from '@/pages/sites/calendar/SiteCalendar';
 import { PageProps } from '@/types';
 import { Head } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { MeetingWizardDialog, type MeetingFormOptions } from './_dialogs';
 
 interface MeetingItem {
     id: number;
@@ -36,17 +37,25 @@ interface Props extends PageProps {
     selectedMeetingType?: string;
     meetingTypes?: MeetingTypeOption[];
     meetings?: MeetingItem[];
+    /** Store route gate + policy create ability (server-computed). */
+    canCreate?: boolean;
+    formOptions?: MeetingFormOptions | null;
 }
 
+/**
+ * The Meetings calendar reuses the shared Site Calendar (DESIGN.md
+ * "Calendars — always the Site Calendar style") through the governance data
+ * adapter. Its header rail carries the five calendar views, so the hub rail
+ * stays on the register pages; creating from a slot opens the same
+ * scheduling wizard in place, seeded with the slot's NZ date and hour.
+ */
 export default function MeetingsCalendar({
-    auth,
-    meetings = [],
-    selectedMeetingType,
+    canCreate = false,
+    formOptions = null,
 }: Props) {
-    const permissions =
-        (auth as { can?: { governance?: Record<string, unknown> } })?.can
-            ?.governance ?? null;
-    const canCreate = canDoGovernance(permissions, 'meetings', 'manage');
+    const canSchedule = canCreate && formOptions !== null;
+    const [createSeed, setCreateSeed] = useState<string | null>(null);
+    const [createOpen, setCreateOpen] = useState(false);
 
     const adapter = useMemo(
         () =>
@@ -56,6 +65,19 @@ export default function MeetingsCalendar({
                     'Board and committee meetings across the operating organisation',
                 initialSources: ['meetings'],
                 sourceFilters: GOVERNANCE_CALENDAR_SOURCES,
+                onCreate: (seed) => {
+                    const date = seed?.date ? toDateInput(seed.date) : '';
+                    const hour =
+                        seed?.hour !== undefined && seed?.hour !== null
+                            ? seed.hour
+                            : 9;
+                    setCreateSeed(
+                        date
+                            ? `${date}T${String(hour).padStart(2, '0')}:00`
+                            : null,
+                    );
+                    setCreateOpen(true);
+                },
             }),
         [],
     );
@@ -73,9 +95,17 @@ export default function MeetingsCalendar({
             <SiteCalendar
                 context="page"
                 scope="global"
-                canCreate={canCreate}
+                canCreate={canSchedule}
                 dataAdapter={adapter}
             />
+            {canSchedule && formOptions ? (
+                <MeetingWizardDialog
+                    isOpen={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    options={formOptions}
+                    initialScheduledAt={createSeed}
+                />
+            ) : null}
         </AppLayout>
     );
 }

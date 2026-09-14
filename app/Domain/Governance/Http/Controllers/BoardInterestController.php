@@ -22,10 +22,15 @@ class BoardInterestController extends Controller
             ->map(fn ($memberInterests) => $memberInterests->map(fn (BoardMemberInterest $interest) => $this->presentInterest($interest)));
 
         $boardMembers = BoardMember::with('user')->active()->get();
+        $myBoardMember = request()->user()?->boardMember;
 
         return Inertia::render('Governance/Interests/Index', [
             'interestsByMember' => $interests,
             'boardMembers' => $boardMembers,
+            // Declarations are self-service only (store() rejects other
+            // members' records), so the register offers "Declare interest"
+            // for the viewer's own board-member record when they have one.
+            'myBoardMemberId' => $myBoardMember?->id,
         ]);
     }
 
@@ -113,6 +118,10 @@ class BoardInterestController extends Controller
     {
         return [
             'id' => $interest->id,
+            'board_member_id' => $interest->board_member_id,
+            'member_name' => $interest->relationLoaded('boardMember')
+                ? $interest->boardMember?->user?->name
+                : null,
             'interest_type' => $interest->interest_type,
             'description' => $interest->description,
             'organization_name' => $interest->entity_name,

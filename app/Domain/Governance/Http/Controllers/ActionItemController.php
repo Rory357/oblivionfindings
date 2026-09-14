@@ -20,36 +20,53 @@ class ActionItemController extends Controller
         $user = $request->user();
         $accessService = app(GovernanceRecordAccessService::class);
 
-        $query = ActionItem::with(['assignedTo', 'completedBy', 'createdBy']);
-        $accessService->scopeActionItems($query, $user);
+        // Scoped base query shared by the list, the summary and filter options.
+        $baseQuery = ActionItem::query();
+        $accessService->scopeActionItems($baseQuery, $user);
+
+        $query = (clone $baseQuery)->with(['assignedTo:id,name', 'completedBy:id,name', 'createdBy:id,name']);
 
         // Filter by assignment
-        if ($request->has('assigned_to_me') || $request->input('filter') === 'my_work') {
+        $mine = ($request->has('assigned_to_me') && ! in_array((string) $request->input('assigned_to_me'), ['0', 'false'], true))
+            || $request->input('filter') === 'my_work';
+        if ($mine) {
             $query->forUser($user->id);
         }
 
-        if ($request->filled('status')) {
-            if ($request->status === 'overdue') {
-                $query->overdue();
-            } else {
-                $query->where('status', $request->status);
-            }
+        $status = $request->filled('status')
+            ? (string) $request->input('status')
+            : ($request->boolean('overdue') ? 'overdue' : null);
+
+        if ($status === 'overdue') {
+            $query->overdue();
+        } elseif ($status === 'active') {
+            $query->open();
+        } elseif ($status !== null) {
+            $query->where('status', $status);
         }
 
-        if ($request->boolean('overdue')) {
+        if ($request->boolean('overdue') && $status !== 'overdue') {
             $query->overdue();
         }
 
-        if ($request->filled('priority')) {
-            $query->where('priority', $request->priority);
+        $priority = $request->filled('priority') ? (string) $request->input('priority') : null;
+        if ($priority === 'elevated') {
+            $query->highPriority();
+        } elseif ($priority !== null) {
+            $query->where('priority', $priority);
         }
 
         if ($request->filled('source_type')) {
-            $query->where('source_type', $request->source_type);
+            $query->where('source_type', (string) $request->input('source_type'));
+        }
+
+        $assignee = filter_var($request->input('assignee'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($assignee !== false) {
+            $query->forUser($assignee);
         }
 
         if ($request->filled('search')) {
-            $search = '%'.$request->search.'%';
+            $search = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim((string) $request->input('search'))).'%';
             $query->where(function ($q) use ($search) {
                 $q->where('action_reference', 'like', $search)
                     ->orWhere('title', 'like', $search)
@@ -59,38 +76,54 @@ class ActionItemController extends Controller
 
         $items = $query->orderBy('due_date')->paginate(20)->withQueryString();
 
-        // Scoped base query for accurate summary counts
-        $baseCountQuery = ActionItem::query();
-        $accessService->scopeActionItems($baseCountQuery, $user);
-
         $summary = [
-            'total_open' => (clone $baseCountQuery)->open()->count(),
-            'overdue' => (clone $baseCountQuery)->overdue()->count(),
-            'my_open' => (clone $baseCountQuery)->forUser($user->id)->open()->count(),
-            'high_priority' => (clone $baseCountQuery)->highPriority()->open()->count(),
+            'total_open' => (clone $baseQuery)->open()->count(),
+            'overdue' => (clone $baseQuery)->overdue()->count(),
+            'my_open' => (clone $baseQuery)->forUser($user->id)->open()->count(),
+            'high_priority' => (clone $baseQuery)->highPriority()->open()->count(),
+            'blocked' => (clone $baseQuery)->blocked()->count(),
         ];
 
-        // Active assignees for filters or task assignments
+        // Filter options come from records this viewer can already see.
+        $sourceTypes = (clone $baseQuery)
+            ->whereNotNull('source_type')
+            ->distinct()
+            ->orderBy('source_type')
+            ->pluck('source_type')
+            ->map(fn ($type) => [
+                'value' => (string) $type,
+                'label' => Str::headline(class_basename((string) $type)),
+            ])
+            ->values();
+
         $assignees = User::query()
-            ->whereNotNull('approved_at')
+            ->whereIn('id', (clone $baseQuery)->whereNotNull('assigned_to')->select('assigned_to'))
             ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+            ->get(['id', 'name']);
 
         return Inertia::render('Governance/Actions/Index', [
             'items' => $items,
             'summary' => $summary,
-            'filters' => $request->only(['status', 'priority', 'source_type', 'assigned_to_me', 'search']),
+            'filters' => [
+                'status' => $status,
+                'priority' => $priority,
+                'source_type' => $request->filled('source_type') ? (string) $request->input('source_type') : null,
+                'assignee' => $assignee !== false ? (string) $assignee : null,
+                'assigned_to_me' => $mine,
+                'search' => $request->filled('search') ? (string) $request->input('search') : null,
+            ],
+            'source_types' => $sourceTypes,
             'assignees' => $assignees,
         ]);
     }
 
-    public function show(ActionItem $action)
+    public function show(Request $request, ActionItem $action)
     {
         $this->authorize('view', $action);
 
-        $action->load(['assignedTo', 'completedBy', 'createdBy']);
+        $action->load(['assignedTo', 'completedBy', 'createdBy', 'escalatedBy:id,name']);
 
-        $user = auth()->user();
+        $user = $request->user();
         $accessService = app(GovernanceRecordAccessService::class);
 
         // Safe resolution of polymorphic source details without private data leaks
@@ -135,16 +168,19 @@ class ActionItemController extends Controller
             }
         }
 
-        $assignees = User::query()
-            ->whereNotNull('approved_at')
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+        $canUpdate = $user->can('update', $action);
 
         return Inertia::render('Governance/Actions/Show', [
             'action' => $action,
             'source_details' => $sourceDetails,
-            'assignees' => $assignees,
-            'can_update' => $user->can('update', $action),
+            // Reassignment options are only needed by people who can reassign.
+            'assignees' => $canUpdate
+                ? User::query()->whereNotNull('approved_at')->orderBy('name')->get(['id', 'name', 'email'])
+                : [],
+            'can_update' => $canUpdate,
+            // Contextual opening (e.g. from a meeting paper): a same-origin
+            // Governance path only — anything else is ignored.
+            'return_to' => $this->safeReturnPath($request->query('return')),
         ]);
     }
 
@@ -156,6 +192,7 @@ class ActionItemController extends Controller
             'completion_notes' => 'required|string|min:3|max:2000',
             'evidence_files' => 'nullable|array',
             'expected_version' => 'required|integer',
+            'return_to' => 'nullable|string|max:2048',
         ]);
 
         if ($action->evidence_required && empty($validated['evidence_files']) && empty($action->evidence_attachments)) {
@@ -170,10 +207,10 @@ class ActionItemController extends Controller
                 $validated['expected_version'],
             );
 
-            return redirect()->back()->with('success', "Action item completed. Receipt: {$receipt}");
+            return $this->redirectAfterMutation($request, "Action item completed. Receipt: {$receipt}");
         } catch (\DomainException $e) {
             if (str_contains($e->getMessage(), 'modified by another user')) {
-                abort(409, $e->getMessage());
+                return $this->conflictResponse($request, $e->getMessage());
             }
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 422);
@@ -206,6 +243,7 @@ class ActionItemController extends Controller
             'progress_pct' => 'required|integer|min:0|max:100',
             'progress_notes' => 'nullable|string|max:1000',
             'expected_version' => 'required|integer',
+            'return_to' => 'nullable|string|max:2048',
         ]);
 
         try {
@@ -215,10 +253,10 @@ class ActionItemController extends Controller
                 $validated['expected_version'],
             );
 
-            return redirect()->back()->with('success', 'Progress updated.');
+            return $this->redirectAfterMutation($request, 'Progress updated.');
         } catch (\DomainException $e) {
             if (str_contains($e->getMessage(), 'modified by another user')) {
-                abort(409, $e->getMessage());
+                return $this->conflictResponse($request, $e->getMessage());
             }
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 422);
@@ -243,7 +281,7 @@ class ActionItemController extends Controller
             return redirect()->back()->with('success', 'Action item marked as blocked.');
         } catch (\DomainException $e) {
             if (str_contains($e->getMessage(), 'modified by another user')) {
-                abort(409, $e->getMessage());
+                return $this->conflictResponse($request, $e->getMessage());
             }
 
             return redirect()->back()->with('error', $e->getMessage());
@@ -264,7 +302,7 @@ class ActionItemController extends Controller
             return redirect()->back()->with('success', 'Action item unblocked.');
         } catch (\DomainException $e) {
             if (str_contains($e->getMessage(), 'modified by another user')) {
-                abort(409, $e->getMessage());
+                return $this->conflictResponse($request, $e->getMessage());
             }
 
             return redirect()->back()->with('error', $e->getMessage());
@@ -286,7 +324,7 @@ class ActionItemController extends Controller
             return redirect()->back()->with('success', 'Action item escalated.');
         } catch (\DomainException $e) {
             if (str_contains($e->getMessage(), 'modified by another user')) {
-                abort(409, $e->getMessage());
+                return $this->conflictResponse($request, $e->getMessage());
             }
 
             return redirect()->back()->with('error', $e->getMessage());
@@ -303,7 +341,7 @@ class ActionItemController extends Controller
         ]);
 
         if ((int) ($action->version_number ?? 1) !== (int) $validated['expected_version']) {
-            abort(409, 'Action item was modified by another user. Please reload and review the latest changes.');
+            return $this->conflictResponse($request, 'Action item was modified by another user. Please reload and review the latest changes.');
         }
 
         $action->update([
@@ -312,5 +350,67 @@ class ActionItemController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Action item reassigned.');
+    }
+
+    /**
+     * After a successful update/completion, return the member to the place
+     * they opened the action from (a validated Governance path), otherwise
+     * back to the action itself.
+     */
+    private function redirectAfterMutation(Request $request, string $message)
+    {
+        $returnTo = $this->safeReturnPath($request->input('return_to'));
+
+        return ($returnTo !== null ? redirect()->to($returnTo) : redirect()->back())
+            ->with('success', $message);
+    }
+
+    /**
+     * A stale expected_version. Inertia visits get a flash they can show in
+     * place; other clients keep the explicit 409.
+     */
+    private function conflictResponse(Request $request, string $message)
+    {
+        if ($request->header('X-Inertia')) {
+            return redirect()->back()->with('error', $message);
+        }
+
+        abort(409, $message);
+    }
+
+    /**
+     * Only a same-origin, relative Governance path is an acceptable return
+     * destination — never an absolute/protocol-relative URL, a backslash or
+     * control-character trick, or a dot-segment escape (no open redirect).
+     */
+    private function safeReturnPath(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+        if ($value === '' || strlen($value) > 2048) {
+            return null;
+        }
+
+        if (preg_match('/[\x00-\x1F\x7F\\\\]/', $value) === 1 || ! str_starts_with($value, '/governance/')) {
+            return null;
+        }
+
+        $parts = parse_url($value);
+        if ($parts === false || isset($parts['scheme']) || isset($parts['host']) || isset($parts['user']) || isset($parts['port'])) {
+            return null;
+        }
+
+        $path = rawurldecode($parts['path'] ?? '');
+        if (! str_starts_with($path, '/governance/')
+            || str_contains($path, '//')
+            || str_contains($path, '\\')
+            || preg_match('#(^|/)\.{1,2}(/|$)#', $path) === 1) {
+            return null;
+        }
+
+        return $value;
     }
 }

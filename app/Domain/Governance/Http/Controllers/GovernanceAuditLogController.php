@@ -30,7 +30,23 @@ class GovernanceAuditLogController extends Controller
             $filters,
             perPage: 50,
             excludedEntityTypes: $excludedEntityTypes,
-        );
+        )->withQueryString();
+
+        // Header meters: unfiltered stream totals (same entity exclusions).
+        $lastSevenDaysFrom = now()->subDays(7)->startOfDay();
+        $summary = [
+            'all_time' => GovernanceAuditService::paginate(
+                [],
+                perPage: 1,
+                excludedEntityTypes: $excludedEntityTypes,
+            )->total(),
+            'last_7_days' => GovernanceAuditService::paginate(
+                ['from' => $lastSevenDaysFrom->toDateTimeString()],
+                perPage: 1,
+                excludedEntityTypes: $excludedEntityTypes,
+            )->total(),
+            'last_7_days_from' => $lastSevenDaysFrom->toDateString(),
+        ];
 
         // Hydrate user names for the visible page only.
         $userIds = collect($entries->items())->pluck('user_id')->filter()->unique()->values();
@@ -70,6 +86,7 @@ class GovernanceAuditLogController extends Controller
                 'from' => $filters['from'] ?? null,
                 'to' => $filters['to'] ?? null,
             ],
+            'summary' => $summary,
             'entityTypes' => $this->entityTypes($excludedEntityTypes),
             'actionTypes' => $this->actionTypes($excludedEntityTypes),
             'changeTypes' => $this->changeTypes($excludedEntityTypes),

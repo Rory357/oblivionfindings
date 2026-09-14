@@ -4,9 +4,11 @@ namespace App\Domain\Governance\Services;
 
 use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\BoardPack;
+use App\Domain\Governance\Models\GovernanceDocument;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Notifications\BoardPackPublishedNotification;
 use App\Domain\Governance\Notifications\PreReadReminderNotification;
+use App\Domain\Governance\Support\BoardPackContainedSources;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -57,19 +59,50 @@ final class BoardPackAccessService
             })
             ->whereJsonContains('distributed_to', $boardMemberId);
 
+        return $this->applyContainedSourceAudience($query, $viewer, $boardMemberId);
+    }
+
+    /**
+     * The typed contained-source audience contract for non-managers.
+     *
+     * A pack is released only when (1) its manifest has been indexed into
+     * typed (source_type, integer id) rows, (2) every contained resolution
+     * and supporting document is a record the viewer can open, and (3) any
+     * confidential agenda is within the viewer's authority. Discovery and
+     * canView/download both evaluate exactly this constraint, so they cannot
+     * disagree about which records a pack embeds.
+     *
+     * @param  Builder<BoardPack>  $query
+     * @return Builder<BoardPack>
+     */
+    private function applyContainedSourceAudience(Builder $query, User $viewer, int $boardMemberId): Builder
+    {
+        // (1) An unindexed manifest is never released to a non-manager (fail closed).
+        $query->whereNotNull($query->getModel()->qualifyColumn('contained_sources_indexed_at'));
+
+        // (2) Every embedded record must be individually visible.
+        $recordAccess = app(GovernanceRecordAccessService::class);
+        $this->excludeHiddenSources(
+            $query,
+            BoardPackContainedSources::RESOLUTION,
+            $recordAccess->canViewAnyResolution($viewer)
+                ? $recordAccess->scopeResolutions(Resolution::query(), $viewer)->select((new Resolution)->qualifyColumn('id'))
+                : null,
+        );
+        $this->excludeHiddenSources(
+            $query,
+            BoardPackContainedSources::GOVERNANCE_DOCUMENT,
+            $recordAccess->canViewAnyDocument($viewer)
+                ? $recordAccess->scopeDocuments(GovernanceDocument::query(), $viewer)->select((new GovernanceDocument)->qualifyColumn('id'))
+                : null,
+        );
+
+        // (3) Confidential agenda content requires executive, chair/secretary or current committee authority.
         $execAccess = app(ExecutiveMeetingAccessService::class);
         if (! $execAccess->hasExecutiveAuthority($viewer)) {
             $today = today()->toDateString();
             $query->where(function (Builder $q) use ($boardMemberId, $today) {
-                $q->where(function (Builder $manifestCheck) {
-                    $manifestCheck->whereNull('document_manifest')
-                        ->orWhere(function (Builder $noConf) {
-                            $noConf->where('document_manifest', 'not like', '%"is_confidential":true%')
-                                ->where('document_manifest', 'not like', '%"is_confidential": true%')
-                                ->where('document_manifest', 'not like', '%"is_confidential":1%')
-                                ->where('document_manifest', 'not like', '%"is_confidential": 1%');
-                        });
-                })->orWhereHas('meeting', function (Builder $mq) use ($boardMemberId, $today) {
+                $q->where($q->getModel()->qualifyColumn('contains_confidential_agenda'), false)->orWhereHas('meeting', function (Builder $mq) use ($boardMemberId, $today) {
                     $mq->where(function (Builder $mSub) use ($boardMemberId, $today) {
                         $mSub->where('chair_id', $boardMemberId)
                             ->orWhere('secretary_id', $boardMemberId)
@@ -91,40 +124,34 @@ final class BoardPackAccessService
                     });
                 });
             });
-
-            $visibleMeetingIds = app(ExecutiveMeetingAccessService::class)
-                ->applyMeetingVisibilityScope(
-                    \App\Domain\Governance\Models\GovernanceMeeting::query(),
-                    $viewer
-                )
-                ->pluck('id');
-
-            $hiddenMeetingIds = \App\Domain\Governance\Models\GovernanceMeeting::query()
-                ->whereNotIn('id', $visibleMeetingIds)
-                ->pluck('id');
-
-            if ($hiddenMeetingIds->isNotEmpty()) {
-                $inaccessibleResolutionIds = Resolution::query()
-                    ->whereIn('governance_meeting_id', $hiddenMeetingIds)
-                    ->pluck('id');
-
-                if ($inaccessibleResolutionIds->isNotEmpty()) {
-                    $query->where(function (Builder $q) use ($inaccessibleResolutionIds) {
-                        foreach ($inaccessibleResolutionIds as $hiddenId) {
-                            $q->where('document_manifest', 'not like', '%"id":'.$hiddenId.'%')
-                                ->where('document_manifest', 'not like', '%"id": '.$hiddenId.'%');
-                        }
-                    });
-                }
-            }
         }
 
         return $query;
     }
 
+    /**
+     * Exclude packs containing any source of $type whose id is not in the
+     * viewer's visible set. A null set means the viewer can see none, so any
+     * contained source of that type hides the pack. Ids are compared as typed
+     * integers — never as manifest text — so id 2 cannot collide with 2999.
+     *
+     * @param  Builder<BoardPack>  $query
+     * @param  Builder<\Illuminate\Database\Eloquent\Model>|null  $visibleIds
+     */
+    private function excludeHiddenSources(Builder $query, string $type, ?Builder $visibleIds): void
+    {
+        $query->whereDoesntHave('containedSources', function (Builder $sources) use ($type, $visibleIds): void {
+            $sources->where('source_type', $type);
+
+            if ($visibleIds !== null) {
+                $sources->whereNotIn('source_id', $visibleIds);
+            }
+        });
+    }
+
     public function canView(User $viewer, BoardPack $pack): bool
     {
-        if (! $this->canViewPacks($viewer) || ! $this->hasMeeting($pack)) {
+        if (! $pack->exists || ! $this->canViewPacks($viewer) || ! $this->hasMeeting($pack)) {
             return false;
         }
 
@@ -145,82 +172,10 @@ final class BoardPackAccessService
             return false;
         }
 
-        // Audience safety: verify viewer can access confidential agenda items if present
-        $manifest = $pack->document_manifest ?? [];
-        $contentSections = $manifest['content_sections'] ?? [];
-        $agenda = $contentSections['agenda'] ?? [];
-
-        $hasConfidential = false;
-        foreach ($agenda as $item) {
-            if (! empty($item['is_confidential'])) {
-                $hasConfidential = true;
-                break;
-            }
-        }
-
-        if ($hasConfidential) {
-            $execAccess = app(ExecutiveMeetingAccessService::class);
-            if (! $execAccess->hasExecutiveAuthority($viewer)) {
-                $boardMember = $viewer->boardMember;
-                $isChairOrSec = $meeting && $boardMember && (
-                    (int) $meeting->chair_id === (int) $boardMember->id ||
-                    (int) $meeting->secretary_id === (int) $boardMember->id
-                );
-                $today = today()->toDateString();
-                $isCommitteeMember = $meeting && $meeting->board_committee_id && $boardMember?->committeeMemberships()
-                    ->where('board_committee_id', $meeting->board_committee_id)
-                    ->where('is_active', true)
-                    ->where(function ($q) use ($today) {
-                        $q->whereNull('appointed_at')->orWhereDate('appointed_at', '<=', $today);
-                    })
-                    ->where(function ($q) use ($today) {
-                        $q->whereNull('term_end')->orWhereDate('term_end', '>=', $today);
-                    })
-                    ->exists();
-
-                if (! $isChairOrSec && ! $isCommitteeMember) {
-                    return false;
-                }
-            }
-        }
-
-        // Recheck all resolutions in manifest against record access (traverse both items and flat)
-        $resolutions = $contentSections['resolutions'] ?? [];
-        if (isset($resolutions['items']) && is_array($resolutions['items'])) {
-            $resolutions = $resolutions['items'];
-        }
-        if (is_array($resolutions) && ! empty($resolutions)) {
-            $recordAccess = app(GovernanceRecordAccessService::class);
-            foreach ($resolutions as $resData) {
-                $resId = is_array($resData) ? ($resData['id'] ?? null) : ($resData->id ?? null);
-                if ($resId) {
-                    $resolution = Resolution::find($resId);
-                    if (! $resolution || ! $recordAccess->canViewResolution($viewer, $resolution)) {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        // Supporting documents check
-        $supportingDocs = $contentSections['supporting_documents'] ?? [];
-        if (isset($supportingDocs['items']) && is_array($supportingDocs['items'])) {
-            $supportingDocs = $supportingDocs['items'];
-        }
-        if (is_array($supportingDocs) && ! empty($supportingDocs)) {
-            $recordAccess = app(GovernanceRecordAccessService::class);
-            foreach ($supportingDocs as $docData) {
-                $docId = is_array($docData) ? ($docData['id'] ?? null) : ($docData->id ?? null);
-                if ($docId) {
-                    $doc = \App\Domain\Governance\Models\GovernanceDocument::find($docId);
-                    if (! $doc || ! $recordAccess->canViewDocument($viewer, $doc)) {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        return true;
+        // Audience safety: the single record passes only if discovery would
+        // return it, so the typed contained-source contract (confidential
+        // agenda, embedded papers and documents) is evaluated exactly once.
+        return $this->visibleQuery($viewer)->whereKey($pack->getKey())->exists();
     }
 
     public function visiblePack(User $viewer, ?BoardPack $pack): ?BoardPack

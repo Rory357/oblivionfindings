@@ -11,13 +11,28 @@ use Inertia\Inertia;
 
 class BoardEvaluationController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $this->authorize('viewAny', BoardEvaluation::class);
 
+        $search = trim((string) $request->query('search', ''));
+        // Filters use the presented statuses ("active" is stored as open).
+        $status = match ($request->query('status')) {
+            'active' => 'open',
+            'draft', 'closed' => $request->query('status'),
+            default => null,
+        };
+        $type = in_array($request->query('type'), ['board', 'committee', 'chair', 'individual'], true)
+            ? $request->query('type')
+            : null;
+
         $evaluations = BoardEvaluation::withCount('responses')
+            ->when($status, fn ($q, $s) => $q->where('status', $s))
+            ->when($type, fn ($q, $t) => $q->where('evaluation_type', $t))
+            ->when($search !== '', fn ($q) => $q->where('title', 'like', "%{$search}%"))
             ->orderByDesc('created_at')
             ->paginate(15)
+            ->withQueryString()
             ->through(function (BoardEvaluation $evaluation) {
                 return [
                     'id' => $evaluation->id,
@@ -31,8 +46,25 @@ class BoardEvaluationController extends Controller
                 ];
             });
 
+        $statusCounts = BoardEvaluation::query()
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
         return Inertia::render('Governance/Evaluations/Index', [
             'evaluations' => $evaluations,
+            'filters' => [
+                'search' => $search !== '' ? $search : null,
+                'status' => $request->query('status'),
+                'type' => $type,
+            ],
+            'summary' => [
+                'total' => (int) $statusCounts->sum(),
+                'active' => (int) ($statusCounts['open'] ?? 0),
+                'draft' => (int) ($statusCounts['draft'] ?? 0),
+                'closed' => (int) ($statusCounts['closed'] ?? 0),
+                'active_board_members' => BoardMember::active()->count(),
+            ],
         ]);
     }
 
@@ -40,7 +72,8 @@ class BoardEvaluationController extends Controller
     {
         $this->authorize('create', BoardEvaluation::class);
 
-        return Inertia::render('Governance/Evaluations/Create');
+        // The full-page form was retired: the register opens the evaluation wizard.
+        return redirect()->route('governance.evaluations.index', ['create' => 1]);
     }
 
     public function store(Request $request)
@@ -218,10 +251,35 @@ class BoardEvaluationController extends Controller
     {
         $this->authorize('results', $evaluation);
 
-        $evaluation->load('responses.boardMember.user');
+        $responses = $evaluation->responses()->with('boardMember.user')->get();
+        $submitted = $responses->whereNotNull('submitted_at');
+
+        // Answers are released detached from identity (no member, id or
+        // timestamp, shuffled) so a response can't be traced to a member.
+        // Participation is listed separately, without answers; members who
+        // chose anonymity are counted but not named.
+        $payload = $evaluation->withoutRelations()->toArray();
+        $payload['responses'] = $responses
+            ->map(fn ($response) => [
+                'submitted' => $response->submitted_at !== null,
+                'answers' => $response->submitted_at !== null ? ($response->answers ?? []) : null,
+            ])
+            ->shuffle()
+            ->values()
+            ->all();
+        $payload['respondents'] = $submitted
+            ->reject(fn ($response) => (bool) $response->is_anonymous)
+            ->map(fn ($response) => [
+                'name' => $response->boardMember?->user?->name ?? $response->boardMember?->name ?? 'Board member',
+                'submitted_at' => $response->submitted_at?->toIso8601String(),
+            ])
+            ->sortBy('name')
+            ->values()
+            ->all();
+        $payload['anonymous_respondent_count'] = $submitted->filter(fn ($response) => (bool) $response->is_anonymous)->count();
 
         return Inertia::render('Governance/Evaluations/Results', [
-            'evaluation' => $evaluation,
+            'evaluation' => $payload,
         ]);
     }
 

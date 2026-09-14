@@ -26,13 +26,15 @@ class ComplianceController extends Controller
         private readonly UserSiteAccessService $siteAccess,
     ) {}
 
+    /**
+     * The full-page create form was retired for the shared wizard dialog on the
+     * register index; old deep links open that dialog instead.
+     */
     public function create()
     {
         $this->authorize('create', ComplianceObligation::class);
 
-        return Inertia::render('Governance/Compliance/Create', [
-            'frameworks' => $this->getFrameworks(),
-        ]);
+        return redirect()->route('governance.compliance.index', ['create' => 1]);
     }
 
     public function index(Request $request)
@@ -53,17 +55,28 @@ class ComplianceController extends Controller
             $query->forOwner($request->owner_id);
         }
 
-        $obligations = $query->orderBy('due_date')->paginate(20);
+        if ($request->filled('search')) {
+            $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim((string) $request->search)).'%';
+            $query->where(fn ($q) => $q->where('obligation_title', 'like', $term)
+                ->orWhere('obligation_code', 'like', $term));
+        }
+
+        $obligations = $query->orderBy('due_date')->paginate(20)->withQueryString();
+
+        $canManage = $request->user()->can('create', ComplianceObligation::class);
 
         return Inertia::render('Governance/Compliance/Index', [
             'obligations' => $obligations,
             'summary' => $this->complianceService->getComplianceStatus(),
             'frameworks' => $this->getFrameworks(),
-            'filters' => $request->only(['framework', 'status', 'owner_id']),
+            'filters' => $request->only(['framework', 'status', 'owner_id', 'search']),
+            'canCreate' => $canManage,
+            // Wizard reference data — only for users who can manage obligations.
+            'formOptions' => $canManage ? fn () => $this->obligationFormOptions($request) : null,
         ]);
     }
 
-    public function show(ComplianceObligation $obligation)
+    public function show(Request $request, ComplianceObligation $obligation)
     {
         $this->authorize('view', $obligation);
 
@@ -77,8 +90,17 @@ class ComplianceController extends Controller
             'recurrences',
         ]);
 
+        $canUpdate = $request->user()->can('update', $obligation);
+
         return Inertia::render('Governance/Compliance/Show', [
             'obligation' => $obligation,
+            'abilities' => [
+                'update' => $canUpdate,
+                'complete' => $request->user()->can('complete', $obligation),
+                'uploadEvidence' => $request->user()->can('uploadEvidence', $obligation),
+            ],
+            // Edit wizard reference data — only for users who can edit this obligation.
+            'formOptions' => $canUpdate ? fn () => $this->obligationFormOptions($request) : null,
         ]);
     }
 
@@ -215,13 +237,15 @@ class ComplianceController extends Controller
         ]);
     }
 
+    /**
+     * The full-page edit form was retired for the shared wizard dialog on the
+     * obligation record; old deep links open that dialog instead.
+     */
     public function edit(ComplianceObligation $obligation)
     {
         $this->authorize('update', $obligation);
 
-        return Inertia::render('Governance/Compliance/Edit', [
-            'obligation' => $obligation,
-        ]);
+        return redirect()->route('governance.compliance.show', ['obligation' => $obligation, 'edit' => 1]);
     }
 
     public function storeNotifiableIncident(Request $request)
@@ -290,6 +314,23 @@ class ComplianceController extends Controller
         }
 
         return $resolved;
+    }
+
+    /**
+     * Reference data for the obligation wizard dialog. Owners are scoped to the
+     * staff the viewer may assign, matching resolveOwner() on store/update.
+     *
+     * @return array<string, mixed>
+     */
+    private function obligationFormOptions(Request $request): array
+    {
+        $owners = User::query()->orderBy('name')->limit(200);
+        $this->siteAccess->applyStaffScope($owners, $request->user(), self::STAFF_SITE_BYPASS_PERMISSIONS);
+
+        return [
+            'frameworks' => $this->getFrameworks(),
+            'owners' => $owners->get(['id', 'name']),
+        ];
     }
 
     protected function getFrameworks(): array

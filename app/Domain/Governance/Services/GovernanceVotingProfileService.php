@@ -4,9 +4,11 @@ namespace App\Domain\Governance\Services;
 
 use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\CommitteeMembership;
+use App\Domain\Governance\Models\GovernanceResolutionBinding;
 use App\Domain\Governance\Models\GovernanceVotingProfile;
 use App\Domain\Governance\Models\Resolution;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class GovernanceVotingProfileService
@@ -76,7 +78,13 @@ class GovernanceVotingProfileService
 
     /**
      * Activate a voting profile.
-     * Rejects activation without explicit governing document authority and approval evidence.
+     *
+     * Rejects activation without an actual governing document reference and
+     * explicit approval authority. A carried resolution only authorises the
+     * exact profile, governing body, governing document and rule revision it
+     * was bound to while it was a draft paper (see
+     * GovernanceResolutionAuthorityService); motion wording never confers
+     * authority. The binding is verified under row locks and consumed once.
      */
     public function activateProfile(
         GovernanceVotingProfile $profile,
@@ -86,7 +94,6 @@ class GovernanceVotingProfileService
         ?string $documentVersion = null
     ): GovernanceVotingProfile {
         $reference = $documentReference ?? $profile->governing_document_reference;
-        $version = $documentVersion ?? $profile->governing_document_version;
 
         if (empty($reference) || str_contains(strtolower($reference), 'candidate') || str_contains(strtolower($reference), 'pending')) {
             throw new \InvalidArgumentException(
@@ -94,87 +101,83 @@ class GovernanceVotingProfileService
             );
         }
 
-        if ($approvedByResolution) {
-            if (! $approvedByResolution->isCarried()) {
+        $authority = app(GovernanceResolutionAuthorityService::class);
+
+        $activated = DB::transaction(function () use ($profile, $user, $approvedByResolution, $documentReference, $documentVersion, $authority): GovernanceVotingProfile {
+            $lockedProfile = GovernanceVotingProfile::query()->whereKey($profile->getKey())->lockForUpdate()->firstOrFail();
+            $reference = $documentReference ?? $lockedProfile->governing_document_reference;
+            $version = $documentVersion ?? $lockedProfile->governing_document_version;
+            $lockedResolution = null;
+
+            if ($approvedByResolution) {
+                $lockedResolution = Resolution::query()->whereKey($approvedByResolution->getKey())->lockForUpdate()->first();
+
+                if (
+                    ! $lockedResolution
+                    || ! $lockedResolution->isCarried()
+                    || ! in_array($lockedResolution->status, ['closed', 'implemented', 'archived'], true)
+                ) {
+                    throw new \InvalidArgumentException(
+                        'Profile activation rejected: approval resolution must be carried.'
+                    );
+                }
+
+                try {
+                    $authority->assertBodyMayApproveProfile($lockedResolution, $lockedProfile);
+                    $authority->verifyAndConsume(
+                        $lockedResolution,
+                        GovernanceResolutionBinding::SUBJECT_VOTING_PROFILE,
+                        (int) $lockedProfile->getKey(),
+                        $authority->votingProfileTerms($lockedProfile, $reference, $version),
+                        (int) $user->getKey(),
+                    );
+                } catch (\DomainException $exception) {
+                    throw new \InvalidArgumentException(
+                        'Profile activation rejected: resolution does not authorize this voting rules profile. '.$exception->getMessage(),
+                        0,
+                        $exception,
+                    );
+                }
+            } elseif (empty($lockedProfile->approved_at) && empty($lockedProfile->approved_by_resolution_id)) {
                 throw new \InvalidArgumentException(
-                    'Profile activation rejected: approval resolution must be carried.'
+                    'Profile activation rejected: approval authority evidence (carried resolution or formal approval record) is required.'
                 );
-            }
-
-            // The resolution must actually authorize voting rules or the governance profile
-            $resText = strtolower($approvedByResolution->title . ' ' . ($approvedByResolution->exact_motion ?? ''));
-            $docRef = strtolower(trim($reference));
-            $profileName = strtolower(trim($profile->name ?? ''));
-
-            $hasAuthorityMatch = false;
-
-            // 1. Explicit approved_voting_profile_id binding
-            if (!empty($approvedByResolution->cost_impact['approved_voting_profile_id']) && (int) $approvedByResolution->cost_impact['approved_voting_profile_id'] === (int) $profile->id) {
-                $hasAuthorityMatch = true;
-            } elseif (!empty($approvedByResolution->paper_snapshot['approved_voting_profile_id']) && (int) $approvedByResolution->paper_snapshot['approved_voting_profile_id'] === (int) $profile->id) {
-                $hasAuthorityMatch = true;
-            }
-            // 2. Exact governing document reference in motion or title
-            elseif (!empty($docRef) && (str_contains(strtolower($approvedByResolution->title), $docRef) || str_contains(strtolower($approvedByResolution->exact_motion ?? ''), $docRef))) {
-                $hasAuthorityMatch = true;
-            }
-            // 3. Exact profile name in motion or title
-            elseif (!empty($profileName) && (str_contains(strtolower($approvedByResolution->title), $profileName) || str_contains(strtolower($approvedByResolution->exact_motion ?? ''), $profileName))) {
-                $hasAuthorityMatch = true;
-            }
-            // 4. Explicit motion to approve voting rules or profile
-            elseif (
-                (
-                    str_contains($resText, 'adopt voting profile')
-                    || str_contains($resText, 'approve voting profile')
-                    || str_contains($resText, 'adopt voting rules')
-                    || str_contains($resText, 'approve voting rules')
-                    || str_contains($resText, 'amend voting profile')
-                    || str_contains($resText, 'amend voting rules')
-                ) && ! (
-                    str_contains($resText, 'catering')
-                    || str_contains($resText, 'hospitality')
-                    || str_contains($resText, 'dinner')
-                    || str_contains($resText, 'lunch')
-                    || str_contains($resText, 'event')
-                )
+            } elseif (
+                trim((string) $reference) !== trim((string) $lockedProfile->governing_document_reference)
+                || trim((string) $version) !== trim((string) $lockedProfile->governing_document_version)
             ) {
-                $hasAuthorityMatch = true;
-            }
-
-            if (! $hasAuthorityMatch) {
                 throw new \InvalidArgumentException(
-                    'Profile activation rejected: resolution does not authorize voting rules or governance profile approval.'
+                    'Profile activation rejected: a previously approved profile cannot be re-activated against a different governing document without new bound approval authority.'
                 );
             }
-        } elseif (empty($profile->approved_at) && empty($profile->approved_by_resolution_id)) {
-            throw new \InvalidArgumentException(
-                'Profile activation rejected: approval authority evidence (carried resolution or formal approval record) is required.'
-            );
-        }
 
-        // Deactivate any currently active profile for the same body / committee
-        GovernanceVotingProfile::where('governing_body', $profile->governing_body)
-            ->when(
-                $profile->board_committee_id,
-                fn ($q) => $q->where('board_committee_id', $profile->board_committee_id),
-                fn ($q) => $q->whereNull('board_committee_id')
-            )
-            ->where('id', '!=', $profile->id)
-            ->update(['is_active' => false, 'effective_to' => now()]);
+            // Deactivate any currently active profile for the same body / committee
+            GovernanceVotingProfile::where('governing_body', $lockedProfile->governing_body)
+                ->when(
+                    $lockedProfile->board_committee_id,
+                    fn ($q) => $q->where('board_committee_id', $lockedProfile->board_committee_id),
+                    fn ($q) => $q->whereNull('board_committee_id')
+                )
+                ->where('id', '!=', $lockedProfile->id)
+                ->update(['is_active' => false, 'effective_to' => now()]);
 
-        $profile->update([
-            'is_active' => true,
-            'governing_document_reference' => $reference,
-            'governing_document_version' => $version,
-            'approved_by_resolution_id' => $approvedByResolution?->id ?? $profile->approved_by_resolution_id,
-            'approved_by_user_id' => $user->id,
-            'approved_at' => $profile->approved_at ?? now(),
-            'effective_from' => now(),
-            'effective_to' => null,
-        ]);
+            $lockedProfile->update([
+                'is_active' => true,
+                'governing_document_reference' => $reference,
+                'governing_document_version' => $version,
+                'approved_by_resolution_id' => $lockedResolution?->id ?? $lockedProfile->approved_by_resolution_id,
+                'approved_by_user_id' => $user->id,
+                'approved_at' => $lockedProfile->approved_at ?? now(),
+                'effective_from' => now(),
+                'effective_to' => null,
+            ]);
 
-        return $profile->fresh();
+            return $lockedProfile->fresh();
+        }, 3);
+
+        $profile->refresh();
+
+        return $activated;
     }
 
     /**

@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -7,6 +6,8 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Link } from '@inertiajs/react';
 import { BookOpen, Eye, FileText, Upload } from 'lucide-react';
 
@@ -41,7 +42,7 @@ export function BoardPackPanel({
         return (
             <Card data-dusk="cockpit-board-pack">
                 <CardHeader>
-                    <CardTitle className="text-lg">
+                    <CardTitle className="text-section-title">
                         Board Pack &amp; Pre-read
                     </CardTitle>
                     <CardDescription>
@@ -49,19 +50,12 @@ export function BoardPackPanel({
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-lg border border-dashed border-border p-6 text-center">
-                        <BookOpen
-                            className="mx-auto h-5 w-5 text-muted-foreground"
-                            aria-hidden="true"
-                        />
-                        <p className="mt-2 text-sm font-medium text-foreground">
-                            No board pack yet
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            A board pack will appear here when the next meeting
-                            is scheduled.
-                        </p>
-                    </div>
+                    <EmptyState
+                        variant="compact"
+                        icon={BookOpen}
+                        title="No board pack yet"
+                        description="A board pack will appear here when the next meeting is scheduled."
+                    />
                 </CardContent>
             </Card>
         );
@@ -71,30 +65,27 @@ export function BoardPackPanel({
         return (
             <Card data-dusk="cockpit-board-pack">
                 <CardHeader>
-                    <CardTitle className="text-lg">
+                    <CardTitle className="text-section-title">
                         Board Pack &amp; Pre-read
                     </CardTitle>
                     <CardDescription>{pack.meeting_title}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-lg border border-dashed border-border p-6 text-center">
-                        <Upload
-                            className="mx-auto h-5 w-5 text-status-warning"
-                            aria-hidden="true"
-                        />
-                        <p className="mt-2 text-sm font-medium text-foreground">
-                            Pack not yet generated
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Once the agenda is finalised, generate the board
-                            pack so members can pre-read.
-                        </p>
-                        {canUploadPack ? (
-                            <Button asChild size="sm" className="mt-3">
-                                <Link href={pack.href}>Upload board pack</Link>
-                            </Button>
-                        ) : null}
-                    </div>
+                    <EmptyState
+                        variant="compact"
+                        icon={Upload}
+                        title="Pack not yet generated"
+                        description="Once the agenda is finalised, generate the board pack so members can pre-read."
+                        action={
+                            canUploadPack ? (
+                                <Button asChild size="sm">
+                                    <Link href={pack.href}>
+                                        Upload board pack
+                                    </Link>
+                                </Button>
+                            ) : undefined
+                        }
+                    />
                 </CardContent>
             </Card>
         );
@@ -105,31 +96,27 @@ export function BoardPackPanel({
             <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                        <CardTitle className="text-lg">
+                        <CardTitle className="text-section-title">
                             Board Pack &amp; Pre-read
                         </CardTitle>
                         <CardDescription>{pack.meeting_title}</CardDescription>
                     </div>
-                    <Badge
-                        className={
-                            pack.distributed
-                                ? 'border border-status-success/30 bg-status-success-bg text-status-success'
-                                : 'border border-status-warning/30 bg-status-warning-bg text-status-warning'
-                        }
+                    <StatusBadge
+                        variant={pack.distributed ? 'success' : 'warning'}
                     >
                         {pack.distributed
                             ? 'Distributed'
                             : 'Ready to distribute'}
-                    </Badge>
+                    </StatusBadge>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="flex flex-col gap-4">
                 <div className="grid grid-cols-3 gap-3">
                     <div className="rounded-md bg-muted/60 p-3">
                         <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
                             Documents
                         </p>
-                        <p className="mt-1 text-xl font-semibold text-foreground">
+                        <p className="mt-1 text-section-title tabular-nums">
                             {pack.doc_count}
                         </p>
                     </div>
@@ -137,7 +124,7 @@ export function BoardPackPanel({
                         <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
                             Sent to
                         </p>
-                        <p className="mt-1 text-xl font-semibold text-foreground">
+                        <p className="mt-1 text-section-title tabular-nums">
                             {pack.distributed_count}
                         </p>
                     </div>
@@ -145,7 +132,7 @@ export function BoardPackPanel({
                         <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
                             Read
                         </p>
-                        <p className="mt-1 text-xl font-semibold text-foreground">
+                        <p className="mt-1 text-section-title tabular-nums">
                             {pack.read_count}
                         </p>
                     </div>

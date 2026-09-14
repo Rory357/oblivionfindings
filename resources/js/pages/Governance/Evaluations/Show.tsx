@@ -1,11 +1,25 @@
+import { Head, router, useForm } from '@inertiajs/react';
+import {
+    BarChart3,
+    CheckCircle,
+    CircleDashed,
+    Lock,
+    Play,
+    Star,
+} from 'lucide-react';
+
+import { ProgressValue } from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -14,14 +28,16 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
+import type { StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
+import { formatDateOnly } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { PageProps } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
-import { CheckCircle, Lock, Play, Star } from 'lucide-react';
+
+import { evaluationTypeLabel } from './_dialogs';
 
 interface Question {
     text: string;
@@ -30,7 +46,7 @@ interface Question {
 
 interface Response {
     id: number;
-    board_member: { user: { name: string } };
+    board_member: { user: { name: string | null } } | null;
     is_complete: boolean;
     submitted_at: string | null;
 }
@@ -57,37 +73,71 @@ interface Props extends PageProps {
     responseRate: { total: number; completed: number };
 }
 
+const STATUS_VARIANT: Record<string, StatusVariant> = {
+    active: 'info',
+    draft: 'neutral',
+    closed: 'success',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+    active: 'Open',
+    draft: 'Draft',
+    closed: 'Closed',
+};
+
 export default function EvaluationShow({
     auth,
     evaluation,
-    boardMembers,
     myResponse,
     responseRate,
 }: Props) {
+    const canManage = Boolean(auth.can?.governance?.evaluations?.manage);
     const { data, setData, post, processing } = useForm({
         answers: myResponse?.answers || ({} as Record<string, string>),
         overall_comments: myResponse?.overall_comments || '',
     });
+    const today = new Date().toISOString().split('T')[0];
+    const isOpen = evaluation.status === 'active';
+    const pastDue = isOpen && evaluation.due_date < today;
+    const responsePercent =
+        responseRate.total > 0
+            ? (responseRate.completed / responseRate.total) * 100
+            : 0;
 
     const handleRespond = (e: React.FormEvent) => {
         e.preventDefault();
-        post(`/governance/evaluations/${evaluation.id}/respond`);
+        post(`/governance/evaluations/${evaluation.id}/respond`, {
+            preserveScroll: true,
+        });
     };
 
     const handleLaunch = () =>
-        router.post(`/governance/evaluations/${evaluation.id}/launch`);
+        router.post(
+            `/governance/evaluations/${evaluation.id}/launch`,
+            {},
+            { preserveScroll: true },
+        );
     const handleClose = () =>
-        router.post(`/governance/evaluations/${evaluation.id}/close`);
+        router.post(
+            `/governance/evaluations/${evaluation.id}/close`,
+            {},
+            { preserveScroll: true },
+        );
 
-    const getStatusColor = (status: string) => governanceStatusColor(status);
+    const setAnswer = (index: number, value: string) =>
+        setData('answers', { ...data.answers, [String(index)]: value });
 
     return (
         <AppLayout
+            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Evaluations', href: '/governance/evaluations' },
-                { title: evaluation.title, href: `/governance/evaluations/${evaluation.id}` },
+                {
+                    title: evaluation.title,
+                    href: `/governance/evaluations/${evaluation.id}`,
+                },
             ]}
         >
             <Head title={evaluation.title} />
@@ -99,92 +149,121 @@ export default function EvaluationShow({
                         icon={Star}
                         title={evaluation.title}
                         titleDusk="evaluation-title"
+                        wrapTitle
                         titleChip={
-                            <Badge
-                                className={cn(
-                                    'text-xs',
-                                    getStatusColor(evaluation.status),
-                                )}
+                            <PageHeaderStatusChip
+                                variant={
+                                    STATUS_VARIANT[evaluation.status] ?? 'neutral'
+                                }
                             >
-                                {evaluation.status}
-                            </Badge>
+                                {STATUS_LABEL[evaluation.status] ??
+                                    evaluation.status}
+                            </PageHeaderStatusChip>
                         }
-                        subline={`Period: ${new Date(evaluation.period_start).toLocaleDateString('en-NZ')} - ${new Date(evaluation.period_end).toLocaleDateString('en-NZ')} · Due ${new Date(evaluation.due_date).toLocaleDateString('en-NZ')}`}
+                        subline={`${evaluationTypeLabel(evaluation.evaluation_type)} evaluation · ${formatDateOnly(evaluation.period_start)} – ${formatDateOnly(evaluation.period_end)} · Due ${formatDateOnly(evaluation.due_date)}`}
+                        actions={
+                            <>
+                                <PageHeaderGlassButton
+                                    icon={BarChart3}
+                                    onClick={() =>
+                                        router.visit(
+                                            `/governance/evaluations/${evaluation.id}/results`,
+                                        )
+                                    }
+                                >
+                                    Results
+                                </PageHeaderGlassButton>
+                                {canManage && isOpen ? (
+                                    <PageHeaderGlassButton
+                                        icon={Lock}
+                                        onClick={handleClose}
+                                    >
+                                        Close
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                {canManage && evaluation.status === 'draft' ? (
+                                    <PageHeaderPrimaryButton
+                                        icon={Play}
+                                        onClick={handleLaunch}
+                                    >
+                                        Launch
+                                    </PageHeaderPrimaryButton>
+                                ) : null}
+                            </>
+                        }
                         meters={
                             <>
                                 <PageHeaderMeterBlock
                                     label="Responses"
-                                    href={`/governance/evaluations/${evaluation.id}`}
+                                    value={`${responseRate.completed}/${responseRate.total}`}
+                                    ariaLabel="View evaluation results"
+                                    href={`/governance/evaluations/${evaluation.id}/results`}
                                 >
-                                    <PageHeaderMeterBig>
-                                        {responseRate.completed}/{responseRate.total}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Submitted</PageHeaderMeterCaption>
+                                    <PageHeaderMeterBar percent={responsePercent} />
+                                    <PageHeaderMeterCaption>
+                                        {Math.round(responsePercent)}% of active
+                                        board members
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
                                     label="Questions"
-                                    href={`/governance/evaluations/${evaluation.id}`}
+                                    ariaLabel="View results by question"
+                                    href={`/governance/evaluations/${evaluation.id}/results`}
                                 >
                                     <PageHeaderMeterBig>
                                         {evaluation.questions.length}
                                     </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Items</PageHeaderMeterCaption>
+                                    <PageHeaderMeterCaption>
+                                        plus overall comments
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Status"
-                                    href={`/governance/evaluations?status=${evaluation.status}`}
-                                    tone={evaluation.status === 'active' ? 'brand' : undefined}
+                                    label="Responses due"
+                                    tone={pastDue ? 'critical' : 'brand'}
+                                    ariaLabel="View open evaluations"
+                                    href="/governance/evaluations?status=active"
                                 >
                                     <PageHeaderMeterBig>
-                                        <span className="text-sm font-semibold uppercase">
-                                            {evaluation.status}
-                                        </span>
+                                        {formatDateOnly(evaluation.due_date)}
                                     </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Current</PageHeaderMeterCaption>
+                                    <PageHeaderMeterCaption>
+                                        {pastDue
+                                            ? 'Deadline has passed'
+                                            : isOpen
+                                              ? 'Open for responses'
+                                              : evaluation.status === 'draft'
+                                                ? 'Not yet launched'
+                                                : 'Evaluation closed'}
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
-                            </>
-                        }
-                        actions={
-                            <>
-                                {evaluation.status === 'draft' && (
-                                    <Button onClick={handleLaunch}>
-                                        <Play className="mr-2 h-4 w-4" /> Launch
-                                    </Button>
-                                )}
-                                {evaluation.status === 'active' && (
-                                    <Button
-                                        variant="outline"
-                                        onClick={handleClose}
-                                    >
-                                        <Lock className="mr-2 h-4 w-4" /> Close
-                                    </Button>
-                                )}
                             </>
                         }
                     />
                 }
             >
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
                     <div className="lg:col-span-2">
-                        {evaluation.status === 'active' && (
+                        {isOpen ? (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Your Response</CardTitle>
+                                    <CardTitle>Your response</CardTitle>
                                     <CardDescription>
-                                        Answer each question below
+                                        {myResponse
+                                            ? 'You have already responded — submitting again replaces your answers.'
+                                            : 'Answer each question below.'}
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <form
                                         onSubmit={handleRespond}
-                                        className="space-y-6"
+                                        className="flex flex-col gap-6"
                                     >
                                         {evaluation.questions.map((q, i) => (
-                                            <div key={i}>
-                                                <Label className="text-base font-medium">
+                                            <fieldset key={i}>
+                                                <legend className="text-sm font-medium">
                                                     {i + 1}. {q.text}
-                                                </Label>
-                                                {q.type === 'rating' && (
+                                                </legend>
+                                                {q.type === 'rating' ? (
                                                     <div className="mt-2 flex gap-2">
                                                         {[1, 2, 3, 4, 5].map(
                                                             (n) => (
@@ -192,32 +271,26 @@ export default function EvaluationShow({
                                                                     key={n}
                                                                     dusk={`rating-${i}-${n}`}
                                                                     type="button"
-                                                                    variant={
-                                                                        data
-                                                                            .answers[
-                                                                            String(
-                                                                                i,
-                                                                            )
+                                                                    aria-label={`Rate ${n} out of 5`}
+                                                                    aria-pressed={
+                                                                        data.answers[
+                                                                            String(i)
                                                                         ] ===
-                                                                        String(
-                                                                            n,
-                                                                        )
+                                                                        String(n)
+                                                                    }
+                                                                    variant={
+                                                                        data.answers[
+                                                                            String(i)
+                                                                        ] ===
+                                                                        String(n)
                                                                             ? 'default'
                                                                             : 'outline'
                                                                     }
                                                                     size="sm"
                                                                     onClick={() =>
-                                                                        setData(
-                                                                            'answers',
-                                                                            {
-                                                                                ...data.answers,
-                                                                                [String(
-                                                                                    i,
-                                                                                )]:
-                                                                                    String(
-                                                                                        n,
-                                                                                    ),
-                                                                            },
+                                                                        setAnswer(
+                                                                            i,
+                                                                            String(n),
                                                                         )
                                                                     }
                                                                 >
@@ -226,10 +299,11 @@ export default function EvaluationShow({
                                                             ),
                                                         )}
                                                     </div>
-                                                )}
-                                                {q.type === 'text' && (
+                                                ) : null}
+                                                {q.type === 'text' ? (
                                                     <Textarea
                                                         dusk={`answer-${i}`}
+                                                        aria-label={q.text}
                                                         className="mt-2"
                                                         value={
                                                             data.answers[
@@ -237,16 +311,14 @@ export default function EvaluationShow({
                                                             ] || ''
                                                         }
                                                         onChange={(e) =>
-                                                            setData('answers', {
-                                                                ...data.answers,
-                                                                [String(i)]:
-                                                                    e.target
-                                                                        .value,
-                                                            })
+                                                            setAnswer(
+                                                                i,
+                                                                e.target.value,
+                                                            )
                                                         }
                                                     />
-                                                )}
-                                                {q.type === 'yes_no' && (
+                                                ) : null}
+                                                {q.type === 'yes_no' ? (
                                                     <div className="mt-2 flex gap-2">
                                                         {['Yes', 'No'].map(
                                                             (v) => (
@@ -254,27 +326,23 @@ export default function EvaluationShow({
                                                                     key={v}
                                                                     dusk={`answer-${i}-${v.toLowerCase()}`}
                                                                     type="button"
+                                                                    aria-pressed={
+                                                                        data.answers[
+                                                                            String(i)
+                                                                        ] === v
+                                                                    }
                                                                     variant={
-                                                                        data
-                                                                            .answers[
-                                                                            String(
-                                                                                i,
-                                                                            )
+                                                                        data.answers[
+                                                                            String(i)
                                                                         ] === v
                                                                             ? 'default'
                                                                             : 'outline'
                                                                     }
                                                                     size="sm"
                                                                     onClick={() =>
-                                                                        setData(
-                                                                            'answers',
-                                                                            {
-                                                                                ...data.answers,
-                                                                                [String(
-                                                                                    i,
-                                                                                )]:
-                                                                                    v,
-                                                                            },
+                                                                        setAnswer(
+                                                                            i,
+                                                                            v,
                                                                         )
                                                                     }
                                                                 >
@@ -283,13 +351,17 @@ export default function EvaluationShow({
                                                             ),
                                                         )}
                                                     </div>
-                                                )}
-                                            </div>
+                                                ) : null}
+                                            </fieldset>
                                         ))}
                                         <div>
-                                            <Label>Overall Comments</Label>
+                                            <Label htmlFor="overall-comments">
+                                                Overall comments
+                                            </Label>
                                             <Textarea
+                                                id="overall-comments"
                                                 dusk="overall-comments"
+                                                className="mt-2"
                                                 value={data.overall_comments}
                                                 onChange={(e) =>
                                                     setData(
@@ -300,45 +372,73 @@ export default function EvaluationShow({
                                                 rows={3}
                                             />
                                         </div>
-                                        <Button
-                                            type="submit"
-                                            disabled={processing}
-                                            dusk="submit-evaluation-response"
-                                        >
-                                            Submit Response
-                                        </Button>
+                                        <div>
+                                            <Button
+                                                type="submit"
+                                                disabled={processing}
+                                                dusk="submit-evaluation-response"
+                                            >
+                                                {myResponse
+                                                    ? 'Update response'
+                                                    : 'Submit response'}
+                                            </Button>
+                                        </div>
                                     </form>
                                 </CardContent>
                             </Card>
+                        ) : (
+                            <EmptyState
+                                icon={
+                                    evaluation.status === 'draft'
+                                        ? CircleDashed
+                                        : Lock
+                                }
+                                title={
+                                    evaluation.status === 'draft'
+                                        ? 'This evaluation has not been launched'
+                                        : 'This evaluation is closed'
+                                }
+                                description={
+                                    evaluation.status === 'draft'
+                                        ? 'Members can respond once it is launched.'
+                                        : 'Responses are no longer accepted. The results remain available.'
+                                }
+                                action={
+                                    evaluation.status === 'closed' ? (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                router.visit(
+                                                    `/governance/evaluations/${evaluation.id}/results`,
+                                                )
+                                            }
+                                        >
+                                            <BarChart3 className="h-3.5 w-3.5" />
+                                            View results
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
                         )}
                     </div>
 
-                    <div className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Response Rate</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="mb-3 text-center">
-                                    <span className="text-3xl font-bold">
-                                        {responseRate.completed}
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                        {' '}
-                                        / {responseRate.total}
-                                    </span>
-                                </div>
-                                <div className="h-2 w-full rounded-full bg-muted">
-                                    <div
-                                        className="h-2 rounded-full bg-status-info"
-                                        style={{
-                                            width: `${responseRate.total > 0 ? (responseRate.completed / responseRate.total) * 100 : 0}%`,
-                                        }}
-                                    />
-                                </div>
-                                <div className="mt-4 space-y-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Response rate</CardTitle>
+                            <CardDescription>
+                                {responseRate.completed} of {responseRate.total}{' '}
+                                active board members
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-4">
+                            <ProgressValue percent={responsePercent}>
+                                {Math.round(responsePercent)}% responded
+                            </ProgressValue>
+                            {evaluation.responses.length > 0 ? (
+                                <ul className="flex flex-col gap-2">
                                     {evaluation.responses.map((r) => (
-                                        <div
+                                        <li
                                             key={r.id}
                                             className="flex items-center gap-2 text-sm"
                                         >
@@ -351,14 +451,21 @@ export default function EvaluationShow({
                                                 )}
                                             />
                                             <span>
-                                                {r.board_member?.user?.name}
+                                                {r.board_member?.user?.name ??
+                                                    'Board member'}
                                             </span>
-                                        </div>
+                                        </li>
                                     ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                                </ul>
+                            ) : (
+                                <EmptyState
+                                    variant="inline"
+                                    icon={CircleDashed}
+                                    title="No responses yet"
+                                />
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
             </PageLayout>
         </AppLayout>

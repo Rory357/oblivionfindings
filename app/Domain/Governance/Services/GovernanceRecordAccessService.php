@@ -28,10 +28,16 @@ final class GovernanceRecordAccessService
         return $this->meetingAccess->applyMeetingVisibilityScope($query, $user);
     }
 
+    /** Capability gate shared by single-record and set-based resolution checks. */
+    public function canViewAnyResolution(User $user): bool
+    {
+        return $user->hasRole('admin', 'board_chair', 'board_secretary', 'board_member', 'board_observer', 'ceo')
+            || $user->canDo('governance.resolutions.view');
+    }
+
     public function canViewResolution(User $user, Resolution $resolution): bool
     {
-        if (! $user->hasRole('admin', 'board_chair', 'board_secretary', 'board_member', 'board_observer', 'ceo')
-            && ! $user->canDo('governance.resolutions.view')) {
+        if (! $this->canViewAnyResolution($user)) {
             return false;
         }
 
@@ -184,9 +190,15 @@ final class GovernanceRecordAccessService
         return $query->where('reviewee_id', $user->id);
     }
 
-    public function canViewDocument(User $user, GovernanceDocument $document): bool
+    /** Capability gate shared by single-record and set-based document checks. */
+    public function canViewAnyDocument(User $user): bool
     {
         return $user->canDo('governance.documents.view');
+    }
+
+    public function canViewDocument(User $user, GovernanceDocument $document): bool
+    {
+        return $this->canViewAnyDocument($user);
     }
 
     public function scopeDocuments(Builder $query, User $user): Builder

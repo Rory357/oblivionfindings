@@ -282,7 +282,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     Route::middleware('permission:governance.policies.view')->group(function () {
         Route::get('/policies', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'index'])->name('policies.index');
         Route::get('/policies/attestations', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'attestations'])->name('policies.attestations');
-        Route::get('/policies/{policy}', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'show'])->name('policies.show');
+        // Numeric constraint keeps /policies/create (registered below) reachable.
+        Route::get('/policies/{policy}', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'show'])->whereNumber('policy')->name('policies.show');
         Route::post('/policies/{policy}/attest', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'attest'])->name('policies.attest');
 
         Route::middleware('permission:governance.policies.manage')->group(function () {

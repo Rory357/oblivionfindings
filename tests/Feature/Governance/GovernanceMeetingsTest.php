@@ -45,17 +45,147 @@ class GovernanceMeetingsTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_view_edit_page(): void
+    public function test_edit_deep_link_opens_the_workspace_wizard_with_form_options(): void
+    {
+        $admin = $this->createAdminUser();
+        $chair = $this->createBoardMember($this->createUserWithRole('board_chair'), ['board_role' => 'chair']);
+        $committee = BoardCommittee::create([
+            'name' => 'Finance Committee',
+            'committee_type' => 'finance',
+            'is_active' => true,
+        ]);
+        $meeting = $this->createMeeting($admin);
+
+        // The retired edit page now opens the edit wizard on the workspace.
+        $this->actingAs($admin)->get("/governance/meetings/{$meeting->id}/edit")
+            ->assertRedirect("/governance/meetings/{$meeting->id}?edit=1");
+
+        $this->actingAs($admin)->get("/governance/meetings/{$meeting->id}?edit=1")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Meetings/Show')
+                ->where('canEdit', true)
+                ->where('formOptions.can_schedule_executive', true)
+                ->where('formOptions.committees.0.id', $committee->id)
+                ->where('formOptions.board_members', fn ($members) => collect($members)->contains(
+                    fn ($member) => $member['id'] === $chair->id && $member['name'] === $chair->user->name
+                ))
+            );
+    }
+
+    public function test_view_only_member_receives_no_meeting_form_options(): void
     {
         $admin = $this->createAdminUser();
         $meeting = $this->createMeeting($admin);
+        $memberUser = $this->createUserWithRole('board_member');
+        $this->createBoardMember($memberUser);
 
-        $response = $this->actingAs($admin)->get("/governance/meetings/{$meeting->id}/edit");
+        $this->actingAs($memberUser)->get('/governance/meetings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Meetings/Index')
+                ->where('canCreate', false)
+                ->where('formOptions', null)
+            );
 
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->component('Governance/Meetings/Edit')
+        $this->actingAs($memberUser)->get("/governance/meetings/{$meeting->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Meetings/Show')
+                ->where('canEdit', false)
+                ->where('formOptions', null)
+            );
+
+        $this->actingAs($memberUser)->get('/governance/meetings/calendar')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canCreate', false)
+                ->where('formOptions', null)
+            );
+    }
+
+    public function test_create_deep_link_opens_the_register_wizard_with_the_calendar_seed(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)->get('/governance/meetings/create')
+            ->assertRedirect('/governance/meetings?create=1');
+
+        $this->actingAs($admin)->get('/governance/meetings/create?date=2026-11-04&hour=14')
+            ->assertRedirect('/governance/meetings?create=1&date=2026-11-04&hour=14');
+
+        // A malformed seed is dropped rather than forwarded.
+        $this->actingAs($admin)->get('/governance/meetings/create?date=tomorrow&hour=99')
+            ->assertRedirect('/governance/meetings?create=1');
+
+        $this->actingAs($admin)->get('/governance/meetings?create=1&date=2026-11-04&hour=14')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Meetings/Index')
+                ->where('canCreate', true)
+                ->where('initialScheduledAt', '2026-11-04T14:00')
+                ->has('formOptions.board_members')
+                ->has('formOptions.committees')
+                // Pagination never re-arms the one-shot dialog link.
+                ->where('meetings.links', fn ($links) => collect($links)
+                    ->every(fn ($link) => ! str_contains((string) ($link['url'] ?? ''), 'create=')))
+            );
+    }
+
+    public function test_meetings_register_filters_by_status_type_date_range_and_search(): void
+    {
+        $admin = $this->createAdminUser();
+        $upcoming = $this->createMeeting($admin, [
+            'title' => 'Upcoming full board',
+            'scheduled_at' => now()->addDays(3),
+        ]);
+        $finance = $this->createMeeting($admin, [
+            'title' => 'Finance committee review',
+            'meeting_type' => 'finance',
+            'location' => 'Wellington office',
+            'scheduled_at' => now()->addDays(10),
+        ]);
+        $held = $this->createMeeting($admin, [
+            'title' => 'Held with minutes in draft',
+            'status' => 'minutes_draft',
+            'quorum_met' => true,
+            'scheduled_at' => now()->subDays(5),
+        ]);
+
+        $response = $this->actingAs($admin)->get('/governance/meetings?status=upcoming');
+        $response->assertOk()->assertInertia(fn ($page) => $page
+            ->where('filters.status', 'upcoming')
+            ->where('summary.upcoming', 2)
+            ->where('summary.minutes_pending', 1)
+            ->where('summary.held', 1)
+            ->where('summary.held_quorum_met', 1)
+            ->where('summary.next_meeting.id', $upcoming->id)
         );
+        // Upcoming reads soonest-first.
+        $this->assertSame([$upcoming->id, $finance->id], $this->pageMeetingIds($response));
+
+        $this->assertSame([$held->id], $this->pageMeetingIds($this->actingAs($admin)->get('/governance/meetings?status=minutes_pending')));
+        $this->assertSame([$finance->id], $this->pageMeetingIds($this->actingAs($admin)->get('/governance/meetings?meeting_type=finance')));
+        $this->assertSame([$finance->id], $this->pageMeetingIds($this->actingAs($admin)->get('/governance/meetings?search=Wellington')));
+
+        $from = now('Pacific/Auckland')->addDays(7)->toDateString();
+        $this->assertSame([$finance->id], $this->pageMeetingIds($this->actingAs($admin)->get("/governance/meetings?from={$from}")));
+
+        $to = now('Pacific/Auckland')->toDateString();
+        $this->assertSame([$held->id], $this->pageMeetingIds($this->actingAs($admin)->get("/governance/meetings?to={$to}")));
+
+        $this->actingAs($admin)->get('/governance/meetings?status=not-a-status')->assertSessionHasErrors('status');
+    }
+
+    /** @return array<int, int> */
+    private function pageMeetingIds($response): array
+    {
+        $ids = [];
+        $response->assertOk()->assertInertia(function ($page) use (&$ids) {
+            $ids = collect($page->toArray()['props']['meetings']['data'])->pluck('id')->map(fn ($id) => (int) $id)->all();
+        });
+
+        return $ids;
     }
 
     public function test_admin_can_update_meeting(): void

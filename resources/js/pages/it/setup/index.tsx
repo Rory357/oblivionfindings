@@ -17,10 +17,16 @@ import {
     ItRecurrencePlans,
     type RecurrencePlanRow,
 } from '@/components/it/it-recurrence-plans';
+import { ItRoutingDryRun } from '@/components/it/it-routing-dry-run';
 import {
     ItReplyTemplates,
     type ReplyTemplateRow,
 } from '@/components/it/it-reply-templates';
+import {
+    ItTicketMacros,
+    summariseMacroAction,
+    type MacroRow,
+} from '@/components/it/it-ticket-macros';
 import {
     ItServiceOperations,
     type AutomationDefinition,
@@ -85,6 +91,7 @@ interface Props {
     replyTemplates?: ReplyTemplateRow[];
     replyPlaceholders?: Record<string, string>;
     recurrencePlans?: RecurrencePlanRow[];
+    macros?: MacroRow[];
     operationsAudit?: OperationsAudit;
     emailDeliveries?: EmailDeliveryRow[];
     emailDeliveryFilter?: {
@@ -183,6 +190,7 @@ export default function ItSetupIndex({
     replyTemplates = [],
     replyPlaceholders = {},
     recurrencePlans = [],
+    macros = [],
     operationsAudit,
     emailDeliveries = [],
     emailDeliveryFilter = null,
@@ -878,13 +886,18 @@ export default function ItSetupIndex({
                         />
                     )}
                     {tab === 'queues' && (
-                        <SetupRegister
-                            title="Queues"
-                            rows={filterRows(queues)}
-                            total={queues.length}
-                            layout={layout}
-                            onEdit={openQueue}
-                        />
+                        <>
+                            <div className="mb-3 flex justify-end">
+                                <ItRoutingDryRun />
+                            </div>
+                            <SetupRegister
+                                title="Queues"
+                                rows={filterRows(queues)}
+                                total={queues.length}
+                                layout={layout}
+                                onEdit={openQueue}
+                            />
+                        </>
                     )}
                     {tab === 'services' && (
                         <SetupRegister
@@ -924,6 +937,28 @@ export default function ItSetupIndex({
                                     ),
                                 )}
                                 placeholders={replyPlaceholders}
+                            />
+                            <ItTicketMacros
+                                macros={macros.filter((macro) =>
+                                    match(
+                                        [
+                                            macro.name,
+                                            macro.description ?? '',
+                                            ...macro.actions.map((action) =>
+                                                summariseMacroAction(action, {
+                                                    agents,
+                                                    queues,
+                                                    templates: replyTemplates,
+                                                }),
+                                            ),
+                                        ].join(' '),
+                                    ),
+                                )}
+                                agents={agents}
+                                queues={queues}
+                                templates={replyTemplates.filter(
+                                    (template) => template.is_active,
+                                )}
                             />
                             <ItRecurrencePlans
                                 plans={recurrencePlans.filter((plan) =>

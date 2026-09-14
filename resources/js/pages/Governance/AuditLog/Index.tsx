@@ -1,21 +1,47 @@
-import { FilterBar, FilterField } from '@/components/filter-bar';
+import { Head, router } from '@inertiajs/react';
+import {
+    Boxes,
+    CalendarRange,
+    Download,
+    History,
+    PenLine,
+    X,
+    Zap,
+} from 'lucide-react';
+import { useState } from 'react';
+
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import {
+    EmptyValue,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    PersonCell,
+    type EntityTableColumn,
+} from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import AppLayout from '@/layouts/app-layout';
-import { statusColors } from '@/lib/status-colors';
+import { formatDateOnly, formatDateTimeLong } from '@/lib/datetime';
 import { PageProps } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Download, History } from 'lucide-react';
-import { useState } from 'react';
 
 interface AuditEntry {
     kind: 'action' | 'change';
@@ -33,94 +59,312 @@ interface AuditEntry {
     user: { id: number; name: string; email: string } | null;
 }
 
+interface Filters {
+    user_id: number | null;
+    entity_type: string | null;
+    action: string | null;
+    change_type: string | null;
+    from: string | null;
+    to: string | null;
+}
+
 interface Props extends PageProps {
     entries: {
         data: AuditEntry[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
         current_page: number;
         last_page: number;
         total: number;
         per_page: number;
     };
-    filters: {
-        user_id: number | null;
-        entity_type: string | null;
-        action: string | null;
-        change_type: string | null;
-        from: string | null;
-        to: string | null;
+    filters: Filters;
+    summary: {
+        all_time: number;
+        last_7_days: number;
+        last_7_days_from: string;
     };
     entityTypes: string[];
     actionTypes: string[];
     changeTypes: string[];
 }
 
+type FilterKey = 'entity_type' | 'action' | 'change_type' | 'from' | 'to';
+
+/** "App\\Domain\\Governance\\Models\\BoardPack" → "BoardPack". */
+const shortEntity = (value: string) => value.split('\\').pop() ?? value;
+const humanise = (value: string) => value.replace(/[._]/g, ' ');
+
 export default function GovernanceAuditLogIndex({
     auth,
     entries,
     filters,
+    summary,
     entityTypes,
     actionTypes,
     changeTypes,
 }: Props) {
-    const [values, setValues] = useState<Record<string, any>>({
+    const values: Record<FilterKey, string | null> = {
         entity_type: filters.entity_type,
         action: filters.action,
         change_type: filters.change_type,
-        from: filters.from,
-        to: filters.to,
+        from: filters.from ? filters.from.slice(0, 10) : null,
+        to: filters.to ? filters.to.slice(0, 10) : null,
+    };
+    const [range, setRange] = useState({
+        from: values.from ?? '',
+        to: values.to ?? '',
     });
+    const [rangeOpen, setRangeOpen] = useState(false);
 
-    const applyFilters = (next: Record<string, any>) => {
-        setValues(next);
-        router.get('/governance/audit-log', next, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
+    const applyFilters = (patch: Partial<Record<FilterKey, string | null>>) => {
+        const next = { ...values, ...patch };
+        router.get(
+            '/governance/audit-log',
+            Object.fromEntries(
+                Object.entries(next).filter(([, v]) => v && v !== 'all'),
+            ),
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
     };
 
-    const fields: FilterField[] = [
-        {
-            type: 'select',
-            key: 'entity_type',
-            label: 'Entity',
-            placeholder: 'Any entity',
-            width: 'md',
-            options: entityTypes.map((t) => ({ value: t, label: t })),
-        },
-        {
-            type: 'select',
-            key: 'action',
-            label: 'Action',
-            placeholder: 'Any action',
-            width: 'md',
-            options: actionTypes.map((t) => ({ value: t, label: t })),
-        },
-        {
-            type: 'select',
-            key: 'change_type',
-            label: 'Change type',
-            placeholder: 'Any change',
-            width: 'md',
-            options: changeTypes.map((t) => ({ value: t, label: t })),
-        },
-        {
-            type: 'date-range',
-            key: 'date',
-            label: 'Date',
-            width: 'sm',
-        },
-    ];
+    const activeFilterCount = Object.values(values).filter(Boolean).length;
+    const clearFilters = () => {
+        setRange({ from: '', to: '' });
+        router.get('/governance/audit-log', {}, { preserveScroll: true });
+    };
 
     const exportUrl = (() => {
         const params = new URLSearchParams();
         Object.entries(values).forEach(([k, v]) => {
-            if (v) params.set(k, String(v));
+            if (v) params.set(k, v);
         });
-        return `/governance/audit-log/export?${params.toString()}`;
+        const query = params.toString();
+        return `/governance/audit-log/export${query ? `?${query}` : ''}`;
     })();
 
-    const activeFilterCount = Object.values(values).filter(Boolean).length;
+    const rangeLabel =
+        values.from || values.to
+            ? `${values.from ? formatDateOnly(values.from) : 'Start'} – ${values.to ? formatDateOnly(values.to) : 'Today'}`
+            : 'Any date';
+
+    const columns: EntityTableColumn<AuditEntry>[] = [
+        {
+            key: 'kind',
+            label: 'Kind',
+            width: '0.6fr',
+            cell: (e) => (
+                <EntityStatusChip variant={e.kind === 'action' ? 'info' : 'neutral'}>
+                    {e.kind === 'action' ? 'Action' : 'Change'}
+                </EntityStatusChip>
+            ),
+        },
+        {
+            key: 'description',
+            label: 'Details',
+            width: '1.6fr',
+            cell: (e) =>
+                e.description ? (
+                    <span className="truncate" title={e.description}>
+                        {e.description}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'actor',
+            label: 'Actor',
+            width: '1fr',
+            cell: (e) => <PersonCell name={e.user ? e.user.name : 'System'} />,
+        },
+        {
+            key: 'ip',
+            label: 'IP address',
+            width: '0.8fr',
+            cell: (e) =>
+                e.ip_address ? (
+                    <span className="font-mono text-xs text-muted-foreground">
+                        {e.ip_address}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'when',
+            label: 'When',
+            width: '1.1fr',
+            cell: (e) => formatDateTimeLong(e.created_at),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            icon={History}
+            title="Governance audit log"
+            subline="Action events and entity changes across governance records"
+            actions={
+                <PageHeaderGlassButton
+                    icon={Download}
+                    onClick={() => {
+                        window.location.href = exportUrl;
+                    }}
+                >
+                    Export CSV
+                </PageHeaderGlassButton>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Matching events"
+                        ariaLabel="View matching audit events"
+                        href={exportUrl.replace('/export', '')}
+                    >
+                        <PageHeaderMeterBig>{entries.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {activeFilterCount > 0
+                                ? `${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'} applied`
+                                : 'no filters applied'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Last 7 days"
+                        ariaLabel="View audit events from the last 7 days"
+                        href={`/governance/audit-log?from=${summary.last_7_days_from}`}
+                    >
+                        <PageHeaderMeterBig>{summary.last_7_days}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            since {formatDateOnly(summary.last_7_days_from)}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="All time"
+                        ariaLabel="View every audit event"
+                        href="/governance/audit-log"
+                    >
+                        <PageHeaderMeterBig>{summary.all_time}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {entityTypes.length} entity types recorded
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        icon={Boxes}
+                        label="Any entity"
+                        value={values.entity_type ?? 'all'}
+                        options={[
+                            { value: 'all', label: 'Any entity' },
+                            ...entityTypes.map((t) => ({
+                                value: t,
+                                label: shortEntity(t),
+                            })),
+                        ]}
+                        onChange={(v) => applyFilters({ entity_type: v })}
+                    />
+                    <PageHeaderFilterSelect
+                        icon={Zap}
+                        label="Any action"
+                        value={values.action ?? 'all'}
+                        options={[
+                            { value: 'all', label: 'Any action' },
+                            ...actionTypes.map((t) => ({
+                                value: t,
+                                label: humanise(t),
+                            })),
+                        ]}
+                        onChange={(v) => applyFilters({ action: v })}
+                    />
+                    <PageHeaderFilterSelect
+                        icon={PenLine}
+                        label="Any change"
+                        value={values.change_type ?? 'all'}
+                        options={[
+                            { value: 'all', label: 'Any change' },
+                            ...changeTypes.map((t) => ({
+                                value: t,
+                                label: humanise(t),
+                            })),
+                        ]}
+                        onChange={(v) => applyFilters({ change_type: v })}
+                    />
+                    <Popover open={rangeOpen} onOpenChange={setRangeOpen}>
+                        <PopoverTrigger asChild>
+                            <PageHeaderFilterButton
+                                icon={CalendarRange}
+                                active={Boolean(values.from || values.to)}
+                                aria-label="Filter by date range"
+                            >
+                                {rangeLabel}
+                            </PageHeaderFilterButton>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-64">
+                            <form
+                                className="flex flex-col gap-3"
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    setRangeOpen(false);
+                                    applyFilters({
+                                        from: range.from || null,
+                                        to: range.to || null,
+                                    });
+                                }}
+                            >
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="audit-from">From</Label>
+                                    <Input
+                                        id="audit-from"
+                                        type="date"
+                                        value={range.from}
+                                        onChange={(e) =>
+                                            setRange((r) => ({
+                                                ...r,
+                                                from: e.target.value,
+                                            }))
+                                        }
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="audit-to">To</Label>
+                                    <Input
+                                        id="audit-to"
+                                        type="date"
+                                        value={range.to}
+                                        onChange={(e) =>
+                                            setRange((r) => ({
+                                                ...r,
+                                                to: e.target.value,
+                                            }))
+                                        }
+                                    />
+                                </div>
+                                <div className="flex justify-between gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setRange({ from: '', to: '' });
+                                            setRangeOpen(false);
+                                            applyFilters({ from: null, to: null });
+                                        }}
+                                    >
+                                        Clear
+                                    </Button>
+                                    <Button type="submit" size="sm">
+                                        Apply range
+                                    </Button>
+                                </div>
+                            </form>
+                        </PopoverContent>
+                    </Popover>
+                </>
+            }
+            rail={<GovernanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout
@@ -128,167 +372,67 @@ export default function GovernanceAuditLogIndex({
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Audit Log', href: '/governance/audit-log' },
+                { title: 'Audit log', href: '/governance/audit-log' },
             ]}
         >
-            <Head title="Governance Audit Log" />
+            <Head title="Governance audit log" />
 
-            <PageLayout
-                hero={
-                    <PageHeader
-                        icon={History}
-                        title="Governance Audit Log"
-                        subline="Cross-module changes and action events on governance entities. Filter, scroll, or export."
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Total events"
-                                    href="/governance/audit-log"
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Recent activity"
+                        caption={`${entries.data.length} of ${entries.total} shown · page ${entries.current_page} of ${Math.max(1, entries.last_page)}`}
+                        right={
+                            activeFilterCount > 0 ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={clearFilters}
+                                    className="text-xs text-muted-foreground"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {entries.total}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Recorded actions</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Page"
-                                    href="/governance/audit-log"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {`${entries.current_page} / ${entries.last_page}`}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Pagination</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
-                        }
-                        actions={
-                            <Button asChild variant="outline">
-                                <a href={exportUrl} download>
-                                    <Download className="mr-2 h-4 w-4" /> Export
-                                    CSV
-                                </a>
-                            </Button>
+                                    <X className="h-3.5 w-3.5" />
+                                    Clear filters
+                                </Button>
+                            ) : null
                         }
                     />
-                }
-            >
-                <FilterBar
-                    fields={fields}
-                    values={values}
-                    onChange={(key, value) => {
-                        const next = { ...values, [key]: value || null };
-                        applyFilters(next);
-                    }}
-                    onReset={() =>
-                        applyFilters({
-                            entity_type: null,
-                            action: null,
-                            change_type: null,
-                            from: null,
-                            to: null,
-                        })
-                    }
-                    activeCount={activeFilterCount}
-                    className="mb-4"
-                />
 
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle>Recent activity</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                        {entries.data.length === 0 ? (
-                            <EmptyState
-                                icon={History}
-                                title="No audit events match your filters"
-                                description="Try clearing filters, or narrow your date range."
-                            />
-                        ) : (
-                            entries.data.map((entry) => (
-                                <article
-                                    key={`${entry.kind}-${entry.id}`}
-                                    className="flex flex-col gap-2 rounded-lg border bg-card p-3 lg:flex-row lg:items-start lg:justify-between"
-                                >
-                                    <div className="space-y-1">
-                                        <div className="flex flex-wrap items-center gap-2 text-sm">
-                                            <Badge
-                                                className={
-                                                    statusColors[
-                                                        entry.kind === 'action'
-                                                            ? 'in_progress'
-                                                            : 'completed'
-                                                    ] ?? ''
-                                                }
-                                            >
-                                                {entry.kind === 'action'
-                                                    ? 'Action'
-                                                    : 'Change'}
-                                            </Badge>
-                                            <span className="font-medium">
-                                                {entry.type}
-                                            </span>
-                                            <span className="text-muted-foreground">
-                                                on {entry.entity_type}#
-                                                {entry.entity_id}
-                                            </span>
-                                        </div>
-                                        {entry.description && (
-                                            <p className="text-sm text-muted-foreground">
-                                                {entry.description}
-                                            </p>
-                                        )}
-                                        <p className="text-xs text-muted-foreground">
-                                            {entry.user
-                                                ? `${entry.user.name} (${entry.user.email})`
-                                                : 'System'}{' '}
-                                            · {entry.ip_address ?? 'no IP'} ·{' '}
-                                            {entry.created_at}
-                                        </p>
-                                    </div>
-                                </article>
-                            ))
-                        )}
-                    </CardContent>
-                </Card>
+                    {entries.data.length === 0 ? (
+                        <EmptyState
+                            icon={History}
+                            title={
+                                activeFilterCount > 0
+                                    ? 'No audit events match your filters'
+                                    : 'No audit events recorded yet'
+                            }
+                            description={
+                                activeFilterCount > 0
+                                    ? 'Try clearing filters, or widen the date range.'
+                                    : 'Governance actions and record changes will be logged here.'
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={entries.data}
+                            rowKey={(e) => `${e.kind}-${e.id}`}
+                            identityLabel="Event"
+                            identity={(e) => ({
+                                icon: e.kind === 'action' ? Zap : PenLine,
+                                name: humanise(e.type),
+                                subline: `${shortEntity(e.entity_type)} #${e.entity_id}`,
+                            })}
+                            columns={columns}
+                            actionsFor={() => []}
+                            minWidth={980}
+                        />
+                    )}
 
-                {entries.last_page > 1 && (
-                    <div className="mt-4 flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                            Page {entries.current_page} of {entries.last_page}
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={entries.current_page <= 1}
-                                onClick={() =>
-                                    applyFilters({
-                                        ...values,
-                                        page: entries.current_page - 1,
-                                    })
-                                }
-                            >
-                                <ChevronLeft className="mr-1 h-4 w-4" />{' '}
-                                Previous
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={
-                                    entries.current_page >= entries.last_page
-                                }
-                                onClick={() =>
-                                    applyFilters({
-                                        ...values,
-                                        page: entries.current_page + 1,
-                                    })
-                                }
-                            >
-                                Next <ChevronRight className="ml-1 h-4 w-4" />
-                            </Button>
-                        </div>
-                    </div>
-                )}
+                    <LaravelPagination
+                        links={entries.links}
+                        lastPage={entries.last_page}
+                        preserveScroll
+                    />
+                </div>
             </PageLayout>
         </AppLayout>
     );

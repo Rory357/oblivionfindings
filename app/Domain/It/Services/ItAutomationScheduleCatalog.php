@@ -43,6 +43,16 @@ class ItAutomationScheduleCatalog
             'on_one_server' => true,
         ],
         [
+            'key' => 'it.prune-knowledge-uploads',
+            'label' => 'Knowledge upload retention',
+            'type' => 'command',
+            'handler' => 'it:prune-knowledge-uploads',
+            'expression' => '40 3 * * *',
+            'timezone' => 'Pacific/Auckland',
+            'without_overlapping' => true,
+            'on_one_server' => true,
+        ],
+        [
             'key' => 'it.run-recurrence',
             'label' => 'Recurring maintenance tickets',
             'type' => 'command',

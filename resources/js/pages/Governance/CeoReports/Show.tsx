@@ -1,17 +1,21 @@
+import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
 import {
     PageHeader,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
 import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { TabsContent } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
 import { cn } from '@/lib/utils';
 import { PageProps } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -19,7 +23,6 @@ import {
     AlertOctagon,
     BookOpen,
     Briefcase,
-    CalendarDays,
     CheckCircle2,
     ClipboardList,
     DollarSign,
@@ -35,7 +38,12 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { AttachmentsPanel, type Attachment } from './_attachments';
-import { CeoReportDialog, type MeetingOption } from './_dialogs';
+import {
+    CeoReportWizardDialog,
+    ceoReportStatusLabel,
+    ceoReportStatusVariant,
+    type MeetingOption,
+} from './_dialogs';
 
 interface DecisionSought {
     title: string;
@@ -117,9 +125,7 @@ function SectionView({
     return (
         <Card>
             <CardContent className="space-y-2 p-5 print:p-3">
-                <h3 className="text-base font-semibold text-foreground print:text-sm">
-                    {title}
-                </h3>
+                <h3 className="text-section-title print:text-sm">{title}</h3>
                 {paras.length === 0 ? (
                     <p className="text-sm text-muted-foreground italic">
                         {fallback}
@@ -219,7 +225,7 @@ function StatusStrip({ report }: { report: Report }) {
 
     return (
         <div
-            className="grid gap-3 md:grid-cols-3 xl:grid-cols-6 print:grid-cols-3"
+            className="grid gap-5 md:grid-cols-3 xl:grid-cols-6 print:grid-cols-3"
             data-dusk="ceo-status-strip"
         >
             {tiles.map((t) => (
@@ -251,13 +257,11 @@ function KpiSnapshotView({
 }) {
     if (!snapshot) {
         return (
-            <Card>
-                <CardContent className="p-6 text-center text-sm text-muted-foreground">
-                    No KPI snapshot was captured for this report. Snapshots are
-                    captured automatically when the report is submitted to the
-                    board.
-                </CardContent>
-            </Card>
+            <EmptyState
+                icon={Gauge}
+                title="No KPI snapshot yet"
+                description="Snapshots are captured automatically when the report is submitted to the board."
+            />
         );
     }
 
@@ -350,7 +354,7 @@ function KpiSnapshotView({
             <CardContent className="space-y-4 p-5 print:p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                        <h3 className="text-base font-semibold text-foreground">
+                        <h3 className="text-section-title">
                             KPI snapshot at submission
                         </h3>
                         <p className="text-xs text-muted-foreground">
@@ -376,7 +380,7 @@ function KpiSnapshotView({
                             </p>
                             <p
                                 className={cn(
-                                    'mt-1 text-xl font-semibold',
+                                    'mt-1 text-lg font-semibold tabular-nums',
                                     TONE_VALUE[t.tone],
                                 )}
                             >
@@ -393,15 +397,15 @@ function KpiSnapshotView({
 function DecisionsView({ items }: { items: DecisionSought[] }) {
     if (!items?.length) {
         return (
-            <Card>
-                <CardContent className="p-6 text-center text-sm text-muted-foreground italic">
-                    No board decisions requested in this report.
-                </CardContent>
-            </Card>
+            <EmptyState
+                icon={Gavel}
+                title="No decisions sought"
+                description="No board decisions were requested in this report."
+            />
         );
     }
     return (
-        <div className="grid gap-3 md:grid-cols-2 print:grid-cols-1">
+        <div className="grid gap-5 md:grid-cols-2 print:grid-cols-1">
             {items.map((d, i) => (
                 <Card key={i}>
                     <CardContent className="space-y-2 p-4">
@@ -436,20 +440,20 @@ function DecisionsView({ items }: { items: DecisionSought[] }) {
 function MattersView({ items }: { items: MatterArising[] }) {
     if (!items?.length) {
         return (
-            <Card>
-                <CardContent className="p-6 text-center text-sm text-muted-foreground italic">
-                    Nothing carried forward from the previous report.
-                </CardContent>
-            </Card>
+            <EmptyState
+                icon={MessageCircleQuestion}
+                title="No matters arising"
+                description="Nothing was carried forward from the previous report."
+            />
         );
     }
-    const TONE: Record<string, string> = {
-        open: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
-        in_progress: 'border-status-info/30 bg-status-info-bg text-status-info',
-        done: 'border-status-success/30 bg-status-success-bg text-status-success',
+    const TONE: Record<string, 'warning' | 'info' | 'success'> = {
+        open: 'warning',
+        in_progress: 'info',
+        done: 'success',
     };
     return (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-5">
             {items.map((m, i) => (
                 <Card key={i}>
                     <CardContent className="space-y-2 p-4">
@@ -457,14 +461,12 @@ function MattersView({ items }: { items: MatterArising[] }) {
                             <p className="text-sm font-semibold text-foreground">
                                 {m.title || `Matter ${i + 1}`}
                             </p>
-                            <Badge
-                                className={cn(
-                                    'border text-[10px] uppercase',
-                                    TONE[m.status] ?? TONE.open,
-                                )}
+                            <StatusBadge
+                                size="sm"
+                                variant={TONE[m.status] ?? 'warning'}
                             >
-                                {(m.status ?? 'open').replace('_', ' ')}
-                            </Badge>
+                                {ceoReportStatusLabel(m.status ?? 'open')}
+                            </StatusBadge>
                         </div>
                         {m.update && (
                             <p className="text-sm text-muted-foreground">
@@ -486,7 +488,8 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
             }
         )?.can?.governance?.['ceo-reports']?.manage ?? false;
 
-    const [editOpen, setEditOpen] = useState(false);
+    const canEdit = can && report.status === 'draft';
+    const [editOpen, setEditOpen] = useDialogDeepLink('edit', canEdit);
     const [activeTab, setActiveTab] = useState<string>('executive');
 
     const handleSubmit = () =>
@@ -536,12 +539,14 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
 
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'CEO Reports', href: '/governance/ceo-reports' },
-                { title: report.title, href: `/governance/ceo-reports/${report.id}` },
+                { title: 'CEO reports', href: '/governance/ceo-reports' },
+                {
+                    title: report.title,
+                    href: `/governance/ceo-reports/${report.id}`,
+                },
             ]}
         >
             <Head title={report.title} />
@@ -554,84 +559,125 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
                         title={report.title}
                         titleDusk="ceo-report-title"
                         titleChip={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Badge
-                                    className={cn(
-                                        'text-xs',
-                                        governanceStatusColor(report.status),
+                            <>
+                                <PageHeaderStatusChip
+                                    variant={ceoReportStatusVariant(
+                                        report.status,
                                     )}
                                 >
-                                    {report.status}
-                                </Badge>
+                                    {ceoReportStatusLabel(report.status)}
+                                </PageHeaderStatusChip>
                                 {report.is_overdue && (
-                                    <Badge className="border border-status-critical/30 bg-status-critical-bg text-status-critical">
-                                        <AlertOctagon className="mr-1 h-3 w-3" />
+                                    <PageHeaderStatusChip
+                                        variant="critical"
+                                        icon={AlertOctagon}
+                                    >
                                         Overdue
-                                    </Badge>
+                                    </PageHeaderStatusChip>
                                 )}
-                            </div>
+                            </>
                         }
-                        subline={`${report.period_label ? `${report.period_label} · ` : ''}${report.author ? `By ${report.author.name}` : ''}${report.meeting ? ` · For ${report.meeting.title}` : ''}`}
+                        subline={[
+                            report.period_label,
+                            report.author ? `By ${report.author.name}` : null,
+                            report.meeting
+                                ? `For ${report.meeting.title}`
+                                : null,
+                        ]
+                            .filter(Boolean)
+                            .join(' · ')}
                         meters={
                             <>
                                 <PageHeaderMeterBlock
                                     label="Sections"
-                                    href={`/governance/ceo-reports/${report.id}`}
+                                    onClick={() => setActiveTab('executive')}
+                                    ariaLabel="View report sections"
                                 >
-                                    <PageHeaderMeterBig>{report.sections_complete}/{SECTION_LIST.length}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Completed</PageHeaderMeterCaption>
+                                    <PageHeaderMeterBig>
+                                        {report.sections_complete}/
+                                        {SECTION_LIST.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Narrative sections completed
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
                                     label="Decisions"
-                                    href={`/governance/ceo-reports/${report.id}#decisions`}
+                                    onClick={() => setActiveTab('decisions')}
+                                    ariaLabel="View decisions sought"
                                 >
-                                    <PageHeaderMeterBig>{report.decisions_sought.length}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Decisions sought</PageHeaderMeterCaption>
+                                    <PageHeaderMeterBig>
+                                        {report.decisions_sought.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Decisions sought
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
                                     label="Matters"
-                                    href={`/governance/ceo-reports/${report.id}#matters`}
+                                    onClick={() => setActiveTab('matters')}
+                                    ariaLabel="View matters arising"
                                 >
-                                    <PageHeaderMeterBig>{report.matters_arising.length}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Matters arising</PageHeaderMeterCaption>
+                                    <PageHeaderMeterBig>
+                                        {report.matters_arising.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Matters arising
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Attachments"
+                                    onClick={() => setActiveTab('attachments')}
+                                    ariaLabel="View attachments"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {report.attachments.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Supporting documents
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                             </>
                         }
                         actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                {can && report.status === 'draft' && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
+                            <>
+                                <PageHeaderGlassButton
+                                    icon={Printer}
+                                    onClick={handlePrint}
+                                >
+                                    Print / PDF
+                                </PageHeaderGlassButton>
+                                {canEdit && (
+                                    <PageHeaderGlassButton
+                                        icon={Pencil}
                                         onClick={() => setEditOpen(true)}
                                     >
-                                        <Pencil className="mr-1.5 h-4 w-4" />
                                         Edit report
-                                    </Button>
+                                    </PageHeaderGlassButton>
                                 )}
                                 {can && report.status === 'draft' && (
-                                    <Button size="sm" onClick={handleSubmit}>
-                                        <Send className="mr-1.5 h-4 w-4" />
+                                    <PageHeaderPrimaryButton
+                                        icon={Send}
+                                        onClick={handleSubmit}
+                                    >
                                         Submit to board
-                                    </Button>
+                                    </PageHeaderPrimaryButton>
                                 )}
                                 {can && report.status === 'submitted' && (
-                                    <Button size="sm" onClick={handlePresent}>
-                                        <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                                    <PageHeaderPrimaryButton
+                                        icon={CheckCircle2}
+                                        onClick={handlePresent}
+                                    >
                                         Mark as presented
-                                    </Button>
+                                    </PageHeaderPrimaryButton>
                                 )}
-                                <Button variant="outline" size="sm" onClick={handlePrint}>
-                                    <Printer className="mr-1.5 h-4 w-4" />
-                                    Print / PDF
-                                </Button>
-                            </div>
+                            </>
                         }
                     />
                 }
             >
-                {can && (
-                    <CeoReportDialog
+                {canEdit && (
+                    <CeoReportWizardDialog
                         isOpen={editOpen}
                         onClose={() => setEditOpen(false)}
                         meetings={meetings ?? []}
@@ -664,96 +710,105 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
                     />
                 )}
 
-                <StatusStrip report={report} />
+                <div className="flex flex-col gap-5">
+                    <StatusStrip report={report} />
 
-                <div className="mt-6" data-dusk="ceo-report-tabs">
-                    <PageTabs
-                        value={activeTab}
-                        onValueChange={setActiveTab}
-                        items={tabs}
-                    >
-                        <TabsContent value="executive">
-                            <SectionView
-                                title="Executive summary"
-                                value={report.executive_summary}
-                                fallback="The CEO did not include an executive summary for this period."
-                            />
-                        </TabsContent>
+                    <div data-dusk="ceo-report-tabs">
+                        <PageTabs
+                            value={activeTab}
+                            onValueChange={setActiveTab}
+                            items={tabs}
+                        >
+                            <TabsContent value="executive">
+                                <SectionView
+                                    title="Executive summary"
+                                    value={report.executive_summary}
+                                    fallback="The CEO did not include an executive summary for this period."
+                                />
+                            </TabsContent>
 
-                        <TabsContent value="operations" className="space-y-3">
-                            <SectionView
-                                title="Operational summary"
-                                value={report.operational_summary}
-                                fallback="No operational summary was included."
-                            />
-                            <SectionView
-                                title="Key achievements"
-                                value={report.key_achievements}
-                                fallback="No key achievements were highlighted."
-                            />
-                        </TabsContent>
+                            <TabsContent
+                                value="operations"
+                                className="flex flex-col gap-5"
+                            >
+                                <SectionView
+                                    title="Operational summary"
+                                    value={report.operational_summary}
+                                    fallback="No operational summary was included."
+                                />
+                                <SectionView
+                                    title="Key achievements"
+                                    value={report.key_achievements}
+                                    fallback="No key achievements were highlighted."
+                                />
+                            </TabsContent>
 
-                        <TabsContent value="financials">
-                            <SectionView
-                                title="Financial summary"
-                                value={report.financial_summary}
-                                fallback="No financial commentary was included."
-                            />
-                        </TabsContent>
+                            <TabsContent value="financials">
+                                <SectionView
+                                    title="Financial summary"
+                                    value={report.financial_summary}
+                                    fallback="No financial commentary was included."
+                                />
+                            </TabsContent>
 
-                        <TabsContent value="risks" className="space-y-3">
-                            <SectionView
-                                title="Challenges & risks"
-                                value={report.challenges_and_risks}
-                                fallback="No challenges or risks were flagged."
-                            />
-                            <SectionView
-                                title="Compliance status"
-                                value={report.compliance_status}
-                                fallback="No compliance update was included."
-                            />
-                        </TabsContent>
+                            <TabsContent value="risks" className="flex flex-col gap-5">
+                                <SectionView
+                                    title="Challenges & risks"
+                                    value={report.challenges_and_risks}
+                                    fallback="No challenges or risks were flagged."
+                                />
+                                <SectionView
+                                    title="Compliance status"
+                                    value={report.compliance_status}
+                                    fallback="No compliance update was included."
+                                />
+                            </TabsContent>
 
-                        <TabsContent value="workforce">
-                            <SectionView
-                                title="Workforce update"
-                                value={report.staffing_update}
-                                fallback="No workforce update was included."
-                            />
-                        </TabsContent>
+                            <TabsContent value="workforce">
+                                <SectionView
+                                    title="Workforce update"
+                                    value={report.staffing_update}
+                                    fallback="No workforce update was included."
+                                />
+                            </TabsContent>
 
-                        <TabsContent value="strategy">
-                            <SectionView
-                                title="Strategic progress"
-                                value={report.recommendations}
-                                fallback="No strategic progress was reported."
-                            />
-                        </TabsContent>
+                            <TabsContent value="strategy">
+                                <SectionView
+                                    title="Strategic progress"
+                                    value={report.recommendations}
+                                    fallback="No strategic progress was reported."
+                                />
+                            </TabsContent>
 
-                        <TabsContent value="decisions">
-                            <DecisionsView items={report.decisions_sought} />
-                        </TabsContent>
+                            <TabsContent value="decisions">
+                                <DecisionsView
+                                    items={report.decisions_sought}
+                                />
+                            </TabsContent>
 
-                        <TabsContent value="matters">
-                            <MattersView items={report.matters_arising} />
-                        </TabsContent>
+                            <TabsContent value="matters">
+                                <MattersView items={report.matters_arising} />
+                            </TabsContent>
 
-                        <TabsContent value="kpi">
-                            <KpiSnapshotView snapshot={report.kpi_snapshot} />
-                        </TabsContent>
+                            <TabsContent value="kpi">
+                                <KpiSnapshotView
+                                    snapshot={report.kpi_snapshot}
+                                />
+                            </TabsContent>
 
-                        <TabsContent value="attachments">
-                            <Card>
-                                <CardContent className="p-5">
-                                    <AttachmentsPanel
-                                        reportId={report.id}
-                                        attachments={report.attachments}
-                                        canManage={can}
-                                    />
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                    </PageTabs>
+                            <TabsContent value="attachments">
+                                <Card>
+                                    <CardContent className="p-5">
+                                        <AttachmentsPanel
+                                            reportId={report.id}
+                                            attachments={report.attachments}
+                                            canManage={can}
+                                        />
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        </PageTabs>
+                    </div>
                 </div>
             </PageLayout>
         </AppLayout>

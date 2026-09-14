@@ -112,6 +112,71 @@ class GovernanceComplianceTest extends TestCase
         $this->assertTrue($obligation->evidence_provided);
     }
 
+    public function test_retired_create_and_edit_pages_redirect_to_wizard_dialogs(): void
+    {
+        $admin = $this->createAdminUser();
+        $obligation = $this->createComplianceObligation($admin);
+
+        $this->actingAs($admin)->get('/governance/compliance/create')
+            ->assertRedirect('/governance/compliance?create=1');
+        $this->actingAs($admin)->get("/governance/compliance/{$obligation->id}/edit")
+            ->assertRedirect("/governance/compliance/{$obligation->id}?edit=1");
+
+        $this->actingAs($admin)->get('/governance/compliance')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Compliance/Index')
+                ->where('canCreate', true)
+                ->has('formOptions.frameworks', 10)
+                ->has('formOptions.owners')
+            );
+
+        $this->actingAs($admin)->get("/governance/compliance/{$obligation->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Compliance/Show')
+                ->where('abilities.update', true)
+                ->where('abilities.complete', true)
+                ->has('formOptions.frameworks')
+            );
+    }
+
+    public function test_view_only_member_gets_no_obligation_wizard_options(): void
+    {
+        $admin = $this->createAdminUser();
+        $member = $this->createUserWithRole('board_member');
+        $obligation = $this->createComplianceObligation($admin);
+
+        $this->actingAs($member)->get('/governance/compliance/create')->assertForbidden();
+
+        $this->actingAs($member)->get('/governance/compliance')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canCreate', false)
+                ->where('formOptions', null)
+            );
+
+        $this->actingAs($member)->get("/governance/compliance/{$obligation->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('abilities.update', false)
+                ->where('formOptions', null)
+            );
+    }
+
+    public function test_register_search_matches_title_and_reference(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->createComplianceObligation($admin, ['obligation_title' => 'Privacy officer appointment', 'obligation_code' => 'PRIV-777']);
+        $this->createComplianceObligation($admin, ['obligation_title' => 'Annual return', 'obligation_code' => 'CHAR-001', 'framework' => 'charities']);
+
+        $this->actingAs($admin)->get('/governance/compliance?search=PRIV-777')
+            ->assertInertia(fn ($page) => $page
+                ->has('obligations.data', 1)
+                ->where('obligations.data.0.obligation_title', 'Privacy officer appointment')
+            );
+    }
+
     public function test_calendar_renders_events(): void
     {
         $admin = $this->createAdminUser();

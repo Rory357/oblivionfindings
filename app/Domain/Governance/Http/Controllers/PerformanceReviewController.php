@@ -15,15 +15,15 @@ class PerformanceReviewController extends Controller
         protected PerformanceReviewService $performanceService
     ) {}
 
+    /**
+     * Legacy deep link: the new-review wizard is a dialog on the index.
+     * Authorise exactly as the retired page did, then open it there.
+     */
     public function create()
     {
         $this->authorize('create', PerformanceReview::class);
 
-        $boardMembers = \App\Domain\Governance\Models\BoardMember::with('user')->get();
-        
-        return Inertia::render('Governance/Performance/Create', [
-            'boardMembers' => $boardMembers,
-        ]);
+        return redirect()->route('governance.performance.index', ['create' => 1]);
     }
 
     public function index(Request $request)
@@ -32,14 +32,44 @@ class PerformanceReviewController extends Controller
 
         $query = PerformanceReview::with(['reviewee', 'goals', 'kpis']);
 
-        app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-            ->scopePerformanceReviews($query, $request->user());
+        $access = app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class);
+        $access->scopePerformanceReviews($query, $request->user());
+
+        // Header counts come from the same audience scope as the list, before
+        // the header filters narrow it, so totals never equal "rows shown".
+        $summaryBase = $access->scopePerformanceReviews(PerformanceReview::query(), $request->user());
+        $summary = [
+            'total' => (clone $summaryBase)->count(),
+            'active' => (clone $summaryBase)->where('status', '!=', 'completed')->count(),
+            'completed' => (clone $summaryBase)->where('status', 'completed')->count(),
+            'board_review' => (clone $summaryBase)->where('status', 'board_review')->count(),
+        ];
 
         if ($request->has('reviewee_id')) {
             $query->byReviewee($request->reviewee_id);
         }
 
+        $status = $request->string('status')->toString();
+        if ($status === 'active') {
+            $query->where('status', '!=', 'completed');
+        } elseif (in_array($status, ['draft', 'self_review', 'peer_review', 'board_review', 'completed'], true)) {
+            $query->where('status', $status);
+        }
+
+        $reviewType = $request->string('review_type')->toString();
+        if (in_array($reviewType, ['quarterly', 'annual', 'ad_hoc'], true)) {
+            $query->where('review_type', $reviewType);
+        }
+
+        if ($search = trim($request->string('search')->toString())) {
+            $query->where(function ($inner) use ($search) {
+                $inner->where('review_cycle', 'like', "%{$search}%")
+                    ->orWhereHas('reviewee', fn ($reviewee) => $reviewee->where('name', 'like', "%{$search}%"));
+            });
+        }
+
         $user = $request->user() ?? auth()->user();
+        $canCreate = $this->canWriteReviews($user, 'create');
 
         $reviews = $query->orderByDesc('created_at')
             ->paginate(15)
@@ -60,7 +90,47 @@ class PerformanceReviewController extends Controller
         return Inertia::render('Governance/Performance/Index', [
             'reviews' => $reviews,
             'review_cycles' => $this->getReviewCycles(),
+            'summary' => $summary,
+            'filters' => [
+                'status' => $status ?: null,
+                'review_type' => $reviewType ?: null,
+                'search' => $request->string('search')->toString() ?: null,
+            ],
+            'can_create' => $canCreate,
+            // New-review wizard options, only for viewers who may create.
+            'board_members' => $canCreate ? $this->boardMemberOptions() : [],
         ]);
+    }
+
+    /**
+     * Mirrors the write routes: the policy AND the route's manage permission,
+     * so a button never renders for a request the route would refuse.
+     */
+    protected function canWriteReviews(?User $user, string $ability, ?PerformanceReview $review = null): bool
+    {
+        if (! $user || ! $user->canDo('governance.performance.manage')) {
+            return false;
+        }
+
+        return $review
+            ? $user->can($ability, $review)
+            : $user->can($ability, PerformanceReview::class);
+    }
+
+    /** @return array<int, array{id:int,user_id:int,name:string,board_role:string|null}> */
+    protected function boardMemberOptions(): array
+    {
+        return \App\Domain\Governance\Models\BoardMember::with('user:id,name')
+            ->get()
+            ->filter(fn ($member) => $member->user !== null)
+            ->map(fn ($member) => [
+                'id' => (int) $member->id,
+                'user_id' => (int) $member->user->id,
+                'name' => (string) $member->user->name,
+                'board_role' => $member->board_role,
+            ])
+            ->values()
+            ->all();
     }
 
     public function show(Request $request, PerformanceReview $review)
@@ -100,6 +170,8 @@ class PerformanceReviewController extends Controller
             'review' => $review,
             'scorecard' => $scorecard,
             'can_assess' => $canAssess,
+            // Edit wizard: same audience as the retired edit page + update route.
+            'can_update' => $this->canWriteReviews($user, 'update', $review),
         ]);
     }
 
@@ -196,15 +268,12 @@ class PerformanceReviewController extends Controller
         return redirect()->back()->with('success', 'Assessment submitted.');
     }
 
+    /** Legacy deep link: the edit wizard is a dialog on the show page. */
     public function edit(PerformanceReview $review)
     {
         $this->authorize('update', $review);
 
-        $review->load(['reviewee', 'goals', 'kpis']);
-
-        return Inertia::render('Governance/Performance/Edit', [
-            'review' => $review,
-        ]);
+        return redirect()->route('governance.performance.show', ['review' => $review->id, 'edit' => 1]);
     }
 
     public function submitFeedback(Request $request, PerformanceReview $review)
@@ -247,7 +316,8 @@ class PerformanceReviewController extends Controller
 
     /**
      * Board approval — finalises the review to completed, optionally linking the
-     * approving resolution.
+     * approving resolution. A cited resolution must be explicitly bound to this
+     * exact review decision (verified and consumed by the model).
      */
     public function approve(Request $request, PerformanceReview $review)
     {
@@ -257,7 +327,9 @@ class PerformanceReviewController extends Controller
             'resolution_id' => 'nullable|integer',
         ]);
 
-        $review->approve($validated['resolution_id'] ?? null);
+        $resolutionId = isset($validated['resolution_id']) ? (int) $validated['resolution_id'] : null;
+
+        $review->approve($resolutionId, $request->user()->id);
 
         return redirect()->back()->with('success', 'Performance review approved and completed.');
     }

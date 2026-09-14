@@ -165,6 +165,25 @@ class GovernanceMyWorkTest extends TestCase
         $this->assertSame($memberA->id, $response->json('scope.viewer.user_id'));
     }
 
+    public function test_meeting_votes_open_the_paper_inside_its_meeting_workspace(): void
+    {
+        $member = User::find($this->fixtures['users']['member']);
+        $open = Resolution::find($this->fixtures['resolutions']['open']);
+
+        $items = collect(
+            $this->actingAs($member)->getJson('/governance/my-work/data?kind=vote')->assertOk()->json('items')
+        );
+        $vote = $items->firstWhere('source.id', $open->id);
+
+        $this->assertNotNull($vote, 'The open meeting decision must be a vote obligation for the member.');
+        $this->assertSame(
+            "/governance/meetings/{$open->governance_meeting_id}?tab=resolutions&paper={$open->id}",
+            $vote['required_action']['href'],
+        );
+        // The record identity stays canonical.
+        $this->assertSame("/governance/resolutions/{$open->id}", $vote['source']['href']);
+    }
+
     public function test_same_name_members_are_isolated_by_id_attribution(): void
     {
         $memberA = User::find($this->fixtures['users']['member']);

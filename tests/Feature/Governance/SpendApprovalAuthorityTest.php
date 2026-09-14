@@ -514,12 +514,17 @@ class SpendApprovalAuthorityTest extends TestCase
         $requester = $this->createUserWithRole('board_secretary');
         $this->assignSite($requester, $this->siteA);
 
+        // The retired create page now opens the index wizard dialog.
         $this->actingAs($requester)->get('/governance/spend-approvals/create')
+            ->assertRedirect('/governance/spend-approvals?create=1');
+        $this->actingAs($requester)->get('/governance/spend-approvals?create=1')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('sites', 1)
-                ->where('sites.0.id', $this->siteA->id)
-                ->where('sites.0.name', $this->siteA->name));
+                ->component('Governance/SpendApprovals/Index')
+                ->where('can_create', true)
+                ->has('form_options.sites', 1)
+                ->where('form_options.sites.0.id', $this->siteA->id)
+                ->where('form_options.sites.0.name', $this->siteA->name));
 
         $globalRequester = User::factory()->create(['approved_at' => now()]);
         $this->grant($globalRequester, [
@@ -527,12 +532,56 @@ class SpendApprovalAuthorityTest extends TestCase
             'governance.spend.request',
             'governance.spend.viewAllSites',
         ]);
-        $this->actingAs($globalRequester)->get('/governance/spend-approvals/create')
+        $this->actingAs($globalRequester)->get('/governance/spend-approvals')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('sites', 2)
-                ->where('sites.0.id', $this->siteA->id)
-                ->where('sites.1.id', $this->siteB->id));
+                ->where('can_create', true)
+                ->has('form_options.sites', 2)
+                ->where('form_options.sites.0.id', $this->siteA->id)
+                ->where('form_options.sites.1.id', $this->siteB->id));
+
+        // View-only and empty-scope viewers never receive the picker.
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $this->grant($viewer, ['governance.spend.view', 'governance.spend.viewAllSites']);
+        $this->actingAs($viewer)->get('/governance/spend-approvals')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('can_create', false)
+                ->where('form_options', null));
+
+        $emptyScopeRequester = $this->createUserWithRole('board_secretary');
+        $this->actingAs($emptyScopeRequester)->get('/governance/spend-approvals')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('can_create', false)
+                ->where('form_options', null));
+    }
+
+    public function test_edit_deep_link_opens_the_show_wizard_only_for_an_editable_draft(): void
+    {
+        $requester = $this->createUserWithRole('board_secretary');
+        $approval = $this->draft($requester);
+
+        $this->actingAs($requester)->get("/governance/spend-approvals/{$approval->id}/edit")
+            ->assertRedirect("/governance/spend-approvals/{$approval->id}?edit=1");
+        $this->actingAs($requester)->get("/governance/spend-approvals/{$approval->id}?edit=1")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/SpendApprovals/Show')
+                ->where('authority.update', true)
+                ->has('form_options.sites', 1)
+                ->where('form_options.sites.0.id', $this->siteA->id)
+                ->has('form_options.thresholds'));
+
+        $otherRequester = $this->createUserWithRole('board_secretary');
+        $this->assignSite($otherRequester, $this->siteA);
+        $this->actingAs($otherRequester)->get("/governance/spend-approvals/{$approval->id}/edit")
+            ->assertForbidden();
+        $this->actingAs($otherRequester)->get("/governance/spend-approvals/{$approval->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('authority.update', false)
+                ->where('form_options', null));
     }
 
     public function test_foreign_and_missing_approval_ids_are_concealed_without_side_effects(): void

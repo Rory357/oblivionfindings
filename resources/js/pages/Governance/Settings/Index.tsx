@@ -1,19 +1,54 @@
+import { Head, useForm } from '@inertiajs/react';
+import {
+    Layers,
+    Save,
+    Scale,
+    Settings as SettingsIcon,
+    ShieldCheck,
+    Users,
+} from 'lucide-react';
+import { useState } from 'react';
+
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
 import {
     PageHeader,
+    PageHeaderFilterSelect,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import InputError from '@/components/input-error';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
 import { PageProps } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle2, FileText, Save, Scale, Settings as SettingsIcon, ShieldAlert, Users } from 'lucide-react';
+
+import {
+    ActivateRulesDialog,
+    type ApprovalResolutionOption,
+    type RulesActivationTarget,
+} from './_dialogs';
 
 interface SettingDefinition {
     key: string;
@@ -61,6 +96,9 @@ interface RulesProfileProp {
     quorumRequired: number;
     quorumFormula: string;
     members: BoardMemberSummary[];
+    /** Present only for users who may activate rules. */
+    activation?: RulesActivationTarget | null;
+    approvalResolutions?: ApprovalResolutionOption[];
 }
 
 interface Props extends PageProps {
@@ -70,6 +108,8 @@ interface Props extends PageProps {
     canManage?: boolean;
 }
 
+const RULES_SECTION = 'rules';
+
 export default function GovernanceSettingsIndex({
     auth,
     settings,
@@ -77,6 +117,11 @@ export default function GovernanceSettingsIndex({
     rulesProfile,
     canManage = false,
 }: Props) {
+    const [section, setSection] = useState('all');
+    const [activateOpen, setActivateOpen] = useState(false);
+    const activation = rulesProfile?.activation ?? null;
+    const canActivate = Boolean(canManage && activation && !activation.is_active);
+
     const initialValues: Record<string, string> = {};
     settings.forEach((s) => {
         initialValues[s.key] =
@@ -89,21 +134,26 @@ export default function GovernanceSettingsIndex({
 
     const rulesForm = useForm({
         legal_form: rulesProfile?.profile.legal_form ?? 'charitable_trust',
-        governing_document_reference: rulesProfile?.profile.governing_document_reference ?? '',
-        governing_document_version: rulesProfile?.profile.governing_document_version ?? '1.0-candidate',
-        quorum_mode: rulesProfile?.profile.quorum_mode ?? 'majority_floor_plus_one',
+        governing_document_reference:
+            rulesProfile?.profile.governing_document_reference ?? '',
+        governing_document_version:
+            rulesProfile?.profile.governing_document_version ?? '1.0-candidate',
+        quorum_mode:
+            rulesProfile?.profile.quorum_mode ?? 'majority_floor_plus_one',
         quorum_formula: rulesProfile?.profile.quorum_formula ?? 'floor(N/2)+1',
-        ordinary_threshold_formula: rulesProfile?.profile.ordinary_threshold_formula ?? 'for > against of valid votes cast',
-        unanimous_denominator_formula: rulesProfile?.profile.unanimous_denominator_formula ?? 'assent from all entitled voters',
-        written_voting_permitted: rulesProfile?.profile.written_voting_permitted ?? false,
-        written_unanimity_required: rulesProfile?.profile.written_unanimity_required ?? true,
-        recusal_policy: rulesProfile?.profile.recusal_policy ?? 'exclude_from_presence_and_tally_without_reducing_N',
-    });
-
-    const activateForm = useForm({
-        governing_document_reference: rulesProfile?.profile.governing_document_reference ?? '',
-        governing_document_version: rulesProfile?.profile.governing_document_version ?? '',
-        approved_by_resolution_id: '',
+        ordinary_threshold_formula:
+            rulesProfile?.profile.ordinary_threshold_formula ??
+            'for > against of valid votes cast',
+        unanimous_denominator_formula:
+            rulesProfile?.profile.unanimous_denominator_formula ??
+            'assent from all entitled voters',
+        written_voting_permitted:
+            rulesProfile?.profile.written_voting_permitted ?? false,
+        written_unanimity_required:
+            rulesProfile?.profile.written_unanimity_required ?? true,
+        recusal_policy:
+            rulesProfile?.profile.recusal_policy ??
+            'exclude_from_presence_and_tally_without_reducing_N',
     });
 
     const grouped = Object.entries(categories).map(([key, label]) => ({
@@ -111,21 +161,121 @@ export default function GovernanceSettingsIndex({
         label,
         settings: settings.filter((s) => s.category === key),
     }));
+    const visibleGroups = grouped.filter(
+        (g) => g.settings.length > 0 && (section === 'all' || section === g.key),
+    );
+    const showRules =
+        Boolean(rulesProfile) && (section === 'all' || section === RULES_SECTION);
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.put('/governance/settings');
+        form.put('/governance/settings', { preserveScroll: true });
     };
 
     const submitRules = (e: React.FormEvent) => {
         e.preventDefault();
-        rulesForm.post('/governance/settings/rules');
+        rulesForm.post('/governance/settings/rules', { preserveScroll: true });
     };
 
-    const submitActivate = (e: React.FormEvent) => {
-        e.preventDefault();
-        activateForm.post('/governance/settings/rules/activate');
-    };
+    const customised = settings.filter(
+        (s) =>
+            s.value !== null &&
+            s.value !== undefined &&
+            String(s.value) !== String(s.default ?? ''),
+    ).length;
+
+    const sectionOptions = [
+        { value: 'all', label: 'All sections' },
+        ...(rulesProfile
+            ? [{ value: RULES_SECTION, label: 'Rules & electorate' }]
+            : []),
+        ...grouped
+            .filter((g) => g.settings.length > 0)
+            .map((g) => ({ value: g.key, label: g.label })),
+    ];
+
+    const header = (
+        <PageHeader
+            icon={SettingsIcon}
+            title="Governance settings"
+            titleChip={
+                canManage ? null : (
+                    <PageHeaderStatusChip variant="neutral">
+                        Read only
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline="Voting rules, spend approval thresholds, escalation and variance alerts"
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Configuration"
+                        ariaLabel="View all settings"
+                        onClick={() => setSection('all')}
+                    >
+                        <PageHeaderMeterBig>{settings.length}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {customised} changed from default
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {rulesProfile ? (
+                        <>
+                            <PageHeaderMeterBlock
+                                label="Voting rules"
+                                tone={rulesProfile.isConfirmed ? 'success' : 'warning'}
+                                ariaLabel="View governance rules and electorate"
+                                onClick={() => setSection(RULES_SECTION)}
+                            >
+                                <PageHeaderMeterBig>
+                                    {rulesProfile.isConfirmed ? 'Confirmed' : 'Candidate'}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {rulesProfile.isConfirmed
+                                        ? 'live voting available'
+                                        : 'live voting unavailable'}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Entitled voters"
+                                ariaLabel="View the electorate"
+                                onClick={() => setSection(RULES_SECTION)}
+                            >
+                                <PageHeaderMeterBig>
+                                    {rulesProfile.eligibleVoterCount}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    of {rulesProfile.members.length} board
+                                    appointments
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Quorum"
+                                ariaLabel="View quorum rules"
+                                onClick={() => setSection(RULES_SECTION)}
+                            >
+                                <PageHeaderMeterBig>
+                                    {rulesProfile.quorumRequired}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    voters · {rulesProfile.quorumFormula}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    ) : null}
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    icon={Layers}
+                    label="All sections"
+                    value={section}
+                    options={sectionOptions}
+                    onChange={setSection}
+                />
+            }
+            rail={<GovernanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout
@@ -136,248 +286,349 @@ export default function GovernanceSettingsIndex({
                 { title: 'Settings', href: '/governance/settings' },
             ]}
         >
-            <Head title="Governance Settings" />
+            <Head title="Governance settings" />
 
-            <PageLayout
-                hero={
-                    <PageHeader
-                        icon={SettingsIcon}
-                        title="Governance Settings"
-                        subline="Configure escalation paths, spend approval thresholds, and variance alert rules."
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Configuration items"
-                                    href="/governance/settings"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {settings.length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Parameters defined</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Rules profile"
-                                    href="/governance/settings"
-                                    tone={rulesProfile?.isConfirmed ? 'brand' : 'warning'}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {rulesProfile ? (rulesProfile.isConfirmed ? 'Confirmed' : 'Draft') : 'Active'}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Electorate authority</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
-                        }
-                    />
-                }
-            >
-                {rulesProfile && (
-                    <div className="space-y-6">
-                        <Card className="border-l-4 border-l-status-warning">
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {showRules && rulesProfile ? (
+                        <Card>
                             <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Scale className="h-5 w-5 text-status-warning" />
-                                        <CardTitle>Governance Rules & Electorate (D1 Authority)</CardTitle>
-                                    </div>
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Scale className="h-4 w-4 text-status-warning" />
+                                        Governance rules & electorate (D1 authority)
+                                    </CardTitle>
                                     <StatusBadge
-                                        variant={rulesProfile.isConfirmed ? 'success' : 'warning'}
+                                        variant={
+                                            rulesProfile.isConfirmed
+                                                ? 'success'
+                                                : 'warning'
+                                        }
                                     >
                                         {rulesProfile.statusLabel}
                                     </StatusBadge>
                                 </div>
                                 <CardDescription>
-                                    Candidate rules apply strict majority quorum (floor(N/2)+1) based on current entitled voting seats.
-                                    Recused members are excluded from presence without reducing the denominator.
-                                    Live voting remains blocked until governing document authority is formally recorded.
+                                    Candidate rules apply strict majority quorum
+                                    (floor(N/2)+1) based on current entitled voting
+                                    seats. Recused members are excluded from
+                                    presence without reducing the denominator.
+                                    Live voting remains blocked until governing
+                                    document authority is formally recorded.
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-6">
-                                <form onSubmit={submitRules} className="space-y-4">
+                            <CardContent className="flex flex-col gap-5">
+                                <form
+                                    onSubmit={submitRules}
+                                    className="flex flex-col gap-4"
+                                >
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div>
-                                            <Label htmlFor="legal_form">Legal Form</Label>
+                                            <Label htmlFor="legal_form">
+                                                Legal form
+                                            </Label>
                                             <Input
                                                 id="legal_form"
                                                 disabled={!canManage}
                                                 value={rulesForm.data.legal_form}
-                                                onChange={(e) => rulesForm.setData('legal_form', e.target.value)}
+                                                onChange={(e) =>
+                                                    rulesForm.setData(
+                                                        'legal_form',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            <InputError
+                                                message={rulesForm.errors.legal_form}
                                             />
                                         </div>
                                         <div>
-                                            <Label htmlFor="governing_document_reference">Governing Document Reference</Label>
+                                            <Label htmlFor="governing_document_reference">
+                                                Governing document reference
+                                            </Label>
                                             <Input
                                                 id="governing_document_reference"
                                                 disabled={!canManage}
                                                 placeholder="e.g. Trust Deed / Constitution 2024"
-                                                value={rulesForm.data.governing_document_reference}
-                                                onChange={(e) => rulesForm.setData('governing_document_reference', e.target.value)}
+                                                value={
+                                                    rulesForm.data
+                                                        .governing_document_reference
+                                                }
+                                                onChange={(e) =>
+                                                    rulesForm.setData(
+                                                        'governing_document_reference',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            <InputError
+                                                message={
+                                                    rulesForm.errors
+                                                        .governing_document_reference
+                                                }
                                             />
                                         </div>
                                         <div>
-                                            <Label htmlFor="quorum_formula">Quorum Mode & Formula</Label>
+                                            <Label htmlFor="quorum_formula">
+                                                Quorum mode & formula
+                                            </Label>
                                             <Input
                                                 id="quorum_formula"
                                                 disabled
                                                 value={`${rulesProfile.profile.quorum_mode} — ${rulesProfile.quorumFormula}`}
                                             />
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                N = {rulesProfile.eligibleVoterCount} entitled seats. Required quorum = {rulesProfile.quorumRequired} participating voters.
+                                            <p className="mt-1 text-caption">
+                                                N = {rulesProfile.eligibleVoterCount}{' '}
+                                                entitled seats. Required quorum ={' '}
+                                                {rulesProfile.quorumRequired}{' '}
+                                                participating voters.
                                             </p>
                                         </div>
                                         <div>
-                                            <Label htmlFor="ordinary_threshold_formula">Ordinary Decision Threshold</Label>
+                                            <Label htmlFor="ordinary_threshold_formula">
+                                                Ordinary decision threshold
+                                            </Label>
                                             <Input
                                                 id="ordinary_threshold_formula"
                                                 disabled={!canManage}
-                                                value={rulesForm.data.ordinary_threshold_formula}
-                                                onChange={(e) => rulesForm.setData('ordinary_threshold_formula', e.target.value)}
+                                                value={
+                                                    rulesForm.data
+                                                        .ordinary_threshold_formula
+                                                }
+                                                onChange={(e) =>
+                                                    rulesForm.setData(
+                                                        'ordinary_threshold_formula',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            <InputError
+                                                message={
+                                                    rulesForm.errors
+                                                        .ordinary_threshold_formula
+                                                }
                                             />
                                         </div>
                                     </div>
 
-                                    {canManage && (
-                                        <div className="flex justify-end pt-2">
-                                            <Button type="submit" variant="outline" disabled={rulesForm.processing}>
-                                                <Save className="mr-2 h-4 w-4" />
-                                                Save Candidate Rules
+                                    {canManage ? (
+                                        <div className="flex flex-wrap justify-end gap-2">
+                                            <Button
+                                                type="submit"
+                                                variant="outline"
+                                                disabled={rulesForm.processing}
+                                            >
+                                                <Save className="h-4 w-4" />
+                                                Save candidate rules
                                             </Button>
+                                            {canActivate ? (
+                                                <Button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setActivateOpen(true)
+                                                    }
+                                                >
+                                                    <ShieldCheck className="h-4 w-4" />
+                                                    Activate rules
+                                                </Button>
+                                            ) : null}
                                         </div>
-                                    )}
+                                    ) : null}
+                                    {canActivate &&
+                                    (rulesProfile.approvalResolutions ?? [])
+                                        .length === 0 ? (
+                                        <p className="text-caption">
+                                            Approve these rules through a board
+                                            resolution first — activation needs a
+                                            carried resolution bound to this
+                                            version of the rules.
+                                        </p>
+                                    ) : null}
                                 </form>
 
-                                <div className="space-y-3 pt-2">
+                                <div className="flex flex-col gap-3">
                                     <div className="flex items-center gap-2">
                                         <Users className="h-4 w-4 text-muted-foreground" />
-                                        <h4 className="text-sm font-semibold">
-                                            Electorate Denominator (N = {rulesProfile.eligibleVoterCount} Entitled Voters)
-                                        </h4>
+                                        <h3 className="text-sm font-semibold">
+                                            Electorate denominator (N ={' '}
+                                            {rulesProfile.eligibleVoterCount}{' '}
+                                            entitled voters)
+                                        </h3>
                                     </div>
-                                    <div className="rounded-md border text-sm overflow-x-auto">
-                                        <table className="w-full text-left">
-                                            <thead className="bg-muted/50 text-xs font-medium text-muted-foreground">
-                                                <tr>
-                                                    <th className="p-2.5">Member Name</th>
-                                                    <th className="p-2.5">Board Role</th>
-                                                    <th className="p-2.5">Voting Seat</th>
-                                                    <th className="p-2.5">Active Term</th>
-                                                    <th className="p-2.5">Eligible Voter (N)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y">
-                                                {rulesProfile.members.map((member) => (
-                                                    <tr key={member.id} className="hover:bg-muted/20">
-                                                        <td className="p-2.5 font-medium">{member.name}</td>
-                                                        <td className="p-2.5 capitalize">{member.role}</td>
-                                                        <td className="p-2.5">
-                                                            {member.role === 'observer' ? (
-                                                                <span className="text-muted-foreground">No (Observer)</span>
-                                                            ) : member.role === 'secretary' ? (
-                                                                member.has_voting_seat ? 'Yes (Appointed)' : 'No (Administrative)'
-                                                            ) : (
-                                                                'Yes'
-                                                            )}
-                                                        </td>
-                                                        <td className="p-2.5 text-xs text-muted-foreground">
-                                                            {member.term_start ?? '—'} to {member.term_end ?? 'Indefinite'}
-                                                        </td>
-                                                        <td className="p-2.5">
-                                                            <StatusBadge variant={member.can_vote ? 'success' : 'neutral'}>
-                                                                {member.can_vote ? 'Entitled' : 'Not Entitled'}
-                                                            </StatusBadge>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                    {rulesProfile.members.length === 0 ? (
+                                        <EmptyState
+                                            variant="inline"
+                                            icon={Users}
+                                            title="No board members are appointed yet"
+                                        />
+                                    ) : (
+                                        <div className="overflow-x-auto rounded-md border border-border">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Member</TableHead>
+                                                        <TableHead>Board role</TableHead>
+                                                        <TableHead>Voting seat</TableHead>
+                                                        <TableHead>Active term</TableHead>
+                                                        <TableHead>Eligible voter (N)</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {rulesProfile.members.map(
+                                                        (member) => (
+                                                            <TableRow key={member.id}>
+                                                                <TableCell className="font-medium">
+                                                                    {member.name}
+                                                                </TableCell>
+                                                                <TableCell className="capitalize">
+                                                                    {member.role}
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    {member.role ===
+                                                                    'observer' ? (
+                                                                        <span className="text-muted-foreground">
+                                                                            No (observer)
+                                                                        </span>
+                                                                    ) : member.role ===
+                                                                      'secretary' ? (
+                                                                        member.has_voting_seat ? (
+                                                                            'Yes (appointed)'
+                                                                        ) : (
+                                                                            'No (administrative)'
+                                                                        )
+                                                                    ) : (
+                                                                        'Yes'
+                                                                    )}
+                                                                </TableCell>
+                                                                <TableCell className="text-caption">
+                                                                    {formatDateOnly(
+                                                                        member.term_start,
+                                                                    )}{' '}
+                                                                    to{' '}
+                                                                    {member.term_end
+                                                                        ? formatDateOnly(
+                                                                              member.term_end,
+                                                                          )
+                                                                        : 'indefinite'}
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <StatusBadge
+                                                                        variant={
+                                                                            member.can_vote
+                                                                                ? 'success'
+                                                                                : 'neutral'
+                                                                        }
+                                                                    >
+                                                                        {member.can_vote
+                                                                            ? 'Entitled'
+                                                                            : 'Not entitled'}
+                                                                    </StatusBadge>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ),
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
-                    </div>
-                )}
+                    ) : null}
 
-                <form onSubmit={submit} className="space-y-6">
-                    {grouped.map((group) =>
-                        group.settings.length === 0 ? null : (
-                            <Card key={group.key}>
-                                <CardHeader>
-                                    <CardTitle>{group.label}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {group.settings.map((s) => (
-                                        <div
-                                            key={s.key}
-                                            className="grid gap-2 lg:grid-cols-[1fr,2fr] lg:items-start"
-                                        >
-                                            <div>
-                                                <Label htmlFor={s.key}>
-                                                    {s.label}
-                                                </Label>
-                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                    {s.description}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <Input
-                                                    id={s.key}
-                                                    type={
-                                                        s.type === 'number'
-                                                            ? 'number'
-                                                            : 'text'
-                                                    }
-                                                    value={
-                                                        form.data.settings[
-                                                            s.key
-                                                        ] ?? ''
-                                                    }
-                                                    onChange={(e) =>
-                                                        form.setData(
-                                                            'settings',
-                                                            {
-                                                                ...form.data
-                                                                    .settings,
-                                                                [s.key]:
-                                                                    e.target
-                                                                        .value,
-                                                            },
-                                                        )
-                                                    }
-                                                />
-                                                {form.errors[
-                                                    `settings.${s.key}` as never
-                                                ] && (
-                                                    <p className="mt-1 text-xs text-status-critical">
-                                                        {String(
-                                                            form.errors[
-                                                                `settings.${s.key}` as never
-                                                            ],
-                                                        )}
+                    {visibleGroups.length > 0 ? (
+                        <form onSubmit={submit} className="flex flex-col gap-5">
+                            {visibleGroups.map((group) => (
+                                <Card key={group.key}>
+                                    <CardHeader>
+                                        <CardTitle>{group.label}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="flex flex-col gap-4">
+                                        {group.settings.map((s) => (
+                                            <div
+                                                key={s.key}
+                                                className="grid gap-2 lg:grid-cols-[1fr_2fr] lg:items-start"
+                                            >
+                                                <div>
+                                                    <Label htmlFor={s.key}>
+                                                        {s.label}
+                                                    </Label>
+                                                    <p className="mt-1 text-caption">
+                                                        {s.description}
                                                     </p>
-                                                )}
-                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                    Key:{' '}
-                                                    <code className="font-mono">
-                                                        {s.key}
-                                                    </code>{' '}
-                                                    · Default:{' '}
-                                                    {String(s.default ?? '—')}
-                                                </p>
+                                                </div>
+                                                <div>
+                                                    <Input
+                                                        id={s.key}
+                                                        disabled={!canManage}
+                                                        type={
+                                                            s.type === 'number'
+                                                                ? 'number'
+                                                                : 'text'
+                                                        }
+                                                        value={
+                                                            form.data.settings[
+                                                                s.key
+                                                            ] ?? ''
+                                                        }
+                                                        onChange={(e) =>
+                                                            form.setData('settings', {
+                                                                ...form.data.settings,
+                                                                [s.key]: e.target.value,
+                                                            })
+                                                        }
+                                                    />
+                                                    <InputError
+                                                        message={
+                                                            (
+                                                                form.errors as Record<
+                                                                    string,
+                                                                    string | undefined
+                                                                >
+                                                            )[`settings.${s.key}`]
+                                                        }
+                                                    />
+                                                    <p className="mt-1 text-caption">
+                                                        Key:{' '}
+                                                        <code className="font-mono">
+                                                            {s.key}
+                                                        </code>{' '}
+                                                        · Default:{' '}
+                                                        {String(s.default ?? '—')}
+                                                    </p>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
-                        ),
-                    )}
+                                        ))}
+                                    </CardContent>
+                                </Card>
+                            ))}
 
-                    <div className="flex items-center justify-end gap-2">
-                        <Button type="submit" disabled={form.processing}>
-                            <Save className="mr-2 h-4 w-4" />
-                            {form.processing ? 'Saving…' : 'Save settings'}
-                        </Button>
-                    </div>
-                </form>
+                            {canManage ? (
+                                <div className="flex items-center justify-end">
+                                    <Button type="submit" disabled={form.processing}>
+                                        <Save className="h-4 w-4" />
+                                        {form.processing
+                                            ? 'Saving…'
+                                            : 'Save settings'}
+                                    </Button>
+                                </div>
+                            ) : null}
+                        </form>
+                    ) : null}
+                </div>
             </PageLayout>
+
+            {canActivate && activation ? (
+                <ActivateRulesDialog
+                    open={activateOpen}
+                    onClose={() => setActivateOpen(false)}
+                    target={activation}
+                    resolutions={rulesProfile?.approvalResolutions ?? []}
+                    canViewResolutions={Boolean(
+                        auth.can?.governance?.resolutions?.view,
+                    )}
+                />
+            ) : null}
         </AppLayout>
     );
 }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Models;
 
+use App\Domain\Governance\Services\GovernanceResolutionAuthorityService;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class Budget extends Model
 {
@@ -133,6 +136,16 @@ class Budget extends Model
             'proposed_at' => now(),
         ]);
 
+        // The generated decision paper is explicitly bound, while still a
+        // draft, to this exact budget version and its budgeted lines. Any
+        // change to those terms before approval invalidates the authority.
+        app(GovernanceResolutionAuthorityService::class)->bind(
+            $resolution,
+            GovernanceResolutionBinding::SUBJECT_BUDGET,
+            (int) $this->getKey(),
+            User::query()->findOrFail($userId),
+        );
+
         $this->update([
             'status' => 'proposed',
             'proposed_by' => $userId,
@@ -141,13 +154,80 @@ class Budget extends Model
         ]);
     }
 
-    public function approve(int $resolutionId): void
+    /**
+     * Approve this budget under a carried resolution.
+     *
+     * Authority comes only from an explicit binding created while the paper
+     * was a draft, naming this exact budget, version and budgeted lines (as a
+     * fingerprint). Titles, cost-impact amounts and motion wording never
+     * confer authority. The binding is verified under row locks and consumed
+     * once.
+     *
+     * @throws ValidationException when the resolution does not authorise this budget
+     */
+    public function approve(int $resolutionId, ?int $actorId = null): void
     {
-        $this->update([
-            'status' => 'approved',
-            'approval_resolution_id' => $resolutionId,
-            'approved_by_board_at' => now(),
-        ]);
+        $authority = app(GovernanceResolutionAuthorityService::class);
+
+        DB::transaction(function () use ($resolutionId, $actorId, $authority) {
+            $lockedBudget = static::query()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
+            $resolution = Resolution::query()->whereKey($resolutionId)->lockForUpdate()->first();
+
+            if (! $resolution) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'The selected resolution does not exist.',
+                ]);
+            }
+
+            if (! in_array($resolution->status, ['closed', 'implemented', 'archived'], true) || $resolution->outcome !== 'carried') {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'Only a closed resolution with a carried outcome can approve a budget.',
+                ]);
+            }
+
+            if ($lockedBudget->isApproved()) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'This budget is already approved.',
+                ]);
+            }
+
+            $alreadyUsed = static::query()
+                ->where('approval_resolution_id', $resolutionId)
+                ->where('id', '!=', $lockedBudget->id)
+                ->where('status', 'approved')
+                ->exists();
+
+            if ($alreadyUsed) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'The selected resolution has already been applied to another approved budget.',
+                ]);
+            }
+
+            // Hold the budgeted lines steady while the terms are compared.
+            $lockedBudget->lineItems()->lockForUpdate()->get(['id']);
+
+            try {
+                $authority->verifyAndConsume(
+                    $resolution,
+                    GovernanceResolutionBinding::SUBJECT_BUDGET,
+                    (int) $lockedBudget->getKey(),
+                    $authority->budgetTerms($lockedBudget),
+                    $actorId ?? auth()->id(),
+                );
+            } catch (\DomainException $exception) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'The selected resolution does not authorize approval of this budget. '.$exception->getMessage(),
+                ]);
+            }
+
+            $lockedBudget->update([
+                'status' => 'approved',
+                'approval_resolution_id' => $resolutionId,
+                'approved_by_board_at' => now(),
+            ]);
+        }, 3);
+
+        $this->refresh();
     }
 
     public function getTotalAllocated(): float

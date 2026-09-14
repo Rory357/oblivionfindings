@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Governance;
 
+use App\Domain\Governance\Models\GovernanceResolutionBinding;
 use App\Domain\Governance\Models\StrategicPlan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\GovernanceTestHelpers;
@@ -39,6 +40,176 @@ class GovernanceStrategyTest extends TestCase
         ]);
     }
 
+    public function test_create_and_edit_deep_links_open_the_wizard_dialogs(): void
+    {
+        $admin = $this->createAdminUser();
+        $plan = $this->createStrategicPlan($admin);
+
+        $this->actingAs($admin)->get('/governance/strategy/create')
+            ->assertRedirect('/governance/strategy?create=1');
+
+        $this->actingAs($admin)->get('/governance/strategy?create=1')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Strategy/Index')
+                ->where('canCreate', true)
+                ->has('formOptions.horizons', 2)
+                ->has('formOptions.pillars', 6)
+                ->where('summary.total', 1)
+                ->has('filters'));
+
+        $this->actingAs($admin)->get("/governance/strategy/{$plan->id}/edit")
+            ->assertRedirect("/governance/strategy/{$plan->id}?edit=1");
+
+        $this->actingAs($admin)->get("/governance/strategy/{$plan->id}?edit=1")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Strategy/Show')
+                ->where('canEdit', true)
+                ->where('canAddGoal', true)
+                ->where('canApprove', true)
+                ->where('canCreateVersion', false)
+                ->has('formOptions.pillars', 6));
+    }
+
+    public function test_view_only_member_gets_no_plan_wizard_or_approval_options(): void
+    {
+        $admin = $this->createAdminUser();
+        $observer = $this->createUserWithRole('board_observer');
+        $plan = $this->createStrategicPlan($admin);
+        $this->createBoundCarriedResolution($admin, GovernanceResolutionBinding::SUBJECT_STRATEGIC_PLAN, $plan->id);
+
+        $this->actingAs($observer)->get('/governance/strategy/create')->assertForbidden();
+        $this->actingAs($observer)->get("/governance/strategy/{$plan->id}/edit")->assertForbidden();
+
+        $this->actingAs($observer)->get('/governance/strategy')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canCreate', false)
+                ->where('formOptions', null));
+
+        $this->actingAs($observer)->get("/governance/strategy/{$plan->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canEdit', false)
+                ->where('canApprove', false)
+                ->where('formOptions', null)
+                ->has('carriedResolutions', 0));
+
+        $this->actingAs($admin)->get("/governance/strategy/{$plan->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->has('carriedResolutions', 1));
+    }
+
+    public function test_wizard_creates_plan_with_values_and_nested_goals(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)->post('/governance/strategy', [
+            'title' => 'Strategic Plan 2027-2030',
+            'planning_horizon' => '3_year',
+            'period_start' => '2027-01-01',
+            'period_end' => '2029-12-31',
+            'vision_statement' => 'Every person lives a good life at home.',
+            'mission_statement' => 'Safe, person-led supported living.',
+            'values' => [
+                ['value' => 'Manaakitanga', 'description' => 'Care and respect'],
+                ['value' => 'Integrity', 'description' => null],
+            ],
+            'goals' => [
+                [
+                    'title' => 'Zero avoidable harm',
+                    'description' => 'Reduce restrictive practice and medication errors.',
+                    'pillar' => 'safety',
+                    'timeframe' => '',
+                    'key_results' => [['result' => 'Medication errors under 1 per 1,000 doses']],
+                ],
+                [
+                    'title' => 'Stable workforce',
+                    'description' => 'Retain experienced support workers.',
+                    'pillar' => 'people',
+                    'timeframe' => '2027-2028',
+                    'key_results' => [],
+                ],
+            ],
+        ])->assertRedirect('/governance/strategy')->assertSessionHasNoErrors();
+
+        $plan = StrategicPlan::query()->where('title', 'Strategic Plan 2027-2030')->firstOrFail();
+        $this->assertSame('Manaakitanga', $plan->values[0]['value']);
+        $this->assertSame(2, $plan->goals()->count());
+
+        $harm = $plan->goals()->where('title', 'Zero avoidable harm')->firstOrFail();
+        $this->assertSame('safety', $harm->pillar);
+        $this->assertSame('2027-01-01 - 2029-12-31', $harm->timeframe);
+        $this->assertSame($admin->id, (int) $harm->lead_executive_id);
+        $this->assertSame([['result' => 'Medication errors under 1 per 1,000 doses', 'status' => 'not_started']], $harm->key_results);
+        $this->assertSame('2027-2028', $plan->goals()->where('title', 'Stable workforce')->value('timeframe'));
+    }
+
+    public function test_wizard_goal_validation_and_edit_adds_goals_without_resending_legacy_horizon(): void
+    {
+        $admin = $this->createAdminUser();
+        $plan = $this->createStrategicPlan($admin, ['planning_horizon' => '1_year', 'title' => 'Legacy annual plan']);
+
+        $this->actingAs($admin)->put("/governance/strategy/{$plan->id}", [
+            'title' => 'Legacy annual plan',
+            'period_start' => $plan->period_start->toDateString(),
+            'period_end' => $plan->period_end->toDateString(),
+            'goals' => [['title' => 'Missing description', 'description' => '', 'pillar' => 'unknown']],
+        ])->assertSessionHasErrors(['goals.0.description', 'goals.0.pillar']);
+        $this->assertSame(0, $plan->goals()->count());
+
+        $this->actingAs($admin)->put("/governance/strategy/{$plan->id}", [
+            'title' => 'Renamed annual plan',
+            'period_start' => $plan->period_start->toDateString(),
+            'period_end' => $plan->period_end->toDateString(),
+            'vision_statement' => 'Updated vision',
+            'mission_statement' => 'Updated mission',
+            'values' => [['value' => 'Respect', 'description' => null]],
+            'goals' => [['title' => 'Open a respite home', 'description' => 'Short breaks for whānau.', 'pillar' => 'quality', 'key_results' => [['result' => 'Home open by June']]]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $plan->refresh();
+        $this->assertSame('Renamed annual plan', $plan->title);
+        $this->assertSame('1_year', $plan->planning_horizon);
+        $this->assertSame('Updated vision', $plan->vision_statement);
+        $this->assertSame(1, $plan->goals()->count());
+    }
+
+    public function test_register_filters_narrow_rows_but_not_summary(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->createStrategicPlan($admin, ['title' => 'Care quality plan']);
+        $approved = $this->createStrategicPlan($admin, ['title' => 'Property plan', 'planning_horizon' => '5_year', 'status' => 'approved']);
+        $approved->goals()->create([
+            'title' => 'Buy homes',
+            'description' => 'Two homes',
+            'pillar' => 'finance',
+            'timeframe' => '2026-2030',
+            'progress_pct' => 40,
+            'lead_executive_id' => $admin->id,
+        ]);
+
+        $this->actingAs($admin)->get('/governance/strategy?status=approved&horizon=5_year&search=Property')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('plans.data', 1)
+                ->where('plans.data.0.title', 'Property plan')
+                ->where('plans.data.0.progress_pct', 40)
+                ->where('summary.total', 2)
+                ->where('summary.draft', 1)
+                ->where('summary.approved', 1)
+                ->where('inEffect.id', $approved->id)
+                ->where('filters.status', 'approved')
+                ->where('filters.horizon', '5_year'));
+
+        $this->actingAs($admin)->get('/governance/strategy?status=bogus')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('plans.data', 2)
+                ->where('filters.status', null));
+    }
+
     public function test_admin_can_add_goal_and_approve_plan(): void
     {
         $admin = $this->createAdminUser();
@@ -56,11 +227,8 @@ class GovernanceStrategyTest extends TestCase
             'title' => 'Improve quality',
         ]);
 
-        $resolution = $this->createResolution($admin, [
-            'strategic_plan_id' => $plan->id,
+        $resolution = $this->createBoundCarriedResolution($admin, GovernanceResolutionBinding::SUBJECT_STRATEGIC_PLAN, $plan->id, [
             'title' => 'Approve Strategic Plan',
-            'status' => 'closed',
-            'outcome' => 'carried',
         ]);
 
         $approveResponse = $this->actingAs($admin)->post("/governance/strategy/{$plan->id}/approve", [
@@ -114,11 +282,8 @@ class GovernanceStrategyTest extends TestCase
         $planA = $this->createStrategicPlan($admin);
         $planB = $this->createStrategicPlan($admin, ['title' => 'Second Plan']);
 
-        $resolution = $this->createResolution($admin, [
-            'strategic_plan_id' => $planA->id,
+        $resolution = $this->createBoundCarriedResolution($admin, GovernanceResolutionBinding::SUBJECT_STRATEGIC_PLAN, $planA->id, [
             'title' => 'Approve Strategic Plan',
-            'status' => 'closed',
-            'outcome' => 'carried',
         ]);
 
         $this->actingAs($admin)->post("/governance/strategy/{$planA->id}/approve", [
@@ -142,11 +307,8 @@ class GovernanceStrategyTest extends TestCase
         $admin = $this->createAdminUser();
         $planA = $this->createStrategicPlan($admin, ['version_number' => 1]);
 
-        $res1 = $this->createResolution($admin, [
-            'strategic_plan_id' => $planA->id,
+        $res1 = $this->createBoundCarriedResolution($admin, GovernanceResolutionBinding::SUBJECT_STRATEGIC_PLAN, $planA->id, [
             'title' => 'Approve Strategic Plan',
-            'status' => 'closed',
-            'outcome' => 'carried',
         ]);
 
         $planA->approve($res1->id);
@@ -159,11 +321,8 @@ class GovernanceStrategyTest extends TestCase
         $this->assertEquals($planA->id, $planB->supersedes_plan_id);
         $this->assertEquals('draft', $planB->status);
 
-        $res2 = $this->createResolution($admin, [
-            'strategic_plan_id' => $planB->id,
+        $res2 = $this->createBoundCarriedResolution($admin, GovernanceResolutionBinding::SUBJECT_STRATEGIC_PLAN, $planB->id, [
             'title' => 'Approve Strategic Plan Refresh',
-            'status' => 'closed',
-            'outcome' => 'carried',
         ]);
 
         $planB->approve($res2->id);
@@ -190,11 +349,8 @@ class GovernanceStrategyTest extends TestCase
             'order' => 1,
         ]);
 
-        $res1 = $this->createResolution($admin, [
-            'strategic_plan_id' => $planA->id,
+        $res1 = $this->createBoundCarriedResolution($admin, GovernanceResolutionBinding::SUBJECT_STRATEGIC_PLAN, $planA->id, [
             'title' => 'Approve Strategic Plan',
-            'status' => 'closed',
-            'outcome' => 'carried',
         ]);
 
         $planA->approve($res1->id);

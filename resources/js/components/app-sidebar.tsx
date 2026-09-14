@@ -14,6 +14,12 @@ import {
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useStableValue } from '@/hooks/use-stable-value';
 import { cn, resolveUrl } from '@/lib/utils';
+import {
+    GOVERNANCE_SECTION_GROUP_LABELS,
+    GOVERNANCE_SECTIONS,
+    governanceHubContainsUrl,
+    visibleSectionTabs,
+} from '@/lib/governance-sections';
 import { vendorRegisterTab } from '@/lib/vendor-navigation';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
@@ -252,6 +258,11 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     if (normalizedItemPath === '/vendors') {
         const selected = vendorRegisterTab(current);
         return selected ? 3000 + item.length : -1;
+    }
+
+    // A Governance hub entry stays lit on every register in its rail.
+    if (governanceHubContainsUrl(normalizedItemPath, normalizedCurrentPath)) {
+        return 2000 + item.length;
     }
 
     if (itemQuery.length > 0) {
@@ -1818,187 +1829,47 @@ function buildGovernanceSubPanelGroups({
     if (!isGovernanceAdmin) {
         if (overview.length > 0) {
             groups.push({ label: 'Governance', items: overview });
+        } else if (can?.roadmap?.view) {
+            // Roadmap-only viewers still need a way in (it has no other entry).
+            groups.push({
+                label: 'Governance',
+                items: [
+                    { title: 'Roadmap', href: '/roadmap/dashboard', icon: Map },
+                ],
+            });
         }
         return groups;
     }
 
-    if (overview.length > 0) {
-        groups.push({ label: 'Overview & My work', items: overview });
+    // Records search lives inside the "Policies & records" hub for managers.
+    const managerOverview = overview.filter(
+        (item) => item.href !== '/governance/records',
+    );
+    if (managerOverview.length > 0) {
+        groups.push({ label: 'Governance', items: managerOverview });
     }
 
-    // 2. Meetings & decisions — meetings, packs, CEO reports, resolutions, actions, evaluations
-    const meetingsDecisions: NavItem[] = [];
-    if (can?.governance?.meetings?.view || can?.governance?.view) {
-        meetingsDecisions.push({
-            title: 'Meetings',
-            href: '/governance/meetings',
-            icon: CalendarDays,
-        });
-    }
-    if (can?.governance?.packs?.view) {
-        meetingsDecisions.push({
-            title: 'Board Packs',
-            href: '/governance/packs',
-            icon: FileText,
-        });
-    }
-    if (can?.governance?.['ceo-reports']?.view) {
-        meetingsDecisions.push({
-            title: 'CEO Reports',
-            href: '/governance/ceo-reports',
-            icon: FileText,
-        });
-    }
-    if (can?.governance?.resolutions?.view) {
-        meetingsDecisions.push({
-            title: 'Resolutions',
-            href: '/governance/resolutions',
-            icon: ClipboardCheck,
-        });
-    }
-    if (can?.governance?.actions?.view) {
-        meetingsDecisions.push({
-            title: 'Action Items',
-            href: '/governance/actions',
-            icon: ClipboardList,
-        });
-    }
-    if (can?.governance?.evaluations?.view) {
-        meetingsDecisions.push({
-            title: 'Board Evaluations',
-            href: '/governance/evaluations',
-            icon: ClipboardCheck,
-        });
-    }
-    if (meetingsDecisions.length > 0) {
-        groups.push({
-            label: 'Meetings & decisions',
-            items: meetingsDecisions,
-        });
-    }
-
-    // 3. Oversight — risks, compliance, financial, strategy, policies, evidence
-    const oversight: NavItem[] = [];
-    if (can?.governance?.risks?.view) {
-        oversight.push({
-            title: 'Risk Register',
-            href: '/governance/risks',
-            icon: Target,
-        });
-    }
-    if (can?.governance?.compliance?.view) {
-        oversight.push({
-            title: 'Compliance',
-            href: '/governance/compliance',
-            icon: Shield,
-        });
-    }
-    if (can?.compliance?.view) {
-        oversight.push({
-            title: 'Operational Compliance',
-            href: '/compliance',
-            icon: ShieldCheck,
-        });
-    }
-    if (can?.governance?.clinical?.view) {
-        oversight.push({
-            title: 'Clinical Governance',
-            href: '/governance/clinical',
-            icon: Shield,
-        });
-    }
-    if (can?.governance?.['te-tiriti']?.view) {
-        oversight.push({
-            title: 'Te Tiriti',
-            href: '/governance/te-tiriti',
-            icon: Landmark,
-        });
-    }
-    if (can?.governance?.budgets?.view) {
-        oversight.push({
-            title: 'Budgets',
-            href: '/governance/budgets',
-            icon: DollarSign,
-        });
-    }
-    if (can?.governance?.spend?.view) {
-        oversight.push({
-            title: 'Spend Approvals',
-            href: '/governance/spend-approvals',
-            icon: DollarSign,
-        });
-    }
-    if (can?.governance?.strategy?.view) {
-        oversight.push({
-            title: 'Strategic Plan',
-            href: '/governance/strategy',
-            icon: Target,
-        });
-    }
-    if (can?.governance?.performance?.view) {
-        oversight.push({
-            title: 'Performance',
-            href: '/governance/performance',
-            icon: ClipboardCheck,
-        });
-    }
-    if (can?.roadmap?.view) {
-        oversight.push({
-            title: 'Roadmap',
-            href: '/roadmap/dashboard',
-            icon: Map,
-        });
-    }
-    if (can?.governance?.policies?.view) {
-        oversight.push({
-            title: 'Policies',
-            href: '/governance/policies',
-            icon: BookOpen,
-        });
-    }
-    if (can?.governance?.documents?.view) {
-        oversight.push({
-            title: 'Documents',
-            href: '/governance/documents',
-            icon: FileText,
-        });
-    }
-    if (can?.governance?.interests?.view) {
-        oversight.push({
-            title: 'Interests Register',
-            href: '/governance/interests',
-            icon: ClipboardList,
-        });
-    }
-    if (oversight.length > 0) {
-        groups.push({ label: 'Oversight', items: oversight });
-    }
-
-    // 4. Board administration — board members, audit log, governance settings
-    const admin: NavItem[] = [];
-    if (can?.governance?.meetings?.manage) {
-        admin.push({
-            title: 'Board Members',
-            href: '/governance/admin/board-members',
-            icon: Users,
-        });
-    }
-    if (can?.governance?.audit?.view) {
-        admin.push({
-            title: 'Audit Log',
-            href: '/governance/audit-log',
-            icon: ClipboardCheck,
-        });
-    }
-    if (can?.governance?.settings?.view) {
-        admin.push({
-            title: 'Governance Settings',
-            href: '/governance/settings',
-            icon: Shield,
-        });
-    }
-    if (admin.length > 0) {
-        groups.push({ label: 'Board administration', items: admin });
+    // One entry per hub (lib/governance-sections.ts); a hub's registers are
+    // the connected-tab rail in its page header, so the sidebar stays short.
+    // The entry opens the first register the viewer can reach.
+    for (const group of ['board', 'oversight', 'admin'] as const) {
+        const items: NavItem[] = [];
+        for (const section of GOVERNANCE_SECTIONS) {
+            if (section.group !== group) continue;
+            const [first] = visibleSectionTabs(section, can);
+            if (!first) continue;
+            items.push({
+                title: section.label,
+                href: first.href,
+                icon: section.icon,
+            });
+        }
+        if (items.length > 0) {
+            groups.push({
+                label: GOVERNANCE_SECTION_GROUP_LABELS[group],
+                items,
+            });
+        }
     }
 
     return groups;

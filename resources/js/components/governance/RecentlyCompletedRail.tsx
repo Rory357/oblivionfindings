@@ -81,7 +81,7 @@ export function RecentlyCompletedRail({ items }: RecentlyCompletedRailProps) {
     return (
         <Card data-dusk="cockpit-recently-completed">
             <CardHeader className="pb-3">
-                <CardTitle className="text-base">Recently Completed</CardTitle>
+                <CardTitle className="text-section-title">Recently Completed</CardTitle>
                 <CardDescription>
                     Closed in the last 14 days — these no longer need board
                     action.

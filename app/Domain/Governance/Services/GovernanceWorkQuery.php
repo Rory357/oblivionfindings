@@ -168,7 +168,7 @@ class GovernanceWorkQuery
         }
 
         try {
-            $query = Resolution::query()->where('status', 'open');
+            $query = Resolution::query()->where('status', 'open')->with('meeting');
             $this->recordAccess->scopeResolutions($query, $viewer);
             $resolutions = $query->get();
 
@@ -242,7 +242,7 @@ class GovernanceWorkQuery
                     requiredAction: [
                         'key' => 'vote',
                         'label' => 'Cast Vote',
-                        'href' => "/governance/resolutions/{$resolution->id}",
+                        'href' => $this->decisionWorkspaceHref($viewer, $resolution),
                         'allowed' => true,
                         'blocked_reason' => null,
                     ],
@@ -734,7 +734,7 @@ class GovernanceWorkQuery
             try {
                 $votes = Vote::query()
                     ->where('board_member_id', $boardMember->id)
-                    ->with('resolution')
+                    ->with('resolution.meeting')
                     ->orderByDesc('voted_at')
                     ->limit(50)
                     ->get();
@@ -761,7 +761,9 @@ class GovernanceWorkQuery
                         requiredAction: [
                             'key' => 'vote',
                             'label' => 'View Decision',
-                            'href' => "/governance/resolutions/{$vote->resolution_id}",
+                            'href' => $res
+                                ? $this->decisionWorkspaceHref($viewer, $res)
+                                : "/governance/resolutions/{$vote->resolution_id}",
                             'allowed' => true,
                             'blocked_reason' => null,
                         ],
@@ -801,6 +803,24 @@ class GovernanceWorkQuery
     /**
      * Deterministic comparison: urgency -> due date -> priority -> stable ID.
      */
+    /**
+     * Where a member acts on a decision: the paper inside its meeting
+     * workspace when the viewer can open that meeting (the approved
+     * one-meeting journey), otherwise the canonical resolution page
+     * (e.g. written resolutions outside a meeting).
+     */
+    protected function decisionWorkspaceHref(User $viewer, Resolution $resolution): string
+    {
+        $meeting = $resolution->meeting;
+
+        if ($meeting instanceof GovernanceMeeting
+            && app(ExecutiveMeetingAccessService::class)->canViewMeeting($viewer, $meeting)) {
+            return "/governance/meetings/{$meeting->id}?tab=resolutions&paper={$resolution->id}";
+        }
+
+        return "/governance/resolutions/{$resolution->id}";
+    }
+
     protected function compareWorkItems(GovernanceWorkItem $a, GovernanceWorkItem $b): int
     {
         // 1. Urgency

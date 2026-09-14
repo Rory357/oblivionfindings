@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -8,16 +7,11 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { resolveActionVerb } from '@/lib/governance-action-verbs';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
-import {
-    AlertOctagon,
-    CalendarDays,
-    CheckCircle2,
-    Circle,
-    Clock,
-} from 'lucide-react';
+import { AlertOctagon, CheckCircle2, Circle, Clock } from 'lucide-react';
 
 export interface MeetingChecklistItem {
     key: string;
@@ -27,6 +21,30 @@ export interface MeetingChecklistItem {
     action_label: string;
     action_url: string;
     blocked_by: string | null;
+}
+
+/**
+ * The viewer's own preparation for the next meeting — derived server-side
+ * from the same permitted records as their meeting workspace
+ * (`GovernancePresenter::memberMeetingReadiness`).
+ */
+export interface MemberMeetingReadiness {
+    workspace_href: string;
+    pack: {
+        published: boolean;
+        read: boolean;
+        revision_number: number | null;
+        href: string | null;
+    };
+    papers: { count: number; href: string };
+    votes: { available: boolean; open: number; href: string };
+    conflicts: {
+        is_member: boolean;
+        declared: number;
+        decisions_to_check: number;
+        href: string;
+    };
+    rsvp: { invited: boolean; response: string | null } | null;
 }
 
 export interface NextMeetingPayload {
@@ -51,11 +69,11 @@ export interface NextMeetingPayload {
     };
     checklist: MeetingChecklistItem[];
     next_step: MeetingChecklistItem | null;
+    member_readiness?: MemberMeetingReadiness | null;
 }
 
 interface MeetingReadinessPanelProps {
     nextMeeting: NextMeetingPayload | null;
-    canScheduleMeeting?: boolean;
 }
 
 const STATUS_ICON: Record<string, { icon: typeof CheckCircle2; cls: string }> =
@@ -72,16 +90,18 @@ const STATUS_ICON: Record<string, { icon: typeof CheckCircle2; cls: string }> =
         },
     };
 
-const STATUS_LABEL: Record<string, string> = {
-    done: 'Done',
-    todo: 'Pending',
-    in_progress: 'In progress',
-    blocked: 'Blocked',
-};
+const STATUS_BADGE: Record<string, { label: string; variant: StatusVariant }> =
+    {
+        done: { label: 'Done', variant: 'success' },
+        todo: { label: 'Pending', variant: 'neutral' },
+        in_progress: { label: 'In progress', variant: 'info' },
+        blocked: { label: 'Blocked', variant: 'critical' },
+        not_applicable: { label: 'Not applicable', variant: 'neutral' },
+    };
 
 /**
- * Map a checklist item key to a verb area so NextActionButton can pick a
- * specific verb (we don't have priority/status here, just the key).
+ * Map a checklist item key to a verb area so the action picks a specific
+ * verb (we don't have priority/status here, just the key).
  */
 function areaForChecklistKey(key: string): string {
     if (key.includes('agenda')) return 'meeting';
@@ -95,110 +115,61 @@ function areaForChecklistKey(key: string): string {
 }
 
 /**
- * Visual lifecycle of the next board meeting — agenda → pack → pre-read →
- * RSVP/quorum → minutes draft → minutes signed. Each step shows its status,
- * an explanation, and a specific-verb action button.
+ * The ADMINISTRATIVE preparation checklist for the next meeting — agenda →
+ * CEO report → pack generation/distribution → quorum → minutes drafted,
+ * approved and signed. Only meeting managers (`governance.meetings.manage`)
+ * see this on Home; ordinary members get `NextMeetingCard` instead. Renders
+ * nothing when there is no next meeting (the Next meeting card owns that
+ * empty state).
  */
 export function MeetingReadinessPanel({
     nextMeeting,
-    canScheduleMeeting = false,
 }: MeetingReadinessPanelProps) {
     if (!nextMeeting) {
-        return (
-            <Card data-dusk="cockpit-meeting-readiness">
-                <CardHeader>
-                    <CardTitle className="text-lg">
-                        Next Meeting Readiness
-                    </CardTitle>
-                    <CardDescription>
-                        Preparation status for the next board meeting.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                        <CalendarDays
-                            className="mx-auto h-6 w-6 text-muted-foreground"
-                            aria-hidden="true"
-                        />
-                        <p className="mt-2 text-sm font-medium text-foreground">
-                            No meeting scheduled
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Schedule the next board meeting to begin pre-read
-                            preparation.
-                        </p>
-                        {canScheduleMeeting && (
-                            <Button asChild size="sm" className="mt-4">
-                                <Link href="/governance/meetings/create">
-                                    Schedule meeting
-                                </Link>
-                            </Button>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-        );
+        return null;
     }
 
     const { meeting, progress, checklist, next_step } = nextMeeting;
-    const daysUntil = meeting.days_until ?? 0;
-    const urgency =
-        daysUntil <= 3 && progress.percent < 80
-            ? 'critical'
-            : daysUntil <= 7 && progress.percent < 60
-              ? 'warning'
-              : 'good';
-    const urgencyTone =
-        urgency === 'critical'
-            ? 'critical'
-            : urgency === 'warning'
-              ? 'warning'
-              : 'info';
 
     return (
         <Card data-dusk="cockpit-meeting-readiness">
             <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <CardTitle className="text-lg">
-                            Next Meeting Readiness
+                        <CardTitle className="text-section-title">
+                            Meeting preparation checklist
                         </CardTitle>
                         <CardDescription>
+                            Secretariat steps for{' '}
                             <Link
                                 href={meeting.href}
-                                className="font-medium text-foreground hover:underline"
+                                className="font-medium text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                             >
                                 {meeting.title}
                             </Link>
-                            {meeting.scheduled_label
-                                ? ` · ${meeting.scheduled_label}`
-                                : ''}
                         </CardDescription>
                     </div>
-                    <Badge
-                        className={cn(
-                            'border',
-                            urgencyTone === 'critical' &&
-                                'border-status-critical/30 bg-status-critical-bg text-status-critical',
-                            urgencyTone === 'warning' &&
-                                'border-status-warning/30 bg-status-warning-bg text-status-warning',
-                            urgencyTone === 'info' &&
-                                'border-status-info/30 bg-status-info-bg text-status-info',
-                        )}
+                    <StatusBadge
+                        variant={
+                            progress.blocked > 0
+                                ? 'critical'
+                                : progress.remaining > 0
+                                  ? 'warning'
+                                  : 'success'
+                        }
                     >
-                        {daysUntil <= 0
-                            ? 'Today'
-                            : daysUntil === 1
-                              ? '1 day to go'
-                              : `${daysUntil} days to go`}
-                    </Badge>
+                        {progress.done} of {progress.total} steps complete
+                    </StatusBadge>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <CardContent className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between text-caption">
                         <span>
-                            {progress.done} of {progress.total} steps complete
+                            {progress.remaining} remaining
+                            {progress.blocked > 0
+                                ? ` · ${progress.blocked} blocked`
+                                : ''}
                         </span>
                         <span className="font-medium text-foreground">
                             {progress.percent}%
@@ -206,7 +177,7 @@ export function MeetingReadinessPanel({
                     </div>
                     <Progress
                         value={progress.percent}
-                        aria-label="Meeting readiness progress"
+                        aria-label="Meeting preparation progress"
                     />
                 </div>
 
@@ -218,19 +189,25 @@ export function MeetingReadinessPanel({
                         <p className="mt-1 text-sm font-medium text-foreground">
                             {next_step.label}
                         </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <p className="mt-0.5 text-caption">
                             {next_step.detail}
                         </p>
                     </div>
                 ) : null}
 
-                <div className="space-y-2">
+                <ul className="flex flex-col gap-2">
                     {checklist.map((item) => {
                         const meta =
                             STATUS_ICON[item.status] ?? STATUS_ICON.todo;
+                        const badge = STATUS_BADGE[item.status] ?? {
+                            label: item.status.replace(/_/g, ' '),
+                            variant: 'neutral' as const,
+                        };
                         const StatusIcon = meta.icon;
                         const isBlocked = item.status === 'blocked';
-                        const isDone = item.status === 'done';
+                        const isDone =
+                            item.status === 'done' ||
+                            item.status === 'not_applicable';
                         const verb = resolveActionVerb(
                             areaForChecklistKey(item.key),
                             'pending',
@@ -238,46 +215,42 @@ export function MeetingReadinessPanel({
                         );
 
                         return (
-                            <div
+                            <li
                                 key={item.key}
-                                className={cn(
-                                    'flex items-start gap-3 rounded-lg border border-border p-3',
-                                    isDone && 'bg-status-success-bg/30',
-                                )}
+                                className="flex items-start gap-3 rounded-lg border border-border p-3"
                                 data-dusk={`cockpit-meeting-step-${item.key}`}
                             >
                                 <div
                                     className={cn('rounded-md p-1.5', meta.cls)}
                                 >
                                     <StatusIcon
-                                        className="h-4 w-4"
+                                        className="size-4"
                                         aria-hidden="true"
                                     />
                                 </div>
-                                <div className="min-w-0 flex-1 space-y-0.5">
+                                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <p
                                             className={cn(
-                                                'text-sm font-medium',
+                                                'text-sm font-medium text-foreground',
                                                 isDone &&
-                                                    'text-muted-foreground line-through',
+                                                    'text-muted-foreground',
                                             )}
                                         >
                                             {item.label}
                                         </p>
-                                        <Badge
-                                            variant="outline"
-                                            className="text-[10px] uppercase"
+                                        <StatusBadge
+                                            size="sm"
+                                            variant={badge.variant}
                                         >
-                                            {STATUS_LABEL[item.status] ??
-                                                item.status}
-                                        </Badge>
+                                            {badge.label}
+                                        </StatusBadge>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-caption">
                                         {item.detail}
                                     </p>
                                     {isBlocked && item.blocked_by ? (
-                                        <p className="text-xs text-status-critical italic">
+                                        <p className="text-xs text-status-critical">
                                             Blocked by: {item.blocked_by}
                                         </p>
                                     ) : null}
@@ -286,11 +259,7 @@ export function MeetingReadinessPanel({
                                     <Button
                                         asChild
                                         size="sm"
-                                        variant={
-                                            item.status === 'in_progress'
-                                                ? 'default'
-                                                : 'outline'
-                                        }
+                                        variant="outline"
                                         className="shrink-0"
                                     >
                                         <Link href={item.action_url}>
@@ -298,10 +267,10 @@ export function MeetingReadinessPanel({
                                         </Link>
                                     </Button>
                                 )}
-                            </div>
+                            </li>
                         );
                     })}
-                </div>
+                </ul>
             </CardContent>
         </Card>
     );

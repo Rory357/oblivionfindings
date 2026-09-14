@@ -6,6 +6,7 @@ use App\Domain\Governance\Services\DashboardAggregatorService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Domain\Governance\Support\GovernancePresenter;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
@@ -25,15 +26,7 @@ class DashboardController extends Controller
         // Check if user is a board member
         $boardMember = $user?->boardMember;
 
-        $workTotals = null;
-        try {
-            if ($user) {
-                $workFeed = $this->workflowService->workQuery()->queryFeed($user);
-                $workTotals = $workFeed['totals'] ?? null;
-            }
-        } catch (\Throwable) {
-            // Non-blocking fallback
-        }
+        $myWork = $this->myWork($user);
 
         return Inertia::render('Governance/Dashboard', [
             'periods' => [
@@ -44,7 +37,7 @@ class DashboardController extends Controller
             ],
             'isBoardMember' => $boardMember !== null,
             'boardRole' => $boardMember?->board_role,
-            'workTotals' => $workTotals,
+            'workTotals' => $myWork['totals'] ?? null,
         ]);
     }
 
@@ -54,20 +47,19 @@ class DashboardController extends Controller
      */
     private const DASHBOARD_CACHE_TTL = 300;
 
+    /** Page size for the ranked board priorities (initial load and each further page). */
+    public const PRIORITIES_PER_PAGE = 100;
+
     public function data(Request $request)
     {
+        if ($request->query('section') === 'priorities') {
+            return $this->priorities($request);
+        }
+
         $period = $request->validate(['period' => 'required|in:today,week,month,year'])['period'];
         $user = $request->user();
-        $workflow = $this->workflowService->dashboardWorkflow($user);
-        $workTotals = null;
-        try {
-            if ($user) {
-                $workFeed = $this->workflowService->workQuery()->queryFeed($user);
-                $workTotals = $workFeed['totals'] ?? null;
-            }
-        } catch (\Throwable) {
-            // Non-blocking fallback
-        }
+        $workflow = $this->workflowService->dashboardWorkflow($user, self::PRIORITIES_PER_PAGE);
+        $myWork = $this->myWork($user);
 
         try {
             // Widget visibility is permission-scoped, so the cache is per
@@ -100,7 +92,8 @@ class DashboardController extends Controller
                 'period' => $periodData,
                 'widgets' => $widgets,
                 'workflow' => $workflow,
-                'work_totals' => $workTotals,
+                'work_totals' => $myWork['totals'] ?? null,
+                'my_work' => $myWork,
                 'freshness' => $freshness,
                 'cockpit' => $this->presenter->dashboard($widgets, $periodData, $freshness, $workflow, $user),
                 'captured_at' => $result['data']['captured_at'] ?? now()->toIso8601String(),
@@ -112,6 +105,67 @@ class DashboardController extends Controller
                 'message' => 'Board information could not be loaded.',
             ], 500);
         }
+    }
+
+    /** Personal obligations previewed on Home; the full list lives on My work. */
+    public const MY_WORK_PREVIEW = 5;
+
+    /**
+     * The viewer's personal obligations exactly as `/governance/my-work` builds
+     * them (default filters: pending, all kinds): the top items plus the full
+     * authorised totals, so Home never reports the number of cards displayed.
+     * Null when the work feed could not be built — Home then shows an
+     * unavailable state instead of "all caught up".
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function myWork(?User $user): ?array
+    {
+        if (! $user) {
+            return null;
+        }
+
+        try {
+            $feed = $this->workflowService->workQuery()->queryFeed($user, [], self::MY_WORK_PREVIEW, 1);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+
+        return [
+            'items' => $feed['items'] ?? [],
+            'totals' => $feed['totals'] ?? null,
+            'pagination' => $feed['pagination'] ?? null,
+            'availability' => $feed['availability'] ?? [],
+            'all_sources_succeeded' => $feed['all_sources_succeeded'] ?? true,
+            'href' => '/governance/my-work',
+        ];
+    }
+
+    /**
+     * One further page of the viewer's ranked board priorities
+     * (`GET /governance/dashboard/data?section=priorities&tab=…&page=…`).
+     * Same audience as the dashboard payload — always the requesting user —
+     * and the same tab definition as `summary.by_tab`, so every counted
+     * priority is reachable.
+     */
+    protected function priorities(Request $request)
+    {
+        $validated = $request->validate([
+            'tab' => 'nullable|in:'.implode(',', GovernanceWorkflowService::PRIORITY_TABS),
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:'.self::PRIORITIES_PER_PAGE,
+        ]);
+
+        $workflow = $this->workflowService->dashboardWorkflow(
+            $request->user(),
+            (int) ($validated['per_page'] ?? self::PRIORITIES_PER_PAGE),
+            (int) ($validated['page'] ?? 1),
+            $validated['tab'] ?? 'all',
+        );
+
+        return response()->json(['workflow' => $workflow]);
     }
 
     public function widget(Request $request, string $widget)

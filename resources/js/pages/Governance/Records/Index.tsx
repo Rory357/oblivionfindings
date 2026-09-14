@@ -1,35 +1,47 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
-    Archive,
     BookOpen,
     Calendar,
-    ChevronRight,
     Download,
-    FileCheck,
-    FileIcon,
+    Eye,
     FileText,
     FolderArchive,
     Gavel,
-    Search,
-    Shield,
+    Layers,
+    Tag,
+    X,
+    type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import {
+    EmptyValue,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderFilterSelect,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
-    PageHeaderRail,
     PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { formatFileSize } from '@/components/ui/file-dropzone';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
+import { formatDateLong, formatDateOnly } from '@/lib/datetime';
 import { PageProps } from '@/types';
 
 interface DocumentRecord {
@@ -80,11 +92,13 @@ interface PaginatedData<T> {
     last_page: number;
     total: number;
     per_page: number;
+    links: Array<{ url: string | null; label: string; active: boolean }>;
 }
 
 interface Props extends PageProps {
     tab: string;
-    search?: string;
+    search?: string | null;
+    category?: string | null;
     capabilities: {
         documents: boolean;
         meetings: boolean;
@@ -98,10 +112,86 @@ interface Props extends PageProps {
     categories: Array<{ value: string; label: string }>;
 }
 
+const humanise = (value: string | null | undefined) =>
+    value ? value.replace(/_/g, ' ') : '';
+
+/** One record-type section: caption, entity table (or honest empty state), pager. */
+function RecordSection<T extends { id: number }>({
+    title,
+    icon,
+    page,
+    emptyTitle,
+    identityLabel,
+    identity,
+    columns,
+    hrefFor,
+    actionsFor,
+}: {
+    title: string;
+    icon: LucideIcon;
+    page: PaginatedData<T> | null;
+    emptyTitle: string;
+    identityLabel: string;
+    identity: (row: T) => { name: string; subline?: ReactNode };
+    columns: EntityTableColumn<T>[];
+    hrefFor: (row: T) => string;
+    actionsFor: (row: T) => MenuItem[];
+}) {
+    const rows = page?.data ?? [];
+    const ctxMenu = useEntityContextMenu<T>();
+    return (
+        <section className="flex flex-col gap-3">
+            <ListCaption
+                title={title}
+                caption={`${rows.length} of ${page?.total ?? 0} shown`}
+            />
+            {rows.length === 0 ? (
+                <EmptyState
+                    icon={icon}
+                    variant="compact"
+                    title={emptyTitle}
+                    description="Try another search term or record type."
+                />
+            ) : (
+                <EntityTable
+                    rows={rows}
+                    rowKey={(row) => row.id}
+                    identityLabel={identityLabel}
+                    identity={(row) => ({ icon, ...identity(row) })}
+                    columns={columns}
+                    hrefFor={hrefFor}
+                    onOpen={(row) => router.visit(hrefFor(row))}
+                    actionsFor={actionsFor}
+                    onRowContextMenu={(e, row) => ctxMenu.open(e, row)}
+                    minWidth={760}
+                />
+            )}
+            {page ? (
+                <LaravelPagination
+                    links={page.links}
+                    lastPage={page.last_page}
+                    preserveScroll
+                />
+            ) : null}
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={icon}
+                    title={identity(ctxMenu.ctx.record).name}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
+        </section>
+    );
+}
+
 export default function RecordsIndex({
     auth,
     tab: initialTab,
     search: initialSearch,
+    category,
     capabilities,
     documents,
     meetings,
@@ -109,406 +199,421 @@ export default function RecordsIndex({
     policies,
     categories,
 }: Props) {
-    const [currentTab, setCurrentTab] = useState(initialTab || 'all');
+    const currentTab = initialTab || 'all';
     const [searchQuery, setSearchQuery] = useState(initialSearch || '');
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        router.get(
-            '/governance/records',
-            { tab: currentTab, search: searchQuery || undefined },
-            { preserveState: true, replace: true },
-        );
+    useEffect(() => {
+        setSearchQuery(initialSearch || '');
+    }, [initialSearch]);
+
+    const visit = (params: {
+        tab?: string;
+        search?: string;
+        category?: string | null;
+    }) => {
+        const next = {
+            tab: params.tab ?? currentTab,
+            search: (params.search ?? searchQuery) || undefined,
+            category:
+                (params.category === undefined ? category : params.category) ||
+                undefined,
+        };
+        router.get('/governance/records', next, {
+            preserveState: true,
+            replace: true,
+        });
     };
 
-    const handleTabChange = (newTab: string) => {
-        setCurrentTab(newTab);
-        router.get(
-            '/governance/records',
-            { tab: newTab, search: searchQuery || undefined },
-            { preserveState: true, replace: true },
-        );
-    };
-
-    const formatBytes = (bytes: number) => {
-        if (!bytes) return '0 B';
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    };
-
-    const railTabs = [
-        { key: 'all', label: 'All records', count: (meetings?.total ?? 0) + (resolutions?.total ?? 0) + (policies?.total ?? 0) + (documents?.total ?? 0) },
-        ...(capabilities.meetings ? [{ key: 'meetings', label: 'Meetings & minutes', count: meetings?.total ?? 0 }] : []),
-        ...(capabilities.resolutions ? [{ key: 'resolutions', label: 'Decisions', count: resolutions?.total ?? 0 }] : []),
-        ...(capabilities.policies ? [{ key: 'policies', label: 'Policies', count: policies?.total ?? 0 }] : []),
-        ...(capabilities.documents ? [{ key: 'documents', label: 'Documents', count: documents?.total ?? 0 }] : []),
+    const typeOptions = [
+        { value: 'all', label: 'All record types' },
+        ...(capabilities.meetings
+            ? [{ value: 'meetings', label: 'Meetings & minutes' }]
+            : []),
+        ...(capabilities.resolutions
+            ? [{ value: 'resolutions', label: 'Decisions' }]
+            : []),
+        ...(capabilities.policies
+            ? [{ value: 'policies', label: 'Policies' }]
+            : []),
+        ...(capabilities.documents
+            ? [{ value: 'documents', label: 'Documents' }]
+            : []),
     ];
+
+    const shows = (key: string) => currentTab === 'all' || currentTab === key;
+    const hasFilters = Boolean(initialSearch || category || currentTab !== 'all');
+    const showCategory =
+        capabilities.documents && (currentTab === 'all' || currentTab === 'documents');
+
+    const meetingColumns: EntityTableColumn<MeetingRecord>[] = [
+        {
+            key: 'status',
+            label: 'Status',
+            width: '0.8fr',
+            cell: (m) => <StatusBadge status={m.status} className="rounded-[8px]" />,
+        },
+        {
+            key: 'minutes',
+            label: 'Minutes',
+            width: '1fr',
+            cell: (m) =>
+                m.has_minutes ? (
+                    <EntityStatusChip variant="success">
+                        Minutes {humanise(m.minutes_status) || 'recorded'}
+                    </EntityStatusChip>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'date',
+            label: 'Held',
+            width: '0.9fr',
+            cell: (m) => formatDateLong(m.scheduled_at, 'Date not set'),
+        },
+    ];
+
+    const resolutionColumns: EntityTableColumn<ResolutionRecord>[] = [
+        {
+            key: 'status',
+            label: 'Status',
+            width: '0.8fr',
+            cell: (r) => <StatusBadge status={r.status} className="rounded-[8px]" />,
+        },
+        {
+            key: 'outcome',
+            label: 'Outcome',
+            width: '0.8fr',
+            cell: (r) =>
+                r.outcome ? (
+                    <EntityChip>
+                        <span className="capitalize">{humanise(r.outcome)}</span>
+                    </EntityChip>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'date',
+            label: 'Recorded',
+            width: '0.9fr',
+            cell: (r) => formatDateLong(r.created_at),
+        },
+    ];
+
+    const policyColumns: EntityTableColumn<PolicyRecord>[] = [
+        {
+            key: 'category',
+            label: 'Category',
+            width: '1fr',
+            cell: (p) => (
+                <EntityChip icon={Tag}>
+                    <span className="capitalize">{humanise(p.category)}</span>
+                </EntityChip>
+            ),
+        },
+        {
+            key: 'version',
+            label: 'Version',
+            width: '0.5fr',
+            cell: (p) => (
+                <span className="text-muted-foreground tabular-nums">
+                    v{p.version_number}
+                </span>
+            ),
+        },
+        {
+            key: 'effective',
+            label: 'Effective',
+            width: '0.9fr',
+            cell: (p) => formatDateOnly(p.effective_from),
+        },
+    ];
+
+    const documentColumns: EntityTableColumn<DocumentRecord>[] = [
+        {
+            key: 'type',
+            label: 'Type',
+            width: '1fr',
+            cell: (d) => (
+                <EntityChip icon={Tag}>
+                    <span className="capitalize">{humanise(d.category)}</span>
+                </EntityChip>
+            ),
+        },
+        {
+            key: 'version',
+            label: 'Version',
+            width: '0.5fr',
+            cell: (d) => (
+                <span className="text-muted-foreground tabular-nums">
+                    v{d.version}
+                </span>
+            ),
+        },
+        {
+            key: 'size',
+            label: 'Size',
+            width: '0.6fr',
+            cell: (d) => (
+                <span className="text-muted-foreground tabular-nums">
+                    {formatFileSize(d.file_size) || '—'}
+                </span>
+            ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            icon={FolderArchive}
+            title="Governance records"
+            subline="Past meetings and minutes, carried decisions, approved policies and board documents"
+            meters={
+                <>
+                    {capabilities.meetings && (
+                        <PageHeaderMeterBlock
+                            label="Past meetings"
+                            href="/governance/records?tab=meetings"
+                        >
+                            <PageHeaderMeterBig>
+                                {meetings?.total ?? 0}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                Historical sessions
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    )}
+                    {capabilities.resolutions && (
+                        <PageHeaderMeterBlock
+                            label="Decisions made"
+                            href="/governance/records?tab=resolutions"
+                        >
+                            <PageHeaderMeterBig>
+                                {resolutions?.total ?? 0}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                Carried resolutions
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    )}
+                    {capabilities.policies && (
+                        <PageHeaderMeterBlock
+                            label="Approved policies"
+                            href="/governance/records?tab=policies"
+                        >
+                            <PageHeaderMeterBig>
+                                {policies?.total ?? 0}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                Active policy library
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    )}
+                    {capabilities.documents && (
+                        <PageHeaderMeterBlock
+                            label="Documents"
+                            href="/governance/records?tab=documents"
+                        >
+                            <PageHeaderMeterBig>
+                                {documents?.total ?? 0}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                Charters & templates
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    )}
+                </>
+            }
+            actions={
+                <PageHeaderSearch
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            visit({ search: searchQuery });
+                        }
+                    }}
+                    placeholder="Search records by title…"
+                />
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        icon={Layers}
+                        label="All record types"
+                        value={currentTab}
+                        options={typeOptions}
+                        onChange={(value) => visit({ tab: value })}
+                    />
+                    {showCategory ? (
+                        <PageHeaderFilterSelect
+                            icon={Tag}
+                            label="All document types"
+                            value={category ?? 'all'}
+                            options={[
+                                { value: 'all', label: 'All document types' },
+                                ...categories,
+                            ]}
+                            onChange={(value) =>
+                                visit({ category: value === 'all' ? null : value })
+                            }
+                        />
+                    ) : null}
+                </>
+            }
+            rail={<GovernanceSectionRail />}
+        />
+    );
+
+    const noSections =
+        !capabilities.meetings &&
+        !capabilities.resolutions &&
+        !capabilities.policies &&
+        !capabilities.documents;
 
     return (
         <AppLayout
+            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Records', href: '/governance/records' },
+                { title: 'Records search', href: '/governance/records' },
             ]}
         >
-            <Head title="Governance Records & Archives" />
-            <PageLayout
-                hero={
-                    <PageHeader
-                        icon={FolderArchive}
-                        title="Governance Records"
-                        subline="Canonical historical archive of past meetings, minutes, carried decisions, approved policies, and documents"
-                        meters={
-                            <>
-                                {capabilities.meetings && (
-                                    <PageHeaderMeterBlock
-                                        label="Past meetings"
-                                        href="/governance/records?tab=meetings"
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {meetings?.total ?? 0}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Historical sessions
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                )}
-                                {capabilities.resolutions && (
-                                    <PageHeaderMeterBlock
-                                        label="Decisions made"
-                                        href="/governance/records?tab=resolutions"
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {resolutions?.total ?? 0}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Carried resolutions
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                )}
-                                {capabilities.policies && (
-                                    <PageHeaderMeterBlock
-                                        label="Approved policies"
-                                        href="/governance/records?tab=policies"
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {policies?.total ?? 0}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Active policy library
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                )}
-                                {capabilities.documents && (
-                                    <PageHeaderMeterBlock
-                                        label="Documents"
-                                        href="/governance/records?tab=documents"
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {documents?.total ?? 0}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>
-                                            Charters & templates
-                                        </PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                )}
-                            </>
-                        }
-                        actions={
-                            <PageHeaderSearch
-                                value={searchQuery}
-                                onChange={setSearchQuery}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        handleSearch(e as unknown as React.FormEvent);
-                                    }
-                                }}
-                                placeholder="Search records by title or reference..."
-                            />
-                        }
-                        rail={
-                            <PageHeaderRail
-                                value={currentTab}
-                                onSelect={handleTabChange}
-                                items={railTabs.map((t) => ({
-                                    key: t.key,
-                                    label: t.label,
-                                    count: t.count,
-                                }))}
-                            />
-                        }
-                    />
-                }
-            >
-                <div className="space-y-6">
-                    {/* Meetings section */}
-                    {(currentTab === 'all' || currentTab === 'meetings') && capabilities.meetings && (
-                        <Card>
-                            <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                                        <Calendar className="h-4 w-4 text-primary" />
-                                        Past Meetings & Minutes
-                                    </h3>
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                        Completed meetings with confirmed agendas and signed minutes
-                                    </p>
-                                </div>
-                                {meetings && (
-                                    <Badge variant="outline" className="text-xs font-normal">
-                                        {meetings.total} records
-                                    </Badge>
-                                )}
-                            </div>
-                            <CardContent className="p-0">
-                                {meetings?.data && meetings.data.length > 0 ? (
-                                    <div className="divide-y divide-border">
-                                        {meetings.data.map((meeting) => (
-                                            <div
-                                                key={meeting.id}
-                                                className="flex items-center justify-between p-4 hover:bg-muted/40 transition-colors"
-                                            >
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <Link
-                                                            href={`/governance/meetings/${meeting.id}`}
-                                                            className="font-medium text-foreground hover:text-primary hover:underline truncate"
-                                                        >
-                                                            {meeting.title}
-                                                        </Link>
-                                                        <StatusBadge status={meeting.status} />
-                                                        {meeting.has_minutes && (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="border-status-success/30 bg-status-success-bg text-status-success text-[10px]"
-                                                            >
-                                                                Minutes {meeting.minutes_status ?? 'recorded'}
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        {meeting.scheduled_at ? new Date(meeting.scheduled_at).toLocaleDateString('en-NZ', { dateStyle: 'medium' }) : 'Date not set'}
-                                                        {' · '}
-                                                        <span className="capitalize">{meeting.meeting_type.replace(/_/g, ' ')}</span>
-                                                    </p>
-                                                </div>
-                                                <Button variant="ghost" size="sm" asChild>
-                                                    <Link href={`/governance/meetings/${meeting.id}`}>
-                                                        View workspace &rarr;
-                                                    </Link>
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="p-8 text-center text-muted-foreground text-sm">
-                                        No historical meetings match the criteria.
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
+            <Head title="Governance records" />
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {hasFilters ? (
+                        <div className="flex justify-end">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs text-muted-foreground"
+                                onClick={() =>
+                                    router.get('/governance/records', {}, { replace: true })
+                                }
+                            >
+                                <X className="h-3.5 w-3.5" />
+                                Clear filters
+                            </Button>
+                        </div>
+                    ) : null}
 
-                    {/* Decisions / Resolutions section */}
-                    {(currentTab === 'all' || currentTab === 'resolutions') && capabilities.resolutions && (
-                        <Card>
-                            <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                                        <Gavel className="h-4 w-4 text-primary" />
-                                        Decisions & Resolutions
-                                    </h3>
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                        Carried, implemented, and archived formal board decisions
-                                    </p>
-                                </div>
-                                {resolutions && (
-                                    <Badge variant="outline" className="text-xs font-normal">
-                                        {resolutions.total} records
-                                    </Badge>
-                                )}
-                            </div>
-                            <CardContent className="p-0">
-                                {resolutions?.data && resolutions.data.length > 0 ? (
-                                    <div className="divide-y divide-border">
-                                        {resolutions.data.map((res) => (
-                                            <div
-                                                key={res.id}
-                                                className="flex items-center justify-between p-4 hover:bg-muted/40 transition-colors"
-                                            >
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <Link
-                                                            href={`/governance/resolutions/${res.id}`}
-                                                            className="font-medium text-foreground hover:text-primary hover:underline truncate"
-                                                        >
-                                                            {res.title}
-                                                        </Link>
-                                                        <StatusBadge status={res.status} />
-                                                        {res.outcome && (
-                                                            <Badge variant="outline" className="text-[10px] capitalize">
-                                                                {res.outcome}
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        {res.resolution_reference}
-                                                        {res.meeting_title ? ` · From ${res.meeting_title}` : ''}
-                                                        {' · '}
-                                                        {res.created_at ? new Date(res.created_at).toLocaleDateString('en-NZ', { dateStyle: 'medium' }) : ''}
-                                                    </p>
-                                                </div>
-                                                <Button variant="ghost" size="sm" asChild>
-                                                    <Link href={`/governance/resolutions/${res.id}`}>
-                                                        View decision &rarr;
-                                                    </Link>
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="p-8 text-center text-muted-foreground text-sm">
-                                        No carried decisions match the criteria.
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
+                    {noSections ? (
+                        <EmptyState
+                            icon={FolderArchive}
+                            title="No governance records are available to you"
+                            description="Records appear here for the registers your role can view."
+                        />
+                    ) : null}
 
-                    {/* Policies section */}
-                    {(currentTab === 'all' || currentTab === 'policies') && capabilities.policies && (
-                        <Card>
-                            <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                                        <BookOpen className="h-4 w-4 text-primary" />
-                                        Approved Policies
-                                    </h3>
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                        Current board-approved governance policies
-                                    </p>
-                                </div>
-                                {policies && (
-                                    <Badge variant="outline" className="text-xs font-normal">
-                                        {policies.total} records
-                                    </Badge>
-                                )}
-                            </div>
-                            <CardContent className="p-0">
-                                {policies?.data && policies.data.length > 0 ? (
-                                    <div className="divide-y divide-border">
-                                        {policies.data.map((policy) => (
-                                            <div
-                                                key={policy.id}
-                                                className="flex items-center justify-between p-4 hover:bg-muted/40 transition-colors"
-                                            >
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <Link
-                                                            href={`/governance/policies/${policy.id}`}
-                                                            className="font-medium text-foreground hover:text-primary hover:underline truncate"
-                                                        >
-                                                            {policy.title}
-                                                        </Link>
-                                                        <Badge variant="outline" className="text-[10px]">
-                                                            v{policy.version_number}
-                                                        </Badge>
-                                                    </div>
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        {policy.policy_code} · Category: <span className="capitalize">{policy.category}</span>
-                                                        {policy.effective_from ? ` · Effective: ${policy.effective_from}` : ''}
-                                                    </p>
-                                                </div>
-                                                <Button variant="ghost" size="sm" asChild>
-                                                    <Link href={`/governance/policies/${policy.id}`}>
-                                                        View policy &rarr;
-                                                    </Link>
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="p-8 text-center text-muted-foreground text-sm">
-                                        No approved policies match the criteria.
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
+                    {shows('meetings') && capabilities.meetings ? (
+                        <RecordSection
+                            title="Past meetings & minutes"
+                            icon={Calendar}
+                            page={meetings}
+                            emptyTitle="No past meetings match"
+                            identityLabel="Meeting"
+                            identity={(m) => ({
+                                name: m.title,
+                                subline: (
+                                    <span className="capitalize">
+                                        {humanise(m.meeting_type)}
+                                    </span>
+                                ),
+                            })}
+                            columns={meetingColumns}
+                            hrefFor={(m) => `/governance/meetings/${m.id}`}
+                            actionsFor={(m) => [
+                                {
+                                    label: 'Open meeting workspace',
+                                    icon: Eye,
+                                    onClick: () =>
+                                        router.visit(`/governance/meetings/${m.id}`),
+                                },
+                            ]}
+                        />
+                    ) : null}
 
-                    {/* Documents section (strictly capability-gated) */}
-                    {(currentTab === 'all' || currentTab === 'documents') && capabilities.documents && (
-                        <Card>
-                            <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                                        <FileText className="h-4 w-4 text-primary" />
-                                        Governance Documents & Charters
-                                    </h3>
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                        Constitutions, charters, terms of reference, and organizational archives
-                                    </p>
-                                </div>
-                                {documents && (
-                                    <Badge variant="outline" className="text-xs font-normal">
-                                        {documents.total} records
-                                    </Badge>
-                                )}
-                            </div>
-                            <CardContent className="p-0">
-                                {documents?.data && documents.data.length > 0 ? (
-                                    <div className="divide-y divide-border">
-                                        {documents.data.map((doc) => (
-                                            <div
-                                                key={doc.id}
-                                                className="flex items-center justify-between p-4 hover:bg-muted/40 transition-colors"
-                                            >
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <Link
-                                                            href={`/governance/documents/${doc.id}`}
-                                                            className="font-medium text-foreground hover:text-primary hover:underline truncate"
-                                                        >
-                                                            {doc.title}
-                                                        </Link>
-                                                        <Badge variant="outline" className="text-[10px]">
-                                                            v{doc.version}
-                                                        </Badge>
-                                                    </div>
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        {doc.file_name} · {formatBytes(doc.file_size)} · Category:{' '}
-                                                        <span className="capitalize">{doc.category.replace(/_/g, ' ')}</span>
-                                                    </p>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Button variant="ghost" size="sm" asChild>
-                                                        <a
-                                                            href={`/governance/documents/${doc.id}/download`}
-                                                            aria-label={`Download ${doc.title}`}
-                                                        >
-                                                            <Download className="h-4 w-4 mr-1" />
-                                                            Download
-                                                        </a>
-                                                    </Button>
-                                                    <Button variant="ghost" size="sm" asChild>
-                                                        <Link href={`/governance/documents/${doc.id}`}>
-                                                            Details &rarr;
-                                                        </Link>
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="p-8 text-center text-muted-foreground text-sm">
-                                        No documents match the criteria.
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
+                    {shows('resolutions') && capabilities.resolutions ? (
+                        <RecordSection
+                            title="Decisions & resolutions"
+                            icon={Gavel}
+                            page={resolutions}
+                            emptyTitle="No carried decisions match"
+                            identityLabel="Decision"
+                            identity={(r) => ({
+                                name: r.title,
+                                subline: `${r.resolution_reference}${r.meeting_title ? ` · From ${r.meeting_title}` : ''}`,
+                            })}
+                            columns={resolutionColumns}
+                            hrefFor={(r) => `/governance/resolutions/${r.id}`}
+                            actionsFor={(r) => [
+                                {
+                                    label: 'Open decision',
+                                    icon: Eye,
+                                    onClick: () =>
+                                        router.visit(`/governance/resolutions/${r.id}`),
+                                },
+                            ]}
+                        />
+                    ) : null}
+
+                    {shows('policies') && capabilities.policies ? (
+                        <RecordSection
+                            title="Approved policies"
+                            icon={BookOpen}
+                            page={policies}
+                            emptyTitle="No approved policies match"
+                            identityLabel="Policy"
+                            identity={(p) => ({
+                                name: p.title,
+                                subline: p.policy_code,
+                            })}
+                            columns={policyColumns}
+                            hrefFor={(p) => `/governance/policies/${p.id}`}
+                            actionsFor={(p) => [
+                                {
+                                    label: 'Open policy',
+                                    icon: Eye,
+                                    onClick: () =>
+                                        router.visit(`/governance/policies/${p.id}`),
+                                },
+                            ]}
+                        />
+                    ) : null}
+
+                    {shows('documents') && capabilities.documents ? (
+                        <RecordSection
+                            title="Governance documents & charters"
+                            icon={FileText}
+                            page={documents}
+                            emptyTitle="No documents match"
+                            identityLabel="Document"
+                            identity={(d) => ({
+                                name: d.title,
+                                subline: d.file_name,
+                            })}
+                            columns={documentColumns}
+                            hrefFor={(d) => `/governance/documents/${d.id}`}
+                            actionsFor={(d) => [
+                                {
+                                    label: 'Details',
+                                    icon: Eye,
+                                    onClick: () =>
+                                        router.visit(`/governance/documents/${d.id}`),
+                                },
+                                {
+                                    label: 'Download',
+                                    icon: Download,
+                                    onClick: () => {
+                                        window.location.href = `/governance/documents/${d.id}/download`;
+                                    },
+                                },
+                            ]}
+                        />
+                    ) : null}
                 </div>
             </PageLayout>
         </AppLayout>

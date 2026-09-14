@@ -15,19 +15,22 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { vote as voteResolution } from '@/routes/governance/resolutions';
 import { declare as declareConflictRoute } from '@/routes/governance/resolutions/conflict';
-import { router } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import {
     AlertCircle,
     AlertTriangle,
     ArrowLeft,
+    ArrowRight,
     CheckCircle,
     CheckCircle2,
     DollarSign,
+    Download,
+    ExternalLink,
     FileText,
     Gavel,
     Lock,
@@ -39,7 +42,11 @@ import {
     Vote,
     XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import {
+    actionHrefWithReturn,
+    type MeetingWorkspaceFocus,
+} from './meeting-workspace-links';
 
 export interface OptionItem {
     label: string;
@@ -113,26 +120,83 @@ export interface PaperResolution {
         voted: number;
         total_eligible: number;
     } | null;
-    action_items?: Array<{
-        id: number;
-        title: string;
-        status: string;
-        due_date?: string;
-        assignee?: { name: string };
-    }>;
-    attachments?: Array<{
-        id: number;
-        file_name: string;
-        file_size: number;
-        created_at: string;
-    }>;
+    /** Follow-up actions the viewer may see (server-filtered by record audience). */
+    action_items?: PaperActionItem[];
+    /** Follow-up actions on this paper the viewer is not permitted to see. */
+    restricted_action_items_count?: number;
+    attachments?: PaperAttachment[];
 }
+
+/** Explicit follow-up action payload from `GovernanceMeetingController::presentPaperAction`. */
+export interface PaperActionItem {
+    id: number;
+    reference: string;
+    title: string;
+    status: string;
+    priority?: string | null;
+    due_date?: string | null;
+    due_label?: string | null;
+    assignee_name?: string | null;
+    is_mine: boolean;
+    can_open: boolean;
+    /** Canonical action page; null when the viewer cannot pass its gate. */
+    open_url: string | null;
+}
+
+/** Supporting document payload from `Resolution::presentAttachments`. */
+export interface PaperAttachment {
+    id: string | null;
+    original_name: string;
+    mime_type?: string | null;
+    size_bytes?: number | null;
+    uploaded_at?: string | null;
+    uploaded_by_name?: string | null;
+    /** Authorised download route; null when the viewer cannot download. */
+    download_url: string | null;
+}
+
+function formatFileSize(bytes?: number | null): string | null {
+    if (bytes === null || bytes === undefined || Number.isNaN(bytes)) return null;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Decision outcome → the shared status token pairs. */
+function outcomeVariant(outcome: string | null | undefined): StatusVariant {
+    switch (outcome) {
+        case 'carried':
+            return 'success';
+        case 'defeated':
+            return 'critical';
+        case 'no_quorum':
+            return 'warning';
+        default:
+            return 'neutral';
+    }
+}
+
+function voteVariant(vote: string): StatusVariant {
+    if (vote === 'for') return 'success';
+    if (vote === 'against') return 'critical';
+    return 'neutral';
+}
+
+const outcomeLabel = (outcome: string) =>
+    outcome === 'no_quorum'
+        ? 'No quorum'
+        : outcome.charAt(0).toUpperCase() + outcome.slice(1).replace(/_/g, ' ');
 
 interface Props {
     resolution: PaperResolution;
     meetingId: number;
     meetingTitle?: string;
     onClose: () => void;
+    /** The next paper in agenda order, so a member can move on after voting. */
+    nextPaper?: Pick<PaperResolution, 'id' | 'title' | 'resolution_reference'> | null;
+    onOpenPaper?: (paperId: number) => void;
+    /** Where to land when the workspace opens (e.g. back from an action). */
+    focus?: MeetingWorkspaceFocus | null;
 }
 
 export function MeetingPaperWorkspace({
@@ -140,7 +204,34 @@ export function MeetingPaperWorkspace({
     meetingId,
     meetingTitle,
     onClose,
+    nextPaper = null,
+    onOpenPaper,
+    focus = null,
 }: Props) {
+    const rootRef = useRef<HTMLDivElement>(null);
+    const followUpsRef = useRef<HTMLDivElement>(null);
+
+    // Keep the member's place: opening a paper (or returning from one of its
+    // follow-up actions) scrolls to the paper, or straight to its follow-ups.
+    useEffect(() => {
+        const target =
+            focus === 'follow-ups' && followUpsRef.current
+                ? followUpsRef.current
+                : rootRef.current;
+        if (!target || typeof target.scrollIntoView !== 'function') return;
+        const reduceMotion =
+            typeof window !== 'undefined' &&
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        target.scrollIntoView({
+            behavior: reduceMotion ? 'auto' : 'smooth',
+            block: 'start',
+        });
+        if (focus === 'follow-ups') {
+            target.focus({ preventScroll: true });
+        }
+    }, [resolution.id, focus]);
+
     const [selectedVote, setSelectedVote] = useState<string>('');
     const [conflictNote, setConflictNote] = useState<string>('');
     const [submittingVote, setSubmittingVote] = useState(false);
@@ -204,9 +295,14 @@ export function MeetingPaperWorkspace({
     };
 
     return (
-        <div className="space-y-6" data-test="meeting-paper-workspace">
+        <div
+            ref={rootRef}
+            className="flex scroll-mt-5 flex-col gap-5"
+            data-test="meeting-paper-workspace"
+            data-paper-id={resolution.id}
+        >
             {/* Top Return Header */}
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4">
+            <Card className="flex-row flex-wrap items-center justify-between gap-3 p-4">
                 <div className="flex items-center gap-3">
                     <Button
                         variant="outline"
@@ -215,34 +311,41 @@ export function MeetingPaperWorkspace({
                         className="gap-1.5"
                     >
                         <ArrowLeft className="h-4 w-4" />
-                        Back to Meeting Agenda
+                        Back to meeting papers
                     </Button>
                     <div className="hidden sm:block text-xs text-muted-foreground">
                         {meetingTitle ? `Meeting: ${meetingTitle}` : 'Meeting Workspace'}
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-mono font-medium text-muted-foreground">
                         {resolution.resolution_reference}
                     </span>
                     <StatusBadge status={resolution.status} />
                     {resolution.outcome && (
-                        <Badge
-                            className={cn(
-                                resolution.outcome === 'carried' && 'bg-status-success-bg text-status-success',
-                                resolution.outcome === 'defeated' && 'bg-status-critical-bg text-status-critical',
-                                resolution.outcome === 'no_quorum' && 'bg-status-warning-bg text-status-warning',
-                            )}
+                        <StatusBadge variant={outcomeVariant(resolution.outcome)}>
+                            {outcomeLabel(resolution.outcome)}
+                        </StatusBadge>
+                    )}
+                    {nextPaper && onOpenPaper && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => onOpenPaper(nextPaper.id)}
+                            aria-label={`Next paper: ${nextPaper.resolution_reference} ${nextPaper.title}`}
+                            data-test="meeting-paper-next"
                         >
-                            {resolution.outcome === 'no_quorum' ? 'No Quorum' : resolution.outcome}
-                        </Badge>
+                            Next paper
+                            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                        </Button>
                     )}
                 </div>
-            </div>
+            </Card>
 
             {/* Paper Title & Snapshot Banner */}
             <div className="space-y-2">
-                <h2 className="text-xl font-bold tracking-tight text-foreground">
+                <h2 className="text-section-title tracking-tight">
                     {resolution.title}
                 </h2>
                 {resolution.paper_snapshot && (
@@ -447,7 +550,7 @@ export function MeetingPaperWorkspace({
                         </CardTitle>
                         <CardDescription>
                             {resolution.deadline
-                                ? `Voting closes: ${new Date(resolution.deadline).toLocaleString()}`
+                                ? `Voting closes ${formatDateTimeLong(resolution.deadline)} (NZ time)`
                                 : 'Voting is currently open for eligible members.'}
                         </CardDescription>
                     </CardHeader>
@@ -550,17 +653,19 @@ export function MeetingPaperWorkspace({
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-wrap items-center gap-3">
-                            <Badge
-                                className={cn(
-                                    resolution.my_vote.vote === 'for' && 'bg-status-success-bg text-status-success',
-                                    resolution.my_vote.vote === 'against' && 'bg-status-critical-bg text-status-critical',
-                                    resolution.my_vote.vote === 'abstain' && 'bg-muted text-foreground',
-                                )}
-                            >
+                            <StatusBadge variant={voteVariant(resolution.my_vote.vote)}>
                                 {resolution.my_vote.vote.toUpperCase()}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                                Recorded {new Date(resolution.my_vote.voted_at).toLocaleString()} · Method: {resolution.my_vote.voting_method ?? 'Electronic'}
+                            </StatusBadge>
+                            <span className="text-xs text-muted-foreground" data-test="paper-vote-receipt-time">
+                                Recorded{' '}
+                                <time dateTime={resolution.my_vote.voted_at}>
+                                    {formatDateTimeLong(resolution.my_vote.voted_at)}
+                                </time>{' '}
+                                (NZ time) · Method:{' '}
+                                {resolution.my_vote.voting_method
+                                    ? resolution.my_vote.voting_method.charAt(0).toUpperCase() +
+                                      resolution.my_vote.voting_method.slice(1).replace(/_/g, ' ')
+                                    : 'Electronic'}
                             </span>
                             {resolution.my_vote.conflict_declared && (
                                 <Badge variant="outline" className="text-status-warning text-xs">
@@ -579,15 +684,9 @@ export function MeetingPaperWorkspace({
                     <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-base">Official Decision Results</CardTitle>
-                            <Badge
-                                className={cn(
-                                    resolution.results.outcome === 'carried' && 'bg-status-success-bg text-status-success',
-                                    resolution.results.outcome === 'defeated' && 'bg-status-critical-bg text-status-critical',
-                                    resolution.results.outcome === 'no_quorum' && 'bg-status-warning-bg text-status-warning',
-                                )}
-                            >
-                                {resolution.results.outcome}
-                            </Badge>
+                            <StatusBadge variant={outcomeVariant(resolution.results.outcome)}>
+                                {outcomeLabel(resolution.results.outcome)}
+                            </StatusBadge>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -621,15 +720,9 @@ export function MeetingPaperWorkspace({
                                     {resolution.results.individual_votes.map((v, i) => (
                                         <div key={i} className="flex items-center justify-between rounded border p-2 text-xs">
                                             <span>{resolveMemberName(v.board_member)}</span>
-                                            <Badge
-                                                className={cn(
-                                                    v.vote === 'for' && 'bg-status-success-bg text-status-success',
-                                                    v.vote === 'against' && 'bg-status-critical-bg text-status-critical',
-                                                    v.vote === 'abstain' && 'bg-muted text-foreground',
-                                                )}
-                                            >
-                                                {v.vote}
-                                            </Badge>
+                                            <StatusBadge variant={voteVariant(v.vote)}>
+                                                {v.vote.charAt(0).toUpperCase() + v.vote.slice(1)}
+                                            </StatusBadge>
                                         </div>
                                     ))}
                                 </div>
@@ -640,39 +733,83 @@ export function MeetingPaperWorkspace({
             )}
 
             {/* Follow-up Action Items */}
-            {resolution.action_items && resolution.action_items.length > 0 && (
-                <Card>
+            {((resolution.action_items?.length ?? 0) > 0 ||
+                (resolution.restricted_action_items_count ?? 0) > 0) && (
+                <Card
+                    ref={followUpsRef}
+                    id={`paper-${resolution.id}-follow-ups`}
+                    tabIndex={-1}
+                    className="scroll-mt-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    data-test="paper-follow-up-actions"
+                >
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-primary" />
-                            Assigned Follow-up Actions ({resolution.action_items.length})
+                            Assigned Follow-up Actions ({resolution.action_items?.length ?? 0})
                         </CardTitle>
+                        {(resolution.restricted_action_items_count ?? 0) > 0 && (
+                            <CardDescription className="flex items-center gap-1.5 text-xs">
+                                <Lock className="size-3.5" aria-hidden="true" />
+                                {resolution.restricted_action_items_count} further follow-up
+                                {resolution.restricted_action_items_count === 1 ? ' action is' : ' actions are'} restricted
+                                to their authorised audience.
+                            </CardDescription>
+                        )}
                     </CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
-                            {resolution.action_items.map((action) => (
-                                <div
-                                    key={action.id}
-                                    className="flex items-center justify-between rounded-lg border p-3 text-xs"
-                                >
-                                    <div>
-                                        <p className="font-semibold text-foreground">{action.title}</p>
-                                        <p className="text-muted-foreground">
-                                            {action.assignee ? `Assigned: ${action.assignee.name}` : 'Unassigned'}
-                                            {action.due_date ? ` · Due: ${action.due_date}` : ''}
-                                        </p>
-                                    </div>
-                                    <Badge variant="outline">{action.status}</Badge>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
+                    {(resolution.action_items?.length ?? 0) > 0 && (
+                        <CardContent>
+                            <ul className="space-y-2">
+                                {(resolution.action_items ?? []).map((action) => (
+                                    <li
+                                        key={action.id}
+                                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-xs"
+                                        data-test="paper-follow-up-action"
+                                    >
+                                        <div className="min-w-0 space-y-0.5">
+                                            <p className="font-semibold text-foreground">
+                                                {action.title}
+                                            </p>
+                                            <p className="text-muted-foreground">
+                                                <span className="font-mono">{action.reference}</span>
+                                                {' · '}
+                                                {action.is_mine
+                                                    ? 'Assigned to you'
+                                                    : action.assignee_name
+                                                      ? `Assigned: ${action.assignee_name}`
+                                                      : 'Unassigned'}
+                                                {action.due_label ? ` · Due ${action.due_label}` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="flex shrink-0 items-center gap-2">
+                                            <StatusBadge status={action.status} />
+                                            {action.can_open && action.open_url && (
+                                                <Button asChild variant="outline" size="sm">
+                                                    <Link
+                                                        href={actionHrefWithReturn(
+                                                            action.open_url,
+                                                            meetingId,
+                                                            resolution.id,
+                                                        )}
+                                                        aria-label={`${action.is_mine && action.status !== 'complete' ? 'Update' : 'Open'} follow-up action ${action.reference}: ${action.title}`}
+                                                        data-test="paper-follow-up-action-open"
+                                                    >
+                                                        <ExternalLink className="size-4" aria-hidden="true" />
+                                                        {action.is_mine && action.status !== 'complete' ? 'Update' : 'Open'}
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        </CardContent>
+                    )}
                 </Card>
             )}
 
             {/* Supporting Documents / Attachments */}
             {resolution.attachments && resolution.attachments.length > 0 && (
-                <Card>
+                <Card data-test="paper-supporting-documents">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base flex items-center gap-2">
                             <Paperclip className="h-4 w-4 text-primary" />
@@ -680,22 +817,37 @@ export function MeetingPaperWorkspace({
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-2">
-                            {resolution.attachments.map((doc) => (
-                                <div
-                                    key={doc.id}
-                                    className="flex items-center justify-between rounded border p-2 text-xs"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <FileText className="h-4 w-4 text-muted-foreground" />
-                                        <span>{doc.file_name}</span>
-                                    </div>
-                                    <span className="text-muted-foreground">
-                                        {Math.round(doc.file_size / 1024)} KB
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
+                        <ul className="space-y-2">
+                            {resolution.attachments.map((doc, index) => {
+                                const size = formatFileSize(doc.size_bytes);
+
+                                return (
+                                    <li
+                                        key={doc.id ?? `${doc.original_name}-${index}`}
+                                        className="flex flex-wrap items-center justify-between gap-3 rounded border p-2 text-xs"
+                                        data-test="paper-supporting-document"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-2">
+                                            <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                            <span className="truncate text-foreground">{doc.original_name}</span>
+                                            {size && <span className="shrink-0 text-muted-foreground">{size}</span>}
+                                        </div>
+                                        {doc.download_url && (
+                                            <Button asChild variant="outline" size="sm">
+                                                <a
+                                                    href={doc.download_url}
+                                                    download
+                                                    aria-label={`Download ${doc.original_name}`}
+                                                >
+                                                    <Download className="size-4" aria-hidden="true" />
+                                                    Download
+                                                </a>
+                                            </Button>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                        </ul>
                     </CardContent>
                 </Card>
             )}

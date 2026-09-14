@@ -4,6 +4,7 @@ namespace App\Domain\Governance\Http\Controllers;
 
 use App\Domain\Governance\Http\Requests\StoreMeetingRequest;
 use App\Domain\Governance\Http\Requests\UpdateMeetingRequest;
+use App\Domain\Governance\Models\ActionItem;
 use App\Domain\Governance\Models\BoardCommittee;
 use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\GovernanceMeeting;
@@ -39,37 +40,183 @@ class GovernanceMeetingController extends Controller
         protected GovernanceRecordAccessService $recordAccess,
     ) {}
 
+    /** Meeting types accepted by Store/UpdateMeetingRequest, in display order. */
+    private const MEETING_TYPES = [
+        'full_board' => 'Full Board',
+        'audit_risk' => 'Audit & Risk',
+        'people' => 'People Committee',
+        'finance' => 'Finance Committee',
+        'special_general' => 'Special General',
+        'executive_session' => 'Executive Session',
+    ];
+
+    /** Meeting lifecycle statuses accepted by UpdateMeetingRequest. */
+    private const MEETING_STATUSES = [
+        'scheduled', 'agenda_draft', 'agenda_final', 'in_progress', 'minutes_draft',
+        'minutes_review', 'minutes_approved', 'minutes_signed', 'archived',
+    ];
+
+    /**
+     * Legacy deep link: scheduling is a wizard dialog on the register. The
+     * retired page carried no extra authorisation beyond the route group, so
+     * this only forwards the calendar's date/hour seed to the dialog.
+     */
     public function create(Request $request)
     {
-        $boardMembers = BoardMember::with('user')->get();
-        $committees = BoardCommittee::all();
+        $query = ['create' => 1];
 
-        $initialScheduledAt = null;
-        if ($request->filled('date')) {
-            $date = $request->input('date');
+        $date = $request->input('date');
+        if (is_string($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1) {
+            $query['date'] = $date;
             $hour = $request->input('hour');
-            $hourNum = is_numeric($hour) ? (int) $hour : 9;
-            $padHour = str_pad((string) $hourNum, 2, '0', STR_PAD_LEFT);
-            $initialScheduledAt = "{$date}T{$padHour}:00";
+            if (is_numeric($hour) && (int) $hour >= 0 && (int) $hour <= 23) {
+                $query['hour'] = (int) $hour;
+            }
         }
 
-        return Inertia::render('Governance/Meetings/Create', [
-            'boardMembers' => $boardMembers,
-            'committees' => $committees,
-            'initialScheduledAt' => $initialScheduledAt,
-        ]);
+        return redirect()->route('governance.meetings.index', $query);
     }
 
     public function index(Request $request)
     {
-        $meetings = $this->executiveAccess->applyMeetingVisibilityScope(
-            GovernanceMeeting::with(['chair.user', 'secretary.user'])->orderByDesc('scheduled_at'),
-            $request->user()
-        )->paginate(15);
+        $validated = $request->validate([
+            'status' => 'nullable|in:upcoming,minutes_pending,'.implode(',', self::MEETING_STATUSES),
+            'meeting_type' => 'nullable|in:'.implode(',', array_keys(self::MEETING_TYPES)),
+            'from' => 'nullable|date_format:Y-m-d',
+            'to' => 'nullable|date_format:Y-m-d',
+            'search' => 'nullable|string|max:120',
+            'date' => 'nullable|date_format:Y-m-d',
+            'hour' => 'nullable|integer|min:0|max:23',
+        ]);
+
+        $viewer = $request->user();
+        $zone = config('app.worker_timezone', 'Pacific/Auckland');
+        $visible = fn () => $this->executiveAccess->applyMeetingVisibilityScope(GovernanceMeeting::query(), $viewer);
+
+        $query = $this->executiveAccess->applyMeetingVisibilityScope(
+            GovernanceMeeting::with(['chair.user', 'secretary.user', 'committee:id,name']),
+            $viewer
+        );
+
+        $status = $validated['status'] ?? null;
+        if ($status === 'upcoming') {
+            $query->where('scheduled_at', '>=', now())->whereNotIn('status', ['archived']);
+        } elseif ($status === 'minutes_pending') {
+            $query->whereIn('status', ['minutes_draft', 'minutes_review']);
+        } elseif ($status !== null) {
+            $query->where('status', $status);
+        }
+
+        if (! empty($validated['meeting_type'])) {
+            $query->where('meeting_type', $validated['meeting_type']);
+        }
+
+        // Date filters are NZ calendar days; scheduled_at is stored in UTC.
+        if (! empty($validated['from'])) {
+            $query->where('scheduled_at', '>=', Carbon::createFromFormat('Y-m-d', $validated['from'], $zone)->startOfDay()->utc());
+        }
+        if (! empty($validated['to'])) {
+            $query->where('scheduled_at', '<=', Carbon::createFromFormat('Y-m-d', $validated['to'], $zone)->endOfDay()->utc());
+        }
+
+        if (! empty($validated['search'])) {
+            $term = '%'.addcslashes($validated['search'], '%_\\').'%';
+            $query->where(fn ($q) => $q->where('title', 'like', $term)->orWhere('location', 'like', $term));
+        }
+
+        // Upcoming meetings read soonest-first; everything else newest-first.
+        $status === 'upcoming'
+            ? $query->orderBy('scheduled_at')
+            : $query->orderByDesc('scheduled_at');
+
+        // Page links keep the filters but never the one-shot wizard deep link.
+        $meetings = $query->paginate(15)->appends(
+            collect($request->query())->except(['create', 'date', 'hour', 'page'])->all()
+        );
+
+        $nextMeeting = $visible()
+            ->where('scheduled_at', '>=', now())
+            ->whereNotIn('status', ['archived'])
+            ->orderBy('scheduled_at')
+            ->first(['id', 'title', 'scheduled_at']);
+
+        $heldQuery = $visible()->where('scheduled_at', '<', now());
+        $summary = [
+            'total' => $visible()->count(),
+            'upcoming' => $visible()->where('scheduled_at', '>=', now())->whereNotIn('status', ['archived'])->count(),
+            'minutes_pending' => $visible()->whereIn('status', ['minutes_draft', 'minutes_review'])->count(),
+            'held' => (clone $heldQuery)->count(),
+            'held_quorum_met' => (clone $heldQuery)->where('quorum_met', true)->count(),
+            'next_meeting' => $nextMeeting ? [
+                'id' => $nextMeeting->id,
+                'title' => $nextMeeting->title,
+                'scheduled_at' => $nextMeeting->scheduled_at?->toIso8601String(),
+            ] : null,
+            'today' => now($zone)->toDateString(),
+        ];
+
+        $canCreate = $this->canScheduleMeetings($viewer);
+
+        $initialScheduledAt = null;
+        if ($canCreate && ! empty($validated['date'])) {
+            $hour = str_pad((string) ($validated['hour'] ?? 9), 2, '0', STR_PAD_LEFT);
+            $initialScheduledAt = "{$validated['date']}T{$hour}:00";
+        }
 
         return Inertia::render('Governance/Meetings/Index', [
             'meetings' => $meetings,
+            'filters' => [
+                'status' => $status,
+                'meeting_type' => $validated['meeting_type'] ?? null,
+                'from' => $validated['from'] ?? null,
+                'to' => $validated['to'] ?? null,
+                'search' => $validated['search'] ?? null,
+            ],
+            'summary' => $summary,
+            'meetingTypes' => self::MEETING_TYPES,
+            'canCreate' => $canCreate,
+            // Scheduling wizard options — only for viewers who can schedule.
+            'formOptions' => $canCreate ? $this->meetingFormOptions($viewer) : null,
+            'initialScheduledAt' => $initialScheduledAt,
         ]);
+    }
+
+    /** The store route's permission gate plus the policy's create ability. */
+    protected function canScheduleMeetings(User $user): bool
+    {
+        return $user->canDo('governance.meetings.manage')
+            && $user->can('create', GovernanceMeeting::class);
+    }
+
+    /**
+     * Select options for the meeting wizard (the retired Create/Edit pages'
+     * props). Executive sessions are only offered to viewers the store/update
+     * guard would accept.
+     *
+     * @return array{board_members: array<int, array{id: int, name: string, is_active: bool}>, committees: array<int, array{id: int, name: string, committee_type: ?string}>, can_schedule_executive: bool}
+     */
+    protected function meetingFormOptions(User $viewer): array
+    {
+        return [
+            'board_members' => BoardMember::with('user:id,name')->get()
+                ->filter(fn (BoardMember $member) => $member->user !== null)
+                ->map(fn (BoardMember $member) => [
+                    'id' => $member->id,
+                    'name' => $member->user->name,
+                    'is_active' => (bool) $member->is_active,
+                ])
+                ->sortBy('name')
+                ->values()
+                ->all(),
+            'committees' => BoardCommittee::query()->orderBy('name')->get(['id', 'name', 'committee_type'])
+                ->map(fn (BoardCommittee $committee) => [
+                    'id' => $committee->id,
+                    'name' => $committee->name,
+                    'committee_type' => $committee->committee_type,
+                ])
+                ->all(),
+            'can_schedule_executive' => $this->executiveAccess->hasExecutiveAuthority($viewer),
+        ];
     }
 
     public function calendar(Request $request)
@@ -120,6 +267,8 @@ class GovernanceMeetingController extends Controller
             ])
             ->values();
 
+        $canCreate = $this->canScheduleMeetings($request->user());
+
         $selectedDate = $validated['date'] ?? null;
         if ($selectedDate === null) {
             $today = now()->toDateString();
@@ -145,6 +294,9 @@ class GovernanceMeetingController extends Controller
                 ['value' => 'executive_session', 'label' => 'Executive Session'],
             ],
             'meetings' => $meetings,
+            // The calendar's create seed opens the same scheduling wizard in place.
+            'canCreate' => $canCreate,
+            'formOptions' => $canCreate ? $this->meetingFormOptions($request->user()) : null,
         ]);
     }
 
@@ -167,16 +319,14 @@ class GovernanceMeetingController extends Controller
             'resolutions.votes.boardMember.user',
             'resolutions.conflictDeclarations.boardMember.user',
             'resolutions.committee',
-            'resolutions.actionItems.assignee',
+            'resolutions.actionItems.assignedTo:id,name',
         ]);
 
         $viewer = $request->user();
 
-        // Scope confidential agenda items for viewers without executive access
-        $visibleAgendaItems = $meeting->agendaItems->filter(
-            fn (MeetingAgendaItem $item) => $this->executiveAccess->canViewAgendaItem($viewer, $meeting, $item)
-        )->values();
-        $meeting->setRelation('agendaItems', $visibleAgendaItems);
+        // Scope confidential agenda items for viewers without executive access.
+        // The readiness checklist derives its counts from the same contract.
+        $meeting->setRelation('agendaItems', $this->executiveAccess->visibleAgendaItems($viewer, $meeting));
 
         $visiblePack = $this->boardPackAccess->visiblePack($viewer, $meeting->boardPack);
         $meeting->setRelation('boardPack', $visiblePack);
@@ -207,8 +357,28 @@ class GovernanceMeetingController extends Controller
             $arr['results'] = $results;
             $arr['quorum'] = $this->votingService->calculateQuorum($meeting->id, $r);
 
+            // Explicit, audience-filtered follow-up and document payloads — never
+            // the raw relation/JSON columns (hidden action titles, storage paths).
+            $visibleActions = $r->actionItems
+                ->filter(fn (ActionItem $action) => $viewer->can('view', $action))
+                ->sortBy(fn (ActionItem $action) => $action->due_date?->timestamp ?? PHP_INT_MAX)
+                ->values();
+            $arr['action_items'] = $visibleActions->map(fn (ActionItem $action) => $this->presentPaperAction($viewer, $action))->all();
+            $arr['restricted_action_items_count'] = $r->actionItems->count() - $visibleActions->count();
+            $arr['attachments'] = $r->presentAttachments(
+                $viewer->canDo('governance.resolutions.view') && $viewer->can('view', $r)
+            );
+
             return $arr;
         })->values();
+
+        // The enriched list above is the only resolution payload the page reads;
+        // strip the raw follow-up relation and attachment JSON from the nested
+        // meeting copy so neither can leak through `meeting.resolutions`.
+        $visibleResolutions->each(function (Resolution $r) {
+            $r->unsetRelation('actionItems');
+            $r->makeHidden('attachments');
+        });
 
         $quorum = $meeting->calculateQuorum();
         $boardMembers = BoardMember::with('user')->active()->get();
@@ -221,18 +391,44 @@ class GovernanceMeetingController extends Controller
         $viewerCanRsvp = $viewerBoardMember !== null && $meeting->isInvited($viewerBoardMember);
         $viewerRsvp = $viewerCanRsvp ? $meeting->rsvps->firstWhere('board_member_id', $viewerBoardMember->id) : null;
 
-        $users = User::query()
-            ->whereNotNull('approved_at')
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+        $canEdit = $meeting->isEditable() && $viewer->can('update', $meeting);
+
+        // The in-meeting decision-paper wizard's options go only to paper
+        // authors (the same gate as the Resolutions register) — never the
+        // whole user directory to every attendee.
+        $canAuthorPapers = $viewer->canDo('governance.resolutions.manage')
+            && $viewer->can('create', Resolution::class);
+        $paperAuthoring = $canAuthorPapers
+            ? [
+                'users' => User::query()
+                    ->whereNotNull('approved_at')
+                    ->orderBy('name')
+                    ->get(['id', 'name']),
+                'committees' => \App\Domain\Governance\Models\BoardCommittee::query()
+                    ->orderBy('name')
+                    ->get(['id', 'name']),
+                'canPublishPapers' => $viewer->can('openVoting', new Resolution),
+                ...app(\App\Domain\Governance\Services\GovernanceResolutionAuthorityService::class)->authoringChoices($viewer),
+            ]
+            : [
+                'users' => [],
+                'committees' => [],
+                'canPublishPapers' => false,
+                'authoritySubjects' => null,
+                'authoritySubjectGroups' => [],
+            ];
 
         return Inertia::render('Governance/Meetings/Show', [
             'meeting' => $meeting,
             'resolutions' => $enrichedResolutions,
-            'users' => $users,
+            ...$paperAuthoring,
             'quorum' => $quorum,
             'boardMembers' => $boardMembers,
-            'canEdit' => $meeting->isEditable() && $viewer->can('update', $meeting),
+            'canEdit' => $canEdit,
+            // Edit wizard options — only for viewers the update route accepts.
+            'formOptions' => $canEdit && $viewer->canDo('governance.meetings.manage')
+                ? $this->meetingFormOptions($viewer)
+                : null,
             'canManageMinutes' => $viewer->can('manageMinutes', $meeting),
             'canApproveMinutes' => $viewer->can('approveMinutes', $meeting),
             'canSignMinutes' => $viewer->can('signMinutes', $meeting),
@@ -243,18 +439,39 @@ class GovernanceMeetingController extends Controller
         ]);
     }
 
+    /**
+     * Typed follow-up action row for the inline paper workspace. The caller
+     * has already confirmed the viewer may see the action; the open link is
+     * only issued when the viewer can also pass the action route's permission
+     * gate, so the page never renders a control that would 403.
+     *
+     * @return array{id: int, reference: string, title: string, status: string, priority: ?string, due_date: ?string, due_label: ?string, assignee_name: ?string, is_mine: bool, can_open: bool, open_url: ?string}
+     */
+    protected function presentPaperAction(User $viewer, ActionItem $action): array
+    {
+        $canOpen = $viewer->canDo('governance.actions.view');
+
+        return [
+            'id' => $action->id,
+            'reference' => $action->action_reference ?? "ACT-{$action->id}",
+            'title' => $action->title,
+            'status' => $action->status,
+            'priority' => $action->priority,
+            'due_date' => $action->due_date?->toDateString(),
+            'due_label' => $action->due_date?->format('j M Y'),
+            'assignee_name' => $action->assignedTo?->name,
+            'is_mine' => (int) $action->assigned_to === (int) $viewer->id,
+            'can_open' => $canOpen,
+            'open_url' => $canOpen ? route('governance.actions.show', $action, false) : null,
+        ];
+    }
+
+    /** Legacy deep link: the edit wizard is a dialog on the meeting workspace. */
     public function edit(GovernanceMeeting $meeting)
     {
         $this->authorize('update', $meeting);
 
-        $boardMembers = BoardMember::with('user')->get();
-        $committees = BoardCommittee::all();
-
-        return Inertia::render('Governance/Meetings/Edit', [
-            'meeting' => $meeting,
-            'boardMembers' => $boardMembers,
-            'committees' => $committees,
-        ]);
+        return redirect()->route('governance.meetings.show', ['meeting' => $meeting->id, 'edit' => 1]);
     }
 
     public function store(StoreMeetingRequest $request)

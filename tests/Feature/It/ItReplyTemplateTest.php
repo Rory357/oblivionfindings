@@ -7,6 +7,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Tasks\Providers\ItAutomationReviewTaskProvider;
 use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
@@ -128,4 +129,27 @@ test('internal templates render only for actors with work access and archived te
     app(ItReplyTemplateService::class)->setActive($internal, $this->agent, false, 1);
     $this->actingAs($this->agent)
         ->getJson("/it/tickets/{$this->ticket->id}/reply-templates/{$internal->id}/render")->assertNotFound();
+});
+
+test('an overdue template review becomes its owner task and archived templates never do', function () {
+    $overdue = app(ItReplyTemplateService::class)->create($this->agent, replyTemplateData([
+        'name' => 'Stale guidance', 'review_due_at' => now()->subDay()->toDateString(),
+    ]));
+    app(ItReplyTemplateService::class)->create($this->agent, replyTemplateData([
+        'name' => 'Fresh guidance', 'review_due_at' => now()->addMonths(3)->toDateString(),
+    ]));
+    $archived = app(ItReplyTemplateService::class)->create($this->agent, replyTemplateData([
+        'name' => 'Retired guidance', 'review_due_at' => now()->subDay()->toDateString(),
+    ]));
+    app(ItReplyTemplateService::class)->setActive($archived, $this->agent, false, 1);
+
+    $provider = new ItAutomationReviewTaskProvider;
+    $tasks = collect($provider->authorizedTasks($this->agent->fresh()));
+    expect($tasks->pluck('ref')->all())->toBe(['TPL-'.$overdue->id])
+        ->and($tasks->sole()->displayState)->toBe('Review overdue')
+        ->and($tasks->sole()->link)->toBe('/it/setup?tab=automation');
+
+    // Reviews belong to the owner; other managers and non-managers see none.
+    expect($provider->authorizedTasks($this->viewer->fresh()))->toBe([])
+        ->and($provider->authorizedTasks($this->requester->fresh()))->toBe([]);
 });

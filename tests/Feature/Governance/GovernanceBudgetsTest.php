@@ -5,6 +5,7 @@ namespace Tests\Feature\Governance;
 use App\Domain\Governance\Models\Budget;
 use App\Domain\Governance\Models\BudgetAdjustment;
 use App\Domain\Governance\Models\BudgetLineItem;
+use App\Domain\Governance\Models\GovernanceResolutionBinding;
 use App\Domain\Governance\Models\Resolution;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\GovernanceTestHelpers;
@@ -21,16 +22,154 @@ class GovernanceBudgetsTest extends TestCase
         $this->seedGovernance();
     }
 
-    public function test_admin_can_view_create_page(): void
+    public function test_create_and_edit_deep_links_open_the_wizard_dialogs(): void
+    {
+        $admin = $this->createAdminUser();
+        $budget = $this->createBudget($admin);
+
+        $this->actingAs($admin)->get('/governance/budgets/create')
+            ->assertRedirect('/governance/budgets?create=1');
+
+        $this->actingAs($admin)->get('/governance/budgets?create=1')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Budgets/Index')
+                ->where('canCreate', true)
+                ->where('formOptions.categories.operations', 'Operations')
+                ->has('formOptions.categories', 7));
+
+        $this->actingAs($admin)->get("/governance/budgets/{$budget->id}/edit")
+            ->assertRedirect("/governance/budgets/{$budget->id}?edit=1");
+
+        $this->actingAs($admin)->get("/governance/budgets/{$budget->id}?edit=1")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Budgets/Show')
+                ->where('canEdit', true)
+                ->has('categories', 7));
+    }
+
+    public function test_view_only_user_gets_no_budget_wizard_options(): void
+    {
+        $viewer = $this->createUserWithRole('board_observer');
+        $admin = $this->createAdminUser();
+        $budget = $this->createBudget($admin);
+
+        $this->assertTrue($viewer->canDo('governance.budgets.view'));
+        $this->assertFalse($viewer->canDo('governance.budgets.create'));
+
+        $this->actingAs($viewer)->get('/governance/budgets/create')->assertForbidden();
+        $this->actingAs($viewer)->get("/governance/budgets/{$budget->id}/edit")->assertForbidden();
+
+        $this->actingAs($viewer)->get('/governance/budgets')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canCreate', false)
+                ->where('formOptions', null));
+
+        $this->actingAs($viewer)->get("/governance/budgets/{$budget->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('canEdit', false));
+    }
+
+    public function test_wizard_creates_budget_with_nested_line_items(): void
     {
         $admin = $this->createAdminUser();
 
-        $response = $this->actingAs($admin)->get('/governance/budgets/create');
+        $this->actingAs($admin)->post('/governance/budgets', [
+            'fiscal_year' => '2027',
+            'title' => 'FY2027 Operating Budget',
+            'description' => 'Operating envelope for supported living homes.',
+            'total_budget' => 999,
+            'board_approved' => false,
+            'line_items' => [
+                ['category' => 'staffing', 'description' => 'Support worker wages', 'account_code' => '6100', 'budget_amount' => 120000, 'forecast_amount' => null, 'notes' => ''],
+                ['category' => 'fleet', 'description' => 'Van leases', 'account_code' => '', 'budget_amount' => 30000.5, 'forecast_amount' => 28000, 'notes' => 'Two vans'],
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->component('Governance/Budgets/Create')
-        );
+        $budget = Budget::query()->where('title', 'FY2027 Operating Budget')->firstOrFail();
+        $this->assertSame('drafting', $budget->status);
+        $this->assertSame('Operating envelope for supported living homes.', $budget->description);
+        $this->assertSame('150000.50', $budget->total_budget, 'The envelope is recalculated to the sum of the lines.');
+        $this->assertSame(2, $budget->lineItems()->count());
+        $this->assertDatabaseHas('budget_line_items', [
+            'budget_id' => $budget->id,
+            'description' => 'Support worker wages',
+            'account_code' => '6100',
+            'forecast_amount' => 120000,
+        ]);
+        $this->assertDatabaseHas('budget_line_items', [
+            'budget_id' => $budget->id,
+            'description' => 'Van leases',
+            'forecast_amount' => 28000,
+            'notes' => 'Two vans',
+        ]);
+    }
+
+    public function test_wizard_rejects_incomplete_line_items(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)->post('/governance/budgets', [
+            'fiscal_year' => '2027',
+            'total_budget' => 1000,
+            'line_items' => [
+                ['category' => 'staffing', 'description' => '', 'budget_amount' => ''],
+            ],
+        ])->assertSessionHasErrors(['line_items.0.description', 'line_items.0.budget_amount']);
+
+        $this->assertDatabaseCount('budgets', 0);
+    }
+
+    public function test_edit_wizard_syncs_line_items_and_keeps_actuals(): void
+    {
+        $admin = $this->createAdminUser();
+        $budget = $this->createBudget($admin, ['title' => 'Draft budget', 'total_budget' => 30000]);
+        $kept = BudgetLineItem::create(['budget_id' => $budget->id, 'category' => 'operations', 'description' => 'Power', 'budget_amount' => 10000, 'forecast_amount' => 10000, 'actual_amount' => 2500]);
+        $removed = BudgetLineItem::create(['budget_id' => $budget->id, 'category' => 'admin', 'description' => 'Stationery', 'budget_amount' => 20000, 'forecast_amount' => 20000, 'actual_amount' => 0]);
+
+        $this->actingAs($admin)->put("/governance/budgets/{$budget->id}", [
+            'fiscal_year' => (string) $budget->fiscal_year,
+            'title' => 'Revised draft budget',
+            'description' => null,
+            'total_budget' => 30000,
+            'line_items' => [
+                ['id' => $kept->id, 'category' => 'operations', 'description' => 'Power and gas', 'account_code' => null, 'budget_amount' => 12000, 'forecast_amount' => 12000, 'notes' => null],
+                ['category' => 'capital', 'description' => 'Accessible bathroom', 'account_code' => '1510', 'budget_amount' => 45000, 'forecast_amount' => null, 'notes' => null],
+            ],
+        ])->assertRedirect("/governance/budgets/{$budget->id}")->assertSessionHasNoErrors();
+
+        $budget->refresh();
+        $this->assertSame('Revised draft budget', $budget->title);
+        $this->assertSame('57000.00', $budget->total_budget);
+        $this->assertDatabaseMissing('budget_line_items', ['id' => $removed->id]);
+        $this->assertSame('Power and gas', $kept->fresh()->description);
+        $this->assertSame('2500.00', $kept->fresh()->actual_amount, 'Recorded actual spend is not touched by the wizard.');
+        $this->assertDatabaseHas('budget_line_items', ['budget_id' => $budget->id, 'description' => 'Accessible bathroom']);
+    }
+
+    public function test_edit_wizard_cannot_touch_lines_of_another_budget_or_an_approved_budget(): void
+    {
+        $admin = $this->createAdminUser();
+        $budget = $this->createBudget($admin);
+        $other = $this->createBudget($admin, ['title' => 'Other budget']);
+        $foreign = BudgetLineItem::create(['budget_id' => $other->id, 'category' => 'operations', 'description' => 'Foreign line', 'budget_amount' => 5000, 'forecast_amount' => 5000, 'actual_amount' => 0]);
+
+        $this->actingAs($admin)->put("/governance/budgets/{$budget->id}", [
+            'line_items' => [
+                ['id' => $foreign->id, 'category' => 'operations', 'description' => 'Hijacked', 'budget_amount' => 1],
+            ],
+        ])->assertNotFound();
+        $this->assertSame('Foreign line', $foreign->fresh()->description);
+
+        $approved = $this->createBudget($admin, ['status' => 'approved', 'title' => 'Approved budget']);
+        $this->actingAs($admin)->put("/governance/budgets/{$approved->id}", [
+            'line_items' => [
+                ['category' => 'operations', 'description' => 'Sneaked in', 'budget_amount' => 1],
+            ],
+        ])->assertForbidden();
+        $this->assertSame(0, $approved->lineItems()->count());
     }
 
     public function test_admin_can_create_budget(): void
@@ -76,6 +215,95 @@ class GovernanceBudgetsTest extends TestCase
             'total_budget' => 200000,
             'status' => 'proposed',
         ]);
+    }
+
+    public function test_proposed_budget_is_approved_only_by_its_bound_decision_paper(): void
+    {
+        $admin = $this->createAdminUser();
+        $budget = $this->createBudget($admin, ['title' => 'FY Care Budget']);
+        BudgetLineItem::create(['budget_id' => $budget->id, 'category' => 'staffing', 'description' => 'Rostered care', 'budget_amount' => 100000, 'forecast_amount' => 100000, 'actual_amount' => 0]);
+
+        $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/propose")->assertRedirect();
+
+        $budget->refresh();
+        $paper = $budget->approvalResolution;
+        $this->assertNotNull($paper);
+        $binding = $paper->authorityBindings()->firstOrFail();
+        $this->assertSame(GovernanceResolutionBinding::SUBJECT_BUDGET, $binding->subject_type);
+        $this->assertSame($budget->id, $binding->subject_id);
+        $this->assertSame('v'.$budget->version_number, $binding->subject_revision);
+
+        $paper->update(['status' => 'closed', 'outcome' => 'carried', 'closed_at' => now()]);
+
+        $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/approve")
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('approved', $budget->fresh()->status);
+        $this->assertNotNull($binding->fresh()->consumed_at);
+    }
+
+    public function test_budget_changed_after_proposal_is_not_approved_by_the_carried_paper(): void
+    {
+        $admin = $this->createAdminUser();
+        $budget = $this->createBudget($admin, ['title' => 'FY Care Budget']);
+        BudgetLineItem::create(['budget_id' => $budget->id, 'category' => 'staffing', 'description' => 'Rostered care', 'budget_amount' => 100000, 'forecast_amount' => 100000, 'actual_amount' => 0]);
+
+        $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/propose")->assertRedirect();
+        $budget->refresh();
+
+        // A proposed budget is still editable; the board voted on the old lines.
+        $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/line-items", [
+            'category' => 'capital',
+            'description' => 'New vehicle',
+            'budget_amount' => 60000,
+        ])->assertSessionHasNoErrors();
+
+        $budget->approvalResolution->update(['status' => 'closed', 'outcome' => 'carried', 'closed_at' => now()]);
+
+        $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/approve")
+            ->assertRedirect()
+            ->assertSessionHasErrors('resolution_id')
+            ->assertSessionHas('error');
+
+        $this->assertSame('proposed', $budget->fresh()->status);
+        $this->assertNull($budget->approvalResolution->authorityBindings()->firstOrFail()->consumed_at);
+    }
+
+    public function test_request_adjustment_carried_resolution_is_not_offered_or_authority(): void
+    {
+        $admin = $this->createAdminUser();
+        $budget = $this->createBudget($admin, ['total_budget' => 100000]);
+        $lineItem = BudgetLineItem::create(['budget_id' => $budget->id, 'category' => 'capital', 'description' => 'Hoists', 'budget_amount' => 100000, 'forecast_amount' => 100000, 'actual_amount' => 0]);
+        $unbound = $this->createResolution($admin, ['status' => 'closed', 'outcome' => 'carried', 'cost_impact' => ['amount' => 9000]]);
+
+        $this->actingAs($admin)->get("/governance/budgets/{$budget->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->has('carriedResolutions', 0));
+
+        // A resolution attached while requesting can never grant approval.
+        $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/adjust", [
+            'budget_line_item_id' => $lineItem->id,
+            'adjustment_type' => 'increase',
+            'amount' => 9000,
+            'reason' => 'Ceiling hoists',
+            'approval_resolution_id' => $unbound->id,
+        ]);
+        $adjustment = BudgetAdjustment::where('budget_id', $budget->id)->latest('id')->firstOrFail();
+
+        $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/adjustments/{$adjustment->id}/approve")
+            ->assertSessionHasErrors('approval_resolution_id');
+        $this->assertSame('submitted', $adjustment->fresh()->status);
+
+        // Only the bound, unused paper is offered for the adjustment row.
+        $bound = $this->createBoundCarriedResolution($admin, GovernanceResolutionBinding::SUBJECT_BUDGET_ADJUSTMENT, $adjustment->id, [
+            'cost_impact' => ['amount' => 9000],
+        ]);
+        $this->actingAs($admin)->get("/governance/budgets/{$budget->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('carriedResolutions', 1)
+                ->where('carriedResolutions.0.id', $bound->id));
     }
 
     public function test_admin_can_view_budget_show(): void
@@ -295,10 +523,9 @@ class GovernanceBudgetsTest extends TestCase
         ]);
         $adjustment = BudgetAdjustment::where('budget_id', $budget->id)->latest('id')->first();
 
-        $resolution = $this->createResolution($admin, [
+        // Authority is the explicit binding to this exact adjustment revision.
+        $resolution = $this->createBoundCarriedResolution($admin, GovernanceResolutionBinding::SUBJECT_BUDGET_ADJUSTMENT, $adjustment->id, [
             'title' => 'Switchgear Capex Resolution',
-            'status' => 'closed',
-            'outcome' => 'carried',
             'cost_impact' => ['amount' => 7500, 'currency' => 'NZD', 'funding_source' => 'Capital', 'is_none' => false],
         ]);
 
@@ -349,13 +576,6 @@ class GovernanceBudgetsTest extends TestCase
             'actual_amount' => 0,
         ]);
 
-        $resolution = $this->createResolution($admin, [
-            'title' => 'Single Use Resolution',
-            'status' => 'closed',
-            'outcome' => 'carried',
-            'cost_impact' => ['amount' => 6000, 'currency' => 'NZD', 'funding_source' => 'Capital', 'is_none' => false],
-        ]);
-
         // Adjustment 1
         $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/adjust", [
             'budget_line_item_id' => $lineItem1->id,
@@ -367,6 +587,12 @@ class GovernanceBudgetsTest extends TestCase
             ->where('budget_line_item_id', $lineItem1->id)
             ->latest('id')
             ->first();
+
+        // The resolution is legitimately bound to adjustment 1 only.
+        $resolution = $this->createBoundCarriedResolution($admin, GovernanceResolutionBinding::SUBJECT_BUDGET_ADJUSTMENT, $adj1->id, [
+            'title' => 'Single Use Resolution',
+            'cost_impact' => ['amount' => 6000, 'currency' => 'NZD', 'funding_source' => 'Capital', 'is_none' => false],
+        ]);
 
         // Approve adjustment 1 with resolution
         $resp1 = $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/adjustments/{$adj1->id}/approve", [
