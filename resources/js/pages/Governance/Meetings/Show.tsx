@@ -405,7 +405,15 @@ export default function MeetingShow({
     // The workspace location (tab + selected paper) lives in the URL so reload,
     // back/forward and links from follow-up actions restore the same place.
     const initialLocation = readWorkspaceLocation(page.url);
-    const [activeTab, setActiveTab] = useState<MeetingTab>(initialLocation.tab);
+    // The meeting-cycle checklist is the chair/secretary's preparation work;
+    // members who can't run the meeting don't get the Workflow tab or meter.
+    const canRunMeeting =
+        canEdit || canManageMinutes || canApproveMinutes || canSignMinutes;
+    const [activeTab, setActiveTab] = useState<MeetingTab>(
+        initialLocation.tab === 'workflow' && !canRunMeeting
+            ? 'agenda'
+            : initialLocation.tab,
+    );
     const [selectedPaperId, setSelectedPaperId] = useState<string | null>(
         initialLocation.paper,
     );
@@ -457,6 +465,7 @@ export default function MeetingShow({
 
     const handleTabChange = (newTab: string) => {
         if (!isMeetingTab(newTab)) return;
+        if (newTab === 'workflow' && !canRunMeeting) return;
         setActiveTab(newTab);
         replaceLocation({ tab: newTab });
     };
@@ -849,12 +858,16 @@ export default function MeetingShow({
             icon: Vote,
             count: resolutions.length,
         },
-        {
-            key: 'workflow',
-            label: 'Workflow',
-            icon: ListChecks,
-            warningCount: workflowChecklist.counts.blocked,
-        },
+        ...(canRunMeeting
+            ? [
+                  {
+                      key: 'workflow' as const,
+                      label: 'Workflow',
+                      icon: ListChecks,
+                      warningCount: workflowChecklist.counts.blocked,
+                  },
+              ]
+            : []),
     ];
 
     const selectedResolution = selectedPaperId
@@ -908,20 +921,22 @@ export default function MeetingShow({
                         }
                         meters={
                             <>
-                                <PageHeaderMeterBlock
-                                    label="Workflow"
-                                    href="#tab-workflow"
-                                    ariaLabel="View the meeting workflow"
-                                    onClick={() => handleTabChange('workflow')}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {workflowChecklist.counts.done}/
-                                        {workflowChecklist.counts.done +
-                                            workflowChecklist.counts.remaining +
-                                            workflowChecklist.counts.blocked}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Tasks complete</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
+                                {canRunMeeting ? (
+                                    <PageHeaderMeterBlock
+                                        label="Workflow"
+                                        href="#tab-workflow"
+                                        ariaLabel="View the meeting workflow"
+                                        onClick={() => handleTabChange('workflow')}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {workflowChecklist.counts.done}/
+                                            {workflowChecklist.counts.done +
+                                                workflowChecklist.counts.remaining +
+                                                workflowChecklist.counts.blocked}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>Tasks complete</PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
                                 <PageHeaderMeterBlock
                                     label="Quorum"
                                     href="#tab-attendance"
@@ -2478,7 +2493,7 @@ export default function MeetingShow({
                             ))}
 
                         {/* ========== WORKFLOW TAB ========== */}
-                        {activeTab === 'workflow' && (
+                        {activeTab === 'workflow' && canRunMeeting && (
                             <Card dusk="meeting-workflow-checklist-card">
                                 <CardHeader className="pb-3">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
