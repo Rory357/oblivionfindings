@@ -3,6 +3,7 @@ import {
     type KbOptions,
     type KbRow,
 } from '@/components/it/it-wizards';
+import { KnowledgeAssistPanel } from '@/components/it/knowledge-assist-panel';
 import { KnowledgeDiagrams } from '@/components/it/knowledge-diagrams';
 import {
     KNOWLEDGE_DOCUMENT_TYPES,
@@ -50,6 +51,7 @@ import axios from 'axios';
 import {
     BookOpen,
     FileClock,
+    Sparkles,
     Files,
     GitBranch,
     Link2,
@@ -115,6 +117,7 @@ export default function KnowledgeDocument({
             '1' && article.can.edit === true,
     );
     const [history, setHistory] = useState(false);
+    const [assist, setAssist] = useState(false);
     const [editorGeneration, setEditorGeneration] = useState(0);
     const initialSection = new URL(
         page.url,
@@ -247,6 +250,14 @@ export default function KnowledgeDocument({
                                         Revisions & review
                                     </PageHeaderGlassButton>
                                 )}
+                            {article.can.edit && !editing && (
+                                <PageHeaderGlassButton
+                                    icon={Sparkles}
+                                    onClick={() => setAssist(true)}
+                                >
+                                    Assist
+                                </PageHeaderGlassButton>
+                            )}
                             {article.can.edit && !editing && (
                                 <PageHeaderPrimaryButton
                                     onClick={() => {
@@ -784,6 +795,13 @@ export default function KnowledgeDocument({
                     </Button>
                 )}
             </div>
+            {article.can.edit && (
+                <KnowledgeAssistPanel
+                    articleId={article.id}
+                    open={assist}
+                    onClose={() => setAssist(false)}
+                />
+            )}
             {history && (
                 <KnowledgeRevisionDialog
                     article={article}

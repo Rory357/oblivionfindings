@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\It\Services\ItAssistContractService;
+use App\Domain\It\Services\ItKbAccessService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
+use App\Models\ItKbArticle;
 use App\Models\ItTicket;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,6 +30,15 @@ class ItAssistController extends Controller
         abort_unless($this->workAccess->applyViewScope(ItTicket::query(), $actor)->whereKey($ticket->id)->exists(), 404);
 
         return response()->json($this->assist->forTicket($ticket, $actor))
+            ->header('Cache-Control', 'no-store, private');
+    }
+
+    public function article(Request $request, ItKbArticle $article): JsonResponse
+    {
+        $actor = $request->user();
+        abort_unless(app(ItKbAccessService::class)->canAuthor($actor, $article), 404);
+
+        return response()->json($this->assist->forArticle($article, $actor))
             ->header('Cache-Control', 'no-store, private');
     }
 }

@@ -191,6 +191,7 @@ Route::middleware(['auth', 'permission:it.request|it.view|it.knowledge.author|it
     Route::get('/it/knowledge/{article}/files/{file}', [\App\Http\Controllers\It\ItKnowledgeFileController::class, 'show'])->whereNumber(['article', 'file'])->name('it.knowledge.files.show');
     Route::get('/it/knowledge/{article}/history', [ItKbController::class, 'history'])->whereNumber('article')->name('it.knowledge.history');
     Route::get('/it/knowledge/{article}/editor-context', [ItKbController::class, 'editorContext'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.editor-context');
+    Route::get('/it/knowledge/{article}/assist', [\App\Http\Controllers\It\ItAssistController::class, 'article'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.assist');
     Route::post('/it/knowledge/{article}/restore-revision', [ItKbController::class, 'restoreRevision'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.restore-revision');
     Route::post('/it/knowledge/{article}/discard-revision', [ItKbController::class, 'discardRevision'])->whereNumber('article')->middleware('permission:it.knowledge.author')->name('it.knowledge.discard-revision');
     Route::get('/it/reports', [ItProvisioningController::class, 'index'])->middleware('permission:it.view')->name('it.reports.index');

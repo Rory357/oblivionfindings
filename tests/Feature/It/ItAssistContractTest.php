@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ItKbArticle;
 use App\Models\ItTicket;
 use App\Models\ItTicketComment;
 use App\Models\Permission;
@@ -61,6 +62,29 @@ test('a participant-scope viewer gets public-only audiences and no internal desc
 
     $this->actingAs($this->requester)
         ->getJson("/it/tickets/{$this->ticket->id}/assist")->assertForbidden();
+});
+
+test('the documentation contract is author-only, disabled and cites permission-checked resolution sources', function () {
+    $article = ItKbArticle::factory()->create([
+        'status' => 'draft', 'audience' => 'all_staff', 'owner_user_id' => $this->agent->id,
+    ]);
+    $this->agent->permissionOverrides()->attach(
+        Permission::where('key', 'it.knowledge.author')->firstOrFail()->id, ['allowed' => true],
+    );
+
+    $contract = $this->actingAs($this->agent->fresh())
+        ->getJson("/it/knowledge/{$article->id}/assist")->assertOk();
+    $contract->assertJsonPath('record.type', 'it_kb_article')
+        ->assertJsonPath('record.reference', 'KB-'.$article->id)
+        ->assertJsonPath('record.published_revision', null);
+    $capabilities = collect($contract->json('capabilities'));
+    expect($capabilities->pluck('key')->all())->toBe(['draft_from_resolution', 'summarise_document', 'completeness_review'])
+        ->and($capabilities->every(fn ($capability) => $capability['enabled'] === false))->toBeTrue()
+        ->and(collect($contract->json('sources'))->keyBy('key')->get('linked_resolutions')['count'])->toBe(0);
+
+    // Readers without authoring rights get nothing, and so do requesters.
+    $this->actingAs($this->viewer)->getJson("/it/knowledge/{$article->id}/assist")->assertForbidden();
+    $this->actingAs($this->requester)->getJson("/it/knowledge/{$article->id}/assist")->assertForbidden();
 });
 
 test('even an enabled flag never enables execution — capabilities stay disabled with an explicit reason', function () {
