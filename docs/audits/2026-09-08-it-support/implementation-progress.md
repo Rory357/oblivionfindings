@@ -489,7 +489,7 @@ Planned → In progress → Implemented → Verified. A partial slice is never a
 
 - Keyboard observation11September in owned desktop runtime131366fe77e64bc5: Setup `PageHeaderRail` tab roles support Tab/Shift+Tab and Enter navigation, but ArrowLeft on Operations did not move focus. Shared component `resources/js/components/page/page-header.tsx` rail currently has no arrow-key handler. Review/fix the tab semantics and focused arrow/Home/End behavior with meaningful component/browser checks at integrated acceptance; no full tab-pattern acceptance claimed from Tab/Enter alone. Browser size was never changed.
 
-- Status: Planned.
+- Status: In progress (14 September: criterion-by-criterion review recorded in [acceptance-review-20260914.md](acceptance-review-20260914.md) — every E01–E23 scenario and release-gate line graded against current-source evidence as Verified (tests) / Browser-owed / Blocked (external) / Partial, with residual risks and prerequisites named; protected design files confirmed untouched by this programme. Remaining: the browser acceptance sweep and the externally blocked provider/recovery items).
 - Dependencies: W00–W26. **Accept:** all required packages are Verified; the AI foundation passes its narrower contract; provider/operational blocks are resolved before claiming complete readiness. Verify protected design files are unchanged from the implementation session's starting baseline. Record any remaining externally blocked verification candidly, with an exact next action; do not relabel it complete or delete it from scope.
 - Scope and criteria: implementation-plan.md §6 W27; audit/scenario mappings retained below.
 - Changed files: none yet. Migrations: none yet.
