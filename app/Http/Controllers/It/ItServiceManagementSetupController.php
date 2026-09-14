@@ -511,8 +511,10 @@ class ItServiceManagementSetupController extends Controller
                     'organisation_wide' => $agent->canDo('it.organisationWide'),
                 ])
                 ->values(),
+            // Organisation-wide viewers configure any active Site; everyone
+            // else stays within their approved Sites.
             'sites' => Site::query()
-                ->whereKey($approvedSiteIds)
+                ->when(! $user->canDo('sites.viewAll'), fn ($query) => $query->whereKey($approvedSiteIds))
                 ->where('is_active', true)
                 ->where('archived', false)
                 ->whereNull('archived_at')

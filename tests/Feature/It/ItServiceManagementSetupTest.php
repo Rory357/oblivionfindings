@@ -53,6 +53,29 @@ beforeEach(function () {
     }
 });
 
+test('organisation-wide viewers configure any active Site while others stay within approved Sites', function () {
+    $approved = Site::factory()->create(['name' => 'Approved house']);
+    $other = Site::factory()->create(['name' => 'Other house']);
+    Site::factory()->create(['name' => 'Archived house', 'is_active' => false]);
+
+    $scoped = serviceManagementSetupUser();
+    serviceManagementAssignSite($scoped, $approved);
+    $scoped->permissionOverrides()->attach(Permission::where('key', 'sites.viewAll')->firstOrFail()->id, ['allowed' => false]);
+    $this->actingAs($scoped->fresh())->get('/it/setup')
+        ->assertInertia(fn ($page) => $page->has('sites', 1)->where('sites.0.name', 'Approved house'));
+
+    // An organisation-wide viewer with no approved-Site profile still sees every active Site.
+    $wide = serviceManagementSetupUser();
+    $wide->permissionOverrides()->attach(Permission::where('key', 'sites.viewAll')->firstOrFail()->id, ['allowed' => true]);
+    $names = collect($this->actingAs($wide->fresh())->get('/it/setup')
+        ->assertInertia(fn ($page) => $page->has('sites'))
+        ->viewData('page')['props']['sites'])->pluck('name');
+    expect($names)->toContain('Approved house')
+        ->and($names)->toContain('Other house')
+        ->and($names)->not->toContain('Archived house')
+        ->and($other->is_active)->toBeTrue();
+});
+
 test('IT pages share the approved grouped navigation while preserving existing deep links', function () {
     $this->actingAs($this->manager)
         ->get('/it/provisioning?status=pending')
