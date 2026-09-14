@@ -437,7 +437,16 @@ class GovernanceWorkflowService
             $isPast = $daysToMeeting < 0;
             $quorum = $meeting->calculateQuorum();
 
-            if ($meeting->agenda_items_count === 0) {
+            // Meeting administration tasks are priorities only for people who
+            // can carry them out (the same abilities the meeting workspace
+            // uses); ordinary members never see "Record attendance" or
+            // "Draft minutes" work they cannot do. No viewer = board-wide.
+            $canAdminister = $user === null || $user->can('update', $meeting);
+            $canDraftMinutes = $user === null || $user->can('manageMinutes', $meeting);
+            $canApproveMinutes = $user === null || $user->can('approveMinutes', $meeting);
+            $canSignMinutes = $user === null || $user->can('signMinutes', $meeting);
+
+            if ($canAdminister && $meeting->agenda_items_count === 0) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:agenda",
                     'Meetings',
@@ -482,7 +491,7 @@ class GovernanceWorkflowService
                 ));
             }
 
-            if (! $quorum['met'] && $isSoon) {
+            if ($canAdminister && ! $quorum['met'] && $isSoon) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:quorum",
                     'Meetings',
@@ -497,7 +506,7 @@ class GovernanceWorkflowService
                 ));
             }
 
-            if ($isPast && $meeting->minutes === null) {
+            if ($canDraftMinutes && $isPast && $meeting->minutes === null) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:minutes-draft",
                     'Meetings',
@@ -512,7 +521,7 @@ class GovernanceWorkflowService
                 ));
             }
 
-            if ($meeting->minutes !== null && $meeting->minutes->status === 'draft') {
+            if ($canApproveMinutes && $meeting->minutes !== null && $meeting->minutes->status === 'draft') {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:minutes-approve",
                     'Meetings',
@@ -527,7 +536,7 @@ class GovernanceWorkflowService
                 ));
             }
 
-            if ($meeting->minutes !== null && $meeting->minutes->status === 'approved') {
+            if ($canSignMinutes && $meeting->minutes !== null && $meeting->minutes->status === 'approved') {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:minutes-sign",
                     'Meetings',

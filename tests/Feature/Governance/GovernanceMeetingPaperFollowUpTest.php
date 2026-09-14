@@ -45,6 +45,37 @@ class GovernanceMeetingPaperFollowUpTest extends TestCase
         $user->permissionOverrides()->attach($permission->id, ['allowed' => false]);
     }
 
+    public function test_meeting_administration_priorities_reach_only_people_who_can_do_them(): void
+    {
+        $chair = $this->createAdminUser();
+        $member = $this->createOrdinaryMember();
+        // A past meeting with no agenda, attendance or minutes: every admin task applies.
+        $meeting = $this->createMeeting($chair, [
+            'title' => 'Past Board Meeting',
+            'scheduled_at' => now()->subDays(3),
+            'status' => 'scheduled',
+        ]);
+
+        $service = app(GovernanceWorkflowService::class);
+        $adminTaskIds = [
+            "meeting:{$meeting->id}:agenda",
+            "meeting:{$meeting->id}:quorum",
+            "meeting:{$meeting->id}:minutes-draft",
+        ];
+
+        $chairIds = collect($service->dashboardWorkflow($chair)['actions'])->pluck('id')->all();
+        foreach ($adminTaskIds as $id) {
+            $this->assertContains($id, $chairIds);
+        }
+
+        $memberWorkflow = $service->dashboardWorkflow($member);
+        $memberIds = collect($memberWorkflow['actions'])->pluck('id')->all();
+        foreach ($adminTaskIds as $id) {
+            $this->assertNotContains($id, $memberIds);
+        }
+        $this->assertSame(count($memberIds), $memberWorkflow['summary']['total']);
+    }
+
     public function test_in_meeting_paper_wizard_options_reach_only_paper_authors(): void
     {
         $chair = $this->createAdminUser();
