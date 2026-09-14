@@ -73,10 +73,13 @@ Frontend
   40, drafts 4 — **98 passed / 1564 assertions** after the backend changes. New
   `ItProvisioningApprovalRoutingTest` (7 cases: configured routing + notifications + workflow-level decision,
   fallback queue + routing gap, scheduled expiry + re-request, per-task reversal once + resume refusal, clean
-  resume, HR cancel → corrective work / clean HR resume, withdrawn template) — result recorded in the
-  progress note for this slice. `ItServiceOperationsTest` schedule expectations updated (the W20 recurrence
-  definition had left the count stale); two Knowledge lifecycle cases in that file fail identically on
-  main and are not touched by this slice.
+  resume, HR cancel → corrective work / clean HR resume, withdrawn template) — **7 passed / 114 assertions**.
+  After merging `origin/main` (`1755a41fe`, W18/W20 macros + Governance hubs): operations + lifecycle +
+  workflow + routing + catalogue suites **120 passed / 1929 assertions**; the only failures are the two
+  Knowledge article lifecycle cases in `ItServiceOperationsTest`, which fail identically on main before this
+  slice (verified by running them in the parent checkout) and belong to the Knowledge revision workspace
+  owner. `ItServiceOperationsTest` schedule expectations were realigned (the W20 recurrence and the merged
+  Knowledge upload retention definitions had left the count stale).
 - Frontend: `tsc --noEmit` clean; ESLint clean on changed files; vitest `components/it` + `pages/it`
   **910 passed** (one expectation updated for the new approval summary text); production build green.
 - Browser (worktree dev server, ordinary sign-in as Demo Admin, seeded joiner workflow of 11 tasks):
