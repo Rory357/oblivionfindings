@@ -49,8 +49,16 @@ final class ItProvisioningHrSourceService
                     ]);
                 }
                 $workflow->update(['status' => 'cancelled', 'cancelled_at' => now(),
-                    'cancellation_reason' => 'Source HR checklist '.$source->status.'. Completed work remains recorded; review any reversal needed.']);
+                    'cancellation_reason' => 'Source HR checklist '.$source->status.'. Completed work remains recorded; corrective tasks were raised for it.']);
                 $this->record($workflow, $actor, 'source_cancelled', ['source_status' => $source->status]);
+                // Explicit rule: a withdrawn hire or a retained employee means every
+                // completed grant/revoke needs reviewed corrective work. The reversal
+                // tasks are approval- and evidence-gated, so nothing changes silently.
+                $reversed = app(ItProvisioningReversalService::class)->reverse($workflow, $actor,
+                    'The source HR checklist was '.$source->status.'.', allowExisting: true, source: 'hr_source_cancelled');
+                if ($reversed !== []) {
+                    $this->record($workflow, $actor, 'source_reversal_requested', ['source_status' => $source->status, 'original_request_ids' => $reversed]);
+                }
 
                 continue;
             }
@@ -58,10 +66,28 @@ final class ItProvisioningHrSourceService
                 continue;
             }
             if ($workflow->cancelled_at !== null) {
+                // Resume in the same HR change while no corrective work has started;
+                // otherwise leave the explicit next step recorded for IT.
+                $blocked = $workflow->requests()->whereNotNull('reversal_of_request_id')->where('status', '!=', 'cancelled')->exists();
+                if (! $blocked) {
+                    $reopened = [];
+                    foreach ($workflow->requests()->where('status', 'cancelled')->whereNull('reversal_of_request_id')->orderBy('id')->lockForUpdate()->get() as $task) {
+                        $task->update(['status' => 'pending', 'approval_status' => $task->approval_required ? 'cancelled' : 'not_required']);
+                        ItTicketEvent::record($task, 'reopened', $actor->id, ['source' => $sourceType, 'reason' => 'The source HR checklist resumed.']);
+                        $reopened[] = (int) $task->id;
+                    }
+                    $workflow->update(['cancelled_at' => null, 'cancellation_reason' => null]);
+                    $this->record($workflow, $actor, 'source_resumed', ['source_status' => $source->status, 'reopened_request_ids' => $reopened]);
+                    app(ItProvisioningRequestLifecycleService::class)->reconcileWorkflow($workflow);
+                    $effective = $source instanceof HrOffboardingChecklist ? $source->due_date : $source->employeeProfile?->start_date;
+                    $this->reschedule($workflow->refresh(), $actor, $effective);
+
+                    continue;
+                }
                 $last = $workflow->events()->latest('id')->first();
                 if ($last?->type !== 'source_resumed' || ($last->payload['source_status'] ?? null) !== $source->status) {
                     $this->record($workflow, $actor, 'source_resumed', ['source_status' => $source->status,
-                        'next_action' => 'Review the cancelled IT work and explicitly start a new approved workflow if required.']);
+                        'next_action' => 'Corrective work is in progress for the cancelled IT work. Complete or cancel it, then explicitly start a new approved workflow if required.']);
                 }
 
                 continue;
@@ -118,6 +144,13 @@ final class ItProvisioningHrSourceService
             }
         }
         if (! $linked) {
+            // Joiner/mover work for someone HR no longer employs must stop; leaver work
+            // completes after the profile closes, so it is not blocked here.
+            if ($workflow && in_array($workflow->lifecycle_type, ['joiner', 'mover'], true)
+                && $task->employeeProfile && ! $task->employeeProfile->is_active) {
+                return 'The employee is no longer current in HR. Review the recorded work and raise explicit corrective tasks where access was granted.';
+            }
+
             return null;
         }
         if (! $source) {

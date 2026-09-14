@@ -2,6 +2,7 @@ import {
     ProvisioningCommandDialog,
     type ProvisioningCommandField,
 } from '@/components/it/provisioning-command-dialog';
+import { provisioningApprovalRequestFields } from '@/components/it/provisioning-command-fields';
 import {
     ProvisioningActions,
     ProvisioningFacts,
@@ -15,6 +16,7 @@ import {
     type ProvisioningWorkflow,
 } from '@/components/it/provisioning-workspace';
 import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import type { SharedData } from '@/types';
@@ -24,6 +26,8 @@ import { useState } from 'react';
 interface WorkflowDetail extends ProvisioningWorkflow {
     tasks: ProvisioningTask[];
     events: ProvisioningEvent[];
+    /** Server verdict of the operations this actor may attempt right now. */
+    actions?: string[];
     original_contract: {
         tasks?: {
             task_key: string;
@@ -51,30 +55,32 @@ export default function ProvisioningWorkflowPage({
     const [tab, setTab] = useState('work');
     const [search, setSearch] = useState('');
     const [operation, setOperation] = useState<string | null>(null);
-    const actions = workflow.can_manage
-        ? [
-              'assign',
-              ...(!workflow.cancelled_at &&
-              workflow.status !== 'completed' &&
-              !['hr_onboarding', 'hr_offboarding'].includes(
-                  workflow.source_type,
-              )
-                  ? ['reschedule']
-                  : []),
-              ...(!workflow.cancelled_at ? ['cancel'] : []),
-              ...(workflow.tasks.some(
-                  (task) =>
-                      task.status === 'done' &&
-                      !task.reversal_of_request_id &&
-                      !workflow.tasks.some(
-                          (candidate) =>
-                              candidate.reversal_of_request_id === task.id,
-                      ),
-              )
-                  ? ['reverse']
-                  : []),
-          ]
-        : [];
+    const actions = !workflow.can_manage
+        ? []
+        : workflow.actions
+          ? workflow.actions
+          : [
+                'assign',
+                ...(!workflow.cancelled_at &&
+                workflow.status !== 'completed' &&
+                !['hr_onboarding', 'hr_offboarding'].includes(
+                    workflow.source_type,
+                )
+                    ? ['reschedule']
+                    : []),
+                ...(!workflow.cancelled_at ? ['cancel'] : []),
+                ...(workflow.tasks.some(
+                    (task) =>
+                        task.status === 'done' &&
+                        !task.reversal_of_request_id &&
+                        !workflow.tasks.some(
+                            (candidate) =>
+                                candidate.reversal_of_request_id === task.id,
+                        ),
+                )
+                    ? ['reverse']
+                    : []),
+            ];
     const fields: ProvisioningCommandField[] =
         operation === 'assign'
             ? [
@@ -112,7 +118,21 @@ export default function ProvisioningWorkflowPage({
                           help: 'Original completed work stays recorded. Reversal tasks require new approval and evidence.',
                       },
                   ]
-                : [reason];
+                : operation === 'request_approval'
+                  ? provisioningApprovalRequestFields
+                  : [reason];
+    const description =
+        operation === 'reschedule'
+            ? 'Open task targets move with the effective date. Their approvals are withdrawn for fresh review. Completed evidence keeps its recorded dates.'
+            : operation === 'cancel' || operation === 'reverse'
+              ? 'Completed actions remain recorded. Reversal tasks require real corrective work, new approval and evidence; creating them does not change external accounts or reassign equipment.'
+              : operation === 'resume'
+                ? 'Cancelled original tasks reopen without approval and need a fresh review. Completed work keeps its evidence and is never repeated. Resuming is refused while corrective work exists.'
+                : operation === 'request_approval'
+                  ? 'One request covers every open task in this workflow that still needs approval. Both approvers must be eligible for every task; the requester and beneficiary can never approve their own work.'
+                  : operation === 'approve' || operation === 'reject'
+                    ? 'Only the tasks where you are the currently responsible approver are decided. A rejection needs the reason below.'
+                    : 'Choose a current eligible owner and a distinct cover person. Existing task assignments remain explicit.';
     if (!visible || currentActor !== actorId)
         return (
             <AppLayout>
@@ -296,6 +316,111 @@ export default function ProvisioningWorkflowPage({
                                 ]}
                             />
                         </ProvisioningSection>
+                        {workflow.tasks.length > 0 && (
+                            <ProvisioningSection title="Task order and prerequisites">
+                                <p className="text-sm text-muted-foreground">
+                                    Tasks run by stage. A task cannot be
+                                    fulfilled until every prerequisite is
+                                    complete; reversal tasks run in reverse
+                                    order.
+                                </p>
+                                <ol className="divide-y divide-border">
+                                    {[...workflow.tasks]
+                                        .sort(
+                                            (a, b) =>
+                                                Number(
+                                                    a.reversal_of_request_id !==
+                                                        null,
+                                                ) -
+                                                    Number(
+                                                        b.reversal_of_request_id !==
+                                                            null,
+                                                    ) ||
+                                                a.stage - b.stage ||
+                                                a.id - b.id,
+                                        )
+                                        .map((task) => {
+                                            const prerequisites = (
+                                                task.dependency_request_ids ??
+                                                []
+                                            )
+                                                .map((id) =>
+                                                    workflow.tasks.find(
+                                                        (candidate) =>
+                                                            candidate.id === id,
+                                                    ),
+                                                )
+                                                .filter(
+                                                    (
+                                                        candidate,
+                                                    ): candidate is ProvisioningTask =>
+                                                        !!candidate,
+                                                );
+                                            const blocked = prerequisites.some(
+                                                (candidate) =>
+                                                    candidate.status !== 'done',
+                                            );
+                                            return (
+                                                <li
+                                                    key={task.id}
+                                                    className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
+                                                >
+                                                    <span className="min-w-0">
+                                                        <Link
+                                                            className="font-medium text-primary underline"
+                                                            href={task.href}
+                                                        >
+                                                            Stage {task.stage} ·{' '}
+                                                            {task.title}
+                                                        </Link>
+                                                        {task.reversal_of_request_id && (
+                                                            <span className="text-muted-foreground">
+                                                                {' '}
+                                                                · corrective
+                                                                work
+                                                            </span>
+                                                        )}
+                                                        {prerequisites.length >
+                                                            0 && (
+                                                            <span className="block text-muted-foreground">
+                                                                After:{' '}
+                                                                {prerequisites
+                                                                    .map(
+                                                                        (
+                                                                            candidate,
+                                                                        ) =>
+                                                                            candidate.title,
+                                                                    )
+                                                                    .join(', ')}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                    <span className="flex flex-wrap gap-2">
+                                                        {blocked &&
+                                                            ![
+                                                                'done',
+                                                                'cancelled',
+                                                            ].includes(
+                                                                task.status,
+                                                            ) && (
+                                                                <StatusBadge
+                                                                    status="pending"
+                                                                    label="Blocked by prerequisite"
+                                                                />
+                                                            )}
+                                                        <StatusBadge
+                                                            status={task.status}
+                                                            label={provisioningLabel(
+                                                                task.status,
+                                                            )}
+                                                        />
+                                                    </span>
+                                                </li>
+                                            );
+                                        })}
+                                </ol>
+                            </ProvisioningSection>
+                        )}
                         {workflow.original_contract?.tasks && (
                             <ProvisioningSection title="Original instructions">
                                 {workflow.original_contract.tasks
@@ -341,13 +466,7 @@ export default function ProvisioningWorkflowPage({
                         provisioningLabel(workflow.lifecycle_type)
                     }
                     fields={fields}
-                    description={
-                        operation === 'reschedule'
-                            ? 'Open task targets move with the effective date. Their approvals are withdrawn for fresh review. Completed evidence keeps its recorded dates.'
-                            : operation === 'cancel' || operation === 'reverse'
-                              ? 'Completed actions remain recorded. Reversal tasks require real corrective work, new approval and evidence; creating them does not change external accounts or reassign equipment.'
-                              : 'Choose a current eligible owner and a distinct cover person. Existing task assignments remain explicit.'
-                    }
+                    description={description}
                     review={[
                         { label: 'Employee', value: workflow.employee.name },
                         {

@@ -94,6 +94,17 @@ class ItAutomationScheduleCatalog
             'overlap_minutes' => 10,
             'on_one_server' => true,
         ],
+        [
+            'key' => 'it.expire-provisioning-approvals',
+            'label' => 'Provisioning approval deadlines',
+            'type' => 'command',
+            'handler' => 'it:expire-provisioning-approvals --limit=200',
+            'expression' => '*/10 * * * *',
+            'timezone' => 'Pacific/Auckland',
+            'without_overlapping' => true,
+            'overlap_minutes' => 10,
+            'on_one_server' => true,
+        ],
     ];
 
     /** Register the canonical events once in the Laravel scheduler. */

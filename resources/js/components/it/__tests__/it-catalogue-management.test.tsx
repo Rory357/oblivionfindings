@@ -247,7 +247,9 @@ it('keeps the live version visible while requiring review of a revised publicati
     fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
     expect(state.post).not.toHaveBeenCalled();
     const review = screen.getByRole('dialog', { name: 'Publish request' });
-    expect(within(review).getByText('Required')).toBeVisible();
+    expect(
+        within(review).getByText('Required · fallback queue'),
+    ).toBeVisible();
     expect(within(review).getByText('Approved requesters')).toBeVisible();
     fireEvent.click(
         within(review).getByRole('button', { name: 'Publish request' }),

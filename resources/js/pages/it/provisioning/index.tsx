@@ -1,18 +1,29 @@
 import { ProvisioningBulkDialog } from '@/components/it/provisioning-bulk-dialog';
+import { ProvisioningCommandDialog } from '@/components/it/provisioning-command-dialog';
+import {
+    taskCommandDescription,
+    taskCommandFields,
+} from '@/components/it/provisioning-command-fields';
 import { ProvisioningLaunchDialog } from '@/components/it/provisioning-launch-dialog';
 import { ProvisioningManualDialog } from '@/components/it/provisioning-manual-dialog';
 import {
+    provisioningActionLabel,
     provisioningLabel,
     provisioningTaskRow,
     provisioningTone,
     type ProvisioningTask,
     type ProvisioningWorkflow,
 } from '@/components/it/provisioning-workspace';
-import { SpecialistRecordList } from '@/components/it/specialist-record-list';
 import {
+    SpecialistRecordList,
+    type SpecialistListItem,
+} from '@/components/it/specialist-record-list';
+import {
+    PROVISIONING_BULK_OPERATIONS,
     hasProvisioningBulkReference,
     type ProvisioningBulkOperation,
 } from '@/components/it/use-provisioning-bulk-command';
+import type { MenuItem } from '@/components/lists/entity-menu';
 import {
     GroupPillRail,
     TabSearchPalette,
@@ -44,6 +55,7 @@ import {
     Package,
     Plus,
     RefreshCw,
+    ShieldCheck,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -55,12 +67,13 @@ interface Props {
         q?: string;
         status?: string;
         lifecycle_type?: string;
-        view: 'tasks' | 'workflows' | 'templates';
+        view: 'tasks' | 'workflows' | 'templates' | 'approvals';
         list_view?: string;
     };
     summary: {
         open: number;
         awaiting_approval: number;
+        my_decisions?: number;
         failed: number;
         overdue: number;
     };
@@ -120,17 +133,18 @@ function ProvisioningRegister({
     useEffect(() => {
         setSelectedIds(new Set());
     }, [url, records]);
-    const selectedTasks =
-        filters.view === 'tasks'
-            ? ((records?.data as ProvisioningTask[]) ?? []).filter((task) =>
-                  selectedIds.has(task.id),
-              )
-            : [];
-    const bulkOperations: ProvisioningBulkOperation[] = [
-        'assign',
-        'cancel',
-        'retry',
-    ];
+    const isTaskView = filters.view === 'tasks' || filters.view === 'approvals';
+    const [rowCommand, setRowCommand] = useState<{
+        task: ProvisioningTask;
+        operation: string;
+    } | null>(null);
+    const selectedTasks = isTaskView
+        ? ((records?.data as ProvisioningTask[]) ?? []).filter((task) =>
+              selectedIds.has(task.id),
+          )
+        : [];
+    const bulkOperations: ProvisioningBulkOperation[] =
+        PROVISIONING_BULK_OPERATIONS;
     useEffect(() => {
         if (timer.current) clearTimeout(timer.current);
         setSearch(filters.q ?? '');
@@ -170,6 +184,12 @@ function ProvisioningRegister({
                     icon: GitBranch,
                     href: '/it/provisioning?view=workflows',
                 },
+                {
+                    key: 'approvals',
+                    label: 'Approvals',
+                    icon: ShieldCheck,
+                    href: '/it/provisioning?view=approvals',
+                },
                 ...(canManage
                     ? [
                           {
@@ -193,14 +213,36 @@ function ProvisioningRegister({
             entry.href = '/it/provisioning?' + parameters.toString();
         }
     const meters = [
-        { key: 'open', label: 'Open work', value: summary.open },
+        {
+            key: 'open',
+            label: 'Open work',
+            value: summary.open,
+            href: '/it/provisioning?view=tasks&status=open',
+        },
         {
             key: 'awaiting_approval',
             label: 'Waiting for approval',
             value: summary.awaiting_approval,
+            href: '/it/provisioning?view=approvals',
         },
-        { key: 'failed', label: 'Failed work', value: summary.failed },
-        { key: 'overdue', label: 'Overdue', value: summary.overdue },
+        {
+            key: 'my_decisions',
+            label: 'Your decisions',
+            value: summary.my_decisions ?? 0,
+            href: '/it/provisioning?view=approvals&status=mine',
+        },
+        {
+            key: 'failed',
+            label: 'Failed work',
+            value: summary.failed,
+            href: '/it/provisioning?view=tasks&status=failed',
+        },
+        {
+            key: 'overdue',
+            label: 'Overdue',
+            value: summary.overdue,
+            href: '/it/provisioning?view=tasks&status=overdue',
+        },
     ];
     if (!visible || actorId !== currentActorId)
         return (
@@ -214,45 +256,40 @@ function ProvisioningRegister({
                 </Button>
             </AppLayout>
         );
-    const taskRows =
-        filters.view === 'tasks'
-            ? ((records?.data as ProvisioningTask[]) ?? []).map(
-                  provisioningTaskRow,
-              )
-            : ((records?.data as ProvisioningWorkflow[]) ?? []).map(
-                  (workflow) => ({
-                      id: workflow.id,
-                      reference: provisioningLabel(workflow.lifecycle_type),
-                      title: workflow.employee.name,
-                      href: workflow.href,
-                      state: {
-                          label: provisioningLabel(workflow.status),
-                          tone: provisioningTone(workflow.status),
-                      },
-                      priority: 'Normal',
-                      impact: workflow.template.name,
-                      owner: workflow.owner?.name,
-                      facts: [
-                          {
-                              label: 'Effective',
-                              value: formatDateOnly(workflow.effective_at),
-                          },
-                          {
-                              label: 'Completed',
-                              value:
-                                  workflow.progress.done +
-                                  ' of ' +
-                                  workflow.progress.total,
-                          },
-                          {
-                              label: 'Owner',
-                              value:
-                                  workflow.owner?.name ??
-                                  'Responsibility needs attention',
-                          },
-                      ],
-                  }),
-              );
+    const taskRows = isTaskView
+        ? ((records?.data as ProvisioningTask[]) ?? []).map(provisioningTaskRow)
+        : ((records?.data as ProvisioningWorkflow[]) ?? []).map((workflow) => ({
+              id: workflow.id,
+              reference: provisioningLabel(workflow.lifecycle_type),
+              title: workflow.employee.name,
+              href: workflow.href,
+              state: {
+                  label: provisioningLabel(workflow.status),
+                  tone: provisioningTone(workflow.status),
+              },
+              priority: 'Normal',
+              impact: workflow.template.name,
+              owner: workflow.owner?.name,
+              facts: [
+                  {
+                      label: 'Effective',
+                      value: formatDateOnly(workflow.effective_at),
+                  },
+                  {
+                      label: 'Completed',
+                      value:
+                          workflow.progress.done +
+                          ' of ' +
+                          workflow.progress.total,
+                  },
+                  {
+                      label: 'Owner',
+                      value:
+                          workflow.owner?.name ??
+                          'Responsibility needs attention',
+                  },
+              ],
+          }));
     return (
         <AppLayout
             breadcrumbs={[
@@ -310,10 +347,7 @@ function ProvisioningRegister({
                         <PageHeaderMeterBlock
                             key={meter.key}
                             label={meter.label}
-                            href={
-                                '/it/provisioning?view=tasks&status=' +
-                                meter.key
-                            }
+                            href={meter.href}
                         >
                             <PageHeaderMeterBig>
                                 {meter.value}
@@ -367,24 +401,26 @@ function ProvisioningRegister({
                                     label="Status"
                                     value={filters.status ?? 'all'}
                                     allValue="all"
-                                    options={(filters.view === 'tasks'
-                                        ? [
-                                              'open',
-                                              'pending',
-                                              'in_progress',
-                                              'failed',
-                                              'done',
-                                              'cancelled',
-                                              'awaiting_approval',
-                                              'overdue',
-                                          ]
-                                        : [
-                                              'pending',
-                                              'in_progress',
-                                              'partially_failed',
-                                              'completed',
-                                              'cancelled',
-                                          ]
+                                    options={(filters.view === 'approvals'
+                                        ? ['mine', 'waiting', 'unrequested']
+                                        : isTaskView
+                                          ? [
+                                                'open',
+                                                'pending',
+                                                'in_progress',
+                                                'failed',
+                                                'done',
+                                                'cancelled',
+                                                'awaiting_approval',
+                                                'overdue',
+                                            ]
+                                          : [
+                                                'pending',
+                                                'in_progress',
+                                                'partially_failed',
+                                                'completed',
+                                                'cancelled',
+                                            ]
                                     ).map((value) => ({
                                         value,
                                         label: provisioningLabel(value),
@@ -440,8 +476,7 @@ function ProvisioningRegister({
                 {canManage &&
                     storageReady &&
                     (hasBulkRecovery ||
-                        (filters.view === 'tasks' &&
-                            selectedTasks.length > 0)) && (
+                        (isTaskView && selectedTasks.length > 0)) && (
                         <div
                             className="flex flex-wrap items-center gap-2"
                             aria-label="Selected task actions"
@@ -486,11 +521,10 @@ function ProvisioningRegister({
                                                     });
                                             }}
                                         >
-                                            {operation === 'assign'
-                                                ? 'Assign selected'
-                                                : operation === 'cancel'
-                                                  ? 'Cancel selected'
-                                                  : 'Retry selected'}
+                                            {(provisioningActionLabel[
+                                                operation
+                                            ] ?? provisioningLabel(operation)) +
+                                                ' · selected'}
                                         </Button>
                                     ))}
                                     <Button
@@ -553,17 +587,21 @@ function ProvisioningRegister({
                 ) : (
                     <SpecialistRecordList
                         title={
-                            filters.view === 'tasks'
-                                ? 'Work tasks'
-                                : 'Staff workflows'
+                            filters.view === 'approvals'
+                                ? 'Approval queue'
+                                : isTaskView
+                                  ? 'Work tasks'
+                                  : 'Staff workflows'
                         }
                         icon={
-                            filters.view === 'tasks' ? ClipboardList : GitBranch
+                            filters.view === 'approvals'
+                                ? ShieldCheck
+                                : isTaskView
+                                  ? ClipboardList
+                                  : GitBranch
                         }
                         selection={
-                            canManage &&
-                            storageReady &&
-                            filters.view === 'tasks'
+                            canManage && storageReady && isTaskView
                                 ? {
                                       keys: selectedIds,
                                       labelFor: (row) =>
@@ -601,9 +639,75 @@ function ProvisioningRegister({
                         rows={taskRows}
                         total={records?.total ?? 0}
                         links={records?.links ?? []}
+                        {...(isTaskView && canManage && storageReady
+                            ? {
+                                  extraActions: (row: SpecialistListItem) => {
+                                      const task = (
+                                          records?.data as
+                                              | ProvisioningTask[]
+                                              | undefined
+                                      )?.find((item) => item.id === row.id);
+                                      if (!task) return [];
+                                      return task.readiness.actions.map(
+                                          (action): MenuItem => ({
+                                              label:
+                                                  provisioningActionLabel[
+                                                      action
+                                                  ] ??
+                                                  provisioningLabel(action),
+                                              icon: ShieldCheck,
+                                              onClick: () =>
+                                                  action === 'fulfil'
+                                                      ? router.visit(task.href)
+                                                      : setRowCommand({
+                                                            task,
+                                                            operation: action,
+                                                        }),
+                                          }),
+                                      );
+                                  },
+                              }
+                            : {})}
                     />
                 )}
             </main>
+            {rowCommand && (
+                <ProvisioningCommandDialog
+                    key={rowCommand.task.id + ':' + rowCommand.operation}
+                    context={{
+                        actorId,
+                        kind: 'request',
+                        targetId: rowCommand.task.id,
+                        operation: rowCommand.operation,
+                    }}
+                    version={rowCommand.task.version}
+                    title={rowCommand.task.title}
+                    description={taskCommandDescription(rowCommand.operation)}
+                    fields={taskCommandFields(
+                        rowCommand.task,
+                        rowCommand.operation,
+                    )}
+                    review={[
+                        {
+                            label: 'Employee',
+                            value: rowCommand.task.employee.name,
+                        },
+                        { label: 'Task', value: rowCommand.task.title },
+                        {
+                            label: 'Current state',
+                            value: provisioningLabel(rowCommand.task.status),
+                        },
+                    ]}
+                    onClose={() => {
+                        setRowCommand(null);
+                        router.reload();
+                    }}
+                    onDenied={() => {
+                        setRowCommand(null);
+                        setVisible(false);
+                    }}
+                />
+            )}
             <TabSearchPalette
                 open={find}
                 onClose={() => setFind(false)}

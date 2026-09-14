@@ -39,7 +39,24 @@ interface TrackingRequest extends MyProvisioningRow {
         catalogue_field_label: string;
     }[];
     events: { id: number; label: string; at: string | null }[];
+    tasks?: {
+        stage: number;
+        type: string;
+        status: string;
+        approval_status: string;
+        due_date: string | null;
+    }[];
 }
+
+const approvalLabel = (status: string) =>
+    ({
+        not_required: 'Not required',
+        pending: 'Waiting for approval',
+        approved: 'Approved',
+        rejected: 'Declined',
+        expired: 'Approval expired',
+        cancelled: 'Needs a new review',
+    })[status] ?? status.replaceAll('_', ' ');
 
 const trackingGroups: GroupedProfileNavGroup[] = [
     {
@@ -152,7 +169,7 @@ export default function ProvisioningTracking({
                             onClick={() => setTab('details')}
                         >
                             <PageHeaderMeterBig>
-                                {request.approval_status.replaceAll('_', ' ')}
+                                {approvalLabel(request.approval_status)}
                             </PageHeaderMeterBig>
                             <PageHeaderMeterCaption>
                                 Approval requirement
@@ -356,8 +373,13 @@ export default function ProvisioningTracking({
                     <dl className="mt-5 space-y-4 text-sm">
                         <div>
                             <dt className="text-muted-foreground">Approval</dt>
-                            <dd>
-                                {request.approval_status.replaceAll('_', ' ')}
+                            <dd className="mt-1">
+                                <StatusBadge
+                                    status={request.approval_status}
+                                    label={approvalLabel(
+                                        request.approval_status,
+                                    )}
+                                />
                             </dd>
                         </div>
                         <div>
@@ -376,6 +398,50 @@ export default function ProvisioningTracking({
                             <dd>{formatDateTime(request.updated_at)}</dd>
                         </div>
                     </dl>
+                    {request.tasks && request.tasks.length > 1 && (
+                        <section className="mt-5" aria-label="Work steps">
+                            <h3 className="text-sm font-semibold">
+                                Work steps
+                            </h3>
+                            <ol className="mt-3 divide-y divide-border">
+                                {request.tasks.map((task, index) => (
+                                    <li
+                                        key={index}
+                                        className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
+                                    >
+                                        <span>
+                                            Step {task.stage} ·{' '}
+                                            {task.type.replaceAll('_', ' ')}
+                                            {task.due_date
+                                                ? ' · due ' +
+                                                  formatDateOnly(task.due_date)
+                                                : ''}
+                                        </span>
+                                        <span className="flex flex-wrap gap-2">
+                                            {task.approval_status !==
+                                                'not_required' &&
+                                                task.status !== 'done' && (
+                                                    <StatusBadge
+                                                        status={
+                                                            task.approval_status
+                                                        }
+                                                        label={approvalLabel(
+                                                            task.approval_status,
+                                                        )}
+                                                    />
+                                                )}
+                                            <StatusBadge
+                                                status={task.status}
+                                                label={provisioningStatus(
+                                                    task.status,
+                                                )}
+                                            />
+                                        </span>
+                                    </li>
+                                ))}
+                            </ol>
+                        </section>
+                    )}
                 </aside>
             </div>
         </AppLayout>

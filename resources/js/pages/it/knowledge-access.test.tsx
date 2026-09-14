@@ -72,9 +72,6 @@ vi.mock('@/components/it/ticket-waiting-dialog', () => ({
 vi.mock('@/components/it/knowledge-draft-delete-dialog', () => ({
     KnowledgeDraftDeleteDialog: () => null,
 }));
-vi.mock('@/components/it/provisioning-cancel-dialog', () => ({
-    ProvisioningCancelDialog: () => null,
-}));
 
 type PageProps = ComponentProps<typeof ItIndex>;
 const article = {

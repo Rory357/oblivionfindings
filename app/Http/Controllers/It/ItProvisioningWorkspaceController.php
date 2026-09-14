@@ -12,6 +12,7 @@ use App\Domain\It\Services\ItProvisioningCommandService;
 use App\Domain\It\Services\ItProvisioningReadinessService;
 use App\Domain\It\Services\ItProvisioningResponsibilityService;
 use App\Domain\It\Services\ItProvisioningTemplatePublicationService;
+use App\Domain\It\Services\ItProvisioningWorkflowLifecycleService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\ItProvisioningRequest;
@@ -38,12 +39,16 @@ final class ItProvisioningWorkspaceController extends Controller
         abort_unless($actor->approved_at !== null && app(HrCurrentStaffService::class)->isCurrent($actor) && ($actor->canDo('it.view') || $actor->canDo('it.manage')), 403);
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', 'string', 'max:30'], 'lifecycle_type' => ['nullable', 'in:joiner,mover,leaver'],
-            'view' => ['nullable', 'in:tasks,workflows,templates'], 'list_view' => ['nullable', 'in:table,cards']]);
+            'view' => ['nullable', 'in:tasks,workflows,templates,approvals'], 'list_view' => ['nullable', 'in:table,cards']]);
         $view = $filters['view'] ?? 'tasks';
         $base = $this->access->applyRequestScope(ItProvisioningRequest::query(), $actor);
+        $awaiting = fn () => (clone $base)->whereNotIn('status', ['done', 'cancelled'])->where('approval_required', true)->where('approval_status', '!=', 'approved');
         $summary = [
             'open' => (clone $base)->whereNotIn('status', ['done', 'cancelled'])->count(),
-            'awaiting_approval' => (clone $base)->whereNotIn('status', ['done', 'cancelled'])->where('approval_required', true)->where('approval_status', '!=', 'approved')->count(),
+            'awaiting_approval' => $awaiting()->count(),
+            'my_decisions' => $awaiting()->where('approval_status', 'pending')->whereNotNull('approval_requested_at')
+                ->where(fn ($q) => $q->whereNull('approval_expires_at')->orWhere('approval_expires_at', '>', now()))
+                ->where(fn ($q) => $q->where('primary_approver_user_id', $actor->id)->orWhere('cover_approver_user_id', $actor->id))->count(),
             'failed' => (clone $base)->where('status', 'failed')->count(),
             'overdue' => (clone $base)->whereNotIn('status', ['done', 'cancelled'])->whereDate('due_date', '<', today())->count(),
         ];
@@ -51,7 +56,28 @@ final class ItProvisioningWorkspaceController extends Controller
         $search = '%'.addcslashes($query, '%_\\').'%';
         $rows = null;
         $templates = [];
-        if ($view === 'tasks') {
+        if ($view === 'approvals') {
+            // An approvals inbox: the viewer's own decisions first, then every
+            // gated task still waiting for a request, a decision or a renewal.
+            $tasks = $awaiting()->with(['employeeProfile.user:id,name', 'workflow', 'assignee:id,name', 'responsibleTeam:id,name']);
+            if ($query !== '') {
+                $tasks->where(fn ($q) => $q->where('item', 'like', $search)->orWhereHas('employeeProfile.user', fn ($users) => $users->where('name', 'like', $search)));
+            }
+            if (! empty($filters['lifecycle_type'])) {
+                $tasks->whereHas('workflow', fn ($q) => $q->where('lifecycle_type', $filters['lifecycle_type']));
+            }
+            if (($filters['status'] ?? null) === 'mine') {
+                $tasks->where('approval_status', 'pending')->whereNotNull('approval_requested_at')
+                    ->where(fn ($q) => $q->where('primary_approver_user_id', $actor->id)->orWhere('cover_approver_user_id', $actor->id));
+            } elseif (($filters['status'] ?? null) === 'unrequested') {
+                $tasks->where(fn ($q) => $q->whereNull('approval_requested_at')->orWhereIn('approval_status', ['cancelled', 'expired', 'rejected']));
+            } elseif (($filters['status'] ?? null) === 'waiting') {
+                $tasks->where('approval_status', 'pending')->whereNotNull('approval_requested_at');
+            }
+            $rows = $tasks->orderByRaw('CASE WHEN primary_approver_user_id = ? OR cover_approver_user_id = ? THEN 0 ELSE 1 END', [$actor->id, $actor->id])
+                ->orderByRaw('approval_expires_at IS NULL')->orderBy('approval_expires_at')->orderBy('id')->paginate(20)->withQueryString()
+                ->through(fn (ItProvisioningRequest $task) => $this->task($task, $actor));
+        } elseif ($view === 'tasks') {
             $tasks = $base->with(['employeeProfile.user:id,name', 'workflow', 'assignee:id,name', 'responsibleTeam:id,name']);
             if ($query !== '') {
                 $tasks->where(function ($q) use ($search, $query): void {
@@ -150,6 +176,7 @@ final class ItProvisioningWorkspaceController extends Controller
         $data['events'] = $data['can_manage'] ? $record->events->map(fn ($event) => ['id' => $event->id, 'type' => $event->type,
             'actor' => $event->actor?->name, 'at' => $event->created_at?->toIso8601String(), 'details' => $event->payload])->all() : [];
         $data['original_contract'] = $data['can_manage'] ? $record->templateVersion?->contract : null;
+        $data['actions'] = $data['can_manage'] ? app(ItProvisioningWorkflowLifecycleService::class)->actions($record, $actor) : [];
 
         return Inertia::render('it/provisioning/workflow', ['actorId' => (int) $actor->id, 'workflow' => $data]);
     }
@@ -271,6 +298,8 @@ final class ItProvisioningWorkspaceController extends Controller
             'due_date' => $task->due_date?->toDateString(), 'priority' => $task->priority,
             'approval_required' => $task->approval_required, 'approval_status' => $task->approval_status,
             'evidence_required' => $task->evidence_required, 'reversal_of_request_id' => $task->reversal_of_request_id,
+            'dependency_request_ids' => array_values(array_map('intval', $task->dependency_request_ids ?? [])),
+            'approval_expires_at' => $task->approval_expires_at?->toIso8601String(),
             'assignee' => $task->assignee ? ['id' => (int) $task->assignee->id, 'name' => $task->assignee->name] : null,
             'team' => $task->responsibleTeam?->name,
             'readiness' => $this->readiness->forRequest($task, $actor)];

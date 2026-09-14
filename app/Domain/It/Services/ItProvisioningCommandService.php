@@ -20,9 +20,9 @@ use Illuminate\Validation\Rule;
 /** Actor-bound receipts reuse the canonical IT command inventory. */
 final class ItProvisioningCommandService
 {
-    public const REQUEST_ACTIONS = ['assign', 'request_approval', 'withdraw_approval', 'approve', 'reject', 'fulfil', 'fail', 'retry', 'cancel', 'reopen'];
+    public const REQUEST_ACTIONS = ['assign', 'request_approval', 'withdraw_approval', 'approve', 'reject', 'fulfil', 'fail', 'retry', 'cancel', 'reopen', 'reverse'];
 
-    public const WORKFLOW_ACTIONS = ['assign', 'reschedule', 'cancel', 'reverse'];
+    public const WORKFLOW_ACTIONS = ['assign', 'reschedule', 'cancel', 'reverse', 'resume', 'request_approval', 'approve', 'reject'];
 
     public function __construct(
         private readonly ItProvisioningAccessService $access,
@@ -85,6 +85,7 @@ final class ItProvisioningCommandService
                     'retry' => $this->requests->retry($target, $actor, $payload['reason']),
                     'cancel' => $this->requests->cancel($target, $actor, $payload['reason']),
                     'reopen' => $this->requests->reopen($target, $actor, $payload['reason']),
+                    'reverse' => $this->requests->reverse($target, $actor, $payload['reason']),
                 };
             }
             $receipt->update(['committed_at' => now(), 'result_metadata' => [
@@ -241,7 +242,7 @@ final class ItProvisioningCommandService
                 'evidence_summary' => ['nullable', 'string', 'max:5000'], 'external_ref' => ['nullable', 'string', 'max:255'],
                 'canonical_target_type' => ['nullable', 'required_with:canonical_target_id', Rule::in(['identity', 'asset_assignment', 'device_assignment'])],
                 'canonical_target_id' => ['nullable', 'required_with:canonical_target_type', 'integer', 'min:1'], 'create_reversals' => ['sometimes', 'boolean']];
-            if (in_array($kind, ['workflow', 'launch', 'template'], true) || in_array($operation, ['withdraw_approval', 'reject', 'fail', 'retry', 'cancel', 'reopen'], true)) {
+            if (in_array($kind, ['workflow', 'launch', 'template'], true) || in_array($operation, ['withdraw_approval', 'reject', 'fail', 'retry', 'cancel', 'reopen', 'reverse'], true)) {
                 $rules['reason'] = ['required', 'string', 'max:5000'];
             }
             if ($kind === 'template') {

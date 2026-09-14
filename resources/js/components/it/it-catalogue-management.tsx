@@ -65,6 +65,9 @@ export interface CatalogManagementItem {
     provisioning_template_version_id?: number | null;
     default_priority: string;
     requires_approval: boolean;
+    approver_user_id?: number | null;
+    cover_approver_user_id?: number | null;
+    approval_window_days?: number | null;
     is_published: boolean;
     internal_only: boolean;
     site_scope?: number[] | null;
@@ -212,6 +215,9 @@ export function ItCatalogueManagement({
         provisioning_template_version_id: null as number | null,
         default_priority: 'normal',
         requires_approval: false,
+        approver_user_id: null as number | null,
+        cover_approver_user_id: null as number | null,
+        approval_window_days: null as number | null,
         internal_only: false,
         site_scope: null as number[] | null,
         search_terms: [] as string[],
@@ -360,6 +366,9 @@ export function ItCatalogueManagement({
             provisioning_template_version_id: item?.provisioning_template_version_id ?? null,
             default_priority: item?.default_priority ?? 'normal',
             requires_approval: item?.requires_approval ?? false,
+            approver_user_id: item?.approver_user_id ?? null,
+            cover_approver_user_id: item?.cover_approver_user_id ?? null,
+            approval_window_days: item?.approval_window_days ?? null,
             internal_only: item?.internal_only ?? false,
             site_scope: item?.site_scope ?? null,
             search_terms: item?.search_terms ?? [],
@@ -1046,6 +1055,122 @@ export function ItCatalogueManagement({
                                                 }
                                             />
                                         </div>
+                                        {form.data.requires_approval &&
+                                            actorId !== undefined && (
+                                                <div
+                                                    className="mt-5 space-y-3 rounded-xl border border-border p-3"
+                                                    aria-label="Approval routing"
+                                                >
+                                                    <p className="text-sm font-medium">
+                                                        Approval routing
+                                                    </p>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Submitted requests are
+                                                        routed to these
+                                                        approvers automatically.
+                                                        Leave both empty to use
+                                                        the service desk
+                                                        fallback queue. The
+                                                        requester and
+                                                        beneficiary can never
+                                                        approve their own
+                                                        request.
+                                                    </p>
+                                                    <ProvisioningPicker
+                                                        actorId={actorId}
+                                                        kind="agents"
+                                                        contextKind="catalogue"
+                                                        label="Default approver (optional)"
+                                                        value={
+                                                            form.data
+                                                                .approver_user_id
+                                                        }
+                                                        onChange={(choice) =>
+                                                            form.setData(
+                                                                'approver_user_id',
+                                                                choice?.id ??
+                                                                    null,
+                                                            )
+                                                        }
+                                                        onDenied={() => {
+                                                            setEditorOpen(
+                                                                false,
+                                                            );
+                                                            form.reset();
+                                                        }}
+                                                    />
+                                                    <ProvisioningPicker
+                                                        actorId={actorId}
+                                                        kind="agents"
+                                                        contextKind="catalogue"
+                                                        label="Cover approver (optional)"
+                                                        value={
+                                                            form.data
+                                                                .cover_approver_user_id
+                                                        }
+                                                        onChange={(choice) =>
+                                                            form.setData(
+                                                                'cover_approver_user_id',
+                                                                choice?.id ??
+                                                                    null,
+                                                            )
+                                                        }
+                                                        onDenied={() => {
+                                                            setEditorOpen(
+                                                                false,
+                                                            );
+                                                            form.reset();
+                                                        }}
+                                                    />
+                                                    <Field
+                                                        label="Approval window (days)"
+                                                        error={
+                                                            form.errors
+                                                                .approval_window_days
+                                                        }
+                                                    >
+                                                        <Input
+                                                            type="number"
+                                                            min={1}
+                                                            max={60}
+                                                            value={
+                                                                form.data
+                                                                    .approval_window_days ??
+                                                                ''
+                                                            }
+                                                            placeholder="5"
+                                                            onChange={(event) =>
+                                                                form.setData(
+                                                                    'approval_window_days',
+                                                                    event.target
+                                                                        .value ===
+                                                                        ''
+                                                                        ? null
+                                                                        : Number(
+                                                                              event
+                                                                                  .target
+                                                                                  .value,
+                                                                          ),
+                                                                )
+                                                            }
+                                                        />
+                                                    </Field>
+                                                    {(form.errors
+                                                        .approver_user_id ||
+                                                        form.errors
+                                                            .cover_approver_user_id) && (
+                                                        <p
+                                                            role="alert"
+                                                            className="text-sm text-status-critical"
+                                                        >
+                                                            {form.errors
+                                                                .approver_user_id ??
+                                                                form.errors
+                                                                    .cover_approver_user_id}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
                                         <div className="mt-5 space-y-3">
                                             <Field
                                                 label="Available at"
@@ -1576,7 +1701,18 @@ export function ItCatalogueManagement({
                                                 label="Approval"
                                                 value={
                                                     form.data.requires_approval
-                                                        ? 'Required'
+                                                        ? form.data
+                                                              .approver_user_id
+                                                            ? 'Required · routed to the named approvers within ' +
+                                                              (form.data
+                                                                  .approval_window_days ??
+                                                                  5) +
+                                                              ' days'
+                                                            : 'Required · routed through the service desk fallback queue within ' +
+                                                              (form.data
+                                                                  .approval_window_days ??
+                                                                  5) +
+                                                              ' days'
                                                         : 'Not required'
                                                 }
                                             />
@@ -1697,7 +1833,9 @@ export function ItCatalogueManagement({
                             label="Approval"
                             value={
                                 publishing?.requires_approval
-                                    ? 'Required'
+                                    ? publishing.approver_user_id
+                                        ? 'Required · named approvers'
+                                        : 'Required · fallback queue'
                                     : 'Not required'
                             }
                         />
