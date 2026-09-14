@@ -292,6 +292,7 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::get('/it/setup/technical-deliveries/{source}/{delivery}', ItTechnicalDeliveryController::class)->where('source', 'device|fleet')->whereNumber('delivery')->name('it.technical-deliveries.review');
         Route::post('/it/setup/technical-deliveries/{source}/{delivery}/retry', ItTechnicalDeliveryController::class)->where('source', 'device|fleet')->whereNumber('delivery')->name('it.technical-deliveries.retry');
         Route::post('/it/setup/validate-candidate', [ItServiceManagementSetupController::class, 'validateCandidate'])->name('it.setup.validate-candidate');
+        Route::get('/it/setup/routing-dry-run', [ItServiceManagementSetupController::class, 'routingDryRun'])->name('it.setup.routing-dry-run');
         Route::post('/it/setup/commands/{requestUuid}/recover', [ItServiceManagementSetupController::class, 'recoverCommand'])->whereUuid('requestUuid')->name('it.setup.commands.recover');
         Route::post('/it/setup/commands/{requestUuid}/cancel', [ItServiceManagementSetupController::class, 'cancelCommand'])->whereUuid('requestUuid')->name('it.setup.commands.cancel');
         Route::post('/it/setup/teams', [ItServiceManagementSetupController::class, 'storeTeam'])->name('it.setup.teams.store');

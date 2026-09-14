@@ -536,6 +536,49 @@ class ItServiceManagementSetupController extends Controller
         ]);
     }
 
+    /**
+     * W18 explainable routing: what the current rules WOULD decide for every
+     * open ticket, side by side with where it sits now. Nothing mutates.
+     */
+    public function routingDryRun(Request $request)
+    {
+        $actor = $request->user();
+        abort_unless((bool) $actor?->canDo('it.manage'), 403);
+        $routing = app(\App\Domain\It\Services\ItTicketRoutingService::class);
+        $names = fn (?int $id): ?string => $id ? \App\Models\User::query()->find($id)?->name : null;
+        $rows = $this->workAccess->applyViewScope(ItTicket::query(), $actor)
+            ->whereIn('status', ItTicket::OPEN_STATUSES)
+            ->with(['queue:id,name', 'assignee:id,name', 'owner:id,name'])
+            ->orderByDesc('id')->limit(200)->get()
+            ->map(function (ItTicket $ticket) use ($routing, $names): array {
+                $proposed = $routing->preview($ticket);
+
+                return [
+                    'id' => $ticket->id,
+                    'reference' => $ticket->reference,
+                    'title' => $ticket->title,
+                    'current' => [
+                        'queue' => $ticket->queue?->name,
+                        'owner' => $ticket->owner?->name,
+                        'assignee' => $ticket->assignee?->name,
+                    ],
+                    'proposed' => [
+                        'queue' => $proposed['queue_name'],
+                        'owner' => $names($proposed['owner_user_id']),
+                        'assignee' => $names($proposed['assigned_to_user_id']),
+                    ],
+                    'strategy' => $proposed['strategy'],
+                    'gaps' => $proposed['gaps'],
+                    'differs' => $proposed['queue_id'] !== $ticket->queue_id
+                        || $proposed['owner_user_id'] !== ($ticket->owner_user_id !== null ? (int) $ticket->owner_user_id : null)
+                        || $proposed['assigned_to_user_id'] !== ($ticket->assigned_to_user_id !== null ? (int) $ticket->assigned_to_user_id : null),
+                ];
+            })->values();
+
+        return response()->json(['rows' => $rows, 'generated_at' => now()->toIso8601String()])
+            ->header('Cache-Control', 'no-store, private');
+    }
+
     public function validateCandidate(ValidateItSetupCandidateRequest $request)
     {
         return response()->json(['candidate' => $this->setupService->authorizeCandidate($request->user(), $request->validated())])

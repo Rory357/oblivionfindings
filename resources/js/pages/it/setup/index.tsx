@@ -17,6 +17,7 @@ import {
     ItRecurrencePlans,
     type RecurrencePlanRow,
 } from '@/components/it/it-recurrence-plans';
+import { ItRoutingDryRun } from '@/components/it/it-routing-dry-run';
 import {
     ItReplyTemplates,
     type ReplyTemplateRow,
@@ -885,13 +886,18 @@ export default function ItSetupIndex({
                         />
                     )}
                     {tab === 'queues' && (
-                        <SetupRegister
-                            title="Queues"
-                            rows={filterRows(queues)}
-                            total={queues.length}
-                            layout={layout}
-                            onEdit={openQueue}
-                        />
+                        <>
+                            <div className="mb-3 flex justify-end">
+                                <ItRoutingDryRun />
+                            </div>
+                            <SetupRegister
+                                title="Queues"
+                                rows={filterRows(queues)}
+                                total={queues.length}
+                                layout={layout}
+                                onEdit={openQueue}
+                            />
+                        </>
                     )}
                     {tab === 'services' && (
                         <SetupRegister
