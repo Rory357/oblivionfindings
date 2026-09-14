@@ -128,23 +128,24 @@ test('knowledge can only enter managed lifecycle states through lifecycle action
     expect($article->status)->toBe('draft');
 
     $this->actingAs($this->manager)
-        ->patch("/it/kb/{$article->id}", ['status' => 'published'])
+        ->patch("/it/kb/{$article->id}", ['status' => 'published', 'lock_version' => $article->fresh()->lock_version])
         ->assertSessionHasErrors('status');
+    // Publishing straight from draft is refused: review is a required step.
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/publish")
+        ->post("/it/kb/{$article->id}/publish", ['lock_version' => $article->fresh()->lock_version])
         ->assertRedirect();
     expect($article->fresh()->status)->toBe('draft');
 
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/submit-review")
-        ->assertRedirect();
+        ->post("/it/kb/{$article->id}/submit-review", ['lock_version' => $article->fresh()->lock_version])
+        ->assertRedirect()->assertSessionMissing('error');
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/publish")
-        ->assertRedirect();
+        ->post("/it/kb/{$article->id}/publish", ['lock_version' => $article->fresh()->lock_version])
+        ->assertRedirect()->assertSessionMissing('error');
     expect($article->fresh()->status)->toBe('published');
 
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/retire")
+        ->post("/it/kb/{$article->id}/retire", ['lock_version' => $article->fresh()->lock_version])
         ->assertSessionHasErrors('reason');
     expect($article->fresh()->status)->toBe('published');
 });
@@ -185,14 +186,14 @@ test('knowledge follows review publish and retire lifecycle with ownership scope
         ->and($article->service->is($service))->toBeTrue();
 
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/submit-review")
-        ->assertRedirect();
+        ->post("/it/kb/{$article->id}/submit-review", ['lock_version' => $article->fresh()->lock_version])
+        ->assertRedirect()->assertSessionMissing('error');
     expect($article->fresh()->status)->toBe('in_review')
         ->and($article->fresh()->review_started_at)->not->toBeNull();
 
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/publish")
-        ->assertRedirect();
+        ->post("/it/kb/{$article->id}/publish", ['lock_version' => $article->fresh()->lock_version])
+        ->assertRedirect()->assertSessionMissing('error');
     expect($article->fresh()->status)->toBe('published')
         ->and($article->fresh()->published_at)->not->toBeNull()
         ->and($article->fresh()->reviewed_by_user_id)->toBe($this->manager->id);
@@ -207,12 +208,14 @@ test('knowledge follows review publish and retire lifecycle with ownership scope
     $this->actingAs($this->worker)
         ->post("/it/kb/{$article->id}/helpful", ['helpful' => true])
         ->assertRedirect();
+    // A helpful vote is recorded as an interaction; the legacy deflection
+    // counter is retained but no longer claims an avoided ticket.
     expect(ItKbInteraction::query()->where('it_kb_article_id', $article->id)->count())->toBe(2)
-        ->and($article->fresh()->deflection_count)->toBe(1);
+        ->and($article->fresh()->deflection_count)->toBe(0);
 
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/retire", ['reason' => 'Superseded by managed recovery.'])
-        ->assertRedirect();
+        ->post("/it/kb/{$article->id}/retire", ['reason' => 'Superseded by managed recovery.', 'lock_version' => $article->fresh()->lock_version])
+        ->assertRedirect()->assertSessionMissing('error');
     expect($article->fresh()->status)->toBe('retired')
         ->and($article->fresh()->retired_at)->not->toBeNull();
 });
