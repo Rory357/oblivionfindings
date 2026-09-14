@@ -79,6 +79,7 @@ class TaskAggregator
             new Providers\ItApprovalTaskProvider,
             new Providers\ItKnowledgeReviewTaskProvider,
             new Providers\ItAutomationReviewTaskProvider,
+            new Providers\ItRecurrenceFailureTaskProvider,
             new Providers\VendorRenewalTaskProvider,
             new Providers\ItProvisioningTaskProvider,
             new Providers\FleetIncidentProvider,
