@@ -31,6 +31,7 @@ import {
     TicketMergedOriginals,
     type MergedOriginals,
 } from '@/components/it/ticket-merged-originals';
+import { TicketAssistPanel } from '@/components/it/ticket-assist-panel';
 import { TicketMacros } from '@/components/it/ticket-macros';
 import { useTicketPropertyMutation } from '@/components/it/ticket-property-mutation';
 import { TicketRelatedWork } from '@/components/it/ticket-related-work';
@@ -925,7 +926,8 @@ export default function ItTicketShow({
                             originals={ticket.merged_originals}
                         />
                         {!concealed && can.manage && isWorking && (
-                            <div className="flex justify-end">
+                            <div className="flex items-center justify-end gap-2">
+                                <TicketAssistPanel ticketId={ticket.id} />
                                 <TicketMacros
                                     ticketId={ticket.id}
                                     disabled={propertyMutation.busy}

@@ -198,6 +198,7 @@ Route::middleware(['auth', 'permission:it.request|it.view|it.knowledge.author|it
     Route::get('/it/work', [ItWorkspaceRedirectController::class, 'work'])->middleware('permission:it.view')->name('it.work.index');
     Route::get('/it/reply-templates', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'index'])->middleware('permission:it.view')->name('it.reply-templates.index');
     Route::get('/it/tickets/{ticket}/reply-templates/{template}/render', [\App\Http\Controllers\It\ItReplyTemplateController::class, 'render'])->whereNumber(['ticket', 'template'])->middleware('permission:it.view')->name('it.reply-templates.render');
+    Route::get('/it/tickets/{ticket}/assist', [\App\Http\Controllers\It\ItAssistController::class, 'show'])->whereNumber('ticket')->middleware('permission:it.view')->name('it.assist.show');
     Route::get('/it/tickets/{ticket}/macros', [\App\Http\Controllers\It\ItTicketMacroController::class, 'index'])->whereNumber('ticket')->middleware('permission:it.view')->name('it.macros.index');
     Route::post('/it/tickets/{ticket}/macros/{macro}/apply', [\App\Http\Controllers\It\ItTicketMacroController::class, 'apply'])->whereNumber(['ticket', 'macro'])->middleware('permission:it.view')->name('it.macros.apply');
     Route::post('/it/kb/{article}/view', [ItKbController::class, 'view'])->name('it.kb.view');
