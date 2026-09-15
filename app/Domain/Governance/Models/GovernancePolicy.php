@@ -169,6 +169,42 @@ class GovernancePolicy extends Model
         return (bool) $this->requires_attestation;
     }
 
+    /**
+     * One viewer's read-and-confirm state — the single rule shared by
+     * "Policies to confirm", the policy page and My work:
+     * not_required · replaced · not_approved · not_yet_in_effect · confirmed ·
+     * due_again (confirmed this version, but the frequency asks again) · to_confirm.
+     */
+    public function confirmationStateFor(?PolicyAttestation $mine, ?string $today = null): string
+    {
+        $today ??= self::nzToday();
+
+        if (! $this->needsConfirmation()) {
+            return 'not_required';
+        }
+
+        if ($this->status === 'superseded') {
+            return 'replaced';
+        }
+
+        if (! in_array($this->status, ['approved', 'published', 'active'], true)) {
+            return 'not_approved';
+        }
+
+        if ($this->comesIntoEffectLater($today)) {
+            return 'not_yet_in_effect';
+        }
+
+        if ($this->isCurrentConfirmation($mine, $today)) {
+            return 'confirmed';
+        }
+
+        return $mine?->acknowledged
+            && (int) $mine->policy_version === (int) $this->version_number
+            ? 'due_again'
+            : 'to_confirm';
+    }
+
     /** The NZ date a confirmation must be repeated, or null when it never expires. */
     public function confirmationDueAgainOn(?PolicyAttestation $attestation): ?string
     {

@@ -267,6 +267,12 @@ interface Props extends PageProps {
     packReading?: PackReading | null;
     viewerCanRsvp?: boolean;
     viewerRsvp?: ViewerRsvp | null;
+    /** Committee meetings: links to that committee's risk view and report. */
+    committeeOversight?: {
+        name: string;
+        risks_href: string;
+        report_href: string;
+    } | null;
     /** Decision-paper wizard options — empty unless the viewer authors papers. */
     users?: UserOption[];
     committees?: CommitteeOption[];
@@ -356,6 +362,7 @@ export default function MeetingShow({
     packReading = null,
     viewerCanRsvp,
     viewerRsvp,
+    committeeOversight = null,
     users = [],
     committees = [],
     authoritySubjects = null,
@@ -821,6 +828,24 @@ export default function MeetingShow({
                         meters={<>{meters}</>}
                         actions={
                             <>
+                                {committeeOversight ? (
+                                    <>
+                                        <PageHeaderGlassButton
+                                            icon={ShieldCheck}
+                                            onClick={() => router.visit(committeeOversight.risks_href)}
+                                            aria-label={`Committee risks: ${committeeOversight.name}`}
+                                        >
+                                            Committee risks
+                                        </PageHeaderGlassButton>
+                                        <PageHeaderGlassButton
+                                            icon={FileText}
+                                            onClick={() => router.visit(committeeOversight.report_href)}
+                                            aria-label={`Committee report: ${committeeOversight.name}`}
+                                        >
+                                            Committee report
+                                        </PageHeaderGlassButton>
+                                    </>
+                                ) : null}
                                 {canOpenEdit ? (
                                     <PageHeaderGlassButton
                                         icon={Pencil}

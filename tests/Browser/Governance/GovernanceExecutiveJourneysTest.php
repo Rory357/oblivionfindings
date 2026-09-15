@@ -304,8 +304,13 @@ test('board secretary can prepare a meeting and clear workflow items', function 
             ->visit("/governance/meetings/{$meeting->id}")
             ->waitFor('@meeting-title', 30)
             ->assertSee($meeting->title)
-            ->assertSeeIn('@workflow-status-agenda', 'done')
-            ->assertSeeIn('@workflow-status-pack_generated', 'todo')
+            // The preparation checklist lives in the Workflow tab (people who
+            // run the meeting only) and shows plain status names.
+            ->waitFor('@meeting-tab-workflow', 10)
+            ->click('@meeting-tab-workflow')
+            ->waitFor('@workflow-status-agenda', 10)
+            ->assertSeeIn('@workflow-status-agenda', 'Done')
+            ->assertSeeIn('@workflow-status-pack_generated', 'To do')
             ->waitFor('@meeting-tab-attendance', 10)
             ->click('@meeting-tab-attendance')
             ->waitFor('@record-attendance', 10)
@@ -313,7 +318,9 @@ test('board secretary can prepare a meeting and clear workflow items', function 
             ->waitFor('@save-attendance', 10)
             ->click('@save-attendance')
             ->waitUntilMissing('@save-attendance', 15)
-            ->assertSeeIn('@workflow-status-quorum', 'done')
+            ->click('@meeting-tab-workflow')
+            ->waitFor('@workflow-status-quorum', 10)
+            ->assertSeeIn('@workflow-status-quorum', 'Done')
             ->waitFor('@generate-pack', 30)
             ->click('@generate-pack')
             ->waitFor('@view-pack', 120)
@@ -325,11 +332,11 @@ test('board secretary can prepare a meeting and clear workflow items', function 
                 $dialog->press('Send the pack');
             })
             ->waitForText('Sent to members', 60)
-            ->visit("/governance/meetings/{$meeting->id}")
+            ->visit("/governance/meetings/{$meeting->id}?tab=workflow")
             ->waitFor('@workflow-status-pack_generated', 30)
-            ->assertSeeIn('@workflow-status-pack_generated', 'done')
-            ->assertSeeIn('@workflow-status-pack_distributed', 'done')
-            ->assertSeeIn('@workflow-status-quorum', 'done');
+            ->assertSeeIn('@workflow-status-pack_generated', 'Done')
+            ->assertSeeIn('@workflow-status-pack_distributed', 'Done')
+            ->assertSeeIn('@workflow-status-quorum', 'Done');
     });
 
     $meeting->refresh();

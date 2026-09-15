@@ -8,6 +8,7 @@ use App\Domain\Governance\Enums\GovernanceWorkKind;
 use App\Domain\Governance\Models\ActionItem;
 use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Models\GovernancePolicy;
 use App\Domain\Governance\Models\PerformanceReview;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\Vote;
@@ -439,6 +440,68 @@ class GovernanceWorkQuery
                             'key' => 'read',
                             'label' => 'Read and confirm',
                             'href' => "/governance/policies/{$attestation->policy_id}",
+                            'allowed' => true,
+                            'blocked_reason' => null,
+                        ],
+                        sourceVersion: $version,
+                        area: GovernanceArea::Policies,
+                        ownerName: $viewer->name,
+                    ));
+                }
+
+                // Policies the viewer confirmed before whose confirmation
+                // frequency now asks for it again (the "due again" state on
+                // Policies to confirm), unless a request above already covers it.
+                $requestedPolicyIds = $attestations->pluck('policy_id')->map(fn ($id) => (int) $id)->all();
+                $today = GovernancePolicy::nzToday();
+                $repeating = GovernancePolicy::query()
+                    ->where('requires_attestation', true)
+                    ->whereIn('status', ['approved', 'published', 'active'])
+                    ->whereNotNull('attestation_frequency')
+                    ->whereNotIn('id', $requestedPolicyIds)
+                    ->whereHas('attestations', fn ($query) => $query
+                        ->where('user_id', $viewer->id)
+                        ->whereNotNull('acknowledged_at'))
+                    ->with(['attestations' => fn ($query) => $query
+                        ->where('user_id', $viewer->id)
+                        ->whereNotNull('acknowledged_at')
+                        ->orderByDesc('acknowledged_at')])
+                    ->orderBy('title')
+                    ->get();
+
+                foreach ($repeating as $policy) {
+                    $mine = $policy->attestations->first();
+                    if ($policy->confirmationStateFor($mine, $today) !== 'due_again') {
+                        continue;
+                    }
+
+                    $dueOn = $policy->confirmationDueAgainOn($mine);
+                    $isOverdue = $dueOn !== null && $dueOn < $today;
+                    $version = (int) $policy->version_number;
+
+                    $items->push(new GovernanceWorkItem(
+                        id: "policy:{$policy->id}:confirm-again",
+                        kind: GovernanceWorkKind::Read,
+                        source: [
+                            'type' => 'policy',
+                            'id' => (int) $policy->id,
+                            'reference' => (string) ($policy->policy_code ?: "Version {$version}"),
+                            'href' => "/governance/policies/{$policy->id}",
+                        ],
+                        title: (string) $policy->title,
+                        reason: "Time to confirm this policy again — it asks members to re-read it "
+                            .mb_strtolower(GovernanceLabels::label('frequency', (string) $policy->attestation_frequency))
+                            .'. You last confirmed it on '.GovernanceLabels::date($mine->acknowledged_at).'.',
+                        priority: $isOverdue ? 'high' : 'medium',
+                        status: $isOverdue ? 'overdue' : 'due_soon',
+                        dueAt: $dueOn !== null ? Carbon::parse($dueOn, GovernanceLabels::TIMEZONE)->toIso8601String() : null,
+                        dueDate: $dueOn,
+                        assigneeUserId: $viewer->id,
+                        boardMemberId: $boardMember?->id,
+                        requiredAction: [
+                            'key' => 'read',
+                            'label' => 'Read and confirm',
+                            'href' => "/governance/policies/{$policy->id}",
                             'allowed' => true,
                             'blocked_reason' => null,
                         ],
