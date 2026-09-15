@@ -27,12 +27,15 @@ final class ItProvisioningTrackingService
         'reopened' => 'IT work reopened',
         'cancelled' => 'Request cancelled',
         'rescheduled' => 'Work date updated',
+        'approval_expired' => 'Approval deadline passed; a new review is needed',
     ];
 
     private const WORKFLOW_EVENTS = [
         'cancelled' => 'Request workflow cancelled; completed work remains recorded',
         'rescheduled' => 'Workflow date updated',
+        'resumed' => 'Request workflow resumed',
         'source_cancelled' => 'Source checklist cancelled; completed work remains recorded',
+        'source_resumed' => 'Source checklist resumed',
         'source_rescheduled' => 'Workflow date updated from its source',
         'reversal_requested' => 'Corrective work requested for completed tasks',
     ];
@@ -105,6 +108,12 @@ final class ItProvisioningTrackingService
             'answers' => $this->answers($submission, $actor),
             'attachments' => app(ItCatalogAttachmentService::class)->forResult($actor, $request, publicOnly: true),
             'events' => $this->events($request),
+            // Per-task progress without internal task titles, notes or approver identity.
+            'tasks' => $this->tasks($request)->sortBy([['stage', 'asc'], ['id', 'asc']])->values()->map(fn (ItProvisioningRequest $task) => [
+                'stage' => (int) $task->stage, 'type' => $task->type, 'status' => $task->status,
+                'approval_status' => $task->approval_required ? $task->approval_status : 'not_required',
+                'due_date' => $task->due_date?->toDateString(),
+            ])->all(),
         ];
     }
 
@@ -149,6 +158,7 @@ final class ItProvisioningTrackingService
         $approval = match (true) {
             $approvals->isEmpty() => 'not_required',
             $approvals->contains('rejected') => 'rejected',
+            $approvals->contains('expired') => 'expired',
             $approvals->contains('cancelled') => 'cancelled',
             $approvals->every(fn ($value) => $value === 'approved') => 'approved',
             default => 'pending',

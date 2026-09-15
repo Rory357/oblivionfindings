@@ -8,6 +8,7 @@ use App\Models\ItAttachment;
 use App\Models\ItCatalogItem;
 use App\Models\ItCatalogSubmission;
 use App\Models\ItProvisioningRequest;
+use App\Models\ItProvisioningTemplate;
 use App\Models\ItProvisioningTemplateVersion;
 use App\Models\ItTicket;
 use App\Models\ItTicketCommandReceipt;
@@ -544,6 +545,11 @@ class ItCatalogSubmissionService
 
         if ($item->provisioning_template_version_id !== null) {
             $version = ItProvisioningTemplateVersion::query()->findOrFail($item->provisioning_template_version_id);
+            // The catalogue contract pins an immutable template version, but a
+            // withdrawn template must not keep launching new work through it.
+            if ((int) ItProvisioningTemplate::query()->whereKey($version->provisioning_template_id)->value('published_version_id') !== (int) $version->id) {
+                throw ValidationException::withMessages(['catalog_item' => 'This request’s provisioning workflow was withdrawn. Ask IT to review and republish the catalogue item before submitting.']);
+            }
             $lifecycle = (string) ($version->contract['lifecycle_type'] ?? '');
             abort_if(in_array($lifecycle, ['mover', 'leaver'], true) && ! $actor->canDo('it.manage'), 403);
             $workflow = app(ItProvisioningWorkflowService::class)->launch(profile: $profile, lifecycleType: $lifecycle,
@@ -556,11 +562,13 @@ class ItCatalogSubmissionService
                 throw ValidationException::withMessages(['catalog_item' => 'This workflow produced no work. Review its template before requesting it.']);
             }
             if ($item->requires_approval) {
+                $routing = app(ItProvisioningApprovalRoutingService::class);
                 foreach ($workflow->requests()->whereNull('reversal_of_request_id')->get() as $task) {
                     $task->update(['approval_required' => true, 'approval_status' => 'pending']);
                     ItTicketEvent::record($task, 'catalogue_approval_required', $actor->id, [
                         'catalog_item_id' => $item->id, 'form_schema_version' => $item->form_schema_version,
                     ]);
+                    $routing->route($task, $actor, 'Catalogue request: '.$item->name, $item->approver_user_id, $item->cover_approver_user_id, $item->approval_window_days);
                 }
                 $anchor->refresh();
             }
@@ -592,8 +600,12 @@ class ItCatalogSubmissionService
             'form_schema_version' => $item->form_schema_version,
             'approval_required' => $provisioning->approval_required,
         ]);
+        if ($provisioning->approval_required && app(ItProvisioningReadinessService::class)->storageReady()) {
+            app(ItProvisioningApprovalRoutingService::class)->route($provisioning, $actor, 'Catalogue request: '.$item->name,
+                $item->approver_user_id, $item->cover_approver_user_id, $item->approval_window_days);
+        }
 
-        return $provisioning;
+        return $provisioning->refresh();
     }
 
     /**

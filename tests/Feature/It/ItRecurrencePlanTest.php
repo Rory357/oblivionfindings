@@ -6,6 +6,7 @@ use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Tasks\Providers\ItRecurrenceFailureTaskProvider;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 
@@ -140,4 +141,28 @@ test('exception dates are skipped and an end date retires the plan after its las
     expect($summary['created'])->toBe(1)
         ->and($plan->fresh()->status)->toBe('retired')
         ->and($plan->fresh()->next_due_at)->toBeNull();
+});
+
+test('a failed occurrence surfaces as the plan owner task until a later occurrence succeeds', function () {
+    $plan = $this->recurrence->create($this->agent, recurrencePlanData($this, [
+        'cron_expression' => '0 9 * * *',
+    ]));
+    $plan->runs()->create([
+        'occurrence_key' => '2026-09-13T09:00:00+12:00', 'status' => 'failed',
+        'detail' => 'Synthetic failure fixture.', 'created_at' => now()->subHour(),
+    ]);
+
+    $provider = new ItRecurrenceFailureTaskProvider;
+    $tasks = collect($provider->authorizedTasks($this->agent->fresh()));
+    expect($tasks->pluck('ref')->all())->toBe(['REC-'.$plan->id])
+        ->and($tasks->sole()->severity)->toBe('high')
+        ->and($tasks->sole()->actionHelp)->toContain('Synthetic failure fixture.');
+
+    // Only the owner sees it, and a later successful occurrence clears it.
+    expect($provider->authorizedTasks($this->requester->fresh()))->toBe([]);
+    $plan->runs()->create([
+        'occurrence_key' => '2026-09-14T09:00:00+12:00', 'status' => 'created',
+        'detail' => null, 'created_at' => now(),
+    ]);
+    expect($provider->authorizedTasks($this->agent->fresh()))->toBe([]);
 });

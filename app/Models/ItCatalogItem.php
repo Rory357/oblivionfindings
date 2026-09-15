@@ -16,7 +16,13 @@ class ItCatalogItem extends Model
 
     public const OUTCOME_TYPES = ['service_request', 'security_request', 'provisioning'];
 
-    public const CONTRACT_FIELDS = ['it_service_id', 'name', 'slug', 'description', 'outcome_type', 'category', 'provisioning_type', 'provisioning_template_version_id', 'default_priority', 'requires_approval', 'internal_only', 'site_scope', 'form_schema_version', 'form_schema', 'search_terms', 'sort_order'];
+    public const CONTRACT_FIELDS = ['it_service_id', 'name', 'slug', 'description', 'outcome_type', 'category', 'provisioning_type', 'provisioning_template_version_id', 'default_priority', 'requires_approval', 'approver_user_id', 'cover_approver_user_id', 'approval_window_days', 'internal_only', 'site_scope', 'form_schema_version', 'form_schema', 'search_terms', 'sort_order'];
+
+    /**
+     * Contract keys added after the first immutable versions were recorded.
+     * Older versions read these as null rather than inheriting a newer draft.
+     */
+    public const CONTRACT_DEFAULTS = ['site_scope' => null, 'provisioning_template_version_id' => null, 'approver_user_id' => null, 'cover_approver_user_id' => null, 'approval_window_days' => null];
 
     protected $fillable = [
         'it_service_id',
@@ -29,6 +35,9 @@ class ItCatalogItem extends Model
         'provisioning_template_version_id',
         'default_priority',
         'requires_approval',
+        'approver_user_id',
+        'cover_approver_user_id',
+        'approval_window_days',
         'is_published',
         'internal_only',
         'site_scope',
@@ -53,6 +62,9 @@ class ItCatalogItem extends Model
         'sort_order' => 'integer',
         'lock_version' => 'integer',
         'provisioning_template_version_id' => 'integer',
+        'approver_user_id' => 'integer',
+        'cover_approver_user_id' => 'integer',
+        'approval_window_days' => 'integer',
     ];
 
     protected static function booted(): void
@@ -100,7 +112,7 @@ class ItCatalogItem extends Model
         $copy = clone $this;
         // Older immutable versions predate Site restrictions. Never inherit
         // a newer draft's restrictions while reading that original contract.
-        $copy->forceFill(['site_scope' => null, 'provisioning_template_version_id' => null, ...$version->contract]);
+        $copy->forceFill([...self::CONTRACT_DEFAULTS, ...$version->contract]);
 
         return $copy;
     }

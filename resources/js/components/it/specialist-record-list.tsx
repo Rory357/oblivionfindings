@@ -37,6 +37,7 @@ export function SpecialistRecordList({
     total,
     links,
     selection,
+    extraActions,
 }: {
     title: string;
     icon: LucideIcon;
@@ -44,6 +45,8 @@ export function SpecialistRecordList({
     total: number;
     links: { url: string | null; label: string; active: boolean }[];
     selection?: EntityTableProps<SpecialistListItem>['selection'];
+    /** Record-specific actions appended after the shared open/copy entries (kebab and context menu alike). */
+    extraActions?: (row: SpecialistListItem) => MenuItem[];
 }) {
     const { url } = usePage();
     const view =
@@ -72,6 +75,7 @@ export function SpecialistRecordList({
                     );
             },
         },
+        ...(extraActions?.(row) ?? []),
     ];
     const status = (row: SpecialistListItem) => (
         <EntityStatusChip variant={row.state.tone}>

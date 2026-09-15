@@ -6,7 +6,23 @@ import {
     type ProvisioningCommandOutcome,
 } from './use-provisioning-command';
 
-export type ProvisioningBulkOperation = 'assign' | 'cancel' | 'retry';
+export type ProvisioningBulkOperation =
+    | 'assign'
+    | 'cancel'
+    | 'retry'
+    | 'fail'
+    | 'request_approval'
+    | 'approve'
+    | 'reject';
+export const PROVISIONING_BULK_OPERATIONS: ProvisioningBulkOperation[] = [
+    'assign',
+    'request_approval',
+    'approve',
+    'reject',
+    'fail',
+    'retry',
+    'cancel',
+];
 export interface ProvisioningBulkReference {
     actorId: number;
     operation: ProvisioningBulkOperation;
@@ -51,7 +67,9 @@ export function readProvisioningBulkReference(
         !record(value) ||
         Object.keys(value).length !== 3 ||
         value.actorId !== actorId ||
-        !['assign', 'cancel', 'retry'].includes(String(value.operation)) ||
+        !(PROVISIONING_BULK_OPERATIONS as string[]).includes(
+            String(value.operation),
+        ) ||
         !Array.isArray(value.items) ||
         value.items.length < 1 ||
         value.items.length > 20
@@ -463,7 +481,16 @@ export function useProvisioningBulkCommand(
             frozen.current = structuredClone(
                 reference.operation === 'assign'
                     ? { assigned_to_user_id: payload.assigned_to_user_id }
-                    : { reason: payload.reason },
+                    : reference.operation === 'request_approval'
+                      ? {
+                            primary_approver_user_id:
+                                payload.primary_approver_user_id,
+                            cover_approver_user_id:
+                                payload.cover_approver_user_id,
+                            approval_expires_on: payload.approval_expires_on,
+                            reason: payload.reason,
+                        }
+                      : { reason: payload.reason },
             );
             setHasFrozen(true);
             void run(

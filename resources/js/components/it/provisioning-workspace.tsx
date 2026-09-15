@@ -2,6 +2,7 @@ import {
     SpecialistRecordList,
     type SpecialistListItem,
 } from '@/components/it/specialist-record-list';
+import type { MenuItem } from '@/components/lists/entity-menu';
 import {
     GroupPillRail,
     TabSearchPalette,
@@ -60,6 +61,8 @@ export interface ProvisioningTask {
     approval_status: string;
     evidence_required: boolean;
     reversal_of_request_id: number | null;
+    dependency_request_ids?: number[];
+    approval_expires_at?: string | null;
     assignee: { id: number; name: string } | null;
     team: string | null;
     readiness: {
@@ -122,6 +125,7 @@ export const provisioningActionLabel: Record<string, string> = {
     reopen: 'Reopen task',
     reschedule: 'Change effective date',
     reverse: 'Create reversal work',
+    resume: 'Resume workflow',
     publish: 'Publish reviewed version',
     unpublish: 'Withdraw template',
     launch: 'Start workflow',
@@ -422,9 +426,11 @@ export function provisioningTaskRow(
 export function ProvisioningTaskList({
     tasks,
     search = '',
+    extraActions,
 }: {
     tasks: ProvisioningTask[];
     search?: string;
+    extraActions?: (task: ProvisioningTask) => MenuItem[];
 }) {
     const visible = tasks.filter((task) =>
         (
@@ -444,6 +450,16 @@ export function ProvisioningTaskList({
             rows={visible.map(provisioningTaskRow)}
             total={visible.length}
             links={[]}
+            {...(extraActions
+                ? {
+                      extraActions: (row: SpecialistListItem) => {
+                          const task = visible.find(
+                              (candidate) => candidate.id === row.id,
+                          );
+                          return task ? extraActions(task) : [];
+                      },
+                  }
+                : {})}
         />
     );
 }

@@ -390,6 +390,9 @@ class ItServiceManagementSetupController extends Controller
                 'provisioning_template_version_id' => $item->provisioning_template_version_id,
                 'default_priority' => $item->default_priority,
                 'requires_approval' => $item->requires_approval,
+                'approver_user_id' => $item->approver_user_id,
+                'cover_approver_user_id' => $item->cover_approver_user_id,
+                'approval_window_days' => $item->approval_window_days,
                 'is_published' => $item->is_published,
                 'internal_only' => $item->internal_only,
                 'site_scope' => $item->site_scope,
@@ -508,8 +511,10 @@ class ItServiceManagementSetupController extends Controller
                     'organisation_wide' => $agent->canDo('it.organisationWide'),
                 ])
                 ->values(),
+            // Organisation-wide viewers configure any active Site; everyone
+            // else stays within their approved Sites.
             'sites' => Site::query()
-                ->whereKey($approvedSiteIds)
+                ->when(! $user->canDo('sites.viewAll'), fn ($query) => $query->whereKey($approvedSiteIds))
                 ->where('is_active', true)
                 ->where('archived', false)
                 ->whereNull('archived_at')

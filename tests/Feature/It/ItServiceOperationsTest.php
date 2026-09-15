@@ -128,23 +128,24 @@ test('knowledge can only enter managed lifecycle states through lifecycle action
     expect($article->status)->toBe('draft');
 
     $this->actingAs($this->manager)
-        ->patch("/it/kb/{$article->id}", ['status' => 'published'])
+        ->patch("/it/kb/{$article->id}", ['status' => 'published', 'lock_version' => $article->fresh()->lock_version])
         ->assertSessionHasErrors('status');
+    // Publishing straight from draft is refused: review is a required step.
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/publish")
+        ->post("/it/kb/{$article->id}/publish", ['lock_version' => $article->fresh()->lock_version])
         ->assertRedirect();
     expect($article->fresh()->status)->toBe('draft');
 
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/submit-review")
-        ->assertRedirect();
+        ->post("/it/kb/{$article->id}/submit-review", ['lock_version' => $article->fresh()->lock_version])
+        ->assertRedirect()->assertSessionMissing('error');
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/publish")
-        ->assertRedirect();
+        ->post("/it/kb/{$article->id}/publish", ['lock_version' => $article->fresh()->lock_version])
+        ->assertRedirect()->assertSessionMissing('error');
     expect($article->fresh()->status)->toBe('published');
 
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/retire")
+        ->post("/it/kb/{$article->id}/retire", ['lock_version' => $article->fresh()->lock_version])
         ->assertSessionHasErrors('reason');
     expect($article->fresh()->status)->toBe('published');
 });
@@ -185,14 +186,14 @@ test('knowledge follows review publish and retire lifecycle with ownership scope
         ->and($article->service->is($service))->toBeTrue();
 
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/submit-review")
-        ->assertRedirect();
+        ->post("/it/kb/{$article->id}/submit-review", ['lock_version' => $article->fresh()->lock_version])
+        ->assertRedirect()->assertSessionMissing('error');
     expect($article->fresh()->status)->toBe('in_review')
         ->and($article->fresh()->review_started_at)->not->toBeNull();
 
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/publish")
-        ->assertRedirect();
+        ->post("/it/kb/{$article->id}/publish", ['lock_version' => $article->fresh()->lock_version])
+        ->assertRedirect()->assertSessionMissing('error');
     expect($article->fresh()->status)->toBe('published')
         ->and($article->fresh()->published_at)->not->toBeNull()
         ->and($article->fresh()->reviewed_by_user_id)->toBe($this->manager->id);
@@ -207,12 +208,14 @@ test('knowledge follows review publish and retire lifecycle with ownership scope
     $this->actingAs($this->worker)
         ->post("/it/kb/{$article->id}/helpful", ['helpful' => true])
         ->assertRedirect();
+    // A helpful vote is recorded as an interaction; the legacy deflection
+    // counter is retained but no longer claims an avoided ticket.
     expect(ItKbInteraction::query()->where('it_kb_article_id', $article->id)->count())->toBe(2)
-        ->and($article->fresh()->deflection_count)->toBe(1);
+        ->and($article->fresh()->deflection_count)->toBe(0);
 
     $this->actingAs($this->manager)
-        ->post("/it/kb/{$article->id}/retire", ['reason' => 'Superseded by managed recovery.'])
-        ->assertRedirect();
+        ->post("/it/kb/{$article->id}/retire", ['reason' => 'Superseded by managed recovery.', 'lock_version' => $article->fresh()->lock_version])
+        ->assertRedirect()->assertSessionMissing('error');
     expect($article->fresh()->status)->toBe('retired')
         ->and($article->fresh()->retired_at)->not->toBeNull();
 });
@@ -760,7 +763,9 @@ test('existing IT schedules are named once and their runs are recorded from Lara
         'it.check-sla',
         'it.close-resolved',
         'it.dispatch-notifications',
+        'it.expire-provisioning-approvals',
         'it.poll-mailbox',
+        'it.prune-knowledge-uploads',
         'it.retry-attachment-cleanup',
         'it.run-recurrence',
     ])->and($events->every(fn ($event) => $event->withoutOverlapping && $event->onOneServer))->toBeTrue();
@@ -1191,11 +1196,14 @@ test('the automation catalogue remains visible when console routes are not loade
     $definitions = $catalog->definitions();
 
     expect($definitions)
-        ->toHaveCount(6)
+        ->toHaveCount(9)
         ->and($definitions[0])->toMatchArray(['key' => 'it.check-sla', 'label' => 'SLA watchdog'])
         ->and($definitions[1])->toMatchArray(['key' => 'it.close-resolved'])
-        ->and($definitions[2])->toMatchArray(['key' => 'it.poll-mailbox'])
-        ->and($definitions[3])->toMatchArray(['key' => 'it.dispatch-notifications', 'expression' => '* * * * *'])
-        ->and($definitions[4])->toMatchArray(['key' => 'it.retry-attachment-cleanup', 'expression' => '*/5 * * * *', 'overlap_minutes' => 10])
-        ->and($definitions[5])->toMatchArray(['key' => 'it.check-approval-deadlines', 'expression' => '* * * * *', 'overlap_minutes' => 10]);
+        ->and($definitions[2])->toMatchArray(['key' => 'it.prune-knowledge-uploads', 'expression' => '40 3 * * *'])
+        ->and($definitions[3])->toMatchArray(['key' => 'it.run-recurrence', 'expression' => '*/15 * * * *'])
+        ->and($definitions[4])->toMatchArray(['key' => 'it.poll-mailbox'])
+        ->and($definitions[5])->toMatchArray(['key' => 'it.dispatch-notifications', 'expression' => '* * * * *'])
+        ->and($definitions[6])->toMatchArray(['key' => 'it.retry-attachment-cleanup', 'expression' => '*/5 * * * *', 'overlap_minutes' => 10])
+        ->and($definitions[7])->toMatchArray(['key' => 'it.check-approval-deadlines', 'expression' => '* * * * *', 'overlap_minutes' => 10])
+        ->and($definitions[8])->toMatchArray(['key' => 'it.expire-provisioning-approvals', 'expression' => '*/10 * * * *', 'overlap_minutes' => 10]);
 });

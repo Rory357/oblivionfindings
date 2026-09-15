@@ -191,6 +191,67 @@ final class ItProvisioningRequestLifecycleService
                 'workflow_id' => $request->provisioning_workflow_id,
             ]);
             $this->reconcileWorkflow($request->workflow);
+            app(ItProvisioningNotifier::class)->approvalDecided($request, $decision, $actor);
+
+            return $request->refresh();
+        });
+    }
+
+    /**
+     * Scheduled expiry of an overdue pending approval. System-initiated: no
+     * actor access check, but the row is re-read under lock so a decision
+     * recorded in the meantime is never overwritten.
+     *
+     * @return 'expired'|'skipped'
+     */
+    public function expireApproval(int $requestId): string
+    {
+        return DB::transaction(function () use ($requestId): string {
+            $request = $this->lock(ItProvisioningRequest::query()->findOrFail($requestId));
+            if (! $request->approval_required || $request->approval_status !== 'pending' || $request->approval_requested_at === null
+                || ! $request->approval_expires_at || $request->approval_expires_at->isFuture()
+                || in_array($request->status, ['done', 'cancelled'], true)) {
+                return 'skipped';
+            }
+            $request->forceFill(['approval_status' => 'expired'])->save();
+            ItTicketEvent::record($request, 'approval_expired', null, [
+                'expired_at' => $request->approval_expires_at->toIso8601String(),
+                'primary_approver_user_id' => $request->primary_approver_user_id,
+                'cover_approver_user_id' => $request->cover_approver_user_id,
+            ]);
+            AuditLogger::logOrFail('it.provisioning.request.approval_expired', $request, [
+                'application_scope' => 'single_application',
+                'workflow_id' => $request->provisioning_workflow_id,
+                'expired_at' => $request->approval_expires_at->toIso8601String(),
+            ]);
+            $this->reconcileWorkflow($request->workflow);
+            app(ItProvisioningNotifier::class)->approvalExpired($request);
+
+            return 'expired';
+        }, 3);
+    }
+
+    /** Explicit corrective work for one completed original task. */
+    public function reverse(ItProvisioningRequest $request, User $actor, string $reason): ItProvisioningRequest
+    {
+        return DB::transaction(function () use ($request, $actor, $reason): ItProvisioningRequest {
+            $request = $this->lock($request);
+            $actor = $this->guard($request, $actor);
+            $reason = trim($reason);
+            if ($reason === '') {
+                throw new DomainException('Explain why the recorded action must be reversed.');
+            }
+            if ($request->status !== 'done' || $request->reversal_of_request_id !== null) {
+                throw new DomainException('Only a completed original task can be reversed. Cancelled or open work needs no reversal.');
+            }
+            $workflow = $request->workflow;
+            if (! $workflow) {
+                throw new DomainException('This legacy request has no workflow. Raise a new manual provisioning task to record the corrective action.');
+            }
+            if ($workflow->requests()->where('reversal_of_request_id', $request->id)->exists()) {
+                throw new DomainException('Corrective work already exists for this task. Continue on that task.');
+            }
+            app(ItProvisioningReversalService::class)->reverse($workflow, $actor, $reason, collect([$request]));
 
             return $request->refresh();
         });
@@ -278,6 +339,11 @@ final class ItProvisioningRequestLifecycleService
                 'canonical_target_type' => $request->canonical_target_type,
                 'canonical_target_id' => $request->canonical_target_id,
             ]);
+            $notifier = app(ItProvisioningNotifier::class);
+            $notifier->taskChanged($request, 'fulfilled', $actor);
+            if ($request->workflow && $request->workflow->fresh()?->status === 'completed') {
+                $notifier->workflowCompleted($request->workflow, $actor);
+            }
 
             return $request->refresh();
         });
@@ -308,6 +374,7 @@ final class ItProvisioningRequestLifecycleService
                 'workflow_id' => $request->provisioning_workflow_id,
                 'reason' => trim($reason),
             ]);
+            app(ItProvisioningNotifier::class)->taskChanged($request, 'failed', $actor);
 
             return $request->refresh();
         });
@@ -342,6 +409,7 @@ final class ItProvisioningRequestLifecycleService
                 'reason' => $reason,
                 'onboarding_task_id' => $request->onboarding_task_id,
             ]);
+            app(ItProvisioningNotifier::class)->taskChanged($request, 'cancelled', $actor);
 
             return $request->refresh();
         });
@@ -407,8 +475,9 @@ final class ItProvisioningRequestLifecycleService
             ])->save();
             $this->record($request, $actor, 'approval_requested', ['reason' => $reason,
                 'primary_approver_user_id' => $primary->id, 'cover_approver_user_id' => $cover->id,
-                'expires_at' => $deadline->toIso8601String()]);
+                'expires_at' => $deadline->toIso8601String(), 'routing_basis' => $data['routing_basis'] ?? 'explicit']);
             $this->reconcileWorkflow($request->workflow);
+            app(ItProvisioningNotifier::class)->approvalRequested($request, [$primary, $cover]);
 
             return $request->refresh();
         });
@@ -447,6 +516,7 @@ final class ItProvisioningRequestLifecycleService
                 'failed_at' => null, 'failure_reason' => null])->save();
             $this->record($request, $actor, 'retried', ['reason' => trim($reason)]);
             $this->reconcileWorkflow($request->workflow);
+            app(ItProvisioningNotifier::class)->taskChanged($request, 'retried', $actor);
 
             return $request->refresh();
         });

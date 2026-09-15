@@ -12,6 +12,7 @@ import {
     type ProvisioningBulkOperation,
 } from '@/components/it/use-provisioning-bulk-command';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
     ReviewCard,
@@ -53,6 +54,9 @@ export function ProvisioningBulkDialog({
     const [reason, setReason] = useState('');
     const [agent, setAgent] = useState<ProvisioningOption | null>(null);
     const [validAgent, setValidAgent] = useState(false);
+    const [cover, setCover] = useState<ProvisioningOption | null>(null);
+    const [validCover, setValidCover] = useState(false);
+    const [expiresOn, setExpiresOn] = useState('');
     const [discard, setDiscard] = useState(false);
     const pendingNavigation = useRef<(() => void) | null>(null);
     const allowNavigation = useRef(false);
@@ -66,11 +70,23 @@ export function ProvisioningBulkDialog({
     const preparing = command.canSubmit && !command.restored;
     const submitted =
         command.rows.some((row) => row.phase !== 'ready') || command.restored;
-    const dirty = reason.length > 0 || agent !== null;
+    const dirty =
+        reason.length > 0 ||
+        agent !== null ||
+        cover !== null ||
+        expiresOn !== '';
     const ready =
         operation === 'assign'
             ? agent !== null && validAgent
-            : reason.trim().length > 0;
+            : operation === 'request_approval'
+              ? agent !== null &&
+                validAgent &&
+                cover !== null &&
+                validCover &&
+                agent.id !== cover.id &&
+                /^\d{4}-\d{2}-\d{2}$/.test(expiresOn) &&
+                reason.trim().length > 0
+              : reason.trim().length > 0;
     const guarded = !command.terminal && (dirty || submitted || command.busy);
     const close = () => {
         if (command.busy || guarded) setDiscard(true);
@@ -83,6 +99,8 @@ export function ProvisioningBulkDialog({
         if (!command.concealed) return;
         setReason('');
         setAgent(null);
+        setCover(null);
+        setExpiresOn('');
         callbacks.current.onDenied();
     }, [command.concealed]);
     useEffect(() => {
@@ -166,7 +184,18 @@ export function ProvisioningBulkDialog({
                                                       assigned_to_user_id:
                                                           agent?.id,
                                                   }
-                                                : { reason: reason.trim() },
+                                                : operation ===
+                                                    'request_approval'
+                                                  ? {
+                                                        primary_approver_user_id:
+                                                            agent?.id,
+                                                        cover_approver_user_id:
+                                                            cover?.id,
+                                                        approval_expires_on:
+                                                            expiresOn,
+                                                        reason: reason.trim(),
+                                                    }
+                                                  : { reason: reason.trim() },
                                         )
                                     }
                                 >
@@ -214,6 +243,77 @@ export function ProvisioningBulkDialog({
                                         }
                                         onDenied={onDenied}
                                     />
+                                ) : operation === 'request_approval' ? (
+                                    <div className="space-y-4">
+                                        <ProvisioningPicker
+                                            actorId={actorId}
+                                            kind="agents"
+                                            contextKind="request"
+                                            {...(firstTaskId
+                                                ? { contextId: firstTaskId }
+                                                : {})}
+                                            label="Primary approver"
+                                            value={agent?.id ?? null}
+                                            onChange={setAgent}
+                                            onValidated={(value) =>
+                                                setValidAgent(value !== null)
+                                            }
+                                            onDenied={onDenied}
+                                        />
+                                        <ProvisioningPicker
+                                            actorId={actorId}
+                                            kind="agents"
+                                            contextKind="request"
+                                            {...(firstTaskId
+                                                ? { contextId: firstTaskId }
+                                                : {})}
+                                            label="Absence cover"
+                                            value={cover?.id ?? null}
+                                            onChange={setCover}
+                                            onValidated={(value) =>
+                                                setValidCover(value !== null)
+                                            }
+                                            onDenied={onDenied}
+                                        />
+                                        {agent &&
+                                            cover &&
+                                            agent.id === cover.id && (
+                                                <p
+                                                    role="alert"
+                                                    className="text-sm text-status-critical"
+                                                >
+                                                    Choose two different people.
+                                                </p>
+                                            )}
+                                        <label className="block space-y-2 text-sm font-medium">
+                                            <span>
+                                                Approval deadline (NZ date) *
+                                            </span>
+                                            <Input
+                                                type="date"
+                                                value={expiresOn}
+                                                onChange={(event) =>
+                                                    setExpiresOn(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </label>
+                                        <label className="block space-y-2 text-sm font-medium">
+                                            <span>
+                                                Reason and next action *
+                                            </span>
+                                            <Textarea
+                                                value={reason}
+                                                maxLength={5000}
+                                                onChange={(event) =>
+                                                    setReason(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </label>
+                                    </div>
                                 ) : (
                                     <label className="block space-y-2 text-sm font-medium">
                                         <span>Reason and next action *</span>
@@ -231,7 +331,14 @@ export function ProvisioningBulkDialog({
                                         ? 'Completed work stays recorded. This cancels only work that can still be cancelled; reversal work is reviewed separately.'
                                         : operation === 'retry'
                                           ? 'Retry returns failed tasks to the work queue. It does not perform external account or equipment changes.'
-                                          : 'The assignee must be eligible for every individual task. Any task that cannot accept the change will have its own result.'}
+                                          : operation === 'fail'
+                                            ? 'Each task is marked failed with this reason and needs an explicit retry before completion.'
+                                            : operation === 'request_approval'
+                                              ? 'Both approvers must be eligible for every selected task; the requester and beneficiary of a task can never approve it. Approval expires at the end of the NZ date.'
+                                              : operation === 'approve' ||
+                                                  operation === 'reject'
+                                                ? 'Only tasks where you are the currently responsible approver will be decided. A rejection needs the reason below.'
+                                                : 'The assignee must be eligible for every individual task. Any task that cannot accept the change will have its own result.'}
                                 </p>
                             </div>
                         ) : preparing ? (
@@ -247,14 +354,35 @@ export function ProvisioningBulkDialog({
                                         operation
                                     }
                                 />
-                                <ReviewRow
-                                    label={
-                                        operation === 'assign'
-                                            ? 'Assignee'
-                                            : 'Reason and next action'
-                                    }
-                                    value={agent?.label ?? reason}
-                                />
+                                {operation === 'request_approval' ? (
+                                    <>
+                                        <ReviewRow
+                                            label="Primary approver"
+                                            value={agent?.label ?? ''}
+                                        />
+                                        <ReviewRow
+                                            label="Absence cover"
+                                            value={cover?.label ?? ''}
+                                        />
+                                        <ReviewRow
+                                            label="Approval deadline"
+                                            value={expiresOn}
+                                        />
+                                        <ReviewRow
+                                            label="Reason and next action"
+                                            value={reason}
+                                        />
+                                    </>
+                                ) : (
+                                    <ReviewRow
+                                        label={
+                                            operation === 'assign'
+                                                ? 'Assignee'
+                                                : 'Reason and next action'
+                                        }
+                                        value={agent?.label ?? reason}
+                                    />
+                                )}
                                 {selection?.tasks.map((task) => (
                                     <ReviewRow
                                         key={task.id}

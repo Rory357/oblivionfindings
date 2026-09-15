@@ -28,6 +28,9 @@ final class ItCatalogManagementService
         'provisioning_template_version_id',
         'default_priority',
         'requires_approval',
+        'approver_user_id',
+        'cover_approver_user_id',
+        'approval_window_days',
         'internal_only',
         'site_scope',
         'form_schema',
@@ -115,6 +118,7 @@ final class ItCatalogManagementService
             if ($item->outcome_type === 'provisioning' && ! in_array($item->provisioning_type, ItProvisioningRequest::TYPES, true)) {
                 throw new DomainException('Choose a supported provisioning type before publishing this request.');
             }
+            $this->assertApprovalRouting($item);
 
             $version = ItCatalogVersion::query()->firstOrCreate([
                 'catalog_item_id' => $item->id,
@@ -124,7 +128,7 @@ final class ItCatalogManagementService
                 'provenance' => 'reviewed_publication',
                 'published_by' => $actor->id,
             ]);
-            if (['site_scope' => null, 'provisioning_template_version_id' => null, ...$version->contract] != $item->only(ItCatalogItem::CONTRACT_FIELDS)) {
+            if ([...ItCatalogItem::CONTRACT_DEFAULTS, ...$version->contract] != $item->only(ItCatalogItem::CONTRACT_FIELDS)) {
                 throw new DomainException('This draft differs from its recorded version. Save a new revision before publishing.');
             }
             $item->forceFill([
@@ -234,6 +238,18 @@ final class ItCatalogManagementService
         $data['provisioning_type'] = ($data['outcome_type'] ?? null) === 'provisioning'
             ? ($data['provisioning_type'] ?? null)
             : null;
+        if (! Schema::hasColumn('it_catalog_items', 'approver_user_id')) {
+            unset($data['approver_user_id'], $data['cover_approver_user_id'], $data['approval_window_days']);
+        } elseif (empty($data['requires_approval'])) {
+            // Routing defaults only mean something for approval-gated requests.
+            $data['approver_user_id'] = null;
+            $data['cover_approver_user_id'] = null;
+            $data['approval_window_days'] = null;
+        } else {
+            $data['approver_user_id'] = ! empty($data['approver_user_id']) ? (int) $data['approver_user_id'] : null;
+            $data['cover_approver_user_id'] = ! empty($data['cover_approver_user_id']) ? (int) $data['cover_approver_user_id'] : null;
+            $data['approval_window_days'] = ! empty($data['approval_window_days']) ? (int) $data['approval_window_days'] : null;
+        }
         $data['search_terms'] = array_values(array_unique(array_filter(array_map(
             fn (mixed $term): string => trim((string) $term),
             (array) ($data['search_terms'] ?? []),
@@ -264,6 +280,33 @@ final class ItCatalogManagementService
         $data['form_schema'] = ['fields' => $fields];
 
         return $data;
+    }
+
+    /**
+     * A published approver pair must be two distinct people with current
+     * access to every Site the request serves; otherwise routing silently
+     * falls back to the service desk queue, which the author should know.
+     */
+    private function assertApprovalRouting(ItCatalogItem $item): void
+    {
+        if (! $item->requires_approval || ! Schema::hasColumn('it_catalog_items', 'approver_user_id')) {
+            return;
+        }
+        $primary = $item->approver_user_id ? (int) $item->approver_user_id : null;
+        $cover = $item->cover_approver_user_id ? (int) $item->cover_approver_user_id : null;
+        if ($primary === null && $cover === null) {
+            return;
+        }
+        if ($primary === null || $cover === null || $primary === $cover) {
+            throw new DomainException('Name both a default approver and a distinct cover approver, or leave both empty to route approvals through the service desk fallback queue.');
+        }
+        $responsibility = app(ItProvisioningResponsibilityService::class);
+        $sites = $item->site_scope ? array_map('intval', $item->site_scope) : [null];
+        foreach ($sites as $siteId) {
+            if (! $responsibility->eligible($primary, $siteId) || ! $responsibility->eligible($cover, $siteId)) {
+                throw new DomainException('Choose default approvers with current access to every Site this request serves before publishing.');
+            }
+        }
     }
 
     private function assertAttachmentLimits(array $fields): void

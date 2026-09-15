@@ -60,6 +60,7 @@ final class ItProvisioningReadinessService
         if ($open && $request->approval_required && $request->approval_status !== 'approved') {
             $blockers[] = match (true) {
                 $request->approval_status === 'rejected' => 'Approval was rejected. Review the decision before requesting another review.',
+                $request->approval_status === 'expired',
                 $request->approval_expires_at?->lessThanOrEqualTo(now()) => 'The approval deadline passed. Request a new review.',
                 ! $request->approval_requested_at => 'Choose a distinct eligible approver and cover, then request approval.',
                 $approver === null => 'Approval has no currently available eligible person. Review its owner and cover.',
@@ -97,6 +98,10 @@ final class ItProvisioningReadinessService
             }
         } elseif ($canAct && $request->status === 'cancelled') {
             $actions[] = 'reopen';
+        } elseif ($managed && $request->status === 'done' && $request->reversal_of_request_id === null && $request->workflow
+            && ! ItProvisioningRequest::query()->where('reversal_of_request_id', $request->id)->exists()) {
+            // Completed work is never edited; corrective work is an explicit new task.
+            $actions[] = 'reverse';
         }
 
         return [
