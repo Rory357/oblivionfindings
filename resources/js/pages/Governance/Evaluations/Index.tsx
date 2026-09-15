@@ -146,7 +146,8 @@ export default function EvaluationsIndex({
                 icon: Eye,
                 onClick: () => router.visit(`/governance/evaluations/${e.id}`),
             },
-            e.status !== 'draft'
+            // Results open once the evaluation has closed (server enforces it).
+            e.status === 'closed' || e.status === 'reported'
                 ? {
                       label: 'View results',
                       icon: BarChart3,

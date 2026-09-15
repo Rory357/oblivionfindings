@@ -119,6 +119,9 @@ export default function EvaluationShow({
     const today = toDateInput(new Date());
     const isDraft = evaluation.status === 'draft';
     const isOpen = evaluation.status === 'active' || evaluation.status === 'open';
+    // Results open once the evaluation has closed (server enforces it), so a
+    // handful of early answers can't be traced back to the people who gave them.
+    const resultsOpen = evaluation.status === 'closed' || evaluation.status === 'reported';
     const pastDue = isOpen && evaluation.due_date < today;
     const canRespond = respondBlockedReason === null;
     const chip = governanceStatus('evaluation_status', evaluation.status);
@@ -210,7 +213,7 @@ export default function EvaluationShow({
                         subline={`${evaluationSubject(evaluation.evaluation_type, evaluation.committee_name)} · Covers ${formatDateOnly(evaluation.period_start)} – ${formatDateOnly(evaluation.period_end)} · Responses due ${formatDateOnly(evaluation.due_date)}`}
                         actions={
                             <>
-                                {!isDraft ? (
+                                {resultsOpen ? (
                                     <PageHeaderGlassButton
                                         icon={BarChart3}
                                         onClick={() => router.visit(resultsHref)}
@@ -473,7 +476,7 @@ export default function EvaluationShow({
                                     title={blockedTitle}
                                     description={respondBlockedReason ?? undefined}
                                     action={
-                                        !isDraft ? (
+                                        resultsOpen ? (
                                             <Button
                                                 variant="outline"
                                                 size="sm"

@@ -173,9 +173,23 @@ class GovernanceBoardEvaluationFlowTest extends TestCase
             ->missing('evaluation.responses'));
         $this->assertStringNotContainsString('Hemi Anonymous', json_encode($show->viewData('page')['props']));
 
+        // Results stay shut while answers are still coming in — even for the
+        // people running the evaluation — and open once it closes.
+        $this->actingAs($admin)
+            ->get("/governance/evaluations/{$evaluation->id}/results")
+            ->assertForbidden();
+        $this->actingAs($named->user)
+            ->get("/governance/evaluations/{$evaluation->id}/results")
+            ->assertForbidden();
+
+        $evaluation->update(['status' => 'closed', 'closed_at' => now()]);
+
         $this->actingAs($admin)
             ->get("/governance/evaluations/{$evaluation->id}/results")
             ->assertInertia(fn ($page) => $page->where('evaluation.active_member_count', 3));
+        $this->actingAs($named->user)
+            ->get("/governance/evaluations/{$evaluation->id}/results")
+            ->assertOk();
 
         // The register tells a member whether they've responded.
         $this->actingAs($named->user)

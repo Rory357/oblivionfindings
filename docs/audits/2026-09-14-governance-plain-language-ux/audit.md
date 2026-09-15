@@ -115,7 +115,8 @@ Verification (merged with origin/main): Pest `tests/Feature/Governance tests/Uni
 Verification (second half): Pest Governance + Unit Governance + Sites calendar + Compliance dashboard + schedule architecture **648/649**, the one failure an intended label change, corrected and re-run **10/10**; Vitest **269/269** (40 files); ESLint 79 changed files clean; `tsc --noEmit` clean; production build succeeded.
 
 **Still open (owner decisions and follow-ups):**
-- **Decisions:** should ordinary board members keep `governance.budgets.approve` (they can decide budget changes); should evaluation results open only after the evaluation closes (small response counts can identify authors); `performance.view` holders get 403 on the performance list; managers can send a CEO self-assessment on the CEO's behalf; a 75% voting rule.
+- **Decided 15 September 2026:** budget approval limited to finance approvers (chair, treasurer, admin; migration `2026_09_15_720000`); evaluation results open only after the evaluation closes.
+- **Decisions still open:** `performance.view` holders get 403 on the performance list; managers can send a CEO self-assessment on the CEO's behalf; a 75% voting rule.
 - **Content:** Te Tiriti principle descriptions (Māori advisor) and the compliance framework list (quality lead); then GOV-A28 testing with real board members.
 - **Small follow-ups:** committee meetings linking to their committee risk view and report; `DashboardAggregatorService::getTopRisks()` critical count vs the register and fake `getDataFreshness()` times; re-confirmation-due policies in My work; `GovernancePresenter::complianceStatus()` possibly unused; Dusk chair journey spec needs the Workflow tab; signed-in browser walkthrough of both halves.
 
