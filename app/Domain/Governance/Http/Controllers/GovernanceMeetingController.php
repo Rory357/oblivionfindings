@@ -592,7 +592,35 @@ class GovernanceMeetingController extends Controller
             'packReading' => $packReading,
             'viewerCanRsvp' => $viewerCanRsvp,
             'viewerRsvp' => $viewerRsvp ? $this->presentRsvp($viewerRsvp) : null,
+            'committeeOversight' => $this->committeeOversight($meeting, $viewer),
         ]);
+    }
+
+    /**
+     * A committee meeting links to that committee's risk view and report —
+     * only for committees that oversee risks and viewers who can open them
+     * (both pages check governance.risks.view on the server).
+     *
+     * @return array{name: string, risks_href: string, report_href: string}|null
+     */
+    protected function committeeOversight(GovernanceMeeting $meeting, User $viewer): ?array
+    {
+        if (! $meeting->board_committee_id || ! $viewer->canDo('governance.risks.view')) {
+            return null;
+        }
+
+        $committee = collect(\App\Domain\Governance\Support\RiskCommitteeScope::committeeOptions())
+            ->firstWhere('id', (int) $meeting->board_committee_id);
+
+        if ($committee === null) {
+            return null;
+        }
+
+        return [
+            'name' => $committee['name'],
+            'risks_href' => "/governance/risks/committee/{$committee['id']}",
+            'report_href' => "/governance/reports/committee/{$committee['id']}",
+        ];
     }
 
     /**

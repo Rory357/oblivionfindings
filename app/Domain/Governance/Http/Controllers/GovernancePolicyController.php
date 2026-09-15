@@ -579,31 +579,7 @@ class GovernancePolicyController extends Controller
      */
     protected function confirmationState(GovernancePolicy $policy, ?PolicyAttestation $mine, string $today): string
     {
-        if (! $policy->needsConfirmation()) {
-            return 'not_required';
-        }
-
-        if ($policy->status === 'superseded') {
-            return 'replaced';
-        }
-
-        if (! in_array($policy->status, ['approved', 'published', 'active'], true)) {
-            return 'not_approved';
-        }
-
-        if ($policy->comesIntoEffectLater($today)) {
-            return 'not_yet_in_effect';
-        }
-
-        if ($policy->isCurrentConfirmation($mine, $today)) {
-            return 'confirmed';
-        }
-
-        // Confirmed this version before, but the confirmation frequency says it's due again.
-        return $mine?->acknowledged
-            && (int) $mine->policy_version === (int) $policy->version_number
-            ? 'due_again'
-            : 'to_confirm';
+        return $policy->confirmationStateFor($mine, $today);
     }
 
     protected function presentMyConfirmation(GovernancePolicy $policy, ?PolicyAttestation $mine): ?array

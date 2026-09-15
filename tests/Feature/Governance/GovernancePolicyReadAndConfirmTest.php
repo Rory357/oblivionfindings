@@ -312,4 +312,51 @@ class GovernancePolicyReadAndConfirmTest extends TestCase
                 ->where('confirmation.state', 'to_confirm')
                 ->where('confirmation.board_confirmed', 0));
     }
+
+    public function test_a_policy_due_to_be_confirmed_again_shows_in_my_work(): void
+    {
+        $member = $this->member('Aroha');
+        $annual = $this->policy(['title' => 'Conflicts of interest policy', 'attestation_frequency' => 'annual']);
+        $stillCurrent = $this->policy(['title' => 'Privacy policy', 'attestation_frequency' => 'annual']);
+        $noRepeat = $this->policy(['title' => 'Code of conduct']);
+
+        // Confirmed 13 months ago — the yearly confirmation is due again.
+        PolicyAttestation::create([
+            'governance_policy_id' => $annual->id,
+            'user_id' => $member->id,
+            'acknowledged' => true,
+            'acknowledged_at' => now()->subMonths(13),
+            'policy_version' => 1,
+        ]);
+        // Confirmed last month — still current.
+        PolicyAttestation::create([
+            'governance_policy_id' => $stillCurrent->id,
+            'user_id' => $member->id,
+            'acknowledged' => true,
+            'acknowledged_at' => now()->subMonth(),
+            'policy_version' => 1,
+        ]);
+        // No confirmation frequency — one confirmation lasts for the version.
+        PolicyAttestation::create([
+            'governance_policy_id' => $noRepeat->id,
+            'user_id' => $member->id,
+            'acknowledged' => true,
+            'acknowledged_at' => now()->subYears(3),
+            'policy_version' => 1,
+        ]);
+
+        $items = collect($this->actingAs($member)->getJson('/governance/my-work/data?kind=read')->assertOk()->json('items'));
+        $policyItems = $items->where('source.type', 'policy')->values();
+
+        $this->assertCount(1, $policyItems);
+        $this->assertSame("policy:{$annual->id}:confirm-again", $policyItems[0]['id']);
+        $this->assertSame('Conflicts of interest policy', $policyItems[0]['title']);
+        $this->assertSame('Read and confirm', $policyItems[0]['required_action']['label']);
+        $this->assertSame("/governance/policies/{$annual->id}", $policyItems[0]['required_action']['href']);
+
+        // The same rule drives the policy page.
+        $this->actingAs($member)
+            ->get("/governance/policies/{$annual->id}")
+            ->assertInertia(fn (Assert $page) => $page->where('confirmation.state', 'due_again'));
+    }
 }
