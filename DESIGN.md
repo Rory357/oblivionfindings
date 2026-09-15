@@ -493,6 +493,23 @@ before.
 
 ---
 
+- **Section captions inside a sidebar module** (corrected 2026-09-16:
+  "the left nav bar has headings in them which is not easy to
+  differentiate") — small uppercase captions ("Fleet", "Assets",
+  "Payroll") splitting a module's sub-links into sections, in either the
+  expanded rail or the collapsed-rail flyout. They read as more nav rows
+  and compete with the links. Each module renders ONE continuous list of
+  links (`flattenSidebarGroups` in `app-sidebar.tsx`), with no caption
+  and no extra gap between the former sections; keep the group builders
+  for ordering only. The module header rows themselves stay.
+- **Sidebar rail that snaps to the top on every click** (corrected
+  2026-09-16) — pages render their layout inline, so the shell remounts on
+  each Inertia visit and a fresh scroll container starts at offset 0.
+  `preserveScroll` on the links does not cover this. The rail's offset is
+  remembered across mounts (`persistScrollTop`/`readStoredScrollTop` in
+  `app-sidebar.tsx`) and restored in a layout effect; any new scrollable
+  chrome that survives a visit needs the same treatment.
+
 ## Conformance sweep (run on request)
 
 When asked to "check everything conforms", audit the codebase against this

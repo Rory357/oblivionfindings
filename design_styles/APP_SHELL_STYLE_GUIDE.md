@@ -86,6 +86,9 @@ Top → bottom:
   - Expanded group: **indented text-only sub-items** (31px, text
     `#8f91ad`, padding-left aligns under the group label ≈38px). Sub
     items do not repeat icons — the group header carries the icon.
+    Sub-items are ONE continuous list: no uppercase section captions
+    and no gaps between sections (dropped 2026-09-16; the group
+    builders keep ordering only).
   - Collapsed group: **alert counts stay visible** on the header row
     (e.g. Incidents "1"). Folding a group must never hide an alert.
 - **Settings** pinned to the bottom above a `rgba(255,255,255,.08)`

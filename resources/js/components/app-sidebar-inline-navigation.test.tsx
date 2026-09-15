@@ -172,6 +172,42 @@ describe('inline application navigation', () => {
         ).not.toBeInTheDocument();
     });
 
+    it('renders each module as one continuous list with no section captions', () => {
+        render(<AppSidebar collapsed={false} />);
+
+        const navigation = screen.getByRole('group', {
+            name: 'Security & Devices navigation',
+        });
+        const links = within(navigation).getAllByRole('link');
+        expect(links.length).toBeGreaterThan(1);
+        // Every child of the list is a link: no caption rows in between.
+        expect(Array.from(navigation.children)).toEqual(links);
+        expect(navigation.querySelector('.uppercase')).toBeNull();
+    });
+
+    it('restores the rail scroll offset when the shell remounts on navigation', () => {
+        const getSpy = vi
+            .spyOn(Element.prototype, 'scrollTop', 'get')
+            .mockReturnValue(120);
+        const setSpy = vi.spyOn(Element.prototype, 'scrollTop', 'set');
+        try {
+            const first = render(<AppSidebar collapsed={false} />);
+            const rail = document.querySelector(
+                '#app-sidebar-nav > div',
+            ) as HTMLElement;
+            fireEvent.scroll(rail);
+            first.unmount();
+            setSpy.mockClear();
+
+            render(<AppSidebar collapsed={false} />);
+
+            expect(setSpy).toHaveBeenCalledWith(120);
+        } finally {
+            getSpy.mockRestore();
+            setSpy.mockRestore();
+        }
+    });
+
     it('uses the flyout only as a fallback for the collapsed icon rail', () => {
         render(<AppSidebar collapsed />);
 

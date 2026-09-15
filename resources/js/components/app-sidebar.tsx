@@ -91,7 +91,14 @@ import {
     X,
     type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import { buildSecurityDevicesNavigationGroups } from './security-devices/security-devices-navigation';
 
 /* Event Horizon ink rail (APP_SHELL_STYLE_GUIDE.md §3). Sits below the
@@ -132,6 +139,36 @@ function CountPill({
             {count > 9 ? '9+' : count}
         </span>
     );
+}
+
+// The shell is not a persistent Inertia layout, so the rail remounts on
+// every visit and its scroll offset would snap to the top on each click.
+// Remember the offset across mounts (and reloads) so the link the user
+// just clicked stays where it was.
+const SIDEBAR_SCROLL_STORAGE_KEY = 'oblivionfindings:sidebar-scroll';
+let sidebarScrollTop = 0;
+
+function readStoredScrollTop(): number {
+    if (sidebarScrollTop > 0) return sidebarScrollTop;
+    try {
+        const raw = window.sessionStorage.getItem(SIDEBAR_SCROLL_STORAGE_KEY);
+        const parsed = raw === null ? 0 : Number(raw);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    } catch {
+        return 0;
+    }
+}
+
+function persistScrollTop(value: number) {
+    sidebarScrollTop = value;
+    try {
+        window.sessionStorage.setItem(
+            SIDEBAR_SCROLL_STORAGE_KEY,
+            String(Math.max(0, Math.round(value))),
+        );
+    } catch {
+        // sessionStorage unavailable (private mode): in-memory copy suffices.
+    }
 }
 
 // Per-user persistence for which module groups are unfolded (same local
@@ -219,6 +256,19 @@ interface IconNavItem {
 export interface SubPanelGroup {
     label: string;
     items: NavItem[];
+}
+
+/** Flatten module groups into one ordered link list. Keys stay scoped to
+ *  the source group so a link that appears under two captions stays unique. */
+export function flattenSidebarGroups(
+    groups: SubPanelGroup[],
+): Array<{ key: string; item: NavItem }> {
+    return groups.flatMap((group) =>
+        (group.items ?? []).map((item) => ({
+            key: `${group.label}:${resolveUrl(item.href)}`,
+            item,
+        })),
+    );
 }
 
 export function filterVisibleSidebarGroups(
@@ -2626,59 +2676,46 @@ function SubPanel({
                 </Button>
             </div>
 
-            {/* Panel groups */}
+            {/* Panel links. Section captions were dropped (2026-09-16):
+                they competed with the links and made the panel harder to
+                scan, so each module is one continuous list in group order. */}
             <div className="py-2">
-                {visibleGroups.map((group) => (
-                    <div key={group.label} className="mb-1">
-                        <div className="px-4 py-1.5 text-[11px] font-medium tracking-wider text-sidebar-foreground/40 uppercase">
-                            {group.label}
-                        </div>
-                        {(group.items ?? []).map((item) => {
-                            const active = isSubItemActive(
-                                currentUrl,
-                                item.href,
-                            );
-                            return (
-                                <Link
-                                    key={resolveUrl(item.href)}
-                                    href={item.href}
-                                    aria-current={active ? 'page' : undefined}
-                                    prefetch
-                                    preserveScroll
+                {flattenSidebarGroups(visibleGroups).map(({ key, item }) => {
+                    const active = isSubItemActive(currentUrl, item.href);
+                    return (
+                        <Link
+                            key={key}
+                            href={item.href}
+                            aria-current={active ? 'page' : undefined}
+                            prefetch
+                            preserveScroll
+                            className={cn(
+                                'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                active
+                                    ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                                    : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+                            )}
+                        >
+                            {item.icon && <SidebarItemIcon icon={item.icon} />}
+                            <span className="truncate">{item.title}</span>
+                            {item.badge != null && item.badge > 0 && (
+                                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
+                                    {item.badge > 9 ? '9+' : item.badge}
+                                </span>
+                            )}
+                            {active && (
+                                <ChevronRight
                                     className={cn(
-                                        'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
-                                        active
-                                            ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                                            : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+                                        'h-3 w-3 text-sidebar-foreground/40',
+                                        item.badge != null && item.badge > 0
+                                            ? 'ml-0'
+                                            : 'ml-auto',
                                     )}
-                                >
-                                    {item.icon && (
-                                        <SidebarItemIcon icon={item.icon} />
-                                    )}
-                                    <span className="truncate">
-                                        {item.title}
-                                    </span>
-                                    {item.badge != null && item.badge > 0 && (
-                                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
-                                            {item.badge > 9 ? '9+' : item.badge}
-                                        </span>
-                                    )}
-                                    {active && (
-                                        <ChevronRight
-                                            className={cn(
-                                                'h-3 w-3 text-sidebar-foreground/40',
-                                                item.badge != null &&
-                                                    item.badge > 0
-                                                    ? 'ml-0'
-                                                    : 'ml-auto',
-                                            )}
-                                        />
-                                    )}
-                                </Link>
-                            );
-                        })}
-                    </div>
-                ))}
+                                />
+                            )}
+                        </Link>
+                    );
+                })}
             </div>
         </div>
     );
@@ -2695,60 +2732,42 @@ function InlineSubPanelGroups({
 }) {
     const visibleGroups = filterVisibleSidebarGroups(groups);
 
+    // Section captions were dropped (2026-09-16): they competed with the
+    // links and made the rail harder to scan. Each module renders one
+    // continuous list; the group order is preserved.
     return (
         <div
             role="group"
             aria-label={`${title} navigation`}
-            className="mt-0.5 mb-1 space-y-1.5 py-0.5"
+            className="mt-0.5 mb-1 space-y-px py-0.5"
         >
-            {visibleGroups.map((group) => {
-                // A lone group that just repeats the module name adds noise —
-                // its items read fine directly under the group header row.
-                const showLabel =
-                    visibleGroups.length > 1 || group.label !== title;
+            {flattenSidebarGroups(visibleGroups).map(
+                ({ key, item: subItem }) => {
+                    const active = isSubItemActive(currentUrl, subItem.href);
 
-                return (
-                    <div key={group.label}>
-                        {showLabel && (
-                            <div className="py-1 pr-2 pl-[38px] text-[10px] font-semibold tracking-wider text-sidebar-foreground/80 uppercase">
-                                {group.label}
-                            </div>
-                        )}
-                        <div className="space-y-px">
-                            {(group.items ?? []).map((subItem) => {
-                                const active = isSubItemActive(
-                                    currentUrl,
-                                    subItem.href,
-                                );
-
-                                return (
-                                    <Link
-                                        key={resolveUrl(subItem.href)}
-                                        href={subItem.href}
-                                        aria-current={
-                                            active ? 'page' : undefined
-                                        }
-                                        prefetch
-                                        preserveScroll
-                                        data-sidebar-item
-                                        className={cn(
-                                            'flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-[38px] text-[13px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-                                            active
-                                                ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                                                : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
-                                        )}
-                                    >
-                                        <span className="min-w-0 flex-1 truncate">
-                                            {subItem.title}
-                                        </span>
-                                        <CountPill count={subItem.badge ?? 0} />
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    </div>
-                );
-            })}
+                    return (
+                        <Link
+                            key={key}
+                            href={subItem.href}
+                            aria-current={active ? 'page' : undefined}
+                            prefetch
+                            preserveScroll
+                            data-sidebar-item
+                            className={cn(
+                                'flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-[38px] text-[13px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                                active
+                                    ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                                    : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
+                            )}
+                        >
+                            <span className="min-w-0 flex-1 truncate">
+                                {subItem.title}
+                            </span>
+                            <CountPill count={subItem.badge ?? 0} />
+                        </Link>
+                    );
+                },
+            )}
         </div>
     );
 }
@@ -2783,6 +2802,15 @@ export function AppSidebar({
     // persisted per user).
     const [expandedGroupIds, setExpandedGroupIds] =
         useState<string[]>(readStoredGroupIds);
+    const railScrollRef = useRef<HTMLDivElement>(null);
+
+    // Restore the rail's scroll offset before paint so the remount is invisible.
+    useLayoutEffect(() => {
+        const el = railScrollRef.current;
+        if (!el) return;
+        const stored = readStoredScrollTop();
+        if (stored > 0) el.scrollTop = stored;
+    }, []);
 
     const iconNavItems = useMemo(
         () =>
@@ -2886,6 +2914,10 @@ export function AppSidebar({
                     )}
                 >
                     <div
+                        ref={railScrollRef}
+                        onScroll={(event) =>
+                            persistScrollTop(event.currentTarget.scrollTop)
+                        }
                         className={cn(
                             'scrollbar-none flex w-full flex-1 flex-col gap-0.5 overflow-y-auto px-2',
                             isCollapsed ? 'items-center' : 'items-stretch',
