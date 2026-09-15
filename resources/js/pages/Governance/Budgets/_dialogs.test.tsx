@@ -51,13 +51,13 @@ vi.mock('@inertiajs/react', async () => {
     };
 });
 
-import { BudgetWizardDialog } from './_dialogs';
+import { BudgetWizardDialog, financialYearOptions } from './_dialogs';
 
 const options = {
     categories: {
         staffing: 'Staffing',
         operations: 'Operations',
-        capital: 'Capital',
+        capital: 'Equipment and buildings',
     },
 };
 
@@ -71,26 +71,39 @@ afterEach(() => {
     inertia.serverErrors = null;
 });
 
+describe('financialYearOptions', () => {
+    it('labels NZ financial years by the year they end', () => {
+        const years = financialYearOptions(new Date('2026-09-14T00:00:00Z'));
+
+        expect(years.map((year) => year.label)).toEqual([
+            '2025/26',
+            '2026/27',
+            '2027/28',
+            '2028/29',
+        ]);
+        expect(years.find((year) => year.is_current)).toMatchObject({
+            value: 2027,
+            range: '1 July 2026 – 30 June 2027',
+        });
+    });
+});
+
 describe('BudgetWizardDialog', () => {
-    it('validates the fiscal year and each nested line before creating', () => {
+    it('defaults to this financial year and validates each nested line before creating', () => {
+        const current = financialYearOptions().find((year) => year.is_current);
+
         render(
             <BudgetWizardDialog isOpen onClose={() => {}} options={options} />,
         );
 
-        fireEvent.change(screen.getByPlaceholderText('e.g. 2026'), {
-            target: { value: '26' },
-        });
-        clickButton(/continue/i);
         expect(
-            screen.getByText('Enter a four-digit year between 2000 and 2100.'),
+            screen.getByText(
+                'Set up a yearly budget for the board to approve.',
+            ),
         ).toBeTruthy();
-
-        fireEvent.change(screen.getByPlaceholderText('e.g. 2026'), {
-            target: { value: '2027' },
-        });
         fireEvent.change(
-            screen.getByPlaceholderText('e.g. FY2026 Operating Budget'),
-            { target: { value: 'FY2027 Operating Budget' } },
+            screen.getByPlaceholderText('e.g. 2026/27 operating budget'),
+            { target: { value: 'Operating budget' } },
         );
         clickButton(/continue/i);
 
@@ -106,12 +119,16 @@ describe('BudgetWizardDialog', () => {
         });
         fireEvent.change(amounts[0], { target: { value: '120000' } });
         clickButton(/continue/i);
-        expect(screen.getByText('Describe the line.')).toBeTruthy();
+        expect(
+            screen.getByText('Describe what this line pays for.'),
+        ).toBeTruthy();
 
         // Remove the incomplete line and carry on to review.
         clickButton(/remove line 2/i);
         clickButton(/continue/i);
-        expect(screen.getByText('Budget envelope')).toBeTruthy();
+        expect(
+            screen.getByRole('heading', { name: 'Total budget' }),
+        ).toBeTruthy();
         clickButton(/continue/i);
         clickButton(/create budget/i);
 
@@ -119,8 +136,8 @@ describe('BudgetWizardDialog', () => {
         const [url, payload] = inertia.post.mock.calls[0];
         expect(url).toBe('/governance/budgets');
         expect(payload).toEqual({
-            fiscal_year: '2027',
-            title: 'FY2027 Operating Budget',
+            fiscal_year: String(current?.value),
+            title: 'Operating budget',
             description: null,
             total_budget: '120000.00',
             board_approved: false,
@@ -137,9 +154,58 @@ describe('BudgetWizardDialog', () => {
         });
     });
 
+    it('requires the approval date and minutes reference for a budget the board already approved', () => {
+        render(
+            <BudgetWizardDialog isOpen onClose={() => {}} options={options} />,
+        );
+
+        clickButton(/^total/i);
+        fireEvent.change(screen.getByPlaceholderText('e.g. 1500000'), {
+            target: { value: '250000' },
+        });
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: /already approved this budget/i,
+            }),
+        );
+        clickButton(/continue/i);
+
+        expect(
+            screen.getByText('Enter the date the board approved this budget.'),
+        ).toBeTruthy();
+        expect(
+            screen.getByText(
+                'Enter the minutes reference for the meeting that approved it.',
+            ),
+        ).toBeTruthy();
+        expect(inertia.post).not.toHaveBeenCalled();
+
+        fireEvent.change(
+            screen.getByPlaceholderText(
+                'e.g. Board minutes 24 June 2026, item 5',
+            ),
+            { target: { value: 'Minutes 24 June 2026, item 5' } },
+        );
+        const date = document.querySelector<HTMLInputElement>(
+            '#budget-approved-on',
+        );
+        expect(date).not.toBeNull();
+        fireEvent.change(date!, { target: { value: '2026-06-24' } });
+        clickButton(/continue/i);
+        clickButton(/create budget/i);
+
+        expect(inertia.post).toHaveBeenCalledTimes(1);
+        expect(inertia.post.mock.calls[0][1]).toMatchObject({
+            total_budget: '250000',
+            board_approved: true,
+            approved_on: '2026-06-24',
+            approval_reference: 'Minutes 24 June 2026, item 5',
+        });
+    });
+
     it('edits existing lines by id and jumps to the step owning a server error', () => {
         inertia.serverErrors = {
-            'line_items.0.description': 'The description field is required.',
+            'line_items.0.description': 'Describe what this line pays for.',
         };
 
         render(
@@ -179,14 +245,12 @@ describe('BudgetWizardDialog', () => {
             />,
         );
 
-        // A proposed budget warns that edits invalidate its bound paper.
+        // A budget sent to the board warns that edits need the board again.
         expect(
-            screen.getByText(
-                /decision paper bound to it will no longer approve it/i,
-            ),
+            screen.getByText(/board must see the updated budget/i),
         ).toBeTruthy();
 
-        clickButton(/line items/i);
+        clickButton(/budget lines/i);
         clickButton(/remove line 2/i);
         clickButton(/review/i);
         clickButton(/save budget/i);
@@ -210,9 +274,11 @@ describe('BudgetWizardDialog', () => {
         });
         expect(payload).not.toHaveProperty('board_approved');
 
-        expect(screen.getByText('Budgeted lines')).toBeTruthy();
         expect(
-            screen.getByText('The description field is required.'),
+            screen.getByRole('heading', { name: 'Budget lines' }),
+        ).toBeTruthy();
+        expect(
+            screen.getByText('Describe what this line pays for.'),
         ).toBeTruthy();
     });
 });

@@ -14,6 +14,7 @@ use App\Domain\Governance\Models\BudgetLineItem;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\SpendApproval;
 use App\Domain\Governance\Models\SpendApprovalDecision;
+use App\Domain\Governance\Support\GovernanceLabels;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
@@ -26,7 +27,52 @@ use Illuminate\Validation\ValidationException;
 
 class SpendApprovalCommandService
 {
+    /** Resolution statuses in which a passed vote is final (matches budgets). */
+    public const PASSED_RESOLUTION_STATUSES = ['closed', 'implemented', 'archived'];
+
+    public const CHANGED_SINCE_SUBMITTED = 'This request changed after it was submitted. Refresh the page and review it again.';
+
+    public const REFRESH_AND_RETRY = 'Something on this page is out of date. Refresh the page and try again.';
+
     public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
+    /**
+     * Passed resolutions an approver can link when recording approval of
+     * spend that needs a board decision: ones they can open, that state an
+     * amount covering the request, and that no other spend request has used.
+     *
+     * @return array<int, array{id: int, title: string, reference: string|null, amount: float, closed_at: string|null}>
+     */
+    public function boardResolutionOptions(User $actor, SpendApproval $approval): array
+    {
+        $usedIds = SpendApproval::query()
+            ->where('status', SpendApproval::STATUS_APPROVED)
+            ->whereNotNull('resolution_id')
+            ->whereKeyNot($approval->id)
+            ->pluck('resolution_id')
+            ->all();
+
+        return Resolution::query()
+            ->whereIn('status', self::PASSED_RESOLUTION_STATUSES)
+            ->where('outcome', 'carried')
+            ->when($usedIds !== [], fn (Builder $query) => $query->whereNotIn('id', $usedIds))
+            ->orderByDesc('closed_at')
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get(['id', 'resolution_reference', 'title', 'status', 'outcome', 'cost_impact', 'closed_at', 'governance_meeting_id'])
+            ->filter(fn (Resolution $resolution) => is_numeric($resolution->cost_impact['amount'] ?? null)
+                && (float) $resolution->cost_impact['amount'] + 0.009 >= (float) $approval->amount
+                && Gate::forUser($actor)->allows('view', $resolution))
+            ->map(fn (Resolution $resolution) => [
+                'id' => (int) $resolution->id,
+                'title' => (string) $resolution->title,
+                'reference' => $resolution->resolution_reference,
+                'amount' => (float) $resolution->cost_impact['amount'],
+                'closed_at' => $resolution->closed_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+    }
 
     public function assertHasAccessibleSite(User $actor): void
     {
@@ -208,7 +254,7 @@ class SpendApprovalCommandService
         Gate::forUser($actor)->authorize('decideAny', SpendApproval::class);
         $preflight = $this->resolveAccessibleApproval($actor, $approvalId);
         if (! in_array($outcome, [SpendApproval::STATUS_APPROVED, SpendApproval::STATUS_REJECTED], true)) {
-            throw ValidationException::withMessages(['decision' => 'The decision outcome is invalid.']);
+            throw ValidationException::withMessages(['decision' => 'Choose whether to approve or decline this spend request.']);
         }
         $this->validateDecisionCommand($outcome, $command);
 
@@ -233,7 +279,7 @@ class SpendApprovalCommandService
             if ($prior) {
                 if (! hash_equals($prior->request_fingerprint, $fingerprint)) {
                     throw ValidationException::withMessages([
-                        'decision_key' => 'This decision key was already used with different decision content.',
+                        'decision_key' => self::CHANGED_SINCE_SUBMITTED,
                     ]);
                 }
 
@@ -242,7 +288,9 @@ class SpendApprovalCommandService
 
             if ($approval->status !== SpendApproval::STATUS_SUBMITTED) {
                 throw ValidationException::withMessages([
-                    'decision' => 'This spend approval has already been decided or is not submitted.',
+                    'decision' => $approval->status === SpendApproval::STATUS_DRAFT
+                        ? "This spend request hasn't been sent for a decision yet."
+                        : 'This spend request has already been decided.',
                 ]);
             }
 
@@ -255,11 +303,14 @@ class SpendApprovalCommandService
                 || ! hash_equals($approval->content_digest, (string) $command['expected_content_digest'])
                 || ! hash_equals($approval->content_digest, $approval->decisionContentDigest($parentEvidence['source']))) {
                 throw ValidationException::withMessages([
-                    'expected_content_digest' => 'The submitted spend evidence has changed. Reload before deciding.',
+                    'expected_content_digest' => self::CHANGED_SINCE_SUBMITTED,
                 ]);
             }
 
             $resolution = $this->lockResolution($command['resolution_id'] ?? $approval->resolution_id);
+            if ($outcome === SpendApproval::STATUS_APPROVED) {
+                $this->assertApprovalAuthority($lockedActor, $approval, $resolution);
+            }
             if ($resolution) {
                 $parentEvidence['resolution'] = $this->resolutionEvidence($resolution);
             }
@@ -392,7 +443,70 @@ class SpendApprovalCommandService
     {
         if ((int) $approval->version !== $expectedVersion) {
             throw ValidationException::withMessages([
-                'expected_version' => 'This spend approval changed. Reload before continuing.',
+                'expected_version' => self::CHANGED_SINCE_SUBMITTED,
+            ]);
+        }
+    }
+
+    /**
+     * Approving spend at or above the board threshold needs the resolution
+     * the board passed, chosen by the approver: one they can open, whose vote
+     * is finished and passed, that states an amount covering this request,
+     * and that no other spend request has already used. A resolution linked
+     * to smaller spend must still be a passed one.
+     */
+    private function assertApprovalAuthority(User $actor, SpendApproval $approval, ?Resolution $resolution): void
+    {
+        if (! $resolution) {
+            if ($approval->requires_board) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => "This request needs a board decision. Choose the resolution the board passed before approving it.",
+                ]);
+            }
+
+            return;
+        }
+
+        if (Gate::forUser($actor)->denies('view', $resolution)) {
+            $this->conceal();
+        }
+
+        if (! in_array($resolution->status, self::PASSED_RESOLUTION_STATUSES, true) || $resolution->outcome !== 'carried') {
+            throw ValidationException::withMessages([
+                'resolution_id' => "This resolution can't be used yet — voting must be finished and the result recorded as passed.",
+            ]);
+        }
+
+        if (! $approval->requires_board) {
+            return;
+        }
+
+        $approvedAmount = $resolution->cost_impact['amount'] ?? null;
+        if (! is_numeric($approvedAmount)) {
+            throw ValidationException::withMessages([
+                'resolution_id' => "The resolution doesn't state the dollar amount approved. Ask the secretary to add it to the resolution's cost section.",
+            ]);
+        }
+
+        if ((float) $approvedAmount + 0.009 < (float) $approval->amount) {
+            throw ValidationException::withMessages([
+                'resolution_id' => sprintf(
+                    'The board approved up to %s but this request is for %s.',
+                    GovernanceLabels::money($approvedAmount, true),
+                    GovernanceLabels::money($approval->amount, true),
+                ),
+            ]);
+        }
+
+        $alreadyUsed = SpendApproval::query()
+            ->where('resolution_id', $resolution->id)
+            ->where('status', SpendApproval::STATUS_APPROVED)
+            ->whereKeyNot($approval->id)
+            ->exists();
+
+        if ($alreadyUsed) {
+            throw ValidationException::withMessages([
+                'resolution_id' => 'This resolution has already been used to approve another spend request.',
             ]);
         }
     }
@@ -717,19 +831,19 @@ class SpendApprovalCommandService
     private function validateDecisionCommand(string $outcome, array $command): void
     {
         if (! isset($command['decision_key']) || ! Str::isUuid((string) $command['decision_key'])) {
-            throw ValidationException::withMessages(['decision_key' => 'A valid decision key is required.']);
+            throw ValidationException::withMessages(['decision_key' => self::REFRESH_AND_RETRY]);
         }
         if (! isset($command['expected_version']) || (int) $command['expected_version'] < 1) {
-            throw ValidationException::withMessages(['expected_version' => 'A valid expected version is required.']);
+            throw ValidationException::withMessages(['expected_version' => self::REFRESH_AND_RETRY]);
         }
         if (! isset($command['expected_content_digest'])
             || preg_match('/\A[a-f0-9]{64}\z/', (string) $command['expected_content_digest']) !== 1) {
             throw ValidationException::withMessages([
-                'expected_content_digest' => 'A valid submitted-content digest is required.',
+                'expected_content_digest' => self::REFRESH_AND_RETRY,
             ]);
         }
         if (trim((string) ($command['decision_notes'] ?? '')) === '') {
-            throw ValidationException::withMessages(['decision_notes' => 'A decision reason is required.']);
+            throw ValidationException::withMessages(['decision_notes' => 'Give a reason for your decision.']);
         }
     }
 

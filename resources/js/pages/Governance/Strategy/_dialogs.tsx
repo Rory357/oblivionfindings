@@ -5,7 +5,6 @@ import {
 } from '@/components/governance/governance-dialog-deep-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
@@ -24,6 +23,7 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { formatDateOnly } from '@/lib/datetime';
+import { planLengthLabel } from '@/lib/governance-labels';
 import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -107,7 +107,7 @@ export const STRATEGIC_PLAN_STEPS: readonly (WizardStep & {
     {
         key: 'plan',
         label: 'Plan',
-        blurb: 'Title, horizon & period',
+        blurb: 'Title, plan length and dates',
         icon: Compass,
     },
     {
@@ -125,7 +125,7 @@ export const STRATEGIC_PLAN_STEPS: readonly (WizardStep & {
     {
         key: 'goals',
         label: 'Goals',
-        blurb: 'Strategic goals & key results',
+        blurb: 'Goals and measures of success',
         icon: Target,
     },
     {
@@ -150,38 +150,23 @@ const FIELD_STEPS: Record<string, StrategicPlanStepKey> = {
 };
 
 const HORIZON_BLURBS: Record<string, string> = {
-    '3_year': 'Medium-term priorities with annual refreshes.',
+    '3_year': 'Medium-term priorities, refreshed each year.',
     '5_year': 'Long-term direction for major investment.',
 };
 
-export const humaniseHorizon = (horizon: string) =>
-    ({
-        '1_year': '1-year plan',
-        '3_year': '3-year plan',
-        '5_year': '5-year plan',
-        '10_year': '10-year plan',
-    })[horizon] ?? horizon.replace(/_/g, ' ');
+const HORIZON_YEARS: Record<string, number> = {
+    annual: 1,
+    '1_year': 1,
+    '3_year': 3,
+    '5_year': 5,
+    '10_year': 10,
+};
 
-export function planStatusVariant(status: string): StatusVariant {
-    if (status === 'approved' || status === 'active') return 'success';
-    if (status === 'draft' || status === 'review' || status === 'consultation')
-        return 'warning';
-    if (status === 'superseded') return 'info';
-    return 'neutral';
-}
-
-export const planStatusLabel = (status: string) =>
-    ({
-        draft: 'Draft',
-        review: 'In review',
-        consultation: 'In consultation',
-        approved: 'Approved',
-        active: 'Approved',
-        superseded: 'Superseded',
-        archived: 'Archived',
-        completed: 'Archived',
-    })[status] ??
-    status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
+/** "3-year plan" — shared plain label for a stored plan length. */
+export const humaniseHorizon = (horizon: string) => {
+    const years = /^(\d+)_year$/.exec(horizon);
+    return years ? `${years[1]}-year plan` : planLengthLabel(horizon);
+};
 
 /** Plan values arrive as legacy strings or `{value, description}` objects. */
 export function normaliseValues(
@@ -197,6 +182,59 @@ export function normaliseValues(
                   },
         )
         .filter((entry) => entry.value.trim() !== '');
+}
+
+/** The day before the same date N years later: 1 Jul 2026 + 3 years → 30 Jun 2029. */
+export function suggestedPlanEnd(start: string, horizon: string): string {
+    const years = HORIZON_YEARS[horizon];
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start);
+    if (!years || !match) return '';
+    const date = new Date(
+        Date.UTC(Number(match[1]) + years, Number(match[2]) - 1, Number(match[3])),
+    );
+    date.setUTCDate(date.getUTCDate() - 1);
+    return date.toISOString().slice(0, 10);
+}
+
+/**
+ * "The dates cover 1 year and 2 months." when the plan period doesn't match
+ * its length (more than two months out); null when they agree.
+ */
+export function planLengthMismatch(
+    start: string,
+    end: string,
+    horizon: string,
+): string | null {
+    const years = HORIZON_YEARS[horizon];
+    const from = Date.parse(`${start}T00:00:00Z`);
+    const to = Date.parse(`${end}T00:00:00Z`);
+    if (!years || Number.isNaN(from) || Number.isNaN(to) || to <= from) {
+        return null;
+    }
+    // Inclusive of the end date: 1 Jul 2026 – 30 Jun 2029 is 3 years.
+    const days = (to - from) / 86_400_000 + 1;
+    if (Math.abs(days - years * 365.25) <= 62) return null;
+    const months = Math.round(days / 30.4375);
+    const wholeYears = Math.floor(months / 12);
+    const rest = months % 12;
+    const parts = [
+        wholeYears > 0
+            ? `${wholeYears} year${wholeYears === 1 ? '' : 's'}`
+            : null,
+        rest > 0 ? `${rest} month${rest === 1 ? '' : 's'}` : null,
+    ].filter(Boolean);
+    return `A ${years}-year plan usually runs about ${years} year${years === 1 ? '' : 's'}, but these dates cover ${parts.join(' and ') || 'less than a month'}.`;
+}
+
+/** "2026-07-01 - 2029-06-30" (stored goal timeframe) → "1 Jul 2026 – 30 Jun 2029". */
+export function formatTimeframe(timeframe: string | null | undefined): string {
+    if (!timeframe) return '';
+    const match = /^(\d{4}-\d{2}-\d{2})\s*[-–]\s*(\d{4}-\d{2}-\d{2})$/.exec(
+        timeframe.trim(),
+    );
+    return match
+        ? `${formatDateOnly(match[1])} – ${formatDateOnly(match[2])}`
+        : timeframe;
 }
 
 let rowSeq = 0;
@@ -219,7 +257,7 @@ function validateStep(
         else if (data.title.trim().length > 255)
             errors.title = 'Keep the title to 255 characters.';
         if (!data.planning_horizon)
-            errors.planning_horizon = 'Choose the planning horizon.';
+            errors.planning_horizon = 'Choose how many years the plan covers.';
         if (!data.period_start) errors.period_start = 'Choose the start date.';
         if (!data.period_end) errors.period_end = 'Choose the end date.';
         else if (data.period_start && data.period_end <= data.period_start)
@@ -239,7 +277,9 @@ function validateStep(
             if (!goal.description.trim())
                 errors[`goals.${i}.description`] =
                     'Describe what the goal achieves.';
-            if (!goal.pillar) errors[`goals.${i}.pillar`] = 'Choose a pillar.';
+            if (!goal.pillar)
+                errors[`goals.${i}.pillar`] =
+                    'Choose the theme this goal belongs to.';
         });
     }
     return errors;
@@ -326,6 +366,7 @@ function StrategicPlanWizardBody({
     );
     const [done, setDone] = useState(false);
     const [confirmClose, setConfirmClose] = useState(false);
+    const [suggestedEnd, setSuggestedEnd] = useState<string | null>(null);
 
     const step = STRATEGIC_PLAN_STEPS[stepIndex];
     const pct = useMemo(
@@ -354,6 +395,18 @@ function StrategicPlanWizardBody({
             return;
         }
         onClose();
+    };
+
+    /**
+     * Suggest the end date from the plan length whenever the end is empty or
+     * still the date we suggested last time — never over a date typed in.
+     */
+    const suggestEnd = (start: string, horizon: string) => {
+        if (data.period_end && data.period_end !== suggestedEnd) return;
+        const suggestion = suggestedPlanEnd(start, horizon);
+        if (!suggestion) return;
+        setSuggestedEnd(suggestion);
+        setData('period_end', suggestion);
     };
 
     /* values */
@@ -457,8 +510,8 @@ function StrategicPlanWizardBody({
                         .map((result) => ({ result })),
                 })),
             };
-            // A legacy horizon the register no longer offers is kept as-is
-            // unless the editor picks a current one.
+            // A legacy plan length the register no longer offers is kept
+            // as-is unless the editor picks a current one.
             if (
                 !(legacyHorizon && current.planning_horizon === legacyHorizon)
             ) {
@@ -500,24 +553,29 @@ function StrategicPlanWizardBody({
                       key: legacyHorizon,
                       label: humaniseHorizon(legacyHorizon),
                       description:
-                          'Current horizon — no longer offered for new plans.',
+                          'This plan’s current length — no longer offered for new plans.',
                       icon: CalendarRange,
                   },
               ]
             : []),
     ];
+    const lengthWarning = planLengthMismatch(
+        data.period_start,
+        data.period_end,
+        data.planning_horizon,
+    );
     const defaultTimeframe =
         data.period_start && data.period_end
-            ? `${data.period_start} - ${data.period_end}`
-            : 'the plan period';
+            ? `${formatDateOnly(data.period_start)} – ${formatDateOnly(data.period_end)}`
+            : 'the plan dates';
 
     const success = done ? (
         <WizardSuccessPane
-            title={isEdit ? 'Plan updated' : 'Plan created'}
+            title={isEdit ? 'Plan updated' : 'Plan saved'}
             blurb={
                 isEdit
                     ? `${data.title.trim() || 'The plan'} has been saved${data.goals.length > 0 ? ` with ${data.goals.length} new goal${data.goals.length === 1 ? '' : 's'}` : ''}.`
-                    : `${data.title.trim() || 'The plan'} is saved as a draft. Bind a decision paper to it when it is ready for the board.`
+                    : `${data.title.trim() || 'The plan'} is saved as a draft. When it's ready for the board, the secretary prepares a resolution that names it.`
             }
             actions={<Button onClick={onClose}>Close</Button>}
         />
@@ -529,13 +587,15 @@ function StrategicPlanWizardBody({
                 open={isOpen}
                 onClose={requestClose}
                 title={isEdit ? 'Edit strategic plan' : 'New strategic plan'}
-                description="A guided wizard to author a strategic plan: horizon, direction, values and goals."
+                description={
+                    isEdit
+                        ? 'Update this draft strategic plan.'
+                        : "Set out the board's plan: how long it runs, its direction, values and goals."
+                }
                 railIcon={Compass}
                 railTitle={isEdit ? 'Edit plan' : 'New plan'}
                 railSub={
-                    plan
-                        ? `v${plan.version_number} · ${planStatusLabel(plan.status)}`
-                        : 'Strategic plan'
+                    plan ? `Version ${plan.version_number}` : 'Strategic plan'
                 }
                 steps={STRATEGIC_PLAN_STEPS}
                 stepIndex={stepIndex}
@@ -591,26 +651,16 @@ function StrategicPlanWizardBody({
                             <div className="sm:col-span-2">
                                 <StepHead
                                     icon={Compass}
-                                    title="Plan and horizon"
-                                    blurb="Name the plan and set the period it steers."
+                                    title="Plan and dates"
+                                    blurb="Name the plan, choose how many years it covers and when it runs."
                                 />
                             </div>
-                            {plan &&
-                            (plan.status === 'draft' ||
-                                plan.status === 'review') ? (
+                            {plan ? (
                                 <InfoCard icon={AlertTriangle} tone="warn">
-                                    If a decision paper is already bound to this
-                                    plan, changing its content means that paper
-                                    will no longer approve it.
-                                </InfoCard>
-                            ) : null}
-                            {plan &&
-                            (plan.status === 'approved' ||
-                                plan.status === 'active') ? (
-                                <InfoCard icon={AlertTriangle} tone="warn">
-                                    This is the board-approved version. For a
-                                    refreshed plan, create a new version from
-                                    the plan page instead.
+                                    If a resolution has already been prepared
+                                    for this version, changing it means the
+                                    resolution must be linked to it again
+                                    before the board votes.
                                 </InfoCard>
                             ) : null}
                             <Field
@@ -625,25 +675,27 @@ function StrategicPlanWizardBody({
                                     onChange={(e) =>
                                         setData('title', e.target.value)
                                     }
-                                    placeholder="e.g. Strategic Plan 2026–2029"
+                                    placeholder="e.g. Strategic plan 2026–2029"
                                 />
                             </Field>
                             <Field
-                                label="Planning horizon"
+                                label="Plan length"
+                                hint="how many years the plan covers"
                                 required
                                 span
                                 error={err('planning_horizon')}
                             >
                                 <TilePicker
                                     value={data.planning_horizon}
-                                    onChange={(value) =>
-                                        setData('planning_horizon', value)
-                                    }
+                                    onChange={(value) => {
+                                        setData('planning_horizon', value);
+                                        suggestEnd(data.period_start, value);
+                                    }}
                                     options={horizonOptions}
                                 />
                             </Field>
                             <Field
-                                label="Period start"
+                                label="Starts"
                                 required
                                 error={err('period_start')}
                             >
@@ -651,13 +703,23 @@ function StrategicPlanWizardBody({
                                     id="plan-period-start"
                                     type="date"
                                     value={data.period_start}
-                                    onChange={(e) =>
-                                        setData('period_start', e.target.value)
-                                    }
+                                    onChange={(e) => {
+                                        setData('period_start', e.target.value);
+                                        suggestEnd(
+                                            e.target.value,
+                                            data.planning_horizon,
+                                        );
+                                    }}
                                 />
                             </Field>
                             <Field
-                                label="Period end"
+                                label="Ends"
+                                hint={
+                                    suggestedEnd &&
+                                    data.period_end === suggestedEnd
+                                        ? 'suggested from the plan length'
+                                        : undefined
+                                }
                                 required
                                 error={err('period_end')}
                             >
@@ -670,6 +732,12 @@ function StrategicPlanWizardBody({
                                     }
                                 />
                             </Field>
+                            {lengthWarning ? (
+                                <InfoCard icon={AlertTriangle} tone="warn">
+                                    {lengthWarning} Check the dates or the plan
+                                    length.
+                                </InfoCard>
+                            ) : null}
                         </div>
                     ) : null}
 
@@ -678,15 +746,11 @@ function StrategicPlanWizardBody({
                             <StepHead
                                 icon={Eye}
                                 title="Vision and mission"
-                                blurb="The future the plan works towards and how the organisation gets there."
+                                blurb="The future the plan works towards, and how the organisation gets there."
                             />
                             <Field
-                                label="Vision statement"
-                                hint={
-                                    isEdit
-                                        ? 'optional'
-                                        : 'optional — recorded as TBD if left blank'
-                                }
+                                label="Vision"
+                                hint="optional — you can add it later"
                                 error={
                                     err('vision_statement') ??
                                     err('description')
@@ -706,12 +770,8 @@ function StrategicPlanWizardBody({
                                 />
                             </Field>
                             <Field
-                                label="Mission statement"
-                                hint={
-                                    isEdit
-                                        ? 'optional'
-                                        : 'optional — recorded as TBD if left blank'
-                                }
+                                label="Mission"
+                                hint="optional — you can add it later"
                                 error={err('mission_statement')}
                             >
                                 <Textarea
@@ -765,7 +825,7 @@ function StrategicPlanWizardBody({
                                         />
                                     </Field>
                                     <Field
-                                        label="Meaning"
+                                        label="What it means"
                                         hint="optional"
                                         error={err(
                                             `values.${index}.description`,
@@ -814,8 +874,8 @@ function StrategicPlanWizardBody({
                                 title="Strategic goals"
                                 blurb={
                                     isEdit
-                                        ? 'Add goals to this plan. Existing goals keep their progress, initiatives and lineage.'
-                                        : 'Add the goals this plan commits to. Progress and initiatives are tracked from the plan page.'
+                                        ? 'Add goals to this plan. Existing goals keep their progress and initiatives.'
+                                        : 'Add the goals this plan commits to, and how you’ll know each one is met.'
                                 }
                             />
                             {existingGoals.length > 0 ? (
@@ -848,7 +908,7 @@ function StrategicPlanWizardBody({
                                     className="rounded-xl border border-border bg-muted/20 p-4"
                                 >
                                     <div className="mb-3 flex items-center justify-between">
-                                        <span className="text-[13px] font-semibold text-muted-foreground">
+                                        <span className="text-caption font-semibold">
                                             New goal {index + 1}
                                         </span>
                                         <Button
@@ -879,7 +939,8 @@ function StrategicPlanWizardBody({
                                             />
                                         </Field>
                                         <Field
-                                            label="Pillar"
+                                            label="Theme"
+                                            hint="the strategic theme this goal belongs to"
                                             required
                                             error={err(`goals.${index}.pillar`)}
                                         >
@@ -890,8 +951,8 @@ function StrategicPlanWizardBody({
                                                         pillar: value,
                                                     })
                                                 }
-                                                placeholder="Pillar"
-                                                ariaLabel={`Goal ${index + 1} pillar`}
+                                                placeholder="Theme"
+                                                ariaLabel={`Goal ${index + 1} theme`}
                                                 options={pillarKeys.map(
                                                     (key) => ({
                                                         value: key,
@@ -918,7 +979,7 @@ function StrategicPlanWizardBody({
                                                             e.target.value,
                                                     })
                                                 }
-                                                placeholder={`Defaults to ${defaultTimeframe}`}
+                                                placeholder={`Leave blank to use ${defaultTimeframe}`}
                                             />
                                         </Field>
                                         <Field
@@ -943,7 +1004,9 @@ function StrategicPlanWizardBody({
                                         </Field>
                                         <div className="grid gap-2 sm:col-span-2">
                                             <span className="text-caption">
-                                                Key results
+                                                Measures of success — how
+                                                you&apos;ll know the goal is met
+                                                (measurable)
                                             </span>
                                             {goal.key_results.map(
                                                 (kr, krIndex) => (
@@ -953,7 +1016,7 @@ function StrategicPlanWizardBody({
                                                     >
                                                         <div className="min-w-0 flex-1">
                                                             <Input
-                                                                aria-label={`Goal ${index + 1} key result ${krIndex + 1}`}
+                                                                aria-label={`Goal ${index + 1} measure of success ${krIndex + 1}`}
                                                                 value={
                                                                     kr.result
                                                                 }
@@ -983,7 +1046,7 @@ function StrategicPlanWizardBody({
                                                                     kr.key,
                                                                 )
                                                             }
-                                                            aria-label={`Remove key result ${krIndex + 1} from goal ${index + 1}`}
+                                                            aria-label={`Remove measure of success ${krIndex + 1} from goal ${index + 1}`}
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
@@ -1000,7 +1063,7 @@ function StrategicPlanWizardBody({
                                                     }
                                                 >
                                                     <Plus className="h-3.5 w-3.5" />{' '}
-                                                    Add key result
+                                                    Add measure of success
                                                 </Button>
                                             </div>
                                         </div>
@@ -1029,7 +1092,7 @@ function StrategicPlanWizardBody({
                                 blurb={
                                     isEdit
                                         ? 'Saving updates the plan and adds any new goals.'
-                                        : 'The plan is created as a draft and approved later by a bound, carried board resolution.'
+                                        : 'The plan is saved as a draft. It’s approved by the board when a resolution naming this version passes.'
                                 }
                             />
                             {err('status') ? (
@@ -1048,7 +1111,7 @@ function StrategicPlanWizardBody({
                                         value={data.title}
                                     />
                                     <ReviewRow
-                                        label="Horizon"
+                                        label="Plan length"
                                         value={
                                             options.horizons[
                                                 data.planning_horizon
@@ -1059,7 +1122,7 @@ function StrategicPlanWizardBody({
                                         }
                                     />
                                     <ReviewRow
-                                        label="Period"
+                                        label="Dates"
                                         value={
                                             data.period_start && data.period_end
                                                 ? `${formatDateOnly(data.period_start)} – ${formatDateOnly(data.period_end)}`
@@ -1075,17 +1138,15 @@ function StrategicPlanWizardBody({
                                     <ReviewRow
                                         label="Vision"
                                         value={
-                                            data.vision_statement.trim()
-                                                ? 'Added'
-                                                : null
+                                            data.vision_statement.trim() ||
+                                            'Not written yet'
                                         }
                                     />
                                     <ReviewRow
                                         label="Mission"
                                         value={
-                                            data.mission_statement.trim()
-                                                ? 'Added'
-                                                : null
+                                            data.mission_statement.trim() ||
+                                            'Not written yet'
                                         }
                                     />
                                     <ReviewRow
@@ -1113,16 +1174,22 @@ function StrategicPlanWizardBody({
                                     span
                                 >
                                     {data.goals.length > 0 ? (
-                                        data.goals.map((goal, index) => (
-                                            <ReviewRow
-                                                key={goal.key}
-                                                label={
-                                                    goal.title ||
-                                                    `Goal ${index + 1}`
-                                                }
-                                                value={`${options.pillars[goal.pillar] ?? goal.pillar} · ${goal.key_results.filter((kr) => kr.result.trim()).length} key result(s)`}
-                                            />
-                                        ))
+                                        data.goals.map((goal, index) => {
+                                            const measures =
+                                                goal.key_results.filter((kr) =>
+                                                    kr.result.trim(),
+                                                ).length;
+                                            return (
+                                                <ReviewRow
+                                                    key={goal.key}
+                                                    label={
+                                                        goal.title ||
+                                                        `Goal ${index + 1}`
+                                                    }
+                                                    value={`${options.pillars[goal.pillar] ?? goal.pillar} · ${measures} measure${measures === 1 ? '' : 's'} of success`}
+                                                />
+                                            );
+                                        })
                                     ) : (
                                         <p className="text-caption">
                                             {isEdit
@@ -1139,12 +1206,17 @@ function StrategicPlanWizardBody({
 
             <DiscardDraftDialog
                 open={confirmClose}
+                mode={isEdit ? 'edit' : 'create'}
                 onKeepEditing={() => setConfirmClose(false)}
                 onDiscard={() => {
                     setConfirmClose(false);
                     onClose();
                 }}
-                description="Any changes to this strategic plan will be lost."
+                description={
+                    isEdit
+                        ? 'Your changes to this strategic plan will be lost.'
+                        : 'The details you entered for this plan will be lost.'
+                }
             />
         </>
     );

@@ -219,7 +219,7 @@ class GovernanceMyWorkTest extends TestCase
         );
     }
 
-    public function test_completed_view_displays_durable_receipts(): void
+    public function test_completed_view_shows_the_record_of_completion_the_server_holds(): void
     {
         $member = User::find($this->fixtures['users']['member']);
         $meeting = GovernanceMeeting::find($this->fixtures['meetings']['regular']);
@@ -236,6 +236,19 @@ class GovernanceMyWorkTest extends TestCase
             'due_date' => now()->subDay()->toDateString(),
             'completed_at' => now()->subHours(2),
             'completion_notes' => 'Implemented and verified.',
+            'completion_receipt' => 'ACT-REC-SIGNED-OFF-20260914',
+        ]);
+        $withoutReceipt = ActionItem::create([
+            'source_type' => 'meeting',
+            'source_id' => $meeting->id,
+            'governance_meeting_id' => $meeting->id,
+            'assigned_to' => $member->id,
+            'created_by' => $member->id,
+            'description' => 'Finished before receipts were recorded',
+            'status' => 'completed',
+            'priority' => 'low',
+            'due_date' => now()->subDays(4)->toDateString(),
+            'completed_at' => now()->subDays(3),
         ]);
 
         $response = $this->actingAs($member)->getJson('/governance/my-work/data?status=completed');
@@ -246,9 +259,143 @@ class GovernanceMyWorkTest extends TestCase
         $completedItem = $items->firstWhere('source.id', $action->id);
         $this->assertNotNull($completedItem, 'Completed item must appear in completed status view.');
         $this->assertSame('completed', $completedItem['status']);
-        $this->assertNotNull($completedItem['receipt'], 'Completed item must include a durable receipt.');
-        $this->assertStringContainsString((string) $action->id, $completedItem['receipt']['receipt_id']);
+        $this->assertSame('Signed off and done', $completedItem['title']);
+        $this->assertStringStartsWith('Marked as done on ', $completedItem['reason']);
+        $this->assertSame('ACT-REC-SIGNED-OFF-20260914', $completedItem['receipt']['receipt_id']);
         $this->assertSame('Implemented and verified.', $completedItem['receipt']['completion_notes']);
+
+        // Nothing is invented: no recorded reference means no reference shown.
+        $legacy = $items->firstWhere('source.id', $withoutReceipt->id);
+        $this->assertNull($legacy['receipt']['receipt_id']);
+        $this->assertNull($legacy['receipt']['completion_notes']);
+    }
+
+    /**
+     * P0-6 — upcoming meetings are for your information: they are listed
+     * apart as "Coming up" and never counted as work to do, so a member can
+     * be up to date while meetings are scheduled.
+     */
+    public function test_upcoming_meetings_are_for_information_and_never_counted_as_work(): void
+    {
+        $member = User::find($this->fixtures['users']['member']);
+
+        $feed = $this->actingAs($member)->getJson('/governance/my-work/data')->assertOk();
+        $totals = $feed->json('totals');
+
+        $this->assertGreaterThanOrEqual(1, $totals['know']);
+        $this->assertSame($totals['vote'] + $totals['read'] + $totals['act'], $totals['all']);
+        $this->assertSame($totals['all'], $totals['pending']);
+        $this->assertFalse(collect($feed->json('items'))->contains('kind', 'know'));
+
+        $comingUp = collect($feed->json('coming_up'));
+        $this->assertCount($totals['know'], $comingUp);
+        $this->assertTrue($comingUp->every(fn (array $item) => $item['status'] === 'upcoming'
+            && $item['kind'] === 'know'
+            && $item['required_action']['label'] === 'Open meeting'
+            && ! str_starts_with($item['title'], 'Upcoming:')));
+
+        // The "For your information" filter lists exactly those meetings.
+        $know = $this->actingAs($member)->getJson('/governance/my-work/data?kind=know')->assertOk();
+        $this->assertCount($totals['know'], $know->json('items'));
+        $this->assertTrue(collect($know->json('items'))->every(fn (array $item) => $item['kind'] === 'know'));
+
+        // Someone with meetings scheduled but nothing to do is up to date.
+        $observer = $this->createUserWithRole('board_observer');
+        $observerFeed = $this->actingAs($observer)->getJson('/governance/my-work/data')->assertOk();
+        $this->assertSame(0, $observerFeed->json('totals.pending'));
+        $this->assertGreaterThanOrEqual(1, $observerFeed->json('totals.know'));
+    }
+
+    public function test_work_items_lead_with_titles_and_use_plain_labels(): void
+    {
+        $member = User::find($this->fixtures['users']['member']);
+
+        $response = $this->actingAs($member)->getJson('/governance/my-work/data?per_page=100')->assertOk();
+        $items = collect($response->json('items'));
+
+        $nullDeadline = $items->firstWhere('source.id', $this->fixtures['resolutions']['null_deadline']);
+        $this->assertSame('Synthetic Resolution: Null Deadline Governance Policy', $nullDeadline['title']);
+        $this->assertSame('No voting deadline has been set.', $nullDeadline['reason']);
+        $this->assertSame('Vote', $nullDeadline['required_action']['label']);
+
+        // A vote whose deadline has passed can't be cast — offer the paper instead.
+        $expired = $items->firstWhere('source.id', $this->fixtures['resolutions']['expired']);
+        $this->assertSame('Open paper', $expired['required_action']['label']);
+
+        $pack = $items->firstWhere('source.type', 'board_pack');
+        $this->assertStringStartsWith('Board pack for Synthetic Ordinary Board Meeting Q3', $pack['title']);
+        $this->assertSame('Read pack', $pack['required_action']['label']);
+        $this->assertStringContainsString("confirm you've read it", $pack['reason']);
+
+        $action = $items->firstWhere('source.reference', 'ACT-SYN-004');
+        $this->assertSame('Update action', $action['required_action']['label']);
+        $this->assertStringStartsNotWith('ACT-', $action['title']);
+
+        $body = $response->getContent();
+        foreach (['Legacy resolution', 'attestation', 'Attest', 'day(s)', 'Cast Vote', 'Read Pack', 'Rev ', 'Upcoming:'] as $developerText) {
+            $this->assertStringNotContainsString($developerText, $body);
+        }
+    }
+
+    /** Regression: completed votes never appeared (the feed checked a table that doesn't exist). */
+    public function test_completed_votes_show_the_recorded_vote_and_paper_version(): void
+    {
+        $member = User::find($this->fixtures['users']['member']);
+        $open = Resolution::find($this->fixtures['resolutions']['open']);
+
+        $vote = Vote::create([
+            'resolution_id' => $open->id,
+            'board_member_id' => $this->fixtures['board_members']['member'],
+            'vote' => 'for',
+            'voted_at' => now()->subHour(),
+            'voting_method' => 'electronic',
+            'recorded_by' => $member->id,
+        ]);
+
+        $completed = collect(
+            $this->actingAs($member)->getJson('/governance/my-work/data?status=completed')->assertOk()->json('items')
+        )->firstWhere('id', "resolution:{$open->id}:vote:completed");
+
+        $this->assertNotNull($completed);
+        $this->assertStringStartsWith('You voted For on ', $completed['reason']);
+        $this->assertSame('for', $completed['receipt']['vote']);
+        $this->assertSame((int) ($open->version_number ?? 1), $completed['receipt']['paper_version']);
+        $this->assertSame("VOTE-RCP-{$vote->id}", $completed['receipt']['receipt_id']);
+
+        // …and it is no longer waiting for a vote.
+        $pendingVotes = collect($this->actingAs($member)->getJson('/governance/my-work/data?kind=vote')->json('items'));
+        $this->assertFalse($pendingVotes->contains('source.id', $open->id));
+    }
+
+    public function test_my_work_page_gives_pagination_links_that_keep_the_filters(): void
+    {
+        $member = User::find($this->fixtures['users']['member']);
+        $meeting = GovernanceMeeting::find($this->fixtures['meetings']['regular']);
+
+        for ($i = 1; $i <= 30; $i++) {
+            ActionItem::create([
+                'source_type' => 'meeting',
+                'source_id' => $meeting->id,
+                'governance_meeting_id' => $meeting->id,
+                'assigned_to' => $member->id,
+                'created_by' => $member->id,
+                'description' => "Paged follow-up {$i}",
+                'status' => 'open',
+                'priority' => 'medium',
+                'due_date' => now()->addDays($i)->toDateString(),
+            ]);
+        }
+
+        $this->actingAs($member)
+            ->get('/governance/my-work?kind=act')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/MyWork/Index')
+                ->where('feed.pagination.links', fn ($links) => collect($links)->contains(
+                    fn ($link) => str_contains((string) ($link['url'] ?? ''), 'page=2')
+                        && str_contains((string) ($link['url'] ?? ''), 'kind=act')
+                ))
+            );
     }
 
     public function test_pagination_and_kind_filters(): void

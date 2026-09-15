@@ -26,14 +26,13 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly } from '@/lib/datetime';
+import { governanceStatus } from '@/lib/governance-labels';
 import { Head, router } from '@inertiajs/react';
 import { Compass, ExternalLink, History, Pencil, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
     StrategicPlanWizardDialog,
     humaniseHorizon,
-    planStatusLabel,
-    planStatusVariant,
     type StrategicPlanFormOptions,
 } from './_dialogs';
 
@@ -64,8 +63,14 @@ interface Props {
         superseded: number;
         archived: number;
     };
-    inEffect?: { id: number; title: string; progress_pct: number } | null;
+    inEffect?: {
+        id: number;
+        title: string;
+        goals_count: number;
+        progress_pct: number;
+    } | null;
     filters?: Filters;
+    horizons?: Record<string, string>;
     canCreate?: boolean;
     /** New-plan wizard options — only sent to viewers who may create. */
     formOptions?: StrategicPlanFormOptions | null;
@@ -75,9 +80,9 @@ const ALL = '__all';
 
 const STATUS_OPTIONS = [
     { value: ALL, label: 'Any status' },
-    { value: 'draft', label: 'Draft or in review' },
+    { value: 'draft', label: 'Draft' },
     { value: 'approved', label: 'Approved' },
-    { value: 'superseded', label: 'Superseded' },
+    { value: 'superseded', label: 'Replaced by a newer version' },
     { value: 'archived', label: 'Archived' },
 ];
 
@@ -91,6 +96,7 @@ export default function StrategyIndex({
     summary,
     inEffect = null,
     filters = EMPTY_FILTERS,
+    horizons,
     canCreate: canCreateProp = false,
     formOptions = null,
 }: Props) {
@@ -141,18 +147,21 @@ export default function StrategyIndex({
     const hasFilters = Boolean(
         filters.status || filters.horizon || filters.search,
     );
-    const horizonOptions = [
-        { value: ALL, label: 'Any horizon' },
+    const lengthOptions = [
+        { value: ALL, label: 'Any length' },
         ...Object.entries(
-            formOptions?.horizons ?? {
-                '3_year': '3-year plan',
-                '5_year': '5-year plan',
-            },
+            horizons ??
+                formOptions?.horizons ?? {
+                    '3_year': '3-year plan',
+                    '5_year': '5-year plan',
+                },
         ).map(([value, label]) => ({ value, label })),
     ];
 
     const open = (plan: StrategicPlan) =>
         router.visit(`/governance/strategy/${plan.id}`);
+    const isDraft = (plan: StrategicPlan) =>
+        ['draft', 'review', 'consultation'].includes(plan.status);
     const actionsFor = (plan: StrategicPlan): MenuItem[] =>
         compactMenu([
             {
@@ -160,7 +169,7 @@ export default function StrategyIndex({
                 icon: ExternalLink,
                 onClick: () => open(plan),
             },
-            canCreate
+            canCreate && isDraft(plan)
                 ? {
                       label: 'Edit plan',
                       icon: Pencil,
@@ -171,18 +180,23 @@ export default function StrategyIndex({
                   }
                 : null,
             {
-                label: 'View changes',
+                label: 'See what changed',
                 icon: History,
                 onClick: () =>
                     router.visit(`/governance/strategy/${plan.id}/changes`),
             },
         ]);
 
+    const inEffectTracked =
+        inEffect !== null &&
+        inEffect.goals_count > 0 &&
+        inEffect.progress_pct > 0;
+
     const header = (
         <PageHeader
             icon={Compass}
-            title="Strategic plans"
-            subline={`Board-approved direction, goals and delivery horizons · ${counts.total} plan${counts.total === 1 ? '' : 's'}`}
+            title="Strategic plan"
+            subline={`The board's plan for the next few years and how it will know it's getting there · ${counts.total} version${counts.total === 1 ? '' : 's'}`}
             actions={
                 <>
                     <PageHeaderSearch
@@ -203,18 +217,9 @@ export default function StrategyIndex({
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Plans"
-                        href="/governance/strategy"
-                    >
-                        <PageHeaderMeterBig>{counts.total}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            Across every horizon and version
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="In effect"
+                        label="Current plan"
                         value={
-                            inEffect
+                            inEffect && inEffectTracked
                                 ? `${Math.round(inEffect.progress_pct)}%`
                                 : undefined
                         }
@@ -226,22 +231,28 @@ export default function StrategyIndex({
                         tone={inEffect ? 'success' : 'brand'}
                         ariaLabel={
                             inEffect
-                                ? `View ${inEffect.title}`
+                                ? `Open ${inEffect.title}`
                                 : 'View approved plans'
                         }
                     >
                         {inEffect ? (
                             <>
-                                <PageHeaderMeterBar
-                                    percent={inEffect.progress_pct}
-                                />
+                                {inEffectTracked ? (
+                                    <PageHeaderMeterBar
+                                        percent={inEffect.progress_pct}
+                                    />
+                                ) : (
+                                    <PageHeaderMeterBig>Approved</PageHeaderMeterBig>
+                                )}
                                 <PageHeaderMeterCaption>
-                                    {inEffect.title} · goal progress
+                                    {inEffectTracked
+                                        ? `${inEffect.title} · goal progress`
+                                        : `${inEffect.title} · progress not tracked yet`}
                                 </PageHeaderMeterCaption>
                             </>
                         ) : (
                             <>
-                                <PageHeaderMeterBig>0</PageHeaderMeterBig>
+                                <PageHeaderMeterBig>None</PageHeaderMeterBig>
                                 <PageHeaderMeterCaption>
                                     No approved plan yet
                                 </PageHeaderMeterCaption>
@@ -255,11 +266,11 @@ export default function StrategyIndex({
                     >
                         <PageHeaderMeterBig>{counts.draft}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Draft or in review
+                            Not approved by the board yet
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Superseded"
+                        label="Replaced"
                         href="/governance/strategy?status=superseded"
                     >
                         <PageHeaderMeterBig>
@@ -277,7 +288,7 @@ export default function StrategyIndex({
                             {counts.archived}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Closed plans
+                            No longer in use
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
@@ -294,10 +305,10 @@ export default function StrategyIndex({
                         }
                     />
                     <PageHeaderFilterSelect
-                        label="Horizon"
+                        label="Plan length"
                         value={filters.horizon ?? ALL}
                         allValue={ALL}
-                        options={horizonOptions}
+                        options={lengthOptions}
                         onChange={(value) =>
                             go({ horizon: value === ALL ? null : value })
                         }
@@ -313,15 +324,15 @@ export default function StrategyIndex({
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Strategic plans', href: '/governance/strategy' },
+                { title: 'Strategic plan', href: '/governance/strategy' },
             ]}
         >
-            <Head title="Strategic plans" />
+            <Head title="Strategic plan" />
 
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
                     <ListCaption
-                        title="Strategic plans"
+                        title="Plans and versions"
                         caption={`${rows.length} of ${counts.total} shown`}
                     />
 
@@ -331,12 +342,12 @@ export default function StrategyIndex({
                             title={
                                 hasFilters
                                     ? 'No plans match your filters'
-                                    : 'No strategic plans yet'
+                                    : 'No strategic plan yet'
                             }
                             description={
                                 hasFilters
                                     ? 'Try clearing a filter or search term.'
-                                    : 'Create the first strategic plan to set the board’s long-term direction.'
+                                    : 'The strategic plan sets out what the organisation wants to achieve over the next few years.'
                             }
                             action={
                                 hasFilters ? (
@@ -393,26 +404,28 @@ export default function StrategyIndex({
                                 {
                                     key: 'status',
                                     label: 'Status',
-                                    width: '0.8fr',
-                                    cell: (plan) => (
-                                        <EntityStatusChip
-                                            variant={planStatusVariant(
-                                                plan.status,
-                                            )}
-                                        >
-                                            {planStatusLabel(plan.status)}
-                                        </EntityStatusChip>
-                                    ),
+                                    width: '1fr',
+                                    cell: (plan) => {
+                                        const chip = governanceStatus(
+                                            'strategic_plan_status',
+                                            plan.status,
+                                        );
+                                        return (
+                                            <EntityStatusChip
+                                                variant={chip.variant}
+                                            >
+                                                {chip.label}
+                                            </EntityStatusChip>
+                                        );
+                                    },
                                 },
                                 {
                                     key: 'horizon',
-                                    label: 'Horizon',
+                                    label: 'Plan length',
                                     width: '0.8fr',
                                     cell: (plan) => (
                                         <EntityChip>
-                                            {formOptions?.horizons[
-                                                plan.planning_horizon
-                                            ] ??
+                                            {horizons?.[plan.planning_horizon] ??
                                                 humaniseHorizon(
                                                     plan.planning_horizon,
                                                 )}
@@ -421,10 +434,10 @@ export default function StrategyIndex({
                                 },
                                 {
                                     key: 'period',
-                                    label: 'Period',
+                                    label: 'Dates',
                                     width: '1.1fr',
                                     cell: (plan) => (
-                                        <span className="text-[12.5px] tabular-nums">
+                                        <span className="tabular-nums">
                                             {formatDateOnly(
                                                 dateOnly(plan.period_start),
                                             )}{' '}
@@ -451,7 +464,8 @@ export default function StrategyIndex({
                                     label: 'Goal progress',
                                     width: '1.2fr',
                                     cell: (plan) =>
-                                        plan.goals_count > 0 ? (
+                                        plan.goals_count > 0 &&
+                                        Number(plan.progress_pct ?? 0) > 0 ? (
                                             <ProgressValue
                                                 percent={Number(
                                                     plan.progress_pct ?? 0,
@@ -466,7 +480,9 @@ export default function StrategyIndex({
                                             </ProgressValue>
                                         ) : (
                                             <ProgressValue percent={null}>
-                                                No goals yet
+                                                {plan.goals_count > 0
+                                                    ? 'Not tracked yet'
+                                                    : 'No goals yet'}
                                             </ProgressValue>
                                         ),
                                 },

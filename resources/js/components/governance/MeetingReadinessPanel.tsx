@@ -1,3 +1,7 @@
+import { Link } from '@inertiajs/react';
+import { AlertOctagon, CheckCircle2, Circle, Clock } from 'lucide-react';
+
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -9,9 +13,8 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { resolveActionVerb } from '@/lib/governance-action-verbs';
+import { humaniseGovernanceValue } from '@/lib/governance-labels';
 import { cn } from '@/lib/utils';
-import { Link } from '@inertiajs/react';
-import { AlertOctagon, CheckCircle2, Circle, Clock } from 'lucide-react';
 
 export interface MeetingChecklistItem {
     key: string;
@@ -36,6 +39,9 @@ export interface MemberMeetingReadiness {
         revision_number: number | null;
         href: string | null;
     };
+    /** Agenda items the viewer can see (the Agenda tab). */
+    agenda?: { count: number; href: string };
+    /** Resolutions the viewer can see (the Decision papers tab). */
     papers: { count: number; href: string };
     votes: { available: boolean; open: number; href: string };
     conflicts: {
@@ -55,6 +61,8 @@ export interface NextMeetingPayload {
         scheduled_label: string | null;
         days_until: number | null;
         status: string;
+        status_label?: string;
+        type_label?: string;
         location: string | null;
         chair: string | null;
         secretary: string | null;
@@ -86,17 +94,17 @@ const STATUS_ICON: Record<string, { icon: typeof CheckCircle2; cls: string }> =
         in_progress: { icon: Clock, cls: 'text-status-info bg-status-info-bg' },
         blocked: {
             icon: AlertOctagon,
-            cls: 'text-status-critical bg-status-critical-bg',
+            cls: 'text-status-warning bg-status-warning-bg',
         },
     };
 
 const STATUS_BADGE: Record<string, { label: string; variant: StatusVariant }> =
     {
         done: { label: 'Done', variant: 'success' },
-        todo: { label: 'Pending', variant: 'neutral' },
+        todo: { label: 'To do', variant: 'neutral' },
         in_progress: { label: 'In progress', variant: 'info' },
-        blocked: { label: 'Blocked', variant: 'critical' },
-        not_applicable: { label: 'Not applicable', variant: 'neutral' },
+        blocked: { label: 'Waiting', variant: 'warning' },
+        not_applicable: { label: 'Not needed', variant: 'neutral' },
     };
 
 /**
@@ -115,12 +123,11 @@ function areaForChecklistKey(key: string): string {
 }
 
 /**
- * The ADMINISTRATIVE preparation checklist for the next meeting — agenda →
- * CEO report → pack generation/distribution → quorum → minutes drafted,
- * approved and signed. Only meeting managers (`governance.meetings.manage`)
- * see this on Home; ordinary members get `NextMeetingCard` instead. Renders
- * nothing when there is no next meeting (the Next meeting card owns that
- * empty state).
+ * The chair and secretary's preparation steps for the next meeting — agenda,
+ * CEO report, board pack, attendance and minutes. Only meeting managers
+ * (`governance.meetings.manage`) see this on Home; ordinary members get
+ * `NextMeetingCard` instead. Renders nothing when there is no next meeting
+ * (the Next meeting card owns that empty state).
  */
 export function MeetingReadinessPanel({
     nextMeeting,
@@ -140,50 +147,38 @@ export function MeetingReadinessPanel({
                             Meeting preparation checklist
                         </CardTitle>
                         <CardDescription>
-                            Secretariat steps for{' '}
+                            What the chair and secretary still need to do for{' '}
                             <Link
                                 href={meeting.href}
                                 className="font-medium text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                             >
                                 {meeting.title}
                             </Link>
+                            .
                         </CardDescription>
                     </div>
                     <StatusBadge
                         variant={
                             progress.blocked > 0
-                                ? 'critical'
+                                ? 'warning'
                                 : progress.remaining > 0
-                                  ? 'warning'
+                                  ? 'neutral'
                                   : 'success'
                         }
                     >
-                        {progress.done} of {progress.total} steps complete
+                        {progress.done} of {progress.total} steps done
                     </StatusBadge>
                 </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between text-caption">
-                        <span>
-                            {progress.remaining} remaining
-                            {progress.blocked > 0
-                                ? ` · ${progress.blocked} blocked`
-                                : ''}
-                        </span>
-                        <span className="font-medium text-foreground">
-                            {progress.percent}%
-                        </span>
-                    </div>
-                    <Progress
-                        value={progress.percent}
-                        aria-label="Meeting preparation progress"
-                    />
-                </div>
+                <Progress
+                    value={progress.percent}
+                    aria-label={`Meeting preparation: ${progress.done} of ${progress.total} steps done`}
+                />
 
                 {next_step ? (
                     <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-                        <p className="text-xs font-medium tracking-wide text-primary uppercase">
+                        <p className="text-xs font-medium text-primary">
                             Next step
                         </p>
                         <p className="mt-1 text-sm font-medium text-foreground">
@@ -200,7 +195,7 @@ export function MeetingReadinessPanel({
                         const meta =
                             STATUS_ICON[item.status] ?? STATUS_ICON.todo;
                         const badge = STATUS_BADGE[item.status] ?? {
-                            label: item.status.replace(/_/g, ' '),
+                            label: humaniseGovernanceValue(item.status) || 'To do',
                             variant: 'neutral' as const,
                         };
                         const StatusIcon = meta.icon;
@@ -232,12 +227,15 @@ export function MeetingReadinessPanel({
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <p
                                             className={cn(
-                                                'text-sm font-medium text-foreground',
+                                                'inline-flex items-center gap-1 text-sm font-medium text-foreground',
                                                 isDone &&
                                                     'text-muted-foreground',
                                             )}
                                         >
                                             {item.label}
+                                            {item.key === 'quorum' ? (
+                                                <GovernanceTermHint term="quorum" />
+                                            ) : null}
                                         </p>
                                         <StatusBadge
                                             size="sm"
@@ -250,8 +248,8 @@ export function MeetingReadinessPanel({
                                         {item.detail}
                                     </p>
                                     {isBlocked && item.blocked_by ? (
-                                        <p className="text-xs text-status-critical">
-                                            Blocked by: {item.blocked_by}
+                                        <p className="text-xs text-status-warning">
+                                            Waiting on: {item.blocked_by}
                                         </p>
                                     ) : null}
                                 </div>

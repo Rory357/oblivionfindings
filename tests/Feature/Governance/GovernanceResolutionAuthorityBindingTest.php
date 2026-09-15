@@ -63,7 +63,7 @@ class GovernanceResolutionAuthorityBindingTest extends TestCase
             $service->activateProfile($profile, $this->chair, $resolution);
             $this->fail('A motion that was never bound to the board profile activated it.');
         } catch (\InvalidArgumentException $exception) {
-            $this->assertStringContainsString('not explicitly bound', $exception->getMessage());
+            $this->assertStringContainsString("wasn't linked to these voting rules", $exception->getMessage());
         }
 
         $this->assertFalse($profile->fresh()->is_active);
@@ -142,7 +142,7 @@ class GovernanceResolutionAuthorityBindingTest extends TestCase
             $service->activateProfile($profile, $this->chair, $resolution, 'A different constitution', 'v1');
             $this->fail('Activation against a different governing document than the one bound was accepted.');
         } catch (\InvalidArgumentException $exception) {
-            $this->assertStringContainsString('has changed since the resolution was bound', $exception->getMessage());
+            $this->assertStringContainsString('voting rules were changed after the resolution was prepared', $exception->getMessage());
         }
 
         $profile->update(['quorum_formula' => '2']);
@@ -268,7 +268,7 @@ class GovernanceResolutionAuthorityBindingTest extends TestCase
             $plan->approve($resolution->id);
             $this->fail('A plan whose content changed after the board bound its approval was approved.');
         } catch (ValidationException $exception) {
-            $this->assertStringContainsString('has changed since the resolution was bound', $exception->errors()['resolution_id'][0]);
+            $this->assertStringContainsString('The strategic plan was edited after its resolution was prepared', $exception->errors()['resolution_id'][0]);
         }
 
         $this->assertSame('draft', $plan->fresh()->status);
@@ -292,7 +292,7 @@ class GovernanceResolutionAuthorityBindingTest extends TestCase
             app(GovernanceNestedMutationService::class)->approveBudgetAdjustment($this->chair, $budget, $adjustment, $resolution->id);
             $this->fail('The adjustment direction changed after binding and was still applied.');
         } catch (ValidationException $exception) {
-            $this->assertStringContainsString("approved direction 'increase'", $exception->errors()['approval_resolution_id'][0]);
+            $this->assertStringContainsString('The resolution approved an increase, but this change is now a decrease.', $exception->errors()['approval_resolution_id'][0]);
         }
 
         $this->assertSame('submitted', $adjustment->fresh()->status);
@@ -315,7 +315,7 @@ class GovernanceResolutionAuthorityBindingTest extends TestCase
             app(GovernanceNestedMutationService::class)->approveBudgetAdjustment($this->chair, $budget, $adjustment, $resolution->id);
             $this->fail('Unbound JSON hints or wording approved a budget adjustment.');
         } catch (ValidationException $exception) {
-            $this->assertStringContainsString('not explicitly bound', $exception->errors()['approval_resolution_id'][0]);
+            $this->assertStringContainsString("wasn't linked to this budget change", $exception->errors()['approval_resolution_id'][0]);
         }
 
         $this->assertSame('submitted', $adjustment->fresh()->status);
@@ -344,7 +344,7 @@ class GovernanceResolutionAuthorityBindingTest extends TestCase
             $service->approveBudgetAdjustment($this->chair, $budget, $adjustment->fresh(), $resolution->id);
             $this->fail('A bound adjustment whose terms changed was applied.');
         } catch (ValidationException $exception) {
-            $this->assertStringContainsString('has changed since the resolution was bound', $exception->errors()['approval_resolution_id'][0]);
+            $this->assertStringContainsString('The budget change was edited after its resolution was prepared', $exception->errors()['approval_resolution_id'][0]);
         }
 
         $this->assertSame('submitted', $adjustment->fresh()->status);
@@ -415,12 +415,14 @@ class GovernanceResolutionAuthorityBindingTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('authority_bindings.0.subject_id', $adjustment->id)
-                ->where('authority_bindings.0.subject_type_label', 'Budget adjustment')
+                ->where('authority_bindings.0.subject_type_label', 'Budget change')
                 ->where('authority_bindings.0.subject_label', fn ($label) => is_string($label) && $label !== '')
                 ->has('authoritySubjects.budget_adjustments')
-                // The edit wizard renders whichever subject groups the service returns.
+                // The edit wizard renders whichever subject groups the service
+                // returns, with plain group names ("What will this resolution approve?").
                 ->where('authoritySubjectGroups', fn ($groups) => collect($groups)
                     ->contains(fn ($group) => $group['key'] === 'budget_adjustments'
+                        && $group['label'] === 'A budget change'
                         && $group['subject_type'] === GovernanceResolutionBinding::SUBJECT_BUDGET_ADJUSTMENT)));
 
         // An unknown subject is a validation error, not a silent unbound paper.
@@ -489,7 +491,7 @@ class GovernanceResolutionAuthorityBindingTest extends TestCase
                 $budget->approve($resolution->id, $this->chair->id);
                 $this->fail('A resolution that was never bound to this budget approved it.');
             } catch (ValidationException $exception) {
-                $this->assertStringContainsString('not explicitly bound', $exception->errors()['resolution_id'][0]);
+                $this->assertStringContainsString("wasn't linked to this budget", $exception->errors()['resolution_id'][0]);
             }
         }
 
@@ -537,7 +539,7 @@ class GovernanceResolutionAuthorityBindingTest extends TestCase
             $budget->approve($resolution->id, $this->chair->id);
             $this->fail('A budget whose lines changed after binding was approved.');
         } catch (ValidationException $exception) {
-            $this->assertStringContainsString('has changed since the resolution was bound', $exception->errors()['resolution_id'][0]);
+            $this->assertStringContainsString('The budget was edited after its resolution was prepared', $exception->errors()['resolution_id'][0]);
         }
 
         $line->update(['budget_amount' => 100000]);
@@ -568,7 +570,7 @@ class GovernanceResolutionAuthorityBindingTest extends TestCase
             $authority->bind($this->createResolution($this->chair), GovernanceResolutionBinding::SUBJECT_BUDGET, $approved->id, $this->chair);
             $this->fail('An approved budget was bound to a new decision paper.');
         } catch (\DomainException $exception) {
-            $this->assertStringContainsString('drafting or proposed budget', $exception->getMessage());
+            $this->assertStringContainsString('Only a draft budget, or one waiting for the board, can be linked to a resolution.', $exception->getMessage());
         }
 
         $budget = $this->careBudget('Care budget');
@@ -639,7 +641,7 @@ class GovernanceResolutionAuthorityBindingTest extends TestCase
             $review->approve($resolution->id, $this->chair->id);
             $this->fail('A board decision changed after binding was approved.');
         } catch (ValidationException $exception) {
-            $this->assertStringContainsString('has changed since the resolution was bound', $exception->errors()['resolution_id'][0]);
+            $this->assertStringContainsString("The board's assessment was changed after the resolution was prepared", $exception->errors()['resolution_id'][0]);
         }
 
         $review->update(['board_decision' => 'maintain']);

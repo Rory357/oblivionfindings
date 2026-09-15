@@ -1,3 +1,14 @@
+import { Link } from '@inertiajs/react';
+import {
+    BookOpenCheck,
+    CheckCircle2,
+    ClipboardCheck,
+    DollarSign,
+    FileSignature,
+    ShieldCheck,
+    ShieldOff,
+} from 'lucide-react';
+
 import {
     Card,
     CardContent,
@@ -5,25 +16,20 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import { Link } from '@inertiajs/react';
-import {
-    CheckCircle2,
-    ClipboardCheck,
-    DollarSign,
-    FileSignature,
-    ShieldCheck,
-} from 'lucide-react';
+import { refSuffix } from '@/lib/governance-labels';
 
 export interface CompletedItem {
     kind:
         | 'risk_closed'
+        | 'risk_removed'
         | 'action_completed'
         | 'minutes_approved'
-        | 'policy_signed'
+        | 'minutes_signed'
+        | 'policy_approved'
         | 'spend_approved'
         | string;
     title: string;
+    reference?: string | null;
     completed_at: string | null;
     completed_label: string | null;
     href: string;
@@ -34,46 +40,21 @@ interface RecentlyCompletedRailProps {
     items: CompletedItem[];
 }
 
-const KIND_META: Record<
-    string,
-    { icon: typeof CheckCircle2; label: string; tone: string }
-> = {
-    risk_closed: {
-        icon: ShieldCheck,
-        label: 'Risk closed',
-        tone: 'text-status-success bg-status-success-bg',
-    },
-    action_completed: {
-        icon: ClipboardCheck,
-        label: 'Action complete',
-        tone: 'text-status-info bg-status-info-bg',
-    },
-    minutes_approved: {
-        icon: FileSignature,
-        label: 'Minutes approved',
-        tone: 'text-primary bg-primary/10',
-    },
-    minutes_signed: {
-        icon: FileSignature,
-        label: 'Minutes signed',
-        tone: 'text-status-success bg-status-success-bg',
-    },
-    policy_signed: {
-        icon: FileSignature,
-        label: 'Policy approved',
-        tone: 'text-status-info bg-status-info-bg',
-    },
-    spend_approved: {
-        icon: DollarSign,
-        label: 'Spend approved',
-        tone: 'text-status-success bg-status-success-bg',
-    },
+const KIND_META: Record<string, { icon: typeof CheckCircle2; label: string }> = {
+    risk_closed: { icon: ShieldCheck, label: 'Risk closed' },
+    risk_removed: { icon: ShieldOff, label: 'Removed from the register' },
+    action_completed: { icon: ClipboardCheck, label: 'Action done' },
+    minutes_approved: { icon: FileSignature, label: 'Minutes approved' },
+    minutes_signed: { icon: FileSignature, label: 'Minutes signed' },
+    policy_approved: { icon: BookOpenCheck, label: 'Policy approved' },
+    spend_approved: { icon: DollarSign, label: 'Spend request approved' },
 };
 
+const FALLBACK_META = { icon: CheckCircle2, label: 'Done' };
+
 /**
- * Reassurance rail — closed risks, completed actions, signed minutes, signed
- * policies, approved spend in the last 14 days. Renders nothing when empty so
- * we don't waste a row on "nothing happened" copy.
+ * Work finished in the last 14 days, already filtered on the server to the
+ * registers the viewer can open. Renders nothing when empty.
  */
 export function RecentlyCompletedRail({ items }: RecentlyCompletedRailProps) {
     if (!items?.length) return null;
@@ -81,59 +62,60 @@ export function RecentlyCompletedRail({ items }: RecentlyCompletedRailProps) {
     return (
         <Card data-dusk="cockpit-recently-completed">
             <CardHeader className="pb-3">
-                <CardTitle className="text-section-title">Recently Completed</CardTitle>
+                <CardTitle className="text-section-title">
+                    Recently completed
+                </CardTitle>
                 <CardDescription>
-                    Closed in the last 14 days — these no longer need board
-                    action.
+                    Finished in the last 14 days — nothing more is needed on
+                    these.
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2">
+                <ul className="scrollbar-pretty -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2">
                     {items.map((item, idx) => {
-                        const meta =
-                            KIND_META[item.kind] ?? KIND_META.action_completed;
+                        const meta = KIND_META[item.kind] ?? FALLBACK_META;
                         const Icon = meta.icon;
+                        const reference = refSuffix(item.reference);
                         return (
-                            <Link
-                                key={`${item.kind}-${idx}`}
-                                href={item.href}
-                                className="group flex w-64 shrink-0 snap-start flex-col gap-2 rounded-lg border border-border bg-card p-3 transition hover:border-status-success/40 hover:shadow-sm"
+                            <li
+                                key={`${item.kind}-${item.href}-${idx}`}
+                                className="w-64 shrink-0 snap-start"
                             >
-                                <div className="flex items-start gap-2">
-                                    <div
-                                        className={cn(
-                                            'rounded-md p-1.5',
-                                            meta.tone,
-                                        )}
-                                    >
-                                        <Icon
-                                            className="h-4 w-4"
-                                            aria-hidden="true"
-                                        />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                                            {meta.label}
-                                        </p>
-                                        <p className="line-clamp-2 text-sm leading-snug font-medium text-foreground">
-                                            {item.title}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between text-[10px] tracking-wide text-muted-foreground uppercase">
-                                    {item.owner ? (
-                                        <span>{item.owner}</span>
-                                    ) : (
-                                        <span>—</span>
-                                    )}
-                                    {item.completed_label ? (
-                                        <span>{item.completed_label}</span>
-                                    ) : null}
-                                </div>
-                            </Link>
+                                <Link
+                                    href={item.href}
+                                    className="flex h-full flex-col gap-2 rounded-lg border border-border bg-card p-3 transition-colors hover:border-status-success/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                >
+                                    <span className="flex items-start gap-2">
+                                        <span className="rounded-md bg-status-success-bg p-1.5 text-status-success">
+                                            <Icon
+                                                className="size-4"
+                                                aria-hidden="true"
+                                            />
+                                        </span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block text-caption">
+                                                {meta.label}
+                                            </span>
+                                            <span className="line-clamp-2 text-sm leading-snug font-medium text-foreground">
+                                                {item.title}
+                                            </span>
+                                        </span>
+                                    </span>
+                                    <span className="flex flex-wrap items-center justify-between gap-2 text-caption">
+                                        <span>
+                                            {[item.owner, reference]
+                                                .filter(Boolean)
+                                                .join(' · ')}
+                                        </span>
+                                        {item.completed_label ? (
+                                            <span>{item.completed_label}</span>
+                                        ) : null}
+                                    </span>
+                                </Link>
+                            </li>
                         );
                     })}
-                </div>
+                </ul>
             </CardContent>
         </Card>
     );

@@ -1,5 +1,6 @@
 import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
 import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import { VotingSwitchedOffBanner } from '@/components/governance/VotingSwitchedOffBanner';
 import {
     EmptyValue,
     EntityContextMenu,
@@ -33,7 +34,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateLong, formatDateTimeLong } from '@/lib/datetime';
-import { show as showResolution } from '@/routes/governance/resolutions';
+import { refSuffix, resolutionChip } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { CalendarDays, FileText, Gavel, Plus, Vote, X } from 'lucide-react';
@@ -45,23 +46,21 @@ import {
     type CommitteeOption,
     type MeetingOption,
     type UserOption,
+    type WizardVotingRules,
 } from './_dialogs';
-import {
-    formatThreshold,
-    resolutionOutcomeLabel,
-    resolutionOutcomeVariant,
-    resolutionStatusLabel,
-    resolutionStatusVariant,
-} from './_helpers';
+import { howItPassesLabel, resolutionWorkspaceHref } from './_helpers';
 
 interface ResolutionRow {
     id: number;
     resolution_reference: string;
     title: string;
     status: string;
+    purpose?: string | null;
     voting_threshold: string;
+    applied_threshold?: string | null;
     deadline: string | null;
     outcome: string | null;
+    governance_meeting_id?: number | null;
     meeting: { id: number; title: string; scheduled_at?: string | null } | null;
     committee?: { id: number; name: string } | null;
     proposed_by?: { name: string } | null;
@@ -72,6 +71,8 @@ interface PendingVote {
     resolution_reference: string;
     title: string;
     deadline?: string | null;
+    meeting_id?: number | null;
+    vote_href?: string;
 }
 
 interface Filters {
@@ -90,14 +91,22 @@ interface Props extends PageProps {
     };
     my_pending_votes: PendingVote[];
     meetings: MeetingOption[];
-    summary: { total: number; draft: number; open: number; carried: number };
+    summary: {
+        total: number;
+        draft: number;
+        open: number;
+        carried: number;
+        decided?: number;
+    };
     filters: Filters;
     can_create: boolean;
     can_publish?: boolean;
+    voting_rules?: { switched_on: boolean; can_switch_on: boolean };
     committees?: CommitteeOption[];
     users?: UserOption[];
     authoritySubjects?: AuthoritySubjects | null;
     authoritySubjectGroups?: AuthoritySubjectGroup[];
+    votingRules?: WizardVotingRules | null;
 }
 
 const ALL = '__all';
@@ -105,17 +114,18 @@ const ALL = '__all';
 const STATUS_OPTIONS = [
     { value: ALL, label: 'Any status' },
     { value: 'draft', label: 'Draft' },
+    { value: 'proposed', label: 'Waiting for the board' },
     { value: 'open', label: 'Open for voting' },
     { value: 'closed', label: 'Voting closed' },
-    { value: 'implemented', label: 'Implemented' },
+    { value: 'implemented', label: 'Done' },
     { value: 'archived', label: 'Archived' },
 ];
 
 const OUTCOME_OPTIONS = [
-    { value: ALL, label: 'Any outcome' },
-    { value: 'carried', label: 'Carried' },
-    { value: 'defeated', label: 'Defeated' },
-    { value: 'no_quorum', label: 'No quorum' },
+    { value: ALL, label: 'Any result' },
+    { value: 'carried', label: 'Passed' },
+    { value: 'defeated', label: 'Not passed' },
+    { value: 'no_quorum', label: 'No decision — not enough members took part' },
 ];
 
 export default function ResolutionsIndex({
@@ -126,10 +136,12 @@ export default function ResolutionsIndex({
     filters,
     can_create,
     can_publish = false,
+    voting_rules,
     committees = [],
     users = [],
     authoritySubjects = null,
     authoritySubjectGroups = [],
+    votingRules = null,
 }: Props) {
     const page = usePage();
     const [search, setSearch] = useState(filters.search ?? '');
@@ -143,8 +155,8 @@ export default function ResolutionsIndex({
     });
     const ctxMenu = useEntityContextMenu<ResolutionRow>();
 
-    const pendingIds = useMemo(
-        () => new Set(my_pending_votes.map((vote) => vote.id)),
+    const pendingById = useMemo(
+        () => new Map(my_pending_votes.map((vote) => [vote.id, vote])),
         [my_pending_votes],
     );
 
@@ -178,31 +190,32 @@ export default function ResolutionsIndex({
         filters.status || filters.outcome || filters.meeting || filters.search,
     );
 
-    const open = (row: ResolutionRow) =>
-        router.visit(showResolution.url({ resolution: row.id }));
+    const recordHref = (row: { id: number }) =>
+        `/governance/resolutions/${row.id}`;
+    const open = (row: ResolutionRow) => router.visit(recordHref(row));
 
-    const actionsFor = (row: ResolutionRow): MenuItem[] =>
-        compactMenu([
+    const actionsFor = (row: ResolutionRow): MenuItem[] => {
+        const pending = pendingById.get(row.id);
+        return compactMenu([
             {
-                label: 'Open paper',
+                label: 'Open resolution',
                 icon: FileText,
                 onClick: () => open(row),
             },
-            pendingIds.has(row.id) && {
+            pending && {
                 label: 'Vote now',
                 icon: Vote,
-                onClick: () => open(row),
+                onClick: () =>
+                    router.visit(pending.vote_href ?? resolutionWorkspaceHref(row)),
             },
             row.meeting && { separator: true },
             row.meeting && {
                 label: 'Open in meeting',
                 icon: CalendarDays,
-                onClick: () =>
-                    router.visit(
-                        `/governance/meetings/${row.meeting!.id}?tab=resolutions&paper=${row.id}`,
-                    ),
+                onClick: () => router.visit(resolutionWorkspaceHref(row)),
             },
         ]);
+    };
 
     const meetingOptions = [
         { value: ALL, label: 'Any meeting' },
@@ -214,17 +227,20 @@ export default function ResolutionsIndex({
         })),
     ];
 
+    const decided = summary.decided ?? summary.carried;
+    const votingSwitchedOff = voting_rules ? !voting_rules.switched_on : false;
+
     const header = (
         <PageHeader
             icon={Gavel}
             title="Resolutions"
-            subline={`Decision papers, board votes and outcomes · ${summary.total} paper${summary.total === 1 ? '' : 's'}`}
+            subline={`Matters the board decides, discusses or notes · ${summary.total} resolution${summary.total === 1 ? '' : 's'}`}
             actions={
                 <>
                     <PageHeaderSearch
                         value={search}
                         onChange={setSearch}
-                        placeholder="Search titles, references or motions…"
+                        placeholder="Search titles, wording or references…"
                     />
                     {can_create ? (
                         <PageHeaderPrimaryButton
@@ -232,7 +248,7 @@ export default function ResolutionsIndex({
                             onClick={() => setCreateOpen(true)}
                             dusk="new-resolution-button"
                         >
-                            New decision paper
+                            New resolution
                         </PageHeaderPrimaryButton>
                     ) : null}
                 </>
@@ -245,7 +261,7 @@ export default function ResolutionsIndex({
                     >
                         <PageHeaderMeterBig>{summary.draft}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Papers being prepared
+                            Being written
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
@@ -255,11 +271,11 @@ export default function ResolutionsIndex({
                     >
                         <PageHeaderMeterBig>{summary.open}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Votes in progress
+                            Votes happening now
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Awaiting your vote"
+                        label="Waiting for your vote"
                         href="/governance/my-work?kind=vote"
                         tone={
                             my_pending_votes.length > 0 ? 'critical' : 'brand'
@@ -269,11 +285,13 @@ export default function ResolutionsIndex({
                             {my_pending_votes.length}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Your outstanding ballots
+                            {my_pending_votes.length > 0
+                                ? 'Open in My work'
+                                : 'Nothing to vote on'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Carried"
+                        label="Passed"
                         href="/governance/resolutions?outcome=carried"
                         tone={summary.carried > 0 ? 'success' : 'brand'}
                     >
@@ -281,7 +299,7 @@ export default function ResolutionsIndex({
                             {summary.carried}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            of {summary.total} papers
+                            {`of ${decided} decided`}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
@@ -298,7 +316,7 @@ export default function ResolutionsIndex({
                         }
                     />
                     <PageHeaderFilterSelect
-                        label="Outcome"
+                        label="Result"
                         value={filters.outcome ?? ALL}
                         allValue={ALL}
                         options={OUTCOME_OPTIONS}
@@ -333,17 +351,22 @@ export default function ResolutionsIndex({
             <Head title="Resolutions" />
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
+                    {votingSwitchedOff ? (
+                        <VotingSwitchedOffBanner
+                            canSwitchOn={Boolean(voting_rules?.can_switch_on)}
+                        />
+                    ) : null}
+
                     {my_pending_votes.length > 0 ? (
                         <Card className="border-status-warning/40">
                             <CardHeader>
                                 <CardTitle className="text-section-title flex items-center gap-2">
                                     <Vote className="size-4 text-status-warning" />
-                                    Your vote is required (
-                                    {my_pending_votes.length})
+                                    {`Waiting for your vote (${my_pending_votes.length})`}
                                 </CardTitle>
                                 <CardDescription>
-                                    Papers open for voting where you are an
-                                    eligible voter and have not yet voted.
+                                    Resolutions open for voting that you can
+                                    vote on and haven’t yet.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="flex flex-col divide-y divide-border">
@@ -357,17 +380,30 @@ export default function ResolutionsIndex({
                                                 {vote.title}
                                             </p>
                                             <p className="text-caption">
-                                                {vote.resolution_reference}
-                                                {vote.deadline
-                                                    ? ` · Closes ${formatDateTimeLong(vote.deadline)}`
-                                                    : ''}
+                                                {[
+                                                    vote.deadline
+                                                        ? `Voting closes ${formatDateTimeLong(vote.deadline)}`
+                                                        : vote.meeting_id
+                                                          ? 'Voting closes at the meeting'
+                                                          : 'No voting deadline set',
+                                                    refSuffix(
+                                                        vote.resolution_reference,
+                                                    ),
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(' · ')}
                                             </p>
                                         </div>
                                         <Button size="sm" asChild>
                                             <Link
-                                                href={showResolution.url({
-                                                    resolution: vote.id,
-                                                })}
+                                                href={
+                                                    vote.vote_href ??
+                                                    resolutionWorkspaceHref({
+                                                        id: vote.id,
+                                                        governance_meeting_id:
+                                                            vote.meeting_id,
+                                                    })
+                                                }
                                             >
                                                 Vote now
                                             </Link>
@@ -379,7 +415,7 @@ export default function ResolutionsIndex({
                     ) : null}
 
                     <ListCaption
-                        title="Decision papers"
+                        title="Resolutions"
                         caption={`${resolutions.data.length} of ${resolutions.total ?? resolutions.data.length} shown`}
                     />
 
@@ -388,13 +424,13 @@ export default function ResolutionsIndex({
                             icon={Gavel}
                             title={
                                 hasFilters
-                                    ? 'No decision papers match your filters'
-                                    : 'No decision papers yet'
+                                    ? 'No resolutions match your filters'
+                                    : 'No resolutions yet'
                             }
                             description={
                                 hasFilters
                                     ? 'Try clearing a filter or search term.'
-                                    : 'Decision papers put a motion, its options and implications before the board.'
+                                    : 'A resolution sets out a matter for the board: the exact wording, the options and what it would mean.'
                             }
                             action={
                                 hasFilters ? (
@@ -420,7 +456,7 @@ export default function ResolutionsIndex({
                                         onClick={() => setCreateOpen(true)}
                                     >
                                         <Plus className="h-3.5 w-3.5" />
-                                        New decision paper
+                                        New resolution
                                     </Button>
                                 ) : undefined
                             }
@@ -429,20 +465,18 @@ export default function ResolutionsIndex({
                         <EntityTable
                             rows={resolutions.data}
                             rowKey={(row) => row.id}
-                            identityLabel="Paper"
+                            identityLabel="Resolution"
                             identity={(row) => ({
                                 icon: Gavel,
                                 name: row.title,
                                 subline: [
-                                    row.resolution_reference,
                                     row.committee?.name,
+                                    refSuffix(row.resolution_reference),
                                 ]
                                     .filter(Boolean)
                                     .join(' · '),
                             })}
-                            hrefFor={(row) =>
-                                showResolution.url({ resolution: row.id })
-                            }
+                            hrefFor={recordHref}
                             onOpen={open}
                             onRowContextMenu={ctxMenu.open}
                             actionsFor={actionsFor}
@@ -450,37 +484,20 @@ export default function ResolutionsIndex({
                                 {
                                     key: 'status',
                                     label: 'Status',
-                                    width: '0.9fr',
-                                    cell: (row) => (
-                                        <EntityStatusChip
-                                            variant={resolutionStatusVariant(
-                                                row.status,
-                                            )}
-                                        >
-                                            {resolutionStatusLabel(row.status)}
-                                        </EntityStatusChip>
-                                    ),
-                                },
-                                {
-                                    key: 'outcome',
-                                    label: 'Outcome',
-                                    width: '0.8fr',
-                                    cell: (row) =>
-                                        row.outcome ? (
+                                    width: '1fr',
+                                    cell: (row) => {
+                                        const chip = resolutionChip(
+                                            row.status,
+                                            row.outcome,
+                                        );
+                                        return (
                                             <EntityStatusChip
-                                                variant={resolutionOutcomeVariant(
-                                                    row.outcome,
-                                                )}
+                                                variant={chip.variant}
                                             >
-                                                {row.outcome === 'no_quorum'
-                                                    ? 'No quorum'
-                                                    : resolutionOutcomeLabel(
-                                                          row.outcome,
-                                                      )}
+                                                {chip.label}
                                             </EntityStatusChip>
-                                        ) : (
-                                            <EmptyValue />
-                                        ),
+                                        );
+                                    },
                                 },
                                 {
                                     key: 'meeting',
@@ -492,37 +509,35 @@ export default function ResolutionsIndex({
                                                 {row.meeting.title}
                                             </span>
                                         ) : (
-                                            <span className="text-muted-foreground">
-                                                Standalone
+                                            <span className="truncate text-muted-foreground">
+                                                Vote outside a meeting
                                             </span>
                                         ),
                                 },
                                 {
                                     key: 'threshold',
-                                    label: 'Threshold',
+                                    label: 'How it passes',
                                     width: '1fr',
                                     cell: (row) => (
                                         <span className="truncate">
-                                            {formatThreshold(
-                                                row.voting_threshold,
-                                            )}
+                                            {howItPassesLabel(row)}
                                         </span>
                                     ),
                                 },
                                 {
                                     key: 'deadline',
-                                    label: 'Voting deadline',
-                                    width: '0.9fr',
+                                    label: 'Voting closes',
+                                    width: '1fr',
                                     cell: (row) =>
                                         row.deadline ? (
-                                            formatDateLong(row.deadline)
+                                            formatDateTimeLong(row.deadline)
                                         ) : (
                                             <EmptyValue />
                                         ),
                                 },
                                 {
                                     key: 'proposer',
-                                    label: 'Proposed by',
+                                    label: 'Written by',
                                     width: '1fr',
                                     cell: (row) => (
                                         <PersonCell
@@ -564,6 +579,7 @@ export default function ResolutionsIndex({
                     authoritySubjects={authoritySubjects}
                     authoritySubjectGroups={authoritySubjectGroups}
                     canPublish={can_publish}
+                    votingRules={votingRules}
                 />
             ) : null}
         </AppLayout>

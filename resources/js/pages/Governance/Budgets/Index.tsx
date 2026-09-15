@@ -1,6 +1,7 @@
 import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
 import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
 import {
+    EmptyValue,
     EntityChip,
     EntityContextMenu,
     EntityStatusChip,
@@ -24,61 +25,68 @@ import {
 } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import type { StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateLong } from '@/lib/datetime';
+import { formatNzd, governanceStatus } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import { ExternalLink, Plus, Wallet, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { BudgetWizardDialog, type BudgetFormOptions } from './_dialogs';
 
-interface Budget {
+export interface BudgetRow {
     id: number;
     fiscal_year: string;
+    financial_year_label: string;
     title: string | null;
-    total_budget: number;
+    display_name: string;
+    total_budget: number | string;
     status: string;
     version_number: number;
+    supersedes_version: number | null;
     approved_by_board_at: string | null;
     line_items_count: number;
     total_allocated: number;
     total_actual: number;
+    actuals_recorded: boolean;
+}
+
+export interface BudgetSummary {
+    financial_year: string;
+    total: number;
+    waiting: number;
+    drafts: number;
+    approved_this_year: number;
+    budgeted_this_year: number;
+    spent_this_year: number;
+    actuals_recorded_this_year: boolean;
 }
 
 interface Props extends PageProps {
-    budgets: Budget[] | { data: Budget[] };
+    budgets: BudgetRow[];
+    summary: BudgetSummary;
     canCreate?: boolean;
     /** New-budget wizard options — only sent to viewers who may create. */
     formOptions?: BudgetFormOptions | null;
 }
 
 const ALL = '__all';
-const PENDING = ['proposed', 'under_review'];
+const WAITING = ['proposed', 'under_review'];
 
 const STATUS_OPTIONS = [
     { value: ALL, label: 'Any status' },
-    { value: 'drafting', label: 'Drafting' },
-    { value: 'pending', label: 'Pending review' },
+    { value: 'drafting', label: 'Draft' },
+    { value: 'pending', label: 'Waiting for the board' },
     { value: 'approved', label: 'Approved' },
-    { value: 'rejected', label: 'Rejected' },
+    { value: 'rejected', label: 'Not approved' },
 ];
 
-function budgetStatusVariant(status: string): StatusVariant {
-    if (status === 'approved') return 'success';
-    if (status === 'rejected') return 'critical';
-    if (PENDING.includes(status)) return 'warning';
-    return 'neutral';
+/** "Version 2 (replaces version 1)". */
+function versionText(budget: Pick<BudgetRow, 'version_number' | 'supersedes_version'>) {
+    return budget.supersedes_version
+        ? `Version ${budget.version_number} (replaces version ${budget.supersedes_version})`
+        : `Version ${budget.version_number}`;
 }
-
-const humanise = (value: string) =>
-    value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', {
-        style: 'currency',
-        currency: 'NZD',
-        maximumFractionDigits: 0,
-    }).format(Number(amount) || 0);
 
 /**
  * The index loads every budget (no server pagination), so the header
@@ -90,23 +98,20 @@ function useUrlFilters() {
     const params = new URLSearchParams(page.url.split('?')[1] ?? '');
     return {
         status: params.get('status'),
-        fiscal_year: params.get('fiscal_year'),
+        year: params.get('year'),
         search: params.get('search'),
     };
 }
 
 export default function BudgetsIndex({
     budgets,
+    summary,
     canCreate: canCreateProp = false,
     formOptions = null,
 }: Props) {
-    const budgetItems = useMemo(
-        () => (Array.isArray(budgets) ? budgets : (budgets?.data ?? [])),
-        [budgets],
-    );
     const filters = useUrlFilters();
     const [search, setSearch] = useState(filters.search ?? '');
-    const ctxMenu = useEntityContextMenu<Budget>();
+    const ctxMenu = useEntityContextMenu<BudgetRow>();
     const canCreate = Boolean(canCreateProp && formOptions);
     const [createOpen, setCreateOpen] = useDialogDeepLink('create', canCreate);
 
@@ -132,16 +137,18 @@ export default function BudgetsIndex({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
 
-    const fiscalYears = useMemo(
+    const years = useMemo(
         () =>
-            Array.from(new Set(budgetItems.map((b) => String(b.fiscal_year))))
+            Array.from(
+                new Set(budgets.map((budget) => budget.financial_year_label)),
+            )
                 .sort()
                 .reverse(),
-        [budgetItems],
+        [budgets],
     );
 
-    const visible = budgetItems.filter((budget) => {
-        if (filters.status === 'pending' && !PENDING.includes(budget.status))
+    const visible = budgets.filter((budget) => {
+        if (filters.status === 'pending' && !WAITING.includes(budget.status))
             return false;
         if (
             filters.status &&
@@ -149,39 +156,25 @@ export default function BudgetsIndex({
             budget.status !== filters.status
         )
             return false;
-        if (
-            filters.fiscal_year &&
-            String(budget.fiscal_year) !== filters.fiscal_year
-        )
+        if (filters.year && budget.financial_year_label !== filters.year)
             return false;
         if (filters.search) {
             const q = filters.search.toLowerCase();
             const haystack =
-                `${budget.title ?? ''} ${budget.fiscal_year}`.toLowerCase();
+                `${budget.display_name} ${budget.financial_year_label}`.toLowerCase();
             if (!haystack.includes(q)) return false;
         }
         return true;
     });
 
-    const approved = budgetItems.filter((b) => b.status === 'approved');
-    const pending = budgetItems.filter((b) => PENDING.includes(b.status));
-    const allocated = budgetItems.reduce(
-        (sum, b) => sum + Number(b.total_allocated || 0),
-        0,
-    );
-    const actual = budgetItems.reduce(
-        (sum, b) => sum + Number(b.total_actual || 0),
-        0,
-    );
-    const hasFilters = Boolean(
-        filters.status || filters.fiscal_year || filters.search,
-    );
+    const hasFilters = Boolean(filters.status || filters.year || filters.search);
+    const thisYearHref = `/governance/budgets?status=approved&year=${encodeURIComponent(summary.financial_year)}`;
+    const budgeted = summary.budgeted_this_year;
+    const spent = summary.spent_this_year;
 
-    const titleFor = (budget: Budget) =>
-        budget.title || `Budget ${budget.fiscal_year}`;
-    const open = (budget: Budget) =>
+    const open = (budget: BudgetRow) =>
         router.visit(`/governance/budgets/${budget.id}`);
-    const actionsFor = (budget: Budget): MenuItem[] =>
+    const actionsFor = (budget: BudgetRow): MenuItem[] =>
         compactMenu([
             {
                 label: 'Open budget',
@@ -190,11 +183,47 @@ export default function BudgetsIndex({
             },
         ]);
 
+    const spentMeter = () => {
+        if (summary.approved_this_year === 0) {
+            return (
+                <>
+                    <PageHeaderMeterBig>None</PageHeaderMeterBig>
+                    <PageHeaderMeterCaption>
+                        No approved budget for {summary.financial_year}
+                    </PageHeaderMeterCaption>
+                </>
+            );
+        }
+        if (!summary.actuals_recorded_this_year) {
+            return (
+                <>
+                    <PageHeaderMeterBig>Not recorded</PageHeaderMeterBig>
+                    <PageHeaderMeterCaption>
+                        Actual spend not recorded yet
+                    </PageHeaderMeterCaption>
+                </>
+            );
+        }
+        return (
+            <>
+                <PageHeaderMeterBig>{formatNzd(spent)}</PageHeaderMeterBig>
+                {budgeted > 0 ? (
+                    <PageHeaderMeterBar percent={(spent / budgeted) * 100} />
+                ) : null}
+                <PageHeaderMeterCaption>
+                    {spent > budgeted
+                        ? `Over budget by ${formatNzd(spent - budgeted)}`
+                        : `${formatNzd(budgeted - spent)} left of ${formatNzd(budgeted)}`}
+                </PageHeaderMeterCaption>
+            </>
+        );
+    };
+
     const header = (
         <PageHeader
             icon={Wallet}
             title="Budgets"
-            subline="Plan, approve and monitor financial budgets across fiscal years"
+            subline={`The yearly spending plan the board approves · This financial year is ${summary.financial_year}`}
             actions={
                 <>
                     <PageHeaderSearch
@@ -218,67 +247,47 @@ export default function BudgetsIndex({
                         label="Budgets"
                         href="/governance/budgets"
                     >
-                        <PageHeaderMeterBig>
-                            {budgetItems.length}
-                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Across {fiscalYears.length} fiscal year
-                            {fiscalYears.length === 1 ? '' : 's'}
+                            {summary.drafts > 0
+                                ? `${summary.drafts} still a draft`
+                                : `Across ${years.length} financial year${years.length === 1 ? '' : 's'}`}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Approved"
-                        href="/governance/budgets?status=approved"
-                        tone={approved.length > 0 ? 'success' : 'brand'}
+                        label="Approved this year"
+                        href={thisYearHref}
+                        tone={summary.approved_this_year > 0 ? 'success' : 'brand'}
+                        ariaLabel={`View budgets approved for ${summary.financial_year}`}
                     >
                         <PageHeaderMeterBig>
-                            {approved.length}
+                            {summary.approved_this_year}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            In effect
+                            Financial year {summary.financial_year}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Pending review"
+                        label="Waiting for the board"
                         href="/governance/budgets?status=pending"
-                        tone={pending.length > 0 ? 'warning' : 'brand'}
+                        tone={summary.waiting > 0 ? 'warning' : 'brand'}
                     >
-                        <PageHeaderMeterBig>
-                            {pending.length}
-                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{summary.waiting}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Proposed or under review
+                            Sent to the board for a decision
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Spent"
-                        value={
-                            allocated > 0
-                                ? `${Math.round((actual / allocated) * 100)}%`
-                                : undefined
-                        }
-                        href="/governance/budgets"
+                        label={`Spent this year (${summary.financial_year})`}
+                        href={thisYearHref}
                         tone={
-                            allocated > 0 && actual > allocated
+                            summary.actuals_recorded_this_year && spent > budgeted
                                 ? 'warning'
                                 : 'brand'
                         }
+                        ariaLabel={`View spending against approved budgets for ${summary.financial_year}`}
                     >
-                        <PageHeaderMeterBig>
-                            {formatCurrency(actual)}
-                        </PageHeaderMeterBig>
-                        {allocated > 0 ? (
-                            <PageHeaderMeterBar
-                                percent={(actual / allocated) * 100}
-                            />
-                        ) : null}
-                        <PageHeaderMeterCaption>
-                            {allocated > 0
-                                ? actual > allocated
-                                    ? `${formatCurrency(actual - allocated)} over ${formatCurrency(allocated)}`
-                                    : `${formatCurrency(allocated - actual)} left of ${formatCurrency(allocated)}`
-                                : 'No line items budgeted yet'}
-                        </PageHeaderMeterCaption>
+                        {spentMeter()}
                     </PageHeaderMeterBlock>
                 </>
             }
@@ -294,18 +303,18 @@ export default function BudgetsIndex({
                         }
                     />
                     <PageHeaderFilterSelect
-                        label="Fiscal year"
-                        value={filters.fiscal_year ?? ALL}
+                        label="Financial year"
+                        value={filters.year ?? ALL}
                         allValue={ALL}
                         options={[
                             { value: ALL, label: 'Any year' },
-                            ...fiscalYears.map((year) => ({
+                            ...years.map((year) => ({
                                 value: year,
-                                label: `FY ${year}`,
+                                label: year,
                             })),
                         ]}
                         onChange={(value) =>
-                            go({ fiscal_year: value === ALL ? null : value })
+                            go({ year: value === ALL ? null : value })
                         }
                     />
                 </>
@@ -328,7 +337,7 @@ export default function BudgetsIndex({
                 <div className="flex flex-col gap-5">
                     <ListCaption
                         title="Budgets"
-                        caption={`${visible.length} of ${budgetItems.length} shown`}
+                        caption={`${visible.length} of ${budgets.length} shown`}
                     />
 
                     {visible.length === 0 ? (
@@ -342,7 +351,7 @@ export default function BudgetsIndex({
                             description={
                                 hasFilters
                                     ? 'Try clearing a filter or search term.'
-                                    : 'Create your first budget to start financial planning.'
+                                    : 'A budget is the yearly spending plan the board approves.'
                             }
                             action={
                                 hasFilters ? (
@@ -353,7 +362,7 @@ export default function BudgetsIndex({
                                             setSearch('');
                                             go({
                                                 status: null,
-                                                fiscal_year: null,
+                                                year: null,
                                                 search: null,
                                             });
                                         }}
@@ -367,7 +376,7 @@ export default function BudgetsIndex({
                                         onClick={() => setCreateOpen(true)}
                                     >
                                         <Plus className="h-3.5 w-3.5" />
-                                        Create budget
+                                        New budget
                                     </Button>
                                 ) : undefined
                             }
@@ -379,8 +388,8 @@ export default function BudgetsIndex({
                             identityLabel="Budget"
                             identity={(budget) => ({
                                 icon: Wallet,
-                                name: titleFor(budget),
-                                subline: `Fiscal year ${budget.fiscal_year}`,
+                                name: budget.display_name,
+                                subline: `Financial year ${budget.financial_year_label} · ${versionText(budget)}`,
                             })}
                             hrefFor={(budget) =>
                                 `/governance/budgets/${budget.id}`
@@ -392,26 +401,20 @@ export default function BudgetsIndex({
                                 {
                                     key: 'status',
                                     label: 'Status',
-                                    width: '0.9fr',
-                                    cell: (budget) => (
-                                        <EntityStatusChip
-                                            variant={budgetStatusVariant(
-                                                budget.status,
-                                            )}
-                                        >
-                                            {humanise(budget.status)}
-                                        </EntityStatusChip>
-                                    ),
-                                },
-                                {
-                                    key: 'version',
-                                    label: 'Version',
-                                    width: '0.5fr',
-                                    cell: (budget) => (
-                                        <EntityChip>
-                                            v{budget.version_number}
-                                        </EntityChip>
-                                    ),
+                                    width: '1fr',
+                                    cell: (budget) => {
+                                        const chip = governanceStatus(
+                                            'budget_status',
+                                            budget.status,
+                                        );
+                                        return (
+                                            <EntityStatusChip
+                                                variant={chip.variant}
+                                            >
+                                                {chip.label}
+                                            </EntityStatusChip>
+                                        );
+                                    },
                                 },
                                 {
                                     key: 'total',
@@ -420,17 +423,26 @@ export default function BudgetsIndex({
                                     align: 'right',
                                     cell: (budget) => (
                                         <span className="font-semibold tabular-nums">
-                                            {formatCurrency(
-                                                budget.total_budget,
-                                            )}
+                                            {formatNzd(budget.total_budget)}
                                         </span>
                                     ),
                                 },
                                 {
                                     key: 'spend',
-                                    label: 'Spent of budgeted',
+                                    label: 'Spent so far',
                                     width: '1.4fr',
                                     cell: (budget) => {
+                                        if (budget.status !== 'approved') {
+                                            return <EmptyValue />;
+                                        }
+                                        if (!budget.actuals_recorded) {
+                                            return (
+                                                <span className="text-caption">
+                                                    Actual spend not recorded
+                                                    yet
+                                                </span>
+                                            );
+                                        }
                                         const pct =
                                             budget.total_allocated > 0
                                                 ? (budget.total_actual /
@@ -446,11 +458,9 @@ export default function BudgetsIndex({
                                                         : 'brand'
                                                 }
                                             >
-                                                {formatCurrency(
-                                                    budget.total_actual,
-                                                )}{' '}
+                                                {formatNzd(budget.total_actual)}{' '}
                                                 of{' '}
-                                                {formatCurrency(
+                                                {formatNzd(
                                                     budget.total_allocated,
                                                 )}
                                             </ProgressValue>
@@ -459,8 +469,8 @@ export default function BudgetsIndex({
                                 },
                                 {
                                     key: 'lines',
-                                    label: 'Line items',
-                                    width: '0.6fr',
+                                    label: 'Lines',
+                                    width: '0.5fr',
                                     align: 'right',
                                     cell: (budget) => (
                                         <span className="tabular-nums">
@@ -469,18 +479,18 @@ export default function BudgetsIndex({
                                     ),
                                 },
                                 {
-                                    key: 'approval',
-                                    label: 'Board approval',
+                                    key: 'approved',
+                                    label: 'Approved',
                                     width: '0.9fr',
                                     cell: (budget) =>
                                         budget.approved_by_board_at ? (
-                                            <EntityStatusChip variant="success">
-                                                Approved
-                                            </EntityStatusChip>
+                                            <EntityChip>
+                                                {formatDateLong(
+                                                    budget.approved_by_board_at,
+                                                )}
+                                            </EntityChip>
                                         ) : (
-                                            <EntityStatusChip variant="warning">
-                                                Pending approval
-                                            </EntityStatusChip>
+                                            <EmptyValue />
                                         ),
                                 },
                             ]}
@@ -494,7 +504,7 @@ export default function BudgetsIndex({
                     x={ctxMenu.ctx.x}
                     y={ctxMenu.ctx.y}
                     icon={Wallet}
-                    title={titleFor(ctxMenu.ctx.record)}
+                    title={ctxMenu.ctx.record.display_name}
                     items={actionsFor(ctxMenu.ctx.record)}
                     onClose={ctxMenu.close}
                 />

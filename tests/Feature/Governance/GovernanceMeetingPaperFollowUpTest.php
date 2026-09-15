@@ -63,10 +63,18 @@ class GovernanceMeetingPaperFollowUpTest extends TestCase
             "meeting:{$meeting->id}:minutes-draft",
         ];
 
-        $chairIds = collect($service->dashboardWorkflow($chair)['actions'])->pluck('id')->all();
+        $chairActions = collect($service->dashboardWorkflow($chair)['actions'])->keyBy('id');
+        $chairIds = $chairActions->keys()->all();
         foreach ($adminTaskIds as $id) {
             $this->assertContains($id, $chairIds);
         }
+
+        // Plain wording that leads with the meeting's own title.
+        $this->assertSame('Record who attended Past Board Meeting', $chairActions["meeting:{$meeting->id}:quorum"]['title']);
+        $this->assertSame('Record attendance', $chairActions["meeting:{$meeting->id}:quorum"]['action_label']);
+        $this->assertSame('Add agenda items for Past Board Meeting', $chairActions["meeting:{$meeting->id}:agenda"]['title']);
+        $this->assertSame('Write the minutes for Past Board Meeting', $chairActions["meeting:{$meeting->id}:minutes-draft"]['title']);
+        $this->assertSame('', $chairActions["meeting:{$meeting->id}:quorum"]['source']['reference']);
 
         $memberWorkflow = $service->dashboardWorkflow($member);
         $memberIds = collect($memberWorkflow['actions'])->pluck('id')->all();
@@ -74,6 +82,17 @@ class GovernanceMeetingPaperFollowUpTest extends TestCase
             $this->assertNotContains($id, $memberIds);
         }
         $this->assertSame(count($memberIds), $memberWorkflow['summary']['total']);
+
+        // Attendance can't be recorded before the meeting day, so a meeting
+        // next week raises its agenda task but no attendance task yet.
+        $nextWeek = $this->createMeeting($chair, [
+            'title' => 'Next Week Board Meeting',
+            'scheduled_at' => now()->addDays(5),
+            'status' => 'scheduled',
+        ]);
+        $laterIds = collect($service->dashboardWorkflow($chair)['actions'])->pluck('id')->all();
+        $this->assertContains("meeting:{$nextWeek->id}:agenda", $laterIds);
+        $this->assertNotContains("meeting:{$nextWeek->id}:quorum", $laterIds);
     }
 
     public function test_in_meeting_paper_wizard_options_reach_only_paper_authors(): void

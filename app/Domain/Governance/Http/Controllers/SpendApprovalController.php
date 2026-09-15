@@ -2,9 +2,13 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
+use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\SpendApproval;
 use App\Domain\Governance\Services\SpendApprovalCommandService;
+use App\Domain\Governance\Support\GovernanceLabels;
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,12 +35,14 @@ class SpendApprovalController extends Controller
                 'status', 'requires_board', 'requested_by', 'decided_by',
                 'resolution_id', 'submitted_at', 'decided_at', 'created_at',
             ])
-            ->with(['requestedBy:id,name,email', 'decidedBy:id,name,email', 'resolution:id,title,outcome'])
+            // Resolution titles are not listed: the list is visible to people
+            // who may not be able to open the resolution itself.
+            ->with(['requestedBy:id,name', 'decidedBy:id,name'])
             ->latest('id');
 
         if ($status = $request->string('status')->toString()) {
             if ($status === 'pending') {
-                // Matches the header "Pending" meter (draft + submitted).
+                // Legacy links: drafts and requests waiting for a decision.
                 $query->whereIn('status', [SpendApproval::STATUS_DRAFT, SpendApproval::STATUS_SUBMITTED]);
             } else {
                 $query->where('status', $status);
@@ -55,12 +61,18 @@ class SpendApprovalController extends Controller
 
         $approvals = $query->paginate(25)->withQueryString();
 
+        // Totals follow the NZ financial year (1 July – 30 June, NZ time).
+        [$yearStart, $yearEnd, $financialYear] = $this->currentFinancialYear();
+
         $summary = [
             'pending' => (clone $scope)->whereIn('status', [SpendApproval::STATUS_DRAFT, SpendApproval::STATUS_SUBMITTED])->count(),
-            'approved_ytd' => (clone $scope)->where('status', SpendApproval::STATUS_APPROVED)
-                ->whereYear('decided_at', now()->year)->sum('amount'),
-            'rejected_ytd' => (clone $scope)->where('status', SpendApproval::STATUS_REJECTED)
-                ->whereYear('decided_at', now()->year)->sum('amount'),
+            'waiting' => (clone $scope)->where('status', SpendApproval::STATUS_SUBMITTED)->count(),
+            'drafts' => (clone $scope)->where('status', SpendApproval::STATUS_DRAFT)->count(),
+            'approved_this_year' => (float) (clone $scope)->where('status', SpendApproval::STATUS_APPROVED)
+                ->whereBetween('decided_at', [$yearStart, $yearEnd])->sum('amount'),
+            'rejected_this_year' => (float) (clone $scope)->where('status', SpendApproval::STATUS_REJECTED)
+                ->whereBetween('decided_at', [$yearStart, $yearEnd])->sum('amount'),
+            'financial_year' => $financialYear,
         ];
 
         // The request wizard lives on this page (the old create page redirects
@@ -86,7 +98,7 @@ class SpendApprovalController extends Controller
                 'search' => $request->string('search')->toString() ?: null,
             ],
             'summary' => $summary,
-            'categories' => SpendApproval::categories(),
+            'categories' => $this->categoryLabels(),
             'thresholds' => $this->thresholds(),
             'can_create' => $canCreate,
             'form_options' => $canCreate ? ['sites' => $siteOptions] : null,
@@ -126,38 +138,120 @@ class SpendApprovalController extends Controller
         ];
     }
 
+    /**
+     * Plain category names (shared Governance labels), keyed by stored value.
+     *
+     * @return array<string, string>
+     */
+    private function categoryLabels(): array
+    {
+        return collect(array_keys(SpendApproval::categories()))
+            ->mapWithKeys(fn (string $key) => [$key => GovernanceLabels::label('spend_category', $key)])
+            ->all();
+    }
+
+    /**
+     * The current NZ financial year as UTC bounds plus its label ("2025/26").
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: string}
+     */
+    private function currentFinancialYear(): array
+    {
+        $timezone = (string) (config('app.worker_timezone') ?: GovernanceLabels::TIMEZONE);
+        $today = CarbonImmutable::now($timezone);
+        $startYear = $today->month >= 7 ? $today->year : $today->year - 1;
+        $start = CarbonImmutable::create($startYear, 7, 1, 0, 0, 0, $timezone);
+
+        return [
+            $start->utc(),
+            $start->addYear()->subSecond()->utc(),
+            GovernanceLabels::financialYear($startYear + 1),
+        ];
+    }
+
     public function show(Request $request, SpendApproval $approval): Response
     {
         $this->authorize('view', $approval);
-        $approval = $this->commands->resolveAccessibleApproval($request->user(), $approval->id);
-        $this->commands->assertCanonicalSourceForRead($request->user(), $approval);
+        $user = $request->user();
+        $approval = $this->commands->resolveAccessibleApproval($user, $approval->id);
+        $this->commands->assertCanonicalSourceForRead($user, $approval);
         $approval->load([
             'requestedBy:id,name,email',
             'submittedBy:id,name,email',
             'decidedBy:id,name,email',
-            'resolution:id,title,outcome,votes_for,votes_against',
+            'resolution:id,resolution_reference,title,status,outcome,governance_meeting_id',
             'budget:id,fiscal_year,title',
+            'site:id,name',
         ]);
 
+        // A linked resolution is shown only to viewers who can open it.
+        $resolution = $approval->resolution && Gate::forUser($user)->allows('view', $approval->resolution)
+            ? [
+                'id' => (int) $approval->resolution->id,
+                'title' => $approval->resolution->title,
+                'reference' => $approval->resolution->resolution_reference,
+                'outcome' => $approval->resolution->outcome,
+            ]
+            : null;
+        $siteName = $approval->site?->name;
+        $approval->unsetRelation('resolution');
+        $approval->unsetRelation('site');
+
         $authority = [
-            'update' => Gate::forUser($request->user())->allows('update', $approval),
-            'submit' => Gate::forUser($request->user())->allows('submit', $approval),
-            'decide' => Gate::forUser($request->user())->allows('decide', $approval),
-            'manage_attachments' => Gate::forUser($request->user())->allows('manageAttachments', $approval),
+            'update' => Gate::forUser($user)->allows('update', $approval),
+            'submit' => Gate::forUser($user)->allows('submit', $approval),
+            'decide' => Gate::forUser($user)->allows('decide', $approval),
+            'manage_attachments' => Gate::forUser($user)->allows('manageAttachments', $approval),
         ];
+        $isSubmitted = $approval->status === SpendApproval::STATUS_SUBMITTED;
+        $threshold = SpendApproval::thresholdFor($approval->category);
 
         return Inertia::render('Governance/SpendApprovals/Show', [
             'approval' => $approval,
-            'categories' => SpendApproval::categories(),
-            'threshold' => SpendApproval::thresholdFor($approval->category),
+            'linked_resolution' => $resolution,
+            'site_name' => $siteName,
+            'financial_year_label' => $approval->budget ? GovernanceLabels::financialYear((string) $approval->budget->fiscal_year) : null,
+            'categories' => $this->categoryLabels(),
+            'threshold' => $threshold,
+            'who_approves' => $this->whoApprovesSentence($threshold),
             'attachments' => $this->presentAttachments($approval),
             'authority' => $authority,
+            // Why the viewer can't decide a request that is waiting for a decision.
+            'decision_blocked_reason' => $isSubmitted && ! $authority['decide']
+                ? $this->decisionBlockedReason($user, $approval)
+                : null,
+            // Passed resolutions the approver can link when board sign-off is needed.
+            'board_resolution_options' => $isSubmitted && $authority['decide'] && $approval->requires_board
+                ? $this->commands->boardResolutionOptions($user, $approval)
+                : [],
+            'can_view_resolutions' => Gate::forUser($user)->allows('viewAny', Resolution::class),
             // Edit wizard options — only for viewers who may edit this draft.
             'form_options' => $authority['update'] ? [
-                'sites' => $this->commands->accessibleSiteOptions($request->user()),
+                'sites' => $this->commands->accessibleSiteOptions($user),
                 'thresholds' => $this->thresholds(),
             ] : null,
         ]);
+    }
+
+    /** "Below $5,000: a finance approver decides. $5,000 and over: needs a board resolution." */
+    private function whoApprovesSentence(float $threshold): string
+    {
+        $amount = GovernanceLabels::money($threshold);
+
+        return "Below {$amount}: approved by a finance approver. {$amount} and over: needs a board resolution, which the approver links when recording the approval.";
+    }
+
+    private function decisionBlockedReason(User $user, SpendApproval $approval): string
+    {
+        if ((int) $approval->requested_by === (int) $user->id) {
+            return 'You requested this, so another approver must decide it.';
+        }
+
+        if ($approval->submitted_by !== null && (int) $approval->submitted_by === (int) $user->id) {
+            return 'You sent this request for a decision, so another approver must decide it.';
+        }
+
+        return 'Spend requests are decided by finance approvers. Ask the chair or the finance lead if you think you should be one.';
     }
 
     public function store(Request $request): RedirectResponse
@@ -168,7 +262,7 @@ class SpendApprovalController extends Controller
         $approval = $this->commands->create($request->user(), $data);
 
         return redirect()->route('governance.spend-approvals.show', $approval)
-            ->with('success', 'Spend approval drafted.');
+            ->with('success', 'Spend request saved as a draft. Send it for a decision when it is ready.');
     }
 
     public function update(Request $request, SpendApproval $approval): RedirectResponse
@@ -184,7 +278,7 @@ class SpendApprovalController extends Controller
 
         $this->commands->update($request->user(), $approval->id, $data, (int) $expectedVersion);
 
-        return back()->with('success', 'Spend approval updated.');
+        return back()->with('success', 'Spend request updated.');
     }
 
     public function submit(Request $request, SpendApproval $approval): RedirectResponse
@@ -197,7 +291,7 @@ class SpendApprovalController extends Controller
         ])['expected_version'];
         $this->commands->submit($request->user(), $approval->id, (int) $expectedVersion);
 
-        return back()->with('success', 'Spend approval submitted for sign-off.');
+        return back()->with('success', 'Spend request sent for a decision.');
     }
 
     public function approve(Request $request, SpendApproval $approval): RedirectResponse
@@ -208,7 +302,7 @@ class SpendApprovalController extends Controller
         $validated = $this->validateDecision($request);
         $this->commands->decide($request->user(), $approval->id, SpendApproval::STATUS_APPROVED, $validated);
 
-        return back()->with('success', 'Spend approval approved.');
+        return back()->with('success', 'Spend request approved.');
     }
 
     public function reject(Request $request, SpendApproval $approval): RedirectResponse
@@ -219,7 +313,7 @@ class SpendApprovalController extends Controller
         $validated = $this->validateDecision($request);
         $this->commands->decide($request->user(), $approval->id, SpendApproval::STATUS_REJECTED, $validated);
 
-        return back()->with('success', 'Spend approval rejected.');
+        return back()->with('success', 'Spend request declined. The requester can see your reason.');
     }
 
     private function validatePayload(Request $request): array
@@ -239,17 +333,40 @@ class SpendApprovalController extends Controller
             'budget_id' => ['nullable', 'integer', 'min:1'],
             'budget_line_item_id' => ['nullable', 'integer', 'min:1'],
             'valid_until' => ['nullable', 'date'],
+        ], [
+            'title.required' => 'Give the request a title.',
+            'category.required' => 'Choose what kind of spend this is.',
+            'category.in' => 'Choose one of the listed kinds of spend.',
+            'amount.required' => 'Enter the amount in NZD.',
+            'amount.numeric' => 'Enter the amount as a number.',
+            'amount.min' => "The amount can't be negative.",
+            'amount.max' => 'That amount is too large.',
+            'valid_until.date' => 'Enter a valid date.',
         ]);
     }
 
     private function validateDecision(Request $request): array
     {
+        $refresh = SpendApprovalCommandService::REFRESH_AND_RETRY;
+
         return $request->validate([
             'decision_key' => ['required', 'uuid'],
             'expected_version' => ['required', 'integer', 'min:1'],
             'expected_content_digest' => ['required', 'string', 'size:64', 'regex:/\A[a-f0-9]{64}\z/'],
             'decision_notes' => ['required', 'string', 'max:2000'],
             'resolution_id' => ['nullable', 'integer', 'min:1'],
+        ], [
+            'decision_key.required' => $refresh,
+            'decision_key.uuid' => $refresh,
+            'expected_version.required' => $refresh,
+            'expected_version.integer' => $refresh,
+            'expected_version.min' => $refresh,
+            'expected_content_digest.required' => $refresh,
+            'expected_content_digest.size' => $refresh,
+            'expected_content_digest.regex' => $refresh,
+            'decision_notes.required' => 'Give a reason for your decision.',
+            'decision_notes.max' => 'Keep the reason to 2,000 characters.',
+            'resolution_id.integer' => 'Choose the resolution from the list.',
         ]);
     }
 
@@ -304,7 +421,7 @@ class SpendApprovalController extends Controller
 
         return $request->wantsJson()
             ? response()->json(['attachments' => $this->presentAttachments($approval->fresh())])
-            : redirect()->back()->with('success', 'Document(s) attached.');
+            : redirect()->back()->with('success', count($attachments) === 1 ? 'File attached.' : 'Files attached.');
     }
 
     public function deleteAttachment(Request $request, SpendApproval $approval, string $attachment): RedirectResponse|JsonResponse
@@ -320,7 +437,7 @@ class SpendApprovalController extends Controller
 
         return $request->wantsJson()
             ? response()->json(['attachments' => $this->presentAttachments($approval->fresh())])
-            : redirect()->back()->with('success', 'Attachment removed.');
+            : redirect()->back()->with('success', 'File removed.');
     }
 
     public function downloadAttachment(Request $request, SpendApproval $approval, string $attachment)

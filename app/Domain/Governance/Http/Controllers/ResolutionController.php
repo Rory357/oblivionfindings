@@ -4,15 +4,21 @@ namespace App\Domain\Governance\Http\Controllers;
 
 use App\Domain\Governance\Http\Requests\StoreResolutionRequest;
 use App\Domain\Governance\Http\Requests\UpdateResolutionRequest;
+use App\Domain\Governance\Models\ActionItem;
 use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\GovernanceResolutionBinding;
+use App\Domain\Governance\Models\GovernanceVotingProfile;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Services\GovernanceAuditService;
+use App\Domain\Governance\Services\GovernanceRecordAccessService;
 use App\Domain\Governance\Services\GovernanceResolutionAuthorityService;
+use App\Domain\Governance\Services\GovernanceVotingProfileService;
 use App\Domain\Governance\Services\VotingService;
+use App\Domain\Governance\Support\GovernanceLabels;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\WorkerClock;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -50,13 +56,13 @@ class ResolutionController extends Controller
     {
         $this->authorize('viewAny', Resolution::class);
 
-        $recordAccess = app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class);
+        $recordAccess = app(GovernanceRecordAccessService::class);
         $user = $request->user();
 
         $base = Resolution::query();
         $recordAccess->scopeResolutions($base, $user);
 
-        $query = (clone $base)->with(['meeting', 'committee', 'proposedBy']);
+        $query = (clone $base)->with(['meeting:id,title,scheduled_at,board_committee_id', 'committee:id,name', 'proposedBy:id,name']);
 
         if ($request->filled('status')) {
             $query->where('status', (string) $request->input('status'));
@@ -80,7 +86,30 @@ class ResolutionController extends Controller
             });
         }
 
-        $resolutions = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+        $profiles = $this->profileMemo();
+
+        // Rows carry only what the register shows — never stored attachment
+        // paths, frozen snapshots or electorate lists.
+        $resolutions = $query->orderByDesc('created_at')->paginate(20)->withQueryString()
+            ->through(fn (Resolution $resolution) => [
+                'id' => $resolution->id,
+                'resolution_reference' => $resolution->resolution_reference,
+                'title' => $resolution->title,
+                'status' => $resolution->status,
+                'outcome' => $resolution->outcome,
+                'purpose' => $resolution->purpose ?? 'decision',
+                'voting_threshold' => $resolution->voting_threshold,
+                'applied_threshold' => $resolution->appliedThreshold($profiles($resolution)),
+                'deadline' => $resolution->deadline?->toIso8601String(),
+                'governance_meeting_id' => $resolution->governance_meeting_id,
+                'meeting' => $resolution->meeting
+                    ? ['id' => $resolution->meeting->id, 'title' => $resolution->meeting->title, 'scheduled_at' => $resolution->meeting->scheduled_at?->toIso8601String()]
+                    : null,
+                'committee' => $resolution->committee
+                    ? ['id' => $resolution->committee->id, 'name' => $resolution->committee->name]
+                    : null,
+                'proposed_by' => $resolution->proposedBy ? ['name' => $resolution->proposedBy->name] : null,
+            ]);
 
         $meetingsQuery = GovernanceMeeting::query()->orderByDesc('scheduled_at');
         $recordAccess->scopeMeetings($meetingsQuery, $user);
@@ -97,6 +126,7 @@ class ResolutionController extends Controller
                 'draft' => (clone $base)->where('status', 'draft')->count(),
                 'open' => (clone $base)->where('status', 'open')->count(),
                 'carried' => (clone $base)->where('outcome', 'carried')->count(),
+                'decided' => (clone $base)->whereNotNull('outcome')->count(),
             ],
             'filters' => [
                 'status' => $request->filled('status') ? (string) $request->input('status') : null,
@@ -107,6 +137,9 @@ class ResolutionController extends Controller
             'can_create' => $canCreate,
             // Publishing from the wizard opens voting — the same ability.
             'can_publish' => $canCreate && $user->can('openVoting', new Resolution),
+            'voting_rules' => $this->votingRulesState($user),
+            // The wizard's success pane links to the resolution it just saved.
+            'created_resolution_id' => session('created_resolution_id'),
             // Wizard options are only sent to people who can author papers.
             ...($canCreate ? $this->authoringFormProps($user) : [
                 'committees' => [],
@@ -138,17 +171,20 @@ class ResolutionController extends Controller
         $myVote = $boardMember
             ? $resolution->getBoardMemberVote($boardMember->id)
             : null;
+        $myVote?->makeHidden(['vote_hash', 'conflict_note']);
 
         $myConflict = $boardMember
             ? $resolution->conflictDeclarations()
-            ->where('board_member_id', $boardMember->id)
-            ->first()
+                ->where('board_member_id', $boardMember->id)
+                ->first()
             : null;
 
+        /** @var User $user */
         $user = auth()->user();
         // `update` is draft-only, so edit options exist only while editable.
         $canManage = $user->can('update', $resolution);
         $canCommand = $user->canDo('governance.resolutions.manage');
+        $isDecision = $resolution->isDecisionPaper();
         $formProps = $canManage ? $this->authoringFormProps($user) : [
             'meetings' => [],
             'committees' => [],
@@ -157,17 +193,29 @@ class ResolutionController extends Controller
             'authoritySubjectGroups' => [],
         ];
 
+        $committeeId = $resolution->board_committee_id ?? $resolution->meeting?->board_committee_id;
+
         return Inertia::render('Governance/Resolutions/Show', [
             'resolution' => $resolution,
+            'applied_threshold' => $resolution->appliedThreshold(),
             'results' => $results,
             'my_vote' => $myVote,
             'my_conflict' => $myConflict,
-            'can_vote' => $user->can('vote', $resolution) && (!$myConflict || !$myConflict->withdrew_from_voting),
+            'can_vote' => $user->can('vote', $resolution) && (! $myConflict || ! $myConflict->withdrew_from_voting),
+            // Why the ballot isn't offered, in plain words (open papers only).
+            'ineligible_reason' => $resolution->isOpen() ? $this->votingService->ineligibleReason($resolution, $user) : null,
+            // Declaring needs the vote permission (route) and a board seat (controller).
+            'can_declare_conflict' => $boardMember !== null
+                && $user->canDo('governance.resolutions.vote')
+                && in_array($resolution->status, ['draft', 'proposed', 'open'], true),
             'can_manage' => $canManage,
             // Mirrors the route permission AND the policy ability of each command.
-            'can_open_voting' => $resolution->isDraft() && $canCommand && $user->can('openVoting', $resolution),
+            'can_open_voting' => $resolution->isDraft() && $isDecision && $canCommand && $user->can('openVoting', $resolution),
+            'can_publish_to_members' => $resolution->isDraft() && ! $isDecision && $canCommand && $user->can('openVoting', $resolution),
             'can_close_voting' => $resolution->status === 'open' && $canCommand && $user->can('closeVoting', $resolution),
-            'can_finalize' => $resolution->status === 'closed' && $canCommand && $user->can('closeVoting', $resolution),
+            'can_finalize' => ($resolution->status === 'closed' || ($resolution->status === 'proposed' && ! $isDecision))
+                && $canCommand && $user->can('closeVoting', $resolution),
+            'voting_rules' => $this->votingRulesState($user, $committeeId ? 'committee' : 'board', $committeeId ? (int) $committeeId : null),
             'quorum' => $resolution->governance_meeting_id
                 ? $this->votingService->calculateQuorum($resolution->governance_meeting_id, $resolution)
                 : $this->votingService->calculateQuorum(null, $resolution),
@@ -175,6 +223,8 @@ class ResolutionController extends Controller
             'paper_snapshot' => $this->presentPaperSnapshot($resolution),
             'authority_bindings' => $this->presentAuthorityBindings($resolution, $formProps['authoritySubjects']),
             'validation_errors' => $resolution->isDraft() ? $resolution->validateForPublication() : [],
+            ...$this->presentFollowUpActions($resolution, $user),
+            'next_pending_vote' => $this->nextPendingVote($resolution),
             ...$formProps,
         ]);
     }
@@ -183,41 +233,44 @@ class ResolutionController extends Controller
     {
         $validated = $request->validated();
 
-        $votingThreshold = match ($validated['type'] ?? 'ordinary') {
-            'special' => 'two_thirds',
-            'unanimous' => 'unanimous',
-            default => $validated['voting_threshold'] ?? 'simple_majority',
-        };
+        $purpose = $validated['purpose'] ?? 'decision';
+        $isDecision = $purpose === 'decision';
+        $votingThreshold = $this->thresholdFromInput($validated, 'simple_majority');
+        $followUps = $isDecision ? array_values($validated['follow_up_actions'] ?? []) : [];
 
         $meetingId = $validated['meeting_id'] ?? $validated['governance_meeting_id'] ?? null;
         $context = $validated['context'] ?? $validated['description'] ?? '';
 
         $authority = app(GovernanceResolutionAuthorityService::class);
-        $resolution = DB::transaction(function () use ($validated, $votingThreshold, $meetingId, $context, $authority, $request): Resolution {
+        $resolution = DB::transaction(function () use ($validated, $votingThreshold, $meetingId, $context, $authority, $request, $purpose, $isDecision, $followUps): Resolution {
             $resolution = Resolution::create([
-            'title' => $validated['title'],
-            'exact_motion' => $validated['exact_motion'] ?? null,
-            'purpose' => $validated['purpose'] ?? 'decision',
-            'decision_type' => $validated['decision_type'] ?? 'resolution',
-            'context' => $context,
-            'options' => $validated['options'] ?? [],
-            'single_option_reason' => $validated['single_option_reason'] ?? null,
-            'recommendation' => $validated['recommendation'] ?? null,
-            'cost_impact' => $validated['cost_impact'] ?? null,
-            'risk_impact' => $validated['risk_impact'] ?? null,
-            'service_user_implications' => $validated['service_user_implications'] ?? null,
-            'risk_equity_implications' => $validated['risk_equity_implications'] ?? null,
-            'attachments' => $validated['attachments'] ?? [],
-            'follow_up_actions' => $validated['follow_up_actions'] ?? [],
-            'voting_threshold' => $votingThreshold,
-            'quorum_required' => $validated['quorum_required'] ?? true,
-            'deadline' => $validated['voting_deadline'] ?? null,
-            'governance_meeting_id' => $meetingId,
-            'board_committee_id' => $validated['board_committee_id'] ?? null,
-            'proposed_by' => auth()->id(),
-            'proposed_at' => now(),
-            'status' => 'draft',
-            'version_number' => 1,
+                'title' => $validated['title'],
+                'exact_motion' => $validated['exact_motion'] ?? null,
+                'purpose' => $purpose,
+                'decision_type' => $validated['decision_type'] ?? 'resolution',
+                'context' => $context,
+                'options' => $validated['options'] ?? [],
+                'single_option_reason' => $validated['single_option_reason'] ?? null,
+                'recommendation' => $validated['recommendation'] ?? null,
+                'cost_impact' => $validated['cost_impact'] ?? null,
+                'risk_impact' => $validated['risk_impact'] ?? null,
+                'service_user_implications' => $validated['service_user_implications'] ?? null,
+                'risk_equity_implications' => $validated['risk_equity_implications'] ?? null,
+                'attachments' => $validated['attachments'] ?? [],
+                'follow_up_actions' => $followUps,
+                // The wizard promises these become actions if the resolution
+                // passes — so they must actually be created then.
+                'auto_generate_actions' => $followUps !== [],
+                'voting_threshold' => $votingThreshold,
+                'quorum_required' => $validated['quorum_required'] ?? true,
+                // Papers that don't go to a vote have no voting deadline.
+                'deadline' => $isDecision ? ($validated['voting_deadline'] ?? null) : null,
+                'governance_meeting_id' => $meetingId,
+                'board_committee_id' => $validated['board_committee_id'] ?? null,
+                'proposed_by' => auth()->id(),
+                'proposed_at' => now(),
+                'status' => 'draft',
+                'version_number' => 1,
             ]);
 
             // Explicit decision authority is bound while the paper is a draft.
@@ -234,30 +287,35 @@ class ResolutionController extends Controller
         // The register/meeting wizard dialog stays where it was opened and shows
         // its success pane; other callers land on the new paper.
         $respond = fn (string $level, string $message) => $request->boolean('_modal')
-            ? redirect()->back()->with($level, $message)
+            ? redirect()->back()->with($level, $message)->with('created_resolution_id', $resolution->id)
             : redirect()->route('governance.resolutions.show', $resolution)->with($level, $message);
 
         if ($request->boolean('publish_now')) {
             $publishError = $this->publishError($request, $resolution);
             if ($publishError !== null) {
-                return $respond('error', "Decision paper {$resolution->resolution_reference} was saved as a draft but not published: {$publishError}");
+                return $respond('error', $isDecision
+                    ? "The resolution was saved as a draft, but voting couldn't be opened: {$publishError}"
+                    : "The paper was saved as a draft, but it couldn't be published to members: {$publishError}");
             }
+
+            return $respond('success', $isDecision
+                ? 'Resolution created, and voting is now open.'
+                : 'Paper created and published to board members.');
         }
 
-        return $respond('success', $request->boolean('publish_now')
-            ? "Decision paper {$resolution->resolution_reference} created and opened for voting."
-            : "Decision paper {$resolution->resolution_reference} created.");
+        return $respond('success', $isDecision ? 'Resolution created as a draft.' : 'Paper created as a draft.');
     }
 
     /**
-     * Open voting for a freshly saved paper when asked to publish it. Returns
-     * the reason it could not be published, or null once voting is open.
+     * Open voting (For decision) or publish to members (For discussion /
+     * For information) for a freshly saved paper. Returns the plain reason it
+     * could not be published, or null once it is.
      */
     protected function publishError(Request $request, Resolution $resolution): ?string
     {
         // Publishing is the open-voting command — the same ability applies.
         if (! $request->user()->can('openVoting', $resolution)) {
-            return 'you are not authorised to open voting.';
+            return 'only the chair or board secretary can publish resolutions.';
         }
 
         $errors = $resolution->validateForPublication();
@@ -266,8 +324,18 @@ class ResolutionController extends Controller
         }
 
         try {
-            $deadline = $resolution->deadline ? Carbon::parse($resolution->deadline) : null;
-            $this->votingService->openVoting($resolution, $deadline);
+            if ($resolution->isDecisionPaper()) {
+                $deadline = $resolution->deadline ? Carbon::parse($resolution->deadline) : null;
+                $this->votingService->openVoting($resolution, $deadline);
+                GovernanceAuditService::log('resolution.voting_opened', 'Resolution', $resolution->id, [
+                    'deadline' => $deadline?->toIso8601String(),
+                ]);
+            } else {
+                $this->votingService->publishToMembers($resolution);
+                GovernanceAuditService::log('resolution.published', 'Resolution', $resolution->id, [
+                    'purpose' => $resolution->purpose,
+                ]);
+            }
         } catch (\InvalidArgumentException|\DomainException $e) {
             return $e->getMessage();
         }
@@ -279,14 +347,14 @@ class ResolutionController extends Controller
     {
         $this->authorize('update', $resolution);
 
-        if (!$resolution->isEditable()) {
-            abort(422, 'Cannot edit paper: resolution is no longer a draft.');
+        if (! $resolution->isEditable()) {
+            abort(422, "This resolution can't be edited because it's no longer a draft.");
         }
 
         $validated = $request->validated();
 
-        if (isset($validated['expected_version']) && (int)$resolution->version_number !== (int)$validated['expected_version']) {
-            $message = 'This decision paper has been updated by another user. Please reload and review the latest changes.';
+        if (isset($validated['expected_version']) && (int) $resolution->version_number !== (int) $validated['expected_version']) {
+            $message = 'Someone else has changed this resolution since you opened it. Reload the page to see their changes before saving yours.';
 
             // The authoring wizard (an Inertia visit) shows the conflict inline;
             // other clients keep the explicit 409.
@@ -297,11 +365,9 @@ class ResolutionController extends Controller
             abort(409, $message);
         }
 
-        $votingThreshold = isset($validated['type']) ? match ($validated['type']) {
-            'special' => 'two_thirds',
-            'unanimous' => 'unanimous',
-            default => 'simple_majority',
-        } : ($validated['voting_threshold'] ?? $resolution->voting_threshold);
+        $votingThreshold = (isset($validated['type']) || isset($validated['voting_threshold']))
+            ? $this->thresholdFromInput($validated, (string) ($resolution->voting_threshold ?: 'simple_majority'))
+            : $resolution->voting_threshold;
 
         $meetingId = array_key_exists('meeting_id', $validated)
             ? $validated['meeting_id']
@@ -311,10 +377,22 @@ class ResolutionController extends Controller
             ? $validated['context']
             : (array_key_exists('description', $validated) ? $validated['description'] : $resolution->context);
 
+        $purpose = $validated['purpose'] ?? $resolution->purpose;
+        $isDecision = ($purpose ?? 'decision') === 'decision';
+
+        $followUps = array_key_exists('follow_up_actions', $validated)
+            ? array_values($validated['follow_up_actions'] ?? [])
+            : ($resolution->follow_up_actions ?? []);
+        if (! $isDecision) {
+            $followUps = [];
+        }
+
+        $deadline = array_key_exists('voting_deadline', $validated) ? $validated['voting_deadline'] : $resolution->deadline;
+
         $updateData = [
             'title' => $validated['title'] ?? $resolution->title,
             'exact_motion' => array_key_exists('exact_motion', $validated) ? $validated['exact_motion'] : $resolution->exact_motion,
-            'purpose' => $validated['purpose'] ?? $resolution->purpose,
+            'purpose' => $purpose,
             'decision_type' => array_key_exists('decision_type', $validated) ? ($validated['decision_type'] ?? 'resolution') : ($resolution->decision_type ?? 'resolution'),
             'context' => $context,
             'options' => array_key_exists('options', $validated) ? $validated['options'] : $resolution->options,
@@ -325,10 +403,11 @@ class ResolutionController extends Controller
             'service_user_implications' => array_key_exists('service_user_implications', $validated) ? $validated['service_user_implications'] : $resolution->service_user_implications,
             'risk_equity_implications' => array_key_exists('risk_equity_implications', $validated) ? $validated['risk_equity_implications'] : $resolution->risk_equity_implications,
             'voting_threshold' => $votingThreshold,
-            'deadline' => array_key_exists('voting_deadline', $validated) ? $validated['voting_deadline'] : $resolution->deadline,
+            'deadline' => $isDecision ? $deadline : null,
             'governance_meeting_id' => $meetingId,
             'board_committee_id' => array_key_exists('board_committee_id', $validated) ? $validated['board_committee_id'] : $resolution->board_committee_id,
-            'follow_up_actions' => array_key_exists('follow_up_actions', $validated) ? $validated['follow_up_actions'] : $resolution->follow_up_actions,
+            'follow_up_actions' => $followUps,
+            'auto_generate_actions' => ! empty($followUps),
             'version_number' => ($resolution->version_number ?? 1) + 1,
         ];
 
@@ -347,12 +426,12 @@ class ResolutionController extends Controller
             $publishError = $this->publishError($request, $resolution);
             if ($publishError !== null) {
                 return redirect()->route('governance.resolutions.show', $resolution)
-                    ->with('error', 'Cannot publish paper: '.$publishError);
+                    ->with('error', "Your changes were saved, but the resolution couldn't be published: {$publishError}");
             }
         }
 
         return redirect()->route('governance.resolutions.show', $resolution)
-            ->with('success', 'Decision paper updated.');
+            ->with('success', 'Resolution updated.');
     }
 
     public function vote(Request $request, Resolution $resolution)
@@ -361,7 +440,15 @@ class ResolutionController extends Controller
 
         $validated = $request->validate([
             'vote' => 'required|in:for,against,abstain',
-            'conflict_note' => 'nullable|string',
+            'vote_note' => 'nullable|string|max:2000',
+            // Older ballots sent the optional reason as `conflict_note`. It was
+            // always a reason for the vote, never a conflict declaration.
+            'conflict_note' => 'nullable|string|max:2000',
+        ], [
+            'vote.required' => 'Choose For, Against or Abstain before casting your vote.',
+            'vote.in' => 'Choose For, Against or Abstain before casting your vote.',
+            'vote_note.max' => 'Keep the reason for your vote under 2,000 characters.',
+            'conflict_note.max' => 'Keep the reason for your vote under 2,000 characters.',
         ]);
 
         $boardMember = BoardMember::active()
@@ -369,8 +456,10 @@ class ResolutionController extends Controller
             ->first();
 
         if (! $boardMember) {
-            return redirect()->back()->with('error', 'You must be an active board member to vote.');
+            return redirect()->back()->with('error', 'Only current board members can vote on resolutions.');
         }
+
+        $note = $validated['vote_note'] ?? $validated['conflict_note'] ?? null;
 
         try {
             $this->votingService->castVote(
@@ -378,16 +467,16 @@ class ResolutionController extends Controller
                 $boardMember,
                 $validated['vote'],
                 'electronic',
-                $validated['conflict_note'] ?? null
+                $note,
             );
             GovernanceAuditService::log('resolution.voted', 'Resolution', $resolution->id, [
                 'vote' => $validated['vote'],
                 'board_member_id' => $boardMember->id,
-                'conflict_note' => !empty($validated['conflict_note']),
+                'has_vote_note' => ! empty($note),
             ]);
 
-            return redirect()->back()->with('success', 'Vote recorded.');
-        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()->with('success', 'Your vote is recorded.');
+        } catch (\InvalidArgumentException|\DomainException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -402,6 +491,13 @@ class ResolutionController extends Controller
             'description' => 'required|string|min:20',
             'withdraw_from_voting' => 'boolean',
             'withdraw_from_discussion' => 'boolean',
+        ], [
+            'type.required' => 'Choose what kind of conflict of interest it is.',
+            'type.in' => 'Choose what kind of conflict of interest it is.',
+            'description.required' => 'Describe the conflict of interest.',
+            'description.min' => 'Add a little more detail about the conflict (at least 20 characters).',
+            'withdraw_from_voting.boolean' => 'Choose whether you are stepping aside from the vote.',
+            'withdraw_from_discussion.boolean' => 'Choose whether you are stepping aside from the discussion.',
         ]);
 
         $boardMember = BoardMember::active()
@@ -409,8 +505,10 @@ class ResolutionController extends Controller
             ->first();
 
         if (! $boardMember) {
-            return redirect()->back()->with('error', 'You must be an active board member to declare a conflict.');
+            return redirect()->back()->with('error', 'Only current board members can declare a conflict of interest on a resolution.');
         }
+
+        $withdraw = $validated['withdraw_from_voting'] ?? true;
 
         try {
             $this->votingService->declareConflict(
@@ -419,17 +517,19 @@ class ResolutionController extends Controller
                 $validated['type'],
                 $validated['description'],
                 auth()->user(),
-                $validated['withdraw_from_voting'] ?? true,
+                $withdraw,
                 $validated['withdraw_from_discussion'] ?? false,
             );
 
             GovernanceAuditService::log('resolution.conflict_declared', 'Resolution', $resolution->id, [
                 'board_member_id' => $boardMember->id,
                 'type' => $validated['type'],
-                'withdrew_from_voting' => $validated['withdraw_from_voting'] ?? true,
+                'withdrew_from_voting' => $withdraw,
             ]);
 
-            return redirect()->back()->with('success', 'Conflict declared.');
+            return redirect()->back()->with('success', $withdraw
+                ? "Your conflict of interest is recorded, and you've stepped aside from the vote."
+                : 'Your conflict of interest is recorded.');
         } catch (\InvalidArgumentException|\DomainException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -439,8 +539,20 @@ class ResolutionController extends Controller
     {
         $this->authorize('openVoting', $resolution);
 
+        // An optional deadline arrives as NZ wall time.
+        if (is_string($request->input('deadline')) && trim((string) $request->input('deadline')) !== '') {
+            try {
+                $request->merge(['deadline' => WorkerClock::toUtc(trim((string) $request->input('deadline')))?->toIso8601String()]);
+            } catch (\Throwable) {
+                // the date rule reports it
+            }
+        }
+
         $validated = $request->validate([
             'deadline' => 'nullable|date|after:now',
+        ], [
+            'deadline.date' => 'Enter the voting deadline as a date and time.',
+            'deadline.after' => 'Pick a voting deadline in the future.',
         ]);
 
         $deadline = isset($validated['deadline'])
@@ -453,8 +565,28 @@ class ResolutionController extends Controller
                 'deadline' => $deadline?->toIso8601String(),
             ]);
 
-            return redirect()->back()->with('success', 'Voting opened.');
-        } catch (\DomainException $e) {
+            return redirect()->back()->with('success', 'Voting is now open.');
+        } catch (\InvalidArgumentException|\DomainException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Share a For discussion / For information paper with board members.
+     * Same ability as opening voting (chair, secretary, admin).
+     */
+    public function publish(Request $request, Resolution $resolution)
+    {
+        $this->authorize('openVoting', $resolution);
+
+        try {
+            $this->votingService->publishToMembers($resolution);
+            GovernanceAuditService::log('resolution.published', 'Resolution', $resolution->id, [
+                'purpose' => $resolution->purpose,
+            ]);
+
+            return redirect()->back()->with('success', 'The paper is now published to board members.');
+        } catch (\InvalidArgumentException|\DomainException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -473,7 +605,15 @@ class ResolutionController extends Controller
                 'outcome' => $resolution->outcome,
             ]);
 
-            return redirect()->back()->with('success', 'Voting closed. Outcome: '.$resolution->outcome);
+            $message = 'Voting is closed. Result: '.GovernanceLabels::label('resolution_outcome', $resolution->outcome).'.';
+            $created = $resolution->outcome === 'carried' ? $resolution->actionItems()->count() : 0;
+            if ($created > 0) {
+                $message .= $created === 1
+                    ? ' 1 follow-up action was created.'
+                    : " {$created} follow-up actions were created.";
+            }
+
+            return redirect()->back()->with('success', $message);
         } catch (\InvalidArgumentException|\DomainException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -487,20 +627,28 @@ class ResolutionController extends Controller
             'status' => 'required|in:implemented,archived',
             'notes' => 'nullable|string',
             'no_action_reason' => 'nullable|string|max:1000',
+        ], [
+            'status.required' => 'Choose whether to mark the resolution as done or archive it.',
+            'status.in' => 'Choose whether to mark the resolution as done or archive it.',
+            'no_action_reason.max' => 'Keep the reason under 1,000 characters.',
         ]);
 
-        if ($resolution->status !== 'closed') {
-            return redirect()->back()->with('error', 'Resolution must be closed before finalizing.');
+        $sharedPaper = $resolution->status === 'proposed' && ! $resolution->isDecisionPaper();
+
+        if ($resolution->status !== 'closed' && ! $sharedPaper) {
+            return redirect()->back()->with('error', 'Voting on this resolution has to close before it can be marked as done or archived.');
         }
 
-        if ($validated['status'] === 'implemented' && $resolution->outcome !== 'carried') {
-            return redirect()->back()->with('error', "Cannot mark resolution as implemented unless outcome is carried (outcome is '{$resolution->outcome}').");
+        if (! $sharedPaper && $validated['status'] === 'implemented' && $resolution->outcome !== 'carried') {
+            return redirect()->back()->with('error', 'Only resolutions that passed can be marked as done. This one\'s result is: '.GovernanceLabels::label('resolution_outcome', $resolution->outcome).'.');
         }
 
         try {
-            DB::transaction(function () use ($resolution, $validated) {
+            DB::transaction(function () use ($resolution, $validated, $sharedPaper) {
                 if ($validated['status'] === 'implemented') {
-                    $resolution->markImplemented($validated['notes'] ?? null, $validated['no_action_reason'] ?? null);
+                    $sharedPaper
+                        ? $resolution->markDoneWithoutVote($validated['notes'] ?? null)
+                        : $resolution->markImplemented($validated['notes'] ?? null, $validated['no_action_reason'] ?? null);
                 } else {
                     $resolution->markArchived($validated['notes'] ?? null);
                 }
@@ -509,7 +657,9 @@ class ResolutionController extends Controller
                 ]);
             });
 
-            return redirect()->back()->with('success', 'Resolution finalized.');
+            return redirect()->back()->with('success', $validated['status'] === 'implemented'
+                ? 'Resolution marked as done.'
+                : 'Resolution archived.');
         } catch (\DomainException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -525,19 +675,23 @@ class ResolutionController extends Controller
             return [];
         }
 
-        $recordAccess = app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class);
+        $recordAccess = app(GovernanceRecordAccessService::class);
         $user = auth()->user();
 
-        // Only papers inside the viewer's record audience, and only the
-        // fields the ballot prompt needs.
+        // Only papers inside the viewer's record audience the viewer can
+        // actually vote on, and only the fields the ballot prompt needs.
         return $this->votingService
             ->getPendingVotes($boardMember->id)
-            ->filter(fn (Resolution $resolution) => $recordAccess->canViewResolution($user, $resolution))
+            ->filter(fn (Resolution $resolution) => $recordAccess->canViewResolution($user, $resolution)
+                && $user->can('vote', $resolution))
             ->map(fn (Resolution $resolution) => [
                 'id' => $resolution->id,
                 'resolution_reference' => $resolution->resolution_reference,
                 'title' => $resolution->title,
                 'deadline' => $resolution->deadline?->toIso8601String(),
+                'meeting_id' => $resolution->governance_meeting_id,
+                // Meeting resolutions are voted on inside the meeting workspace.
+                'vote_href' => $this->decisionHref($resolution),
             ])
             ->values()
             ->all();
@@ -552,8 +706,8 @@ class ResolutionController extends Controller
     {
         $this->authorize('update', $resolution);
 
-        if (!$resolution->isEditable()) {
-            abort(422, 'Cannot modify attachments on an active or closed resolution paper.');
+        if (! $resolution->isEditable()) {
+            abort(422, 'Files can only be added or removed while the resolution is a draft.');
         }
 
         $request->validate([
@@ -564,6 +718,11 @@ class ResolutionController extends Controller
                 'max:20480', // 20 MB per file
                 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif,webp,csv,txt,md',
             ],
+        ], [
+            'files.required' => 'Choose at least one file.',
+            'files.max' => 'Add up to 10 files at a time.',
+            'files.*.max' => 'Each file must be 20 MB or smaller.',
+            'files.*.mimes' => 'Files must be PDF, Word, Excel, PowerPoint, an image, CSV or text.',
         ]);
 
         $existing = is_array($resolution->attachments) ? $resolution->attachments : [];
@@ -571,7 +730,7 @@ class ResolutionController extends Controller
         foreach ($request->file('files') as $file) {
             $directory = "governance/resolutions/{$resolution->id}";
             $extension = $file->getClientOriginalExtension() ?: $file->extension();
-            $storedName = Str::uuid()->toString() . ($extension ? ".{$extension}" : '');
+            $storedName = Str::uuid()->toString().($extension ? ".{$extension}" : '');
             $path = $file->storeAs($directory, $storedName, 'local');
 
             $existing[] = [
@@ -597,22 +756,22 @@ class ResolutionController extends Controller
 
         return $request->wantsJson()
             ? response()->json(['attachments' => $this->presentAttachments($resolution->fresh())])
-            : redirect()->back()->with('success', 'Attachment(s) added.');
+            : redirect()->back()->with('success', count($request->file('files')) === 1 ? 'File added.' : 'Files added.');
     }
 
     public function deleteAttachment(Request $request, Resolution $resolution, string $attachment)
     {
         $this->authorize('update', $resolution);
 
-        if (!$resolution->isEditable()) {
-            abort(422, 'Cannot modify attachments on an active or closed resolution paper.');
+        if (! $resolution->isEditable()) {
+            abort(422, 'Files can only be added or removed while the resolution is a draft.');
         }
 
         $existing = is_array($resolution->attachments) ? $resolution->attachments : [];
         $target = collect($existing)->firstWhere('id', $attachment);
 
         if (! $target) {
-            abort(404, 'Attachment not found.');
+            abort(404, "That file couldn't be found.");
         }
 
         if (isset($target['path']) && Storage::disk('local')->exists($target['path'])) {
@@ -634,7 +793,7 @@ class ResolutionController extends Controller
 
         return $request->wantsJson()
             ? response()->json(['attachments' => $this->presentAttachments($resolution->fresh())])
-            : redirect()->back()->with('success', 'Attachment removed.');
+            : redirect()->back()->with('success', 'File removed.');
     }
 
     public function downloadAttachment(Resolution $resolution, string $attachment)
@@ -645,7 +804,7 @@ class ResolutionController extends Controller
         $target = collect($existing)->firstWhere('id', $attachment);
 
         if (! $target || empty($target['path']) || ! Storage::disk('local')->exists($target['path'])) {
-            abort(404, 'Attachment not found.');
+            abort(404, "That file couldn't be found.");
         }
 
         return Storage::disk('local')->download(
@@ -672,14 +831,48 @@ class ResolutionController extends Controller
     }
 
     /**
+     * The stored voting rule from wizard input: the tile picker's `type`
+     * (ordinary / special / unanimous) or an explicit engine threshold.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    protected function thresholdFromInput(array $validated, string $default): string
+    {
+        if (! empty($validated['type'])) {
+            return match ($validated['type']) {
+                'special' => 'two_thirds',
+                'unanimous' => 'unanimous',
+                default => 'simple_majority',
+            };
+        }
+
+        return ! empty($validated['voting_threshold']) ? (string) $validated['voting_threshold'] : $default;
+    }
+
+    /**
+     * Whether board voting is switched on, and whether this viewer can switch
+     * it on (the chair or secretary — governance settings managers).
+     *
+     * @return array{switched_on: bool, can_switch_on: bool}
+     */
+    protected function votingRulesState(User $user, string $body = 'board', ?int $committeeId = null): array
+    {
+        return [
+            'switched_on' => app(GovernanceVotingProfileService::class)->votingIsSwitchedOn($body, $committeeId),
+            'can_switch_on' => $user->canDo('governance.settings.manage'),
+        ];
+    }
+
+    /**
      * Options for the decision-paper wizard (create and edit share one form).
      *
-     * @return array{meetings: mixed, committees: mixed, users: mixed, authoritySubjects: array<string, mixed>, authoritySubjectGroups: list<array{key: string, subject_type: string, label: string}>}
+     * @return array{meetings: mixed, committees: mixed, users: mixed, authoritySubjects: array<string, mixed>, authoritySubjectGroups: list<array{key: string, subject_type: string, label: string}>, votingRules: array<string, bool>}
      */
     protected function authoringFormProps(User $user): array
     {
         $meetingsQuery = GovernanceMeeting::query()->orderByDesc('scheduled_at');
-        app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)->scopeMeetings($meetingsQuery, $user);
+        app(GovernanceRecordAccessService::class)->scopeMeetings($meetingsQuery, $user);
+        $boardProfile = app(GovernanceVotingProfileService::class)->getActiveProfile('board');
 
         return [
             'meetings' => $meetingsQuery->get(['id', 'title', 'scheduled_at']),
@@ -690,14 +883,20 @@ class ResolutionController extends Controller
                 ->whereNotNull('approved_at')
                 ->orderBy('name')
                 ->get(['id', 'name']),
+            // What the wizard tells authors about votes outside a meeting.
+            'votingRules' => [
+                'switched_on' => (bool) $boardProfile?->isConfirmed(),
+                'written_voting_permitted' => (bool) $boardProfile?->written_voting_permitted,
+                'written_unanimity_required' => (bool) $boardProfile?->written_unanimity_required,
+            ],
             ...app(GovernanceResolutionAuthorityService::class)->authoringChoices($user),
         ];
     }
 
     /**
-     * The paper's explicit approval bindings with a readable subject label.
+     * The paper's explicit approval links with a readable label.
      * The label comes from the author's own selectable options when present,
-     * otherwise from the binding's recorded identity (never restricted content).
+     * otherwise from the link's recorded identity (never restricted content).
      *
      * @param  array<string, mixed>|null  $options
      * @return array<int, array<string, mixed>>
@@ -708,24 +907,103 @@ class ResolutionController extends Controller
             ->orderBy('id')
             ->get(['id', 'resolution_id', 'subject_type', 'subject_id', 'subject_revision', 'governing_body', 'board_committee_id', 'document_reference', 'document_version', 'budget_id', 'budget_line_item_id', 'amount', 'direction', 'bound_at', 'consumed_at'])
             ->map(function (GovernanceResolutionBinding $binding) use ($options): array {
-                $typeLabel = Str::ucfirst(str_replace('_', ' ', (string) $binding->subject_type));
+                $typeLabel = GovernanceLabels::label('authority_subject', (string) $binding->subject_type);
                 $optionLabel = collect($options[Str::plural((string) $binding->subject_type)] ?? [])
                     ->first(fn ($option) => is_array($option) && (int) ($option['id'] ?? 0) === (int) $binding->subject_id)['label'] ?? null;
 
+                $revision = $binding->subject_revision !== null
+                    ? preg_replace('/^v(?=\d)/i', '', (string) $binding->subject_revision)
+                    : null;
+
                 $fallback = collect([
-                    "{$typeLabel} #{$binding->subject_id}",
-                    $binding->document_reference,
-                    $binding->direction && $binding->amount !== null ? Str::ucfirst((string) $binding->direction).' $'.number_format((float) $binding->amount, 2) : null,
-                    $binding->subject_revision !== null ? "revision {$binding->subject_revision}" : null,
+                    $binding->document_reference ?: $typeLabel,
+                    $binding->direction && $binding->amount !== null
+                        ? GovernanceLabels::label('budget_change_type', (string) $binding->direction).' of '.GovernanceLabels::money($binding->amount)
+                        : null,
                 ])->filter()->implode(' · ');
 
                 return [
                     ...$binding->toArray(),
                     'subject_type_label' => $typeLabel,
                     'subject_label' => $optionLabel ?? $fallback,
+                    'subject_version' => $revision,
                 ];
             })
             ->all();
+    }
+
+    /**
+     * Follow-up actions created from this resolution that the viewer may see,
+     * plus how many more exist that they can't.
+     *
+     * @return array{action_items: list<array<string, mixed>>, restricted_action_items_count: int}
+     */
+    protected function presentFollowUpActions(Resolution $resolution, User $viewer): array
+    {
+        $actions = $resolution->actionItems()->with('assignedTo:id,name')->get();
+        $visible = $actions
+            ->filter(fn (ActionItem $action) => $viewer->can('view', $action))
+            ->sortBy(fn (ActionItem $action) => $action->due_date?->timestamp ?? PHP_INT_MAX)
+            ->values();
+        $canOpen = $viewer->canDo('governance.actions.view');
+
+        return [
+            'action_items' => $visible->map(fn (ActionItem $action) => [
+                'id' => $action->id,
+                'reference' => $action->action_reference ?? "ACT-{$action->id}",
+                'title' => $action->title ?: $action->description,
+                'status' => $action->status,
+                'due_date' => $action->due_date?->toDateString(),
+                'assignee_name' => $action->assignedTo?->name,
+                'is_mine' => (int) $action->assigned_to === (int) $viewer->id,
+                'can_open' => $canOpen,
+                'open_url' => $canOpen ? route('governance.actions.show', $action, false) : null,
+            ])->all(),
+            'restricted_action_items_count' => $actions->count() - $visible->count(),
+        ];
+    }
+
+    /** The next resolution still waiting for this member's vote. */
+    protected function nextPendingVote(Resolution $current): ?array
+    {
+        $next = collect($this->getMyPendingVotes())
+            ->first(fn (array $pending) => (int) $pending['id'] !== (int) $current->id);
+
+        return $next ? ['id' => $next['id'], 'title' => $next['title'], 'href' => $next['vote_href']] : null;
+    }
+
+    /**
+     * Canonical place to read and vote on a resolution: the meeting workspace
+     * for meeting resolutions (GovernanceWorkQuery::decisionWorkspaceHref),
+     * otherwise the resolution record.
+     */
+    protected function decisionHref(Resolution $resolution): string
+    {
+        return $resolution->governance_meeting_id
+            ? "/governance/meetings/{$resolution->governance_meeting_id}?tab=resolutions&paper={$resolution->id}"
+            : "/governance/resolutions/{$resolution->id}";
+    }
+
+    /**
+     * Memoised fallback voting profile per governing body, so the register
+     * can show each row's applied rule without a query per row.
+     *
+     * @return callable(Resolution): ?GovernanceVotingProfile
+     */
+    protected function profileMemo(): callable
+    {
+        $cache = [];
+        $service = app(GovernanceVotingProfileService::class);
+
+        return function (Resolution $resolution) use (&$cache, $service): ?GovernanceVotingProfile {
+            $committeeId = $resolution->board_committee_id ?? $resolution->meeting?->board_committee_id;
+            $key = $committeeId ? "committee:{$committeeId}" : 'board';
+            if (! array_key_exists($key, $cache)) {
+                $cache[$key] = $service->getActiveProfile($committeeId ? 'committee' : 'board', $committeeId ? (int) $committeeId : null);
+            }
+
+            return $cache[$key];
+        };
     }
 
     /**
@@ -733,19 +1011,6 @@ class ResolutionController extends Controller
      */
     protected function presentPaperSnapshot(Resolution $resolution): ?array
     {
-        $snapshot = $resolution->paper_snapshot;
-        if (! is_array($snapshot)) {
-            return null;
-        }
-
-        if (is_array($snapshot['attachments'] ?? null)) {
-            $snapshot['attachments'] = collect($snapshot['attachments'])
-                ->filter(fn ($row) => is_array($row))
-                ->map(fn (array $row) => Arr::except($row, ['path']))
-                ->values()
-                ->all();
-        }
-
-        return $snapshot;
+        return $resolution->presentPaperSnapshot();
     }
 }

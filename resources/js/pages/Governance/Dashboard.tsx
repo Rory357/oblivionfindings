@@ -1,10 +1,30 @@
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
-import { AlertTriangle, CalendarPlus, Landmark, RefreshCw } from 'lucide-react';
+import {
+    AlertTriangle,
+    CalendarPlus,
+    Landmark,
+    ListFilter,
+    RefreshCw,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import {
+    assuranceAttention,
+    assuranceExtras,
+    assuranceVisibility,
+} from '@/components/governance/AssuranceSummaryPanel';
+import type { WorkflowAction } from '@/components/governance/BoardPriorityCard';
+import { CockpitSkeleton } from '@/components/governance/CockpitSkeleton';
 import { GovernanceHomeRail } from '@/components/governance/GovernanceHomeRail';
-import type { MyWorkPreview, MyWorkTotals } from '@/components/governance/MyNextActionsRail';
+import type {
+    MyWorkPreview,
+    MyWorkTotals,
+} from '@/components/governance/MyNextActionsRail';
+import type {
+    PriorityPagination,
+    TabKey,
+} from '@/components/governance/PriorityOverviewPanel';
 import {
     PageHeader,
     PageHeaderFilterSelect,
@@ -14,27 +34,32 @@ import {
     PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
     PageHeaderSearch,
-    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatDateTimeLong, formatTime } from '@/lib/datetime';
+import { formatDate, formatTime } from '@/lib/datetime';
 import { canDoGovernance } from '@/lib/governance-permissions';
 import { data as dashboardData } from '@/routes/governance/dashboard';
 import { PageProps } from '@/types';
 
-import type { WorkflowAction } from '@/components/governance/BoardPriorityCard';
-import { CockpitSkeleton } from '@/components/governance/CockpitSkeleton';
-import type { PriorityPagination } from '@/components/governance/PriorityOverviewPanel';
-import { CockpitLayout, type CockpitPayload } from './Cockpit/CockpitLayout';
+import {
+    CockpitLayout,
+    type CockpitPayload,
+    type HomeView,
+} from './Cockpit/CockpitLayout';
 
 interface DashboardPayload {
     snapshot_id: number | null;
     workflow: {
-        summary: { total: number; critical: number; overdue: number };
+        summary: {
+            total: number;
+            critical: number;
+            overdue: number;
+            by_tab?: Record<TabKey, number>;
+        };
         actions: WorkflowAction[];
         pagination?: PriorityPagination | null;
     };
@@ -50,31 +75,24 @@ type Props = PageProps & {
     workTotals?: MyWorkTotals | null;
 };
 
-type Period = 'today' | 'week' | 'month' | 'year';
-
-const PERIOD_OPTIONS: { value: Period; label: string }[] = [
-    { value: 'today', label: 'Today' },
-    { value: 'week', label: 'This week' },
-    { value: 'month', label: 'This month' },
-    { value: 'year', label: 'This year' },
+const VIEW_OPTIONS: { value: HomeView; label: string }[] = [
+    { value: 'all', label: 'Show everything' },
+    { value: 'mine', label: 'Needs my action' },
+    { value: 'board', label: 'Board-wide' },
 ];
 
 const plural = (count: number, one: string, many: string) =>
     count === 1 ? one : many;
 
 /**
- * Governance Home — the board member's primary page. The header carries the
- * member's key facts (My work, next meeting, board assurance) as meter
- * blocks that link to the views listing exactly those records; the body
- * (`CockpitLayout`) leads with Next meeting and My work, then board-wide
- * priorities and a concise assurance summary.
+ * Governance Home — one page for board members and the people who run the
+ * board. The header carries My work, the next meeting and one "Needs the
+ * board's attention" meter (plus board priorities for meeting managers),
+ * each opening the place its number lives. The body (`CockpitLayout`) leads
+ * with Next meeting and My work, then Board assurance and board priorities.
  */
-export default function GovernanceDashboard({
-    auth,
-    boardRole,
-    workTotals,
-}: Props) {
-    const [period, setPeriod] = useState<Period>('month');
+export default function GovernanceDashboard({ auth, workTotals }: Props) {
+    const [view, setView] = useState<HomeView>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [payload, setPayload] = useState<DashboardPayload | null>(null);
     const [loading, setLoading] = useState(true);
@@ -83,17 +101,17 @@ export default function GovernanceDashboard({
     const activeRequestRef = useRef(0);
     const payloadRef = useRef<DashboardPayload | null>(null);
 
-    // `fresh` bypasses the server-side dashboard cache so Refresh always
-    // returns just-computed numbers. A failure after a successful load keeps
-    // the earlier data on screen and says so.
-    const load = useCallback(async (selectedPeriod: Period, fresh: boolean) => {
+    // `fresh` bypasses the server-side cache so Refresh always returns
+    // just-computed figures. A failure after a successful load keeps the
+    // earlier figures on screen and says so.
+    const load = useCallback(async (fresh: boolean) => {
         const reqId = ++activeRequestRef.current;
         setLoading(true);
         setRefreshError(null);
         try {
             const response = await axios.get<DashboardPayload>(
                 dashboardData.url(),
-                { params: fresh ? { period: selectedPeriod, fresh: 1 } : { period: selectedPeriod } },
+                { params: fresh ? { period: 'month', fresh: 1 } : { period: 'month' } },
             );
             if (reqId !== activeRequestRef.current) return;
             payloadRef.current = response.data;
@@ -103,10 +121,10 @@ export default function GovernanceDashboard({
             if (reqId !== activeRequestRef.current) return;
             const previous = payloadRef.current;
             if (!previous) {
-                setError('Board information could not be loaded.');
+                setError("Board information couldn't be loaded.");
             } else {
                 setRefreshError(
-                    `Refresh failed — showing information captured at ${formatTime(previous.captured_at ?? null, 'an earlier time')}.`,
+                    `Refresh didn't work — showing figures from ${formatTime(previous.captured_at ?? null, 'earlier')}.`,
                 );
             }
         } finally {
@@ -117,10 +135,10 @@ export default function GovernanceDashboard({
     }, []);
 
     useEffect(() => {
-        void load(period, false);
-    }, [load, period]);
+        void load(false);
+    }, [load]);
 
-    const refresh = () => void load(period, true);
+    const refresh = () => void load(true);
 
     const workflow = payload?.workflow;
     const cockpit = payload?.cockpit;
@@ -128,14 +146,12 @@ export default function GovernanceDashboard({
         (auth as { can?: { governance?: Record<string, unknown> } })?.can
             ?.governance ?? null;
 
-    const canManageMeetings = canDoGovernance(permissions, 'meetings', 'manage');
+    const isManager = canDoGovernance(permissions, 'meetings', 'manage');
     const canViewMeetings = canDoGovernance(permissions, 'meetings', 'view');
     const canViewRecords = canDoGovernance(permissions, 'view');
-    const canViewRisks = canDoGovernance(permissions, 'risks', 'view');
-    const canViewCompliance = canDoGovernance(permissions, 'compliance', 'view');
-    const canViewActions = canDoGovernance(permissions, 'actions', 'view');
 
-    // My work: the same authorised totals as /governance/my-work.
+    // My work: the same authorised totals as /governance/my-work (upcoming
+    // meetings are never counted as work to do).
     const myWork = payload?.my_work;
     const myWorkTotals: MyWorkTotals | null = payload
         ? (myWork?.totals ?? payload.work_totals ?? null)
@@ -148,76 +164,45 @@ export default function GovernanceDashboard({
         nextMeeting?.member_readiness?.workspace_href ??
         nextMeeting?.meeting.href ??
         null;
+
+    // One source for the meter and the Board assurance headline.
     const assurance = cockpit?.assurance ?? null;
+    const visibility = assurance ? assuranceVisibility(assurance, permissions) : null;
+    const extras = isManager ? assuranceExtras(cockpit?.cards_by_key) : [];
+    const attention =
+        assurance && visibility
+            ? assuranceAttention(assurance, visibility, extras)
+            : null;
+    const showAttentionMeter =
+        !payload ||
+        (visibility !== null &&
+            (Object.values(visibility).some(Boolean) || extras.length > 0));
+    const seriousAttention =
+        (visibility?.risks && (assurance?.risks_above_appetite.count ?? 0) > 0) ||
+        (visibility?.compliance && (assurance?.obligations_overdue.count ?? 0) > 0);
 
-    const primaryAction = (() => {
-        if (canManageMeetings) {
-            return meetingHref
-                ? { label: 'Prepare meeting', href: meetingHref, icon: undefined }
-                : { label: 'Schedule meeting', href: '/governance/meetings/create', icon: CalendarPlus };
-        }
-        return meetingHref
-            ? { label: 'Prepare for meeting', href: meetingHref, icon: undefined }
-            : { label: 'Open My work', href: '/governance/my-work', icon: undefined };
-    })();
-
-    const subline = !payload
-        ? 'Board meetings, your work and board assurance'
-        : [
-              nextMeeting
-                  ? `Next meeting ${formatDateTimeLong(nextMeeting.meeting.scheduled_at, 'date to be confirmed')}`
-                  : 'No upcoming meeting',
-              payload.captured_at
-                  ? `Updated ${formatTime(payload.captured_at)}`
-                  : null,
-          ]
-              .filter(Boolean)
-              .join(' · ');
-
-    const titleChip =
-        pending === null ? null : overdue > 0 ? (
-            <PageHeaderStatusChip variant="critical">
-                {overdue} overdue for you
-            </PageHeaderStatusChip>
-        ) : pending > 0 ? (
-            <PageHeaderStatusChip variant="warning">
-                {pending} pending for you
-            </PageHeaderStatusChip>
-        ) : (
-            <PageHeaderStatusChip variant="success">
-                Nothing pending for you
-            </PageHeaderStatusChip>
-        );
-
-    const assuranceMeter = (
-        key: 'risks_above_appetite' | 'obligations_overdue' | 'actions_overdue',
-        label: string,
-        caption: { some: (n: number) => string; none: string },
-        alertTone: 'critical' | 'warning',
-        fallbackHref: string,
-    ) => {
-        const signal = assurance?.[key];
-        const available = Boolean(signal?.available) && signal?.count != null;
-        const count = available ? (signal?.count as number) : null;
-        return (
-            <PageHeaderMeterBlock
-                label={label}
-                href={signal?.href ?? fallbackHref}
-                tone={count !== null && count > 0 ? alertTone : 'brand'}
-            >
-                <PageHeaderMeterBig>{count ?? '—'}</PageHeaderMeterBig>
-                <PageHeaderMeterCaption>
-                    {!payload
-                        ? 'Loading'
-                        : count === null
-                          ? 'Unavailable'
-                          : count > 0
-                            ? caption.some(count)
-                            : caption.none}
-                </PageHeaderMeterCaption>
-            </PageHeaderMeterBlock>
-        );
+    const scrollToSection = (id: string) => {
+        setView('all');
+        window.setTimeout(() => {
+            document.getElementById(id)?.scrollIntoView({ block: 'start' });
+        }, 0);
     };
+
+    const primaryAction = meetingHref
+        ? { label: 'Prepare for meeting', href: meetingHref, icon: undefined }
+        : isManager
+          ? { label: 'Schedule meeting', href: '/governance/meetings/create', icon: CalendarPlus }
+          : null;
+
+    const subline = [
+        'What you need to do, your next meeting, and anything the board must know',
+        payload?.captured_at ? `Updated ${formatTime(payload.captured_at)}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+    const priorityTotal = workflow?.summary.total ?? null;
+    const priorityOverdue = workflow?.summary.overdue ?? 0;
 
     return (
         <AppLayout
@@ -236,7 +221,6 @@ export default function GovernanceDashboard({
                         icon={Landmark}
                         title="Governance"
                         titleDusk="governance-cockpit-heading"
-                        titleChip={titleChip}
                         subline={subline}
                         actions={
                             <>
@@ -258,17 +242,19 @@ export default function GovernanceDashboard({
                                     icon={RefreshCw}
                                     onClick={refresh}
                                     disabled={loading}
-                                    aria-label="Refresh governance home"
+                                    aria-label="Refresh the figures on this page"
                                 >
                                     {loading ? 'Refreshing' : 'Refresh'}
                                 </PageHeaderGlassButton>
-                                <PageHeaderPrimaryButton
-                                    icon={primaryAction.icon}
-                                    onClick={() => router.visit(primaryAction.href)}
-                                    data-dusk="governance-home-primary"
-                                >
-                                    {primaryAction.label}
-                                </PageHeaderPrimaryButton>
+                                {primaryAction ? (
+                                    <PageHeaderPrimaryButton
+                                        icon={primaryAction.icon}
+                                        onClick={() => router.visit(primaryAction.href)}
+                                        data-dusk="governance-home-primary"
+                                    >
+                                        {primaryAction.label}
+                                    </PageHeaderPrimaryButton>
+                                ) : null}
                             </>
                         }
                         meters={
@@ -277,19 +263,19 @@ export default function GovernanceDashboard({
                                     label="My work"
                                     href="/governance/my-work"
                                     tone={overdue > 0 ? 'critical' : pending ? 'warning' : 'brand'}
-                                    ariaLabel="View my work"
+                                    ariaLabel="Open My work"
                                 >
                                     <PageHeaderMeterBig>{pending ?? '—'}</PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
                                         {pending === null
                                             ? payload
-                                                ? 'Unavailable'
+                                                ? 'Not available'
                                                 : 'Loading'
                                             : overdue > 0
-                                              ? `${pending} pending · ${overdue} overdue`
+                                              ? `${overdue} overdue`
                                               : pending > 0
-                                                ? `${pending} ${plural(pending, 'item needs', 'items need')} you`
-                                                : 'Nothing pending'}
+                                                ? `${plural(pending, 'thing', 'things')} for you to do`
+                                                : 'Nothing to do'}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
@@ -306,7 +292,7 @@ export default function GovernanceDashboard({
                                 >
                                     <PageHeaderMeterBig>
                                         {nextMeeting
-                                            ? formatDate(nextMeeting.meeting.scheduled_at, 'TBC')
+                                            ? formatDate(nextMeeting.meeting.scheduled_at, 'To be confirmed')
                                             : '—'}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
@@ -328,51 +314,68 @@ export default function GovernanceDashboard({
                                               : 'None scheduled'}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
-                                {canViewRisks
-                                    ? assuranceMeter(
-                                          'risks_above_appetite',
-                                          'Risks above appetite',
-                                          {
-                                              some: (n) => `${n} outside tolerance`,
-                                              none: 'None above appetite',
-                                          },
-                                          'critical',
-                                          '/governance/risks?above_appetite=1',
-                                      )
-                                    : null}
-                                {canViewCompliance
-                                    ? assuranceMeter(
-                                          'obligations_overdue',
-                                          'Obligations overdue',
-                                          {
-                                              some: (n) => `${n} ${plural(n, 'obligation', 'obligations')} past due`,
-                                              none: 'None overdue',
-                                          },
-                                          'critical',
-                                          '/governance/compliance?status=overdue',
-                                      )
-                                    : null}
-                                {canViewActions
-                                    ? assuranceMeter(
-                                          'actions_overdue',
-                                          'Overdue board actions',
-                                          {
-                                              some: (n) => `${n} ${plural(n, 'action', 'actions')} past due`,
-                                              none: 'None overdue',
-                                          },
-                                          'warning',
-                                          '/governance/actions?status=overdue',
-                                      )
-                                    : null}
+                                {showAttentionMeter ? (
+                                    <PageHeaderMeterBlock
+                                        label="Needs the board's attention"
+                                        tone={
+                                            attention && attention.total > 0
+                                                ? seriousAttention
+                                                    ? 'critical'
+                                                    : 'warning'
+                                                : 'brand'
+                                        }
+                                        onClick={() => scrollToSection('board-assurance')}
+                                        ariaLabel="View board assurance"
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {!attention || attention.checked === 0
+                                                ? '—'
+                                                : attention.total}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {!attention
+                                                ? payload
+                                                    ? 'Not available'
+                                                    : 'Loading'
+                                                : attention.parts.length > 0
+                                                  ? attention.parts.length === 1
+                                                      ? attention.parts[0]
+                                                      : `${attention.parts[0]} + ${attention.parts.length - 1} more`
+                                                  : attention.unavailable > 0
+                                                    ? 'Some figures not available'
+                                                    : 'Nothing flagged'}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                                {isManager ? (
+                                    <PageHeaderMeterBlock
+                                        label="Board priorities"
+                                        tone={priorityOverdue > 0 ? 'critical' : 'brand'}
+                                        onClick={() => scrollToSection('board-priorities')}
+                                        ariaLabel="View board priorities"
+                                    >
+                                        <PageHeaderMeterBig>{priorityTotal ?? '—'}</PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {priorityTotal === null
+                                                ? payload
+                                                    ? 'Not available'
+                                                    : 'Loading'
+                                                : priorityOverdue > 0
+                                                  ? `${priorityOverdue} overdue`
+                                                  : 'None overdue'}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
                             </>
                         }
                         filters={
                             <PageHeaderFilterSelect
-                                label="This month"
-                                value={period}
-                                allValue="month"
-                                options={PERIOD_OPTIONS}
-                                onChange={(value) => setPeriod(value as Period)}
+                                icon={ListFilter}
+                                label="Show everything"
+                                value={view}
+                                allValue="all"
+                                options={VIEW_OPTIONS}
+                                onChange={(value) => setView(value as HomeView)}
                             />
                         }
                         rail={
@@ -388,8 +391,8 @@ export default function GovernanceDashboard({
                     <Card data-dusk="dashboard-error">
                         <CardContent>
                             <ErrorState
-                                title="Board information could not be loaded"
-                                message="Governance reporting services did not respond. Nothing has been marked complete — try again."
+                                title="Board information couldn't be loaded"
+                                message="Nothing has been marked as done. Try again in a few minutes."
                                 onRetry={loading ? undefined : refresh}
                             />
                         </CardContent>
@@ -417,7 +420,7 @@ export default function GovernanceDashboard({
                                     onClick={refresh}
                                     disabled={loading}
                                 >
-                                    {loading ? 'Retrying…' : 'Retry'}
+                                    {loading ? 'Trying again…' : 'Try again'}
                                 </Button>
                             </div>
                         ) : null}
@@ -426,11 +429,7 @@ export default function GovernanceDashboard({
                             workflow={workflow}
                             myWork={myWork}
                             permissions={permissions}
-                            boardRole={boardRole ?? null}
-                            userRole={
-                                (auth.user as { role?: string } | undefined)
-                                    ?.role ?? null
-                            }
+                            view={view}
                             onRefresh={refresh}
                         />
                     </div>

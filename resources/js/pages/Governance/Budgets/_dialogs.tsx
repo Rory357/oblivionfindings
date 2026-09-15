@@ -23,6 +23,8 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/wizard/shell';
+import { formatDateOnly, toDateInput } from '@/lib/datetime';
+import { financialYearLabel, formatNzd } from '@/lib/governance-labels';
 import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -43,9 +45,21 @@ import { useMemo, useState } from 'react';
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+export interface FinancialYearOption {
+    /** Stored as the year the financial year ends (2027 = 2026/27). */
+    value: number;
+    label: string;
+    range: string;
+    is_current?: boolean;
+}
+
 export interface BudgetFormOptions {
     categories: Record<string, string>;
+    financial_years?: FinancialYearOption[];
 }
+
+/** A year choice; `raw` keeps a budget saved under an older year format. */
+type YearChoice = FinancialYearOption & { raw?: string };
 
 /** A budgeted line as the budget page already loads it. */
 export interface EditableBudgetLine {
@@ -87,28 +101,30 @@ type BudgetForm = {
     description: string;
     total_budget: string;
     board_approved: boolean;
+    approved_on: string;
+    approval_reference: string;
     line_items: LineRow[];
 };
 
-type StepKey = 'details' | 'lines' | 'envelope' | 'review';
+type StepKey = 'details' | 'lines' | 'total' | 'review';
 
 export const BUDGET_STEPS: readonly (WizardStep & { key: StepKey })[] = [
     {
         key: 'details',
         label: 'Budget',
-        blurb: 'Fiscal year, title & scope',
+        blurb: 'Financial year, title and purpose',
         icon: Wallet,
     },
     {
         key: 'lines',
-        label: 'Line items',
-        blurb: 'Budgeted lines by category',
+        label: 'Budget lines',
+        blurb: 'What the money is for',
         icon: ListPlus,
     },
     {
-        key: 'envelope',
-        label: 'Envelope',
-        blurb: 'Total and board status',
+        key: 'total',
+        label: 'Total',
+        blurb: 'Total and board approval',
         icon: FileText,
     },
     {
@@ -124,15 +140,11 @@ const FIELD_STEPS: Record<string, StepKey> = {
     title: 'details',
     description: 'details',
     line_items: 'lines',
-    total_budget: 'envelope',
-    board_approved: 'envelope',
+    total_budget: 'total',
+    board_approved: 'total',
+    approved_on: 'total',
+    approval_reference: 'total',
 };
-
-export const formatNzd = (amount: number | string | null | undefined) =>
-    new Intl.NumberFormat('en-NZ', {
-        style: 'currency',
-        currency: 'NZD',
-    }).format(Number(amount) || 0);
 
 let lineSeq = 0;
 const nextKey = () => `line-${++lineSeq}`;
@@ -153,6 +165,26 @@ const amountString = (value: number | string | null | undefined) =>
 const isAmount = (value: string) =>
     value.trim() !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
 
+/**
+ * NZ financial years (1 July – 30 June) from the year before this one to two
+ * years ahead, valued by the year each ends — the same convention the server
+ * uses ("2027" = 2026/27).
+ */
+export function financialYearOptions(
+    today: Date = new Date(),
+): FinancialYearOption[] {
+    const [year, month] = toDateInput(today).split('-').map(Number);
+    const currentEnd = month >= 7 ? year + 1 : year;
+    return [currentEnd - 1, currentEnd, currentEnd + 1, currentEnd + 2].map(
+        (end) => ({
+            value: end,
+            label: financialYearLabel(end),
+            range: `1 July ${end - 1} – 30 June ${end}`,
+            is_current: end === currentEnd,
+        }),
+    );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Validation + completeness                                          */
 /* ------------------------------------------------------------------ */
@@ -164,39 +196,44 @@ function validateStep(
 ): Record<string, string> {
     const errors: Record<string, string> = {};
     if (step === 'details') {
-        const year = data.fiscal_year.trim();
-        if (!year) {
-            errors.fiscal_year = 'Enter the fiscal year.';
-        } else if (!isEdit) {
-            const n = Number(year);
-            if (!/^\d{4}$/.test(year) || n < 2000 || n > 2100) {
-                errors.fiscal_year =
-                    'Enter a four-digit year between 2000 and 2100.';
-            }
-        } else if (year.length > 20) {
-            errors.fiscal_year = 'Keep the fiscal year to 20 characters.';
+        if (!data.fiscal_year.trim()) {
+            errors.fiscal_year = 'Choose the financial year this budget covers.';
         }
     }
     if (step === 'lines') {
         data.line_items.forEach((line, i) => {
             if (!line.category)
-                errors[`line_items.${i}.category`] = 'Choose a category.';
+                errors[`line_items.${i}.category`] =
+                    'Choose a category for this line.';
             if (!line.description.trim())
-                errors[`line_items.${i}.description`] = 'Describe the line.';
+                errors[`line_items.${i}.description`] =
+                    'Describe what this line pays for.';
             if (!isAmount(line.budget_amount))
                 errors[`line_items.${i}.budget_amount`] =
-                    'Enter the budgeted amount.';
+                    'Enter the amount budgeted for this line.';
             if (
                 line.forecast_amount.trim() !== '' &&
                 !isAmount(line.forecast_amount)
             )
                 errors[`line_items.${i}.forecast_amount`] =
-                    'The forecast must be zero or more.';
+                    "The forecast can't be negative.";
         });
     }
-    if (step === 'envelope' && data.line_items.length === 0) {
-        if (!isAmount(data.total_budget)) {
+    if (step === 'total') {
+        if (data.line_items.length === 0 && !isAmount(data.total_budget)) {
             errors.total_budget = 'Enter the total budget in NZD.';
+        }
+        if (!isEdit && data.board_approved) {
+            if (!data.approved_on) {
+                errors.approved_on =
+                    'Enter the date the board approved this budget.';
+            } else if (data.approved_on > toDateInput(new Date())) {
+                errors.approved_on = "The approval date can't be in the future.";
+            }
+            if (!data.approval_reference.trim()) {
+                errors.approval_reference =
+                    'Enter the minutes reference for the meeting that approved it.';
+            }
         }
     }
     return errors;
@@ -254,14 +291,38 @@ function BudgetWizardBody({
         ? 'operations'
         : (categoryKeys[0] ?? '');
 
+    const yearOptions = useMemo((): YearChoice[] => {
+        const base: YearChoice[] = options.financial_years?.length
+            ? options.financial_years
+            : financialYearOptions();
+        const stored = budget ? String(budget.fiscal_year ?? '') : '';
+        // A budget saved under an older year format stays selectable.
+        return stored && !base.some((option) => String(option.value) === stored)
+            ? [
+                  {
+                      value: Number(stored) || 0,
+                      label: financialYearLabel(stored),
+                      range: '',
+                      raw: stored,
+                  },
+                  ...base,
+              ]
+            : base;
+    }, [budget, options.financial_years]);
+
+    const currentYear =
+        yearOptions.find((option) => option.is_current) ?? yearOptions[0];
+
     const form = useForm<BudgetForm>({
         fiscal_year: budget
             ? String(budget.fiscal_year ?? '')
-            : String(new Date().getFullYear()),
+            : String(currentYear?.value ?? ''),
         title: budget?.title ?? '',
         description: budget?.description ?? '',
         total_budget: budget ? amountString(budget.total_budget) : '',
         board_approved: false,
+        approved_on: '',
+        approval_reference: '',
         line_items: (budget?.line_items ?? []).map((line) => ({
             key: nextKey(),
             id: line.id,
@@ -329,7 +390,15 @@ function BudgetWizardBody({
 
     const hasLines = data.line_items.length > 0;
     const lineSum = linesTotal(data.line_items);
-    const envelope = hasLines ? lineSum : Number(data.total_budget) || 0;
+    const total = hasLines ? lineSum : Number(data.total_budget) || 0;
+    const selectedYear = yearOptions.find(
+        (option) =>
+            String(option.value) === data.fiscal_year ||
+            option.raw === data.fiscal_year,
+    );
+    const yearLabel = data.fiscal_year
+        ? (selectedYear?.label ?? financialYearLabel(data.fiscal_year))
+        : null;
 
     const submit = () => {
         const all: Record<string, string> = {};
@@ -362,7 +431,14 @@ function BudgetWizardBody({
                         : current.total_budget,
                 line_items: lines,
             };
-            if (!budget) payload.board_approved = current.board_approved;
+            if (!budget) {
+                payload.board_approved = current.board_approved;
+                if (current.board_approved) {
+                    payload.approved_on = current.approved_on;
+                    payload.approval_reference =
+                        current.approval_reference.trim();
+                }
+            }
             return payload;
         });
 
@@ -388,16 +464,17 @@ function BudgetWizardBody({
     const isReview = step.key === 'review';
     const proposed = budget?.status === 'proposed';
     const budgetName =
-        data.title.trim() ||
-        (data.fiscal_year ? `FY${data.fiscal_year} budget` : 'Budget');
+        data.title.trim() || (yearLabel ? `${yearLabel} budget` : 'The budget');
 
     const success = done ? (
         <WizardSuccessPane
             title={isEdit ? 'Budget updated' : 'Budget created'}
             blurb={
                 isEdit
-                    ? `${budgetName} has been saved with ${data.line_items.length} line item${data.line_items.length === 1 ? '' : 's'}.`
-                    : `${budgetName} has been created. Submit it for board approval from the budget page.`
+                    ? `${budgetName} has been saved with ${data.line_items.length} line${data.line_items.length === 1 ? '' : 's'}.`
+                    : data.board_approved
+                      ? `${budgetName} has been recorded as approved by the board.`
+                      : `${budgetName} is saved as a draft. When it's ready, send it to the board from the budget page.`
             }
             actions={<Button onClick={onClose}>Close</Button>}
         />
@@ -409,13 +486,17 @@ function BudgetWizardBody({
                 open={isOpen}
                 onClose={requestClose}
                 title={isEdit ? 'Edit budget' : 'New budget'}
-                description="A guided wizard to author a board budget, its budgeted lines and envelope."
+                description={
+                    isEdit
+                        ? 'Update this budget and its lines.'
+                        : 'Set up a yearly budget for the board to approve.'
+                }
                 railIcon={Wallet}
                 railTitle={isEdit ? 'Edit budget' : 'New budget'}
                 railSub={
                     budget
-                        ? `FY${budget.fiscal_year} · v${budget.version_number}`
-                        : 'Finance'
+                        ? `${financialYearLabel(budget.fiscal_year)} · version ${budget.version_number}`
+                        : 'Board finance'
                 }
                 steps={BUDGET_STEPS}
                 stepIndex={stepIndex}
@@ -472,30 +553,36 @@ function BudgetWizardBody({
                                 <StepHead
                                     icon={Wallet}
                                     title="Which budget is this?"
-                                    blurb="Set the fiscal year it covers, a recognisable title and what it funds."
+                                    blurb="Choose the financial year it covers, give it a recognisable title and say what it funds."
                                 />
                             </div>
                             {proposed ? (
                                 <InfoCard icon={AlertTriangle} tone="warn">
-                                    This budget has been proposed to the board.
-                                    Changing its title, description, envelope or
-                                    lines means the decision paper bound to it
-                                    will no longer approve it.
+                                    This budget has been sent to the board.
+                                    Changing its title, description, total or
+                                    lines means the board must see the updated
+                                    budget before it can be approved.
                                 </InfoCard>
                             ) : null}
                             <Field
-                                label="Fiscal year"
+                                label="Financial year"
                                 required
+                                hint="1 July – 30 June"
                                 error={err('fiscal_year')}
                             >
-                                <Input
-                                    id="budget-fiscal-year"
-                                    inputMode="numeric"
+                                <SelectInput
                                     value={data.fiscal_year}
-                                    onChange={(e) =>
-                                        setData('fiscal_year', e.target.value)
+                                    onChange={(value) =>
+                                        setData('fiscal_year', value)
                                     }
-                                    placeholder="e.g. 2026"
+                                    placeholder="Choose the financial year"
+                                    ariaLabel="Financial year"
+                                    options={yearOptions.map((option) => ({
+                                        value: option.raw ?? String(option.value),
+                                        label: option.range
+                                            ? `${option.label} (${option.range})`
+                                            : option.label,
+                                    }))}
                                 />
                             </Field>
                             <Field
@@ -509,7 +596,7 @@ function BudgetWizardBody({
                                     onChange={(e) =>
                                         setData('title', e.target.value)
                                     }
-                                    placeholder="e.g. FY2026 Operating Budget"
+                                    placeholder="e.g. 2026/27 operating budget"
                                 />
                             </Field>
                             <Field
@@ -525,7 +612,7 @@ function BudgetWizardBody({
                                     onChange={(e) =>
                                         setData('description', e.target.value)
                                     }
-                                    placeholder="Budget purpose and scope — which homes, services or programmes it funds."
+                                    placeholder="What this budget pays for — which homes, services or programmes."
                                 />
                             </Field>
                         </div>
@@ -535,15 +622,22 @@ function BudgetWizardBody({
                         <div className="grid gap-4">
                             <StepHead
                                 icon={ListPlus}
-                                title="Budgeted lines"
-                                blurb="Add each budgeted line. Actual spend and variance notes are recorded on the budget page."
+                                title="Budget lines"
+                                blurb="Add a line for each thing the money is for. Actual spend is recorded on the budget page once the budget is approved."
                             />
+                            {proposed ? (
+                                <InfoCard icon={AlertTriangle} tone="warn">
+                                    Changing these lines means the board must
+                                    see the updated budget before it can be
+                                    approved.
+                                </InfoCard>
+                            ) : null}
                             {hasLines ? null : (
                                 <InfoCard icon={ListPlus}>
                                     No lines yet. You can add them now or later
                                     from the budget page — a budget needs at
-                                    least one line before it can be submitted to
-                                    the board.
+                                    least one line before it can be sent to the
+                                    board.
                                 </InfoCard>
                             )}
                             {data.line_items.map((line, index) => (
@@ -552,7 +646,7 @@ function BudgetWizardBody({
                                     className="rounded-xl border border-border bg-muted/20 p-4"
                                 >
                                     <div className="mb-3 flex items-center justify-between">
-                                        <span className="text-[13px] font-semibold text-muted-foreground">
+                                        <span className="text-caption font-semibold">
                                             Line {index + 1}
                                             {line.id ? ' · saved' : ' · new'}
                                         </span>
@@ -614,7 +708,7 @@ function BudgetWizardBody({
                                         </Field>
                                         <Field
                                             label="Account code"
-                                            hint="optional"
+                                            hint="from your accounting system, if known"
                                             error={err(
                                                 `line_items.${index}.account_code`,
                                             )}
@@ -631,7 +725,7 @@ function BudgetWizardBody({
                                             />
                                         </Field>
                                         <Field
-                                            label="Budget amount (NZD)"
+                                            label="Amount budgeted (NZD)"
                                             required
                                             error={err(
                                                 `line_items.${index}.budget_amount`,
@@ -654,7 +748,7 @@ function BudgetWizardBody({
                                         </Field>
                                         <Field
                                             label="Forecast (NZD)"
-                                            hint="defaults to the budget"
+                                            hint="what you now expect to spend (optional)"
                                             error={err(
                                                 `line_items.${index}.forecast_amount`,
                                             )}
@@ -688,7 +782,7 @@ function BudgetWizardBody({
                                                         notes: e.target.value,
                                                     })
                                                 }
-                                                placeholder="Assumptions behind the figure"
+                                                placeholder="How the figure was worked out"
                                             />
                                         </Field>
                                     </div>
@@ -705,7 +799,7 @@ function BudgetWizardBody({
                                     <Plus className="h-4 w-4" /> Add line
                                 </Button>
                                 {hasLines ? (
-                                    <span className="text-sm text-muted-foreground">
+                                    <span className="text-subtle">
                                         {data.line_items.length} line
                                         {data.line_items.length === 1
                                             ? ''
@@ -720,12 +814,12 @@ function BudgetWizardBody({
                         </div>
                     ) : null}
 
-                    {step.key === 'envelope' ? (
+                    {step.key === 'total' ? (
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="sm:col-span-2">
                                 <StepHead
                                     icon={FileText}
-                                    title="Budget envelope"
+                                    title="Total budget"
                                     blurb="The total the board is asked to approve."
                                 />
                             </div>
@@ -754,11 +848,11 @@ function BudgetWizardBody({
                             </Field>
                             <InfoCard icon={Wallet}>
                                 {hasLines
-                                    ? `The envelope is the sum of the ${data.line_items.length} budgeted line${data.line_items.length === 1 ? '' : 's'} and is recalculated whenever lines change.`
-                                    : 'With no lines yet, enter the envelope. Adding lines later recalculates it to their sum.'}
+                                    ? `The total is the sum of the ${data.line_items.length} line${data.line_items.length === 1 ? '' : 's'} and updates whenever the lines change.`
+                                    : 'With no lines yet, enter the total. Adding lines later changes it to their sum.'}
                             </InfoCard>
                             {!isEdit ? (
-                                <div className="sm:col-span-2">
+                                <div className="grid gap-3 sm:col-span-2">
                                     <div className="flex items-start gap-2.5">
                                         <Checkbox
                                             id="budget-board-approved"
@@ -772,16 +866,64 @@ function BudgetWizardBody({
                                         />
                                         <div>
                                             <Label htmlFor="budget-board-approved">
-                                                Already approved by the board
+                                                The board has already approved
+                                                this budget
                                             </Label>
                                             <p className="text-caption mt-0.5">
-                                                Records a budget the board
-                                                approved outside this system. No
-                                                decision paper is linked.
+                                                Only for a budget the board
+                                                approved outside this system.
+                                                It's recorded as approved
+                                                straight away, so give the
+                                                meeting details.
                                             </p>
                                         </div>
                                     </div>
                                     <FieldErr>{err('board_approved')}</FieldErr>
+                                    {data.board_approved ? (
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <Field
+                                                label="Date the board approved it"
+                                                required
+                                                error={err('approved_on')}
+                                            >
+                                                <Input
+                                                    id="budget-approved-on"
+                                                    type="date"
+                                                    max={toDateInput(
+                                                        new Date(),
+                                                    )}
+                                                    value={data.approved_on}
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            'approved_on',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+                                            <Field
+                                                label="Minutes reference"
+                                                required
+                                                error={err(
+                                                    'approval_reference',
+                                                )}
+                                            >
+                                                <Input
+                                                    id="budget-approval-reference"
+                                                    value={
+                                                        data.approval_reference
+                                                    }
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            'approval_reference',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="e.g. Board minutes 24 June 2026, item 5"
+                                                />
+                                            </Field>
+                                        </div>
+                                    ) : null}
                                 </div>
                             ) : null}
                         </div>
@@ -794,8 +936,10 @@ function BudgetWizardBody({
                                 title="Review the budget"
                                 blurb={
                                     isEdit
-                                        ? 'Saving updates the budget and applies your line changes.'
-                                        : 'The budget is created in drafting. Submit it to the board from the budget page.'
+                                        ? 'Saving updates the budget and its lines.'
+                                        : data.board_approved
+                                          ? 'The budget is recorded as already approved by the board.'
+                                          : 'The budget is saved as a draft. Send it to the board from the budget page when it is ready.'
                                 }
                             />
                             <div className="grid gap-3 sm:grid-cols-2">
@@ -805,8 +949,8 @@ function BudgetWizardBody({
                                     onEdit={() => goTo('details')}
                                 >
                                     <ReviewRow
-                                        label="Fiscal year"
-                                        value={data.fiscal_year}
+                                        label="Financial year"
+                                        value={yearLabel}
                                     />
                                     <ReviewRow
                                         label="Title"
@@ -814,48 +958,44 @@ function BudgetWizardBody({
                                     />
                                     <ReviewRow
                                         label="Description"
-                                        value={
-                                            data.description.trim()
-                                                ? 'Added'
-                                                : null
-                                        }
+                                        value={data.description.trim() || null}
                                     />
                                 </ReviewCard>
                                 <ReviewCard
                                     icon={FileText}
-                                    title="Envelope"
-                                    onEdit={() => goTo('envelope')}
+                                    title="Total"
+                                    onEdit={() => goTo('total')}
                                 >
                                     <ReviewRow
                                         label="Total budget"
                                         value={
                                             hasLines || data.total_budget.trim()
-                                                ? formatNzd(envelope)
+                                                ? formatNzd(total)
                                                 : null
                                         }
                                     />
                                     <ReviewRow
-                                        label="Source"
+                                        label="Worked out from"
                                         value={
                                             hasLines
-                                                ? 'Sum of lines'
-                                                : 'Entered'
+                                                ? 'The budget lines'
+                                                : 'The total you entered'
                                         }
                                     />
                                     {!isEdit ? (
                                         <ReviewRow
-                                            label="Board status"
+                                            label="Board approval"
                                             value={
                                                 data.board_approved
-                                                    ? 'Already approved'
-                                                    : 'Drafting'
+                                                    ? `Approved on ${formatDateOnly(data.approved_on, 'a date not given')} (${data.approval_reference.trim() || 'no minutes reference'})`
+                                                    : 'Draft — not sent to the board yet'
                                             }
                                         />
                                     ) : null}
                                 </ReviewCard>
                                 <ReviewCard
                                     icon={ListPlus}
-                                    title={`Line items (${data.line_items.length})`}
+                                    title={`Budget lines (${data.line_items.length})`}
                                     onEdit={() => goTo('lines')}
                                     span
                                 >
@@ -865,7 +1005,9 @@ function BudgetWizardBody({
                                                 key={line.key}
                                                 label={`${categories[line.category] ?? line.category} · ${line.description || `Line ${index + 1}`}`}
                                                 value={formatNzd(
-                                                    line.budget_amount,
+                                                    Number(
+                                                        line.budget_amount,
+                                                    ) || 0,
                                                 )}
                                             />
                                         ))
@@ -883,12 +1025,17 @@ function BudgetWizardBody({
 
             <DiscardDraftDialog
                 open={confirmClose}
+                mode={isEdit ? 'edit' : 'create'}
                 onKeepEditing={() => setConfirmClose(false)}
                 onDiscard={() => {
                     setConfirmClose(false);
                     onClose();
                 }}
-                description="Any changes to this budget and its lines will be lost."
+                description={
+                    isEdit
+                        ? 'Your changes to this budget and its lines will be lost.'
+                        : 'The details you entered for this budget will be lost.'
+                }
             />
         </>
     );

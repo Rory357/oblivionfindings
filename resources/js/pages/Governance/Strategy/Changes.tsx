@@ -20,10 +20,12 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly } from '@/lib/datetime';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
+    Compass,
     History,
     Info,
     Pencil,
     Plus,
+    Target,
     Trash2,
     X,
     type LucideIcon,
@@ -34,6 +36,7 @@ type ChangeType = 'added' | 'updated' | 'removed';
 
 interface Change {
     type: ChangeType;
+    area?: 'goal' | 'direction';
     goal: string;
     detail: string;
 }
@@ -55,6 +58,7 @@ interface Props {
     changes: {
         has_snapshot: boolean;
         baseline_label?: string;
+        compared_version?: number | null;
         changes: Change[];
     };
 }
@@ -65,19 +69,19 @@ const TYPES: Record<
 > = {
     added: {
         label: 'Added',
-        caption: 'New goals',
+        caption: 'New in this version',
         icon: Plus,
         variant: 'success',
     },
     updated: {
-        label: 'Updated',
-        caption: 'Changed goals',
+        label: 'Changed',
+        caption: 'Changed in this version',
         icon: Pencil,
         variant: 'warning',
     },
     removed: {
         label: 'Removed',
-        caption: 'Goals removed',
+        caption: 'Taken out of this version',
         icon: Trash2,
         variant: 'critical',
     },
@@ -99,14 +103,13 @@ export default function StrategyChanges({ plan, changes }: Props) {
         : null;
 
     const all = changes.changes ?? [];
-    const grouped = ORDER.reduce<Record<ChangeType, Change[]>>(
-        (acc, type) => {
-            acc[type] = all.filter((change) => change.type === type);
-            return acc;
-        },
-        { added: [], updated: [], removed: [] },
-    );
-    const visibleTypes = activeType ? [activeType] : ORDER;
+    const filtered = activeType
+        ? all.filter((change) => change.type === activeType)
+        : all;
+    const direction = filtered.filter((change) => change.area === 'direction');
+    const goals = filtered.filter((change) => change.area !== 'direction');
+    const countOf = (type: ChangeType) =>
+        all.filter((change) => change.type === type).length;
     const baseHref = `/governance/strategy/${plan.id}/changes`;
 
     const setType = (value: string) =>
@@ -121,17 +124,21 @@ export default function StrategyChanges({ plan, changes }: Props) {
             ? `${formatDateOnly(dateOnly(plan.period_start))} – ${formatDateOnly(dateOnly(plan.period_end))}`
             : null;
 
+    const comparedWith = changes.has_snapshot
+        ? `Compared with ${changes.baseline_label ?? 'the version the board approved'}`
+        : 'Nothing to compare with yet';
+
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Strategic plans', href: '/governance/strategy' },
+                { title: 'Strategic plan', href: '/governance/strategy' },
                 { title: plan.title, href: `/governance/strategy/${plan.id}` },
-                { title: 'Changes', href: baseHref },
+                { title: 'What changed', href: baseHref },
             ]}
         >
-            <Head title={`Changes — ${plan.title}`} />
+            <Head title={`What changed — ${plan.title}`} />
 
             <PageLayout
                 hero={
@@ -139,11 +146,9 @@ export default function StrategyChanges({ plan, changes }: Props) {
                         variant="profile"
                         backHref={`/governance/strategy/${plan.id}`}
                         icon={History}
-                        title={`Changes — ${plan.title}`}
+                        title={`What changed — ${plan.title}`}
                         subline={[
-                            changes.has_snapshot
-                                ? `Compared with ${changes.baseline_label ?? 'the last snapshot'}`
-                                : 'No approved baseline to compare with',
+                            comparedWith,
                             plan.planning_horizon
                                 ? humaniseHorizon(plan.planning_horizon)
                                 : null,
@@ -160,7 +165,7 @@ export default function StrategyChanges({ plan, changes }: Props) {
                                         href={`${baseHref}?type=${type}`}
                                         preserveScroll
                                         tone={
-                                            grouped[type].length === 0
+                                            countOf(type) === 0
                                                 ? 'brand'
                                                 : type === 'added'
                                                   ? 'success'
@@ -168,10 +173,10 @@ export default function StrategyChanges({ plan, changes }: Props) {
                                                     ? 'warning'
                                                     : 'critical'
                                         }
-                                        ariaLabel={`View ${TYPES[type].label.toLowerCase()} goals`}
+                                        ariaLabel={`View ${TYPES[type].label.toLowerCase()} items`}
                                     >
                                         <PageHeaderMeterBig>
-                                            {grouped[type].length}
+                                            {countOf(type)}
                                         </PageHeaderMeterBig>
                                         <PageHeaderMeterCaption>
                                             {TYPES[type].caption}
@@ -187,29 +192,25 @@ export default function StrategyChanges({ plan, changes }: Props) {
                                         {all.length}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        Since{' '}
-                                        {changes.baseline_label ??
-                                            'the last snapshot'}
+                                        Goals, vision, mission and values
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                             </>
                         }
                         filters={
-                            changes.has_snapshot ? (
-                                <PageHeaderFilterSelect
-                                    label="Change type"
-                                    value={activeType ?? ALL}
-                                    allValue={ALL}
-                                    options={[
-                                        { value: ALL, label: 'All changes' },
-                                        ...ORDER.map((type) => ({
-                                            value: type,
-                                            label: TYPES[type].label,
-                                        })),
-                                    ]}
-                                    onChange={setType}
-                                />
-                            ) : undefined
+                            <PageHeaderFilterSelect
+                                label="Change"
+                                value={activeType ?? ALL}
+                                allValue={ALL}
+                                options={[
+                                    { value: ALL, label: 'All changes' },
+                                    ...ORDER.map((type) => ({
+                                        value: type,
+                                        label: TYPES[type].label,
+                                    })),
+                                ]}
+                                onChange={setType}
+                            />
                         }
                     />
                 }
@@ -218,20 +219,20 @@ export default function StrategyChanges({ plan, changes }: Props) {
                     {!changes.has_snapshot ? (
                         <EmptyState
                             icon={Info}
-                            title="Comparison not available"
-                            description="No prior approved baseline or snapshot exists for this strategic plan version."
+                            title="Nothing to compare yet"
+                            description="This is the first version, so there's nothing to compare yet. Changes show here once the board has approved a version."
                         />
                     ) : all.length === 0 ? (
                         <EmptyState
                             icon={History}
-                            title="No changes detected"
-                            description={`Goals match ${changes.baseline_label || 'the last snapshot'}.`}
+                            title="No changes"
+                            description={`Nothing has changed since ${changes.baseline_label ?? 'the version the board approved'}.`}
                         />
-                    ) : activeType && grouped[activeType].length === 0 ? (
+                    ) : filtered.length === 0 && activeType ? (
                         <EmptyState
                             icon={TYPES[activeType].icon}
-                            title={`No ${TYPES[activeType].label.toLowerCase()} goals`}
-                            description="Try another change type."
+                            title={`Nothing ${TYPES[activeType].label.toLowerCase()}`}
+                            description="Try another kind of change."
                             action={
                                 <Button
                                     variant="outline"
@@ -244,55 +245,71 @@ export default function StrategyChanges({ plan, changes }: Props) {
                             }
                         />
                     ) : (
-                        visibleTypes.map((type) => {
-                            const items = grouped[type];
-                            if (items.length === 0) return null;
-                            const Icon = TYPES[type].icon;
-
-                            return (
-                                <Card key={type}>
-                                    <CardHeader>
-                                        <CardTitle className="text-section-title flex items-center gap-2">
-                                            <Icon className="h-4 w-4 text-primary" />
-                                            {TYPES[type].label}
-                                        </CardTitle>
-                                        <CardDescription>
-                                            {items.length} goal
-                                            {items.length === 1 ? '' : 's'}
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="flex flex-col gap-3">
-                                        {items.map((item, index) => (
-                                            <div
-                                                key={`${item.goal}-${index}`}
-                                                className="flex items-start gap-3 rounded-lg border border-border p-3"
-                                            >
-                                                <StatusBadge
-                                                    variant={
-                                                        TYPES[type].variant
-                                                    }
-                                                >
-                                                    {TYPES[type].label}
-                                                </StatusBadge>
-                                                <div className="min-w-0">
-                                                    <p className="font-medium text-foreground">
-                                                        {item.goal}
-                                                    </p>
-                                                    {item.detail ? (
-                                                        <p className="mt-1 text-sm text-muted-foreground">
-                                                            {item.detail}
-                                                        </p>
-                                                    ) : null}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </CardContent>
-                                </Card>
-                            );
-                        })
+                        <>
+                            {direction.length > 0 ? (
+                                <ChangeCard
+                                    title="Vision, mission and values"
+                                    icon={Compass}
+                                    items={direction}
+                                />
+                            ) : null}
+                            {goals.length > 0 ? (
+                                <ChangeCard
+                                    title="Goals"
+                                    icon={Target}
+                                    items={goals}
+                                />
+                            ) : null}
+                        </>
                     )}
                 </div>
             </PageLayout>
         </AppLayout>
+    );
+}
+
+function ChangeCard({
+    title,
+    icon: Icon,
+    items,
+}: {
+    title: string;
+    icon: LucideIcon;
+    items: Change[];
+}) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-section-title flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-primary" />
+                    {title}
+                </CardTitle>
+                <CardDescription>
+                    {items.length} change{items.length === 1 ? '' : 's'}
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+                {items.map((item, index) => (
+                    <div
+                        key={`${item.type}-${item.goal}-${index}`}
+                        className="flex items-start gap-3 rounded-lg border border-border p-3"
+                    >
+                        <StatusBadge variant={TYPES[item.type].variant}>
+                            {TYPES[item.type].label}
+                        </StatusBadge>
+                        <div className="min-w-0">
+                            <p className="font-medium text-foreground">
+                                {item.goal}
+                            </p>
+                            {item.detail ? (
+                                <p className="text-subtle mt-1">
+                                    {item.detail}
+                                </p>
+                            ) : null}
+                        </div>
+                    </div>
+                ))}
+            </CardContent>
+        </Card>
     );
 }

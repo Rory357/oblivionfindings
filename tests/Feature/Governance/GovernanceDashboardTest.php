@@ -4,8 +4,10 @@ namespace Tests\Feature\Governance;
 
 use App\Domain\Governance\Http\Controllers\DashboardController;
 use App\Domain\Governance\Models\ConflictDeclaration;
+use App\Domain\Governance\Models\GovernancePolicy;
 use App\Domain\Governance\Models\MeetingAgendaItem;
 use App\Domain\Governance\Services\DashboardAggregatorService;
+use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -237,8 +239,12 @@ class GovernanceDashboardTest extends TestCase
 
         $readiness = $home->json('cockpit.next_meeting.member_readiness');
         $this->assertSame("/governance/meetings/{$meeting->id}", $readiness['workspace_href']);
-        // Only the agenda the member may read is counted.
+        // Only the agenda the member may read is counted, and decision papers
+        // are counted separately — exactly what the meeting's tabs list.
+        $this->assertSame(1, $readiness['agenda']['count']);
+        $this->assertSame("/governance/meetings/{$meeting->id}?tab=agenda", $readiness['agenda']['href']);
         $this->assertSame(1, $readiness['papers']['count']);
+        $this->assertSame("/governance/meetings/{$meeting->id}?tab=resolutions", $readiness['papers']['href']);
         $this->assertStringNotContainsString('CONFIDENTIAL acquisition briefing', $home->getContent());
         // No pack has been published to the member.
         $this->assertFalse($readiness['pack']['published']);
@@ -316,10 +322,11 @@ class GovernanceDashboardTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('items.total', 3));
 
-        // The KPI band never says "within appetite" while risks are above it.
-        $riskKpi = collect($home->json('cockpit.kpi_band'))->firstWhere('key', 'risks_over_appetite');
-        $this->assertSame('2', $riskKpi['value']);
-        $this->assertStringNotContainsStringIgnoringCase('within appetite', $riskKpi['sublabel']);
+        // The unused KPI band, calendar feed and pack panel payloads are gone.
+        $this->assertNull($home->json('cockpit.kpi_band'));
+        $this->assertNull($home->json('cockpit.calendar_events'));
+        $this->assertNull($home->json('cockpit.board_pack'));
+        $this->assertTrue($assurance['risks_above_appetite']['permitted']);
     }
 
     public function test_home_reports_failed_assurance_sources_as_unavailable_not_zero(): void
@@ -352,9 +359,93 @@ class GovernanceDashboardTest extends TestCase
 
         $this->assertSame('unknown', $response->json('cockpit.cards_by_key.top_risks.status'));
         $this->assertSame('unknown', $response->json('cockpit.cards_by_key.compliance_calendar.status'));
-        $riskKpi = collect($response->json('cockpit.kpi_band'))->firstWhere('key', 'risks_over_appetite');
-        $this->assertSame('—', $riskKpi['value']);
-        $this->assertStringNotContainsStringIgnoringCase('within appetite', $riskKpi['sublabel']);
+        $riskMetrics = collect($response->json('cockpit.cards_by_key.top_risks.metrics'));
+        $this->assertTrue($riskMetrics->every(fn (array $metric) => $metric['value'] === 'Not available'));
+    }
+
+    /** P0-6 — a member with meetings scheduled but nothing to do has nothing pending on Home. */
+    public function test_home_my_work_never_counts_upcoming_meetings_as_work(): void
+    {
+        $chair = $this->createAdminUser();
+        $member = $this->createOrdinaryMember();
+        $meeting = $this->createMeeting($chair, ['title' => 'October board meeting', 'scheduled_at' => now()->addDays(6)]);
+
+        $home = $this->actingAs($member)->getJson('/governance/dashboard/data?period=month&fresh=1')->assertOk();
+
+        $this->assertSame(0, $home->json('my_work.totals.pending'));
+        $this->assertSame(0, $home->json('work_totals.pending'));
+        $this->assertSame(1, $home->json('my_work.totals.know'));
+        $this->assertSame([], $home->json('my_work.items'));
+        $this->assertSame("meeting:{$meeting->id}:know", $home->json('my_work.coming_up.0.id'));
+        $this->assertSame('upcoming', $home->json('my_work.coming_up.0.status'));
+
+        // The period is optional: Home asks for this month by default.
+        $this->actingAs($member)->getJson('/governance/dashboard/data')->assertOk();
+    }
+
+    /**
+     * Recently completed and the timeline follow the registers' audience:
+     * a viewer who can't open risks, policies or actions never gets their
+     * titles, and only audit log viewers receive the timeline at all.
+     */
+    public function test_recently_completed_and_timeline_are_filtered_like_their_registers(): void
+    {
+        $chair = $this->createAdminUser();
+
+        $risk = $this->createRisk($chair, ['risk_reference' => 'R-2026-009', 'title' => 'SECRET removed vehicle risk']);
+        $risk->update(['status' => 'voided', 'closed_at' => now()->subDay()]);
+        GovernancePolicy::create([
+            'policy_code' => 'POL-SECRET-2',
+            'title' => 'SECRET approved complaints policy',
+            'category' => 'governance',
+            'content' => 'Policy text.',
+            'status' => 'approved',
+            'approved_at' => now()->subDay(),
+            'owner_id' => $chair->id,
+            'created_by' => $chair->id,
+        ]);
+        $this->createActionItem($chair, $chair, [
+            'title' => 'SECRET send the annual report',
+            'status' => 'complete',
+            'completed_at' => now()->subDay(),
+        ]);
+
+        $chairHome = $this->actingAs($chair)->getJson('/governance/dashboard/data?period=month&fresh=1')->assertOk();
+        $completed = collect($chairHome->json('cockpit.recently_completed'))->keyBy('kind');
+
+        $this->assertSame('SECRET removed vehicle risk', $completed->get('risk_removed')['title']);
+        $this->assertSame('R-2026-009', $completed->get('risk_removed')['reference']);
+        $this->assertSame('SECRET approved complaints policy', $completed->get('policy_approved')['title']);
+        $this->assertSame('SECRET send the annual report', $completed->get('action_completed')['title']);
+        $this->assertIsArray($chairHome->json('cockpit.timeline.events'));
+        $this->assertNull($chairHome->json('cockpit.timeline.restricted'));
+
+        $member = $this->createOrdinaryMember();
+        foreach (['governance.risks.view', 'governance.policies.view', 'governance.actions.view', 'governance.compliance.view'] as $key) {
+            $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key]);
+            $member->permissionOverrides()->attach($permission->id, ['allowed' => false]);
+        }
+
+        $memberHome = $this->actingAs($member)->getJson('/governance/dashboard/data?period=month&fresh=1')->assertOk();
+
+        // No title from a register the member can't open — in Home's lists,
+        // cards or the raw widgets.
+        $this->assertSame([], $memberHome->json('cockpit.recently_completed'));
+        $this->assertStringNotContainsString('SECRET', $memberHome->getContent());
+        $this->assertNull($memberHome->json('widgets.voided_risks'));
+        $this->assertTrue($memberHome->json('cockpit.timeline.restricted'));
+        $this->assertSame([], $memberHome->json('cockpit.timeline.events'));
+
+        // Assurance counts are masked on the server, not just hidden on the page.
+        $this->assertFalse($memberHome->json('cockpit.assurance.risks_above_appetite.permitted'));
+        $this->assertNull($memberHome->json('cockpit.assurance.risks_above_appetite.count'));
+        $this->assertFalse($memberHome->json('cockpit.assurance.obligations_overdue.permitted'));
+        $this->assertNull($memberHome->json('cockpit.assurance.obligations_overdue.count'));
+
+        // The single-widget endpoint has the same audience.
+        $this->actingAs($member)->getJson('/governance/dashboard/widget/top_risks?period=month')->assertForbidden();
+        $this->actingAs($member)->getJson('/governance/dashboard/widget/compliance_calendar?period=month')->assertForbidden();
+        $this->actingAs($chair)->getJson('/governance/dashboard/widget/top_risks?period=month')->assertOk();
     }
 
     public function test_dashboard_data_timeline_events_is_zero_indexed_list(): void

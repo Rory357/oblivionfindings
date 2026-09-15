@@ -1,5 +1,6 @@
 import { router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 /**
  * Deep links for register dialogs that replaced routed Create/Edit pages.
@@ -23,9 +24,22 @@ export function withoutDialogFlag(url: string, flag: string): string {
     return `${path}${qs ? `?${qs}` : ''}${hash ? `#${hash}` : ''}`;
 }
 
+/** What an old create/edit link says when it can't open its dialog. */
+export function blockedDialogMessage(flag: 'create' | 'edit'): string {
+    return flag === 'edit'
+        ? "This record can't be edited from here any more."
+        : "You can't add a new record here.";
+}
+
+/**
+ * Opens a register dialog from its deep-link flag. When the flag is present
+ * but the dialog isn't allowed (an old edit link to an approved budget, say)
+ * the viewer gets an info message instead of nothing happening.
+ */
 export function useDialogDeepLink(
     flag: 'create' | 'edit',
     allowed: boolean,
+    blockedMessage?: string,
 ): [boolean, (open: boolean) => void] {
     const page = usePage();
     const [open, setOpen] = useState(
@@ -34,6 +48,12 @@ export function useDialogDeepLink(
 
     useEffect(() => {
         if (!hasDialogFlag(page.url, flag)) return;
+        if (!allowed) {
+            // The id de-duplicates the toast if the effect runs twice.
+            toast.info(blockedMessage ?? blockedDialogMessage(flag), {
+                id: `governance-deep-link-${flag}`,
+            });
+        }
         router.replace({
             url: withoutDialogFlag(page.url, flag),
             preserveScroll: true,

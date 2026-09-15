@@ -1,5 +1,9 @@
-import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import {
+    pageHasFlashError,
+    useDialogDeepLink,
+} from '@/components/governance/governance-dialog-deep-link';
 import InputError from '@/components/input-error';
+import { EntityChip } from '@/components/lists';
 import {
     PageHeader,
     PageHeaderGlassButton,
@@ -11,7 +15,6 @@ import {
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -31,24 +34,28 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
+import { SelectInput } from '@/components/wizard/primitives';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly } from '@/lib/datetime';
+import {
+    formatNzd,
+    goalStatusLabel,
+    governanceStatus,
+    refSuffix,
+    themeLabel,
+} from '@/lib/governance-labels';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle,
+    Circle,
     Clock,
     Compass,
-    GitBranch,
+    Copy,
+    Eye,
+    Flag,
     History,
     Loader2,
     Pencil,
@@ -60,10 +67,9 @@ import {
 import { useState, type FormEvent } from 'react';
 import {
     StrategicPlanWizardDialog,
+    formatTimeframe,
     humaniseHorizon,
     normaliseValues,
-    planStatusLabel,
-    planStatusVariant,
     type PlanValue,
     type StrategicPlanFormOptions,
     type StrategicPlanStepKey,
@@ -71,7 +77,7 @@ import {
 
 interface CarriedResolution {
     id: number;
-    resolution_reference: string;
+    resolution_reference: string | null;
     title: string;
     outcome: string;
     closed_at: string | null;
@@ -97,9 +103,8 @@ interface Goal {
     description: string;
     progress_pct?: number | string;
     key_results: Array<{ result: string; status: string }> | null;
-    status: string;
+    status: string | null;
     lead_executive?: { name: string } | null;
-    origin_goal_id?: number | null;
     roadmap_initiative?: { id: number; title: string; status: string } | null;
     initiatives: Initiative[];
 }
@@ -116,171 +121,158 @@ interface StrategicPlan {
     status: string;
     version_number: number;
     version_notes?: string | null;
-    approval_resolution: {
-        id: number;
-        resolution_reference: string;
-        outcome: string;
-    } | null;
     approved_by_board_at?: string | null;
     goals: Goal[];
     supersedes?: { id: number; title: string; version_number: number } | null;
 }
 
+interface ApprovalSummary {
+    key: string;
+    label: string;
+    detail: string;
+    resolution: {
+        id: number;
+        title: string;
+        reference: string | null;
+    } | null;
+}
+
 interface Props {
     plan: StrategicPlan;
+    approval: ApprovalSummary;
     carriedResolutions?: CarriedResolution[];
     canEdit?: boolean;
     canAddGoal?: boolean;
     canApprove?: boolean;
     canCreateVersion?: boolean;
+    canViewResolutions?: boolean;
     /** Edit wizard options — only sent to viewers who may edit. */
     formOptions?: StrategicPlanFormOptions | null;
 }
 
-const PILLAR_LABELS: Record<string, string> = {
-    safety: 'Safety',
-    quality: 'Quality',
-    people: 'People',
-    finance: 'Finance',
-    compliance: 'Compliance',
-    it_resilience: 'IT resilience',
+const APPROVAL_VARIANT: Record<string, StatusVariant> = {
+    approved: 'success',
+    passed: 'success',
+    voting_open: 'info',
+    drafted: 'warning',
+    on_agenda: 'info',
+    stale: 'warning',
+    not_passed: 'critical',
+    waiting: 'neutral',
+    superseded: 'neutral',
+    archived: 'neutral',
 };
 
-const humanise = (value: string) =>
-    value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
-
-function workStatusVariant(status: string): StatusVariant {
-    switch (status) {
-        case 'achieved':
-        case 'completed':
-            return 'success';
-        case 'in_progress':
-        case 'on_track':
-            return 'info';
-        case 'at_risk':
-        case 'on_hold':
-        case 'delayed':
-            return 'warning';
-        case 'blocked':
-        case 'off_track':
-            return 'critical';
-        default:
-            return 'neutral';
-    }
-}
-
-const statusFilterFor = (status: string) =>
-    ({
-        draft: 'draft',
-        review: 'draft',
-        approved: 'approved',
-        active: 'approved',
-        superseded: 'superseded',
-        archived: 'archived',
-        completed: 'archived',
-    })[status] ?? null;
-
-const formatNzd = (amount: number | string | null | undefined) =>
-    new Intl.NumberFormat('en-NZ', {
-        style: 'currency',
-        currency: 'NZD',
-        maximumFractionDigits: 0,
-    }).format(Number(amount) || 0);
+const NONE = '__none';
 
 const dateOnly = (value: string | null | undefined) =>
     (value ?? '').slice(0, 10);
 
+/** A goal's progress is tracked once initiatives or a percentage are recorded. */
+export function goalProgressTracked(goal: Pick<Goal, 'initiatives' | 'progress_pct'>) {
+    return (goal.initiatives ?? []).length > 0 || Number(goal.progress_pct ?? 0) > 0;
+}
+
+function MeasureIcon({ status }: { status: string | null | undefined }) {
+    switch (status) {
+        case 'achieved':
+        case 'complete':
+        case 'completed':
+            return <CheckCircle className="h-4 w-4 shrink-0 text-status-success" />;
+        case 'in_progress':
+        case 'on_track':
+            return <Clock className="h-4 w-4 shrink-0 text-status-info" />;
+        case 'at_risk':
+        case 'delayed':
+        case 'off_track':
+        case 'missed':
+        case 'blocked':
+            return (
+                <AlertTriangle className="h-4 w-4 shrink-0 text-status-warning" />
+            );
+        default:
+            return <Circle className="h-4 w-4 shrink-0 text-muted-foreground" />;
+    }
+}
+
 export default function StrategyShow({
     plan,
+    approval,
     carriedResolutions = [],
     canEdit = false,
     canAddGoal = false,
     canApprove = false,
     canCreateVersion = false,
+    canViewResolutions = false,
     formOptions = null,
 }: Props) {
     const canOpenWizard = Boolean(canEdit && formOptions);
-    const [editOpen, setEditOpen] = useDialogDeepLink('edit', canOpenWizard);
+    const isApproved = ['approved', 'active'].includes(plan.status);
+    const [editOpen, setEditOpen] = useDialogDeepLink(
+        'edit',
+        canOpenWizard,
+        isApproved
+            ? "This plan has been approved, so it can't be edited. Create a new version to change it."
+            : "This version can't be edited.",
+    );
     const [wizardStep, setWizardStep] = useState<StrategicPlanStepKey>('plan');
     const [isApproveOpen, setIsApproveOpen] = useState(false);
     const [isVersionOpen, setIsVersionOpen] = useState(false);
-
-    const approveForm = useForm({ resolution_id: '' });
-    const versionForm = useForm({ version_notes: '' });
 
     const openWizard = (step: StrategicPlanStepKey) => {
         setWizardStep(step);
         setEditOpen(true);
     };
 
-    const handleApprove = (e: FormEvent) => {
-        e.preventDefault();
-        if (!approveForm.data.resolution_id) return;
-        approveForm.transform((data) => ({
-            resolution_id: Number(data.resolution_id),
-        }));
-        approveForm.post(`/governance/strategy/${plan.id}/approve`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setIsApproveOpen(false);
-                approveForm.reset();
-            },
-        });
-    };
-
-    const handleCreateVersion = (e: FormEvent) => {
-        e.preventDefault();
-        if (!versionForm.data.version_notes.trim()) return;
-        versionForm.post(`/governance/strategy/${plan.id}/version`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setIsVersionOpen(false);
-                versionForm.reset();
-            },
-        });
-    };
-
     const goals = plan.goals ?? [];
     const values = normaliseValues(plan.values);
     const pillarLabel = (pillar: string) =>
-        formOptions?.pillars[pillar] ??
-        PILLAR_LABELS[pillar] ??
-        humanise(pillar);
+        formOptions?.pillars[pillar] ?? themeLabel(pillar);
 
     const groupedGoals = goals.reduce<Record<string, Goal[]>>((acc, goal) => {
         (acc[goal.pillar] ??= []).push(goal);
         return acc;
     }, {});
 
+    const trackedGoals = goals.filter(goalProgressTracked);
     const averageProgress =
-        goals.length > 0
-            ? goals.reduce(
+        trackedGoals.length > 0
+            ? trackedGoals.reduce(
                   (sum, goal) => sum + Number(goal.progress_pct ?? 0),
                   0,
-              ) / goals.length
+              ) / trackedGoals.length
             : 0;
     const achievedGoals = goals.filter(
         (goal) => goal.status === 'achieved',
     ).length;
-    const keyResults = goals.flatMap((goal) => goal.key_results ?? []);
-    const achievedResults = keyResults.filter(
-        (kr) => kr.status === 'achieved',
+    const measures = goals.flatMap((goal) => goal.key_results ?? []);
+    const achievedMeasures = measures.filter(
+        (measure) => measure.status === 'achieved',
     ).length;
+    const measuresTracked = measures.some(
+        (measure) => (measure.status ?? 'not_started') !== 'not_started',
+    );
     const initiatives = goals.flatMap((goal) => goal.initiatives ?? []);
-    const statusFilter = statusFilterFor(plan.status);
+    const statusChip = governanceStatus('strategic_plan_status', plan.status);
     const period = `${formatDateOnly(dateOnly(plan.period_start))} – ${formatDateOnly(dateOnly(plan.period_end))}`;
     const goalsHref = `/governance/strategy/${plan.id}#goals`;
+    const nextVersion = plan.version_number + 1;
+
+    const scrollToApproval = () =>
+        document
+            .getElementById('board-approval')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Strategic plans', href: '/governance/strategy' },
+                { title: 'Strategic plan', href: '/governance/strategy' },
                 { title: plan.title, href: `/governance/strategy/${plan.id}` },
             ]}
         >
-            <Head title={plan.title} />
+            <Head title={`${plan.title} — Strategic plan`} />
 
             <PageLayout
                 hero={
@@ -291,10 +283,8 @@ export default function StrategyShow({
                         title={plan.title}
                         titleDusk="strategy-heading"
                         titleChip={
-                            <PageHeaderStatusChip
-                                variant={planStatusVariant(plan.status)}
-                            >
-                                {planStatusLabel(plan.status)}
+                            <PageHeaderStatusChip variant={statusChip.variant}>
+                                {statusChip.label}
                             </PageHeaderStatusChip>
                         }
                         subline={[
@@ -313,7 +303,7 @@ export default function StrategyShow({
                                         )
                                     }
                                 >
-                                    View changes
+                                    See what changed
                                 </PageHeaderGlassButton>
                                 {canOpenWizard ? (
                                     <PageHeaderGlassButton
@@ -336,14 +326,14 @@ export default function StrategyShow({
                                         icon={CheckCircle}
                                         onClick={() => setIsApproveOpen(true)}
                                     >
-                                        Approve plan
+                                        Record board approval
                                     </PageHeaderPrimaryButton>
                                 ) : canCreateVersion ? (
                                     <PageHeaderPrimaryButton
-                                        icon={GitBranch}
+                                        icon={Copy}
                                         onClick={() => setIsVersionOpen(true)}
                                     >
-                                        New version
+                                        Create version {nextVersion}
                                     </PageHeaderPrimaryButton>
                                 ) : null}
                             </>
@@ -361,7 +351,7 @@ export default function StrategyShow({
                                     <PageHeaderMeterCaption>
                                         Across{' '}
                                         {Object.keys(groupedGoals).length}{' '}
-                                        pillar
+                                        theme
                                         {Object.keys(groupedGoals).length === 1
                                             ? ''
                                             : 's'}
@@ -370,20 +360,20 @@ export default function StrategyShow({
                                 <PageHeaderMeterBlock
                                     label="Goal progress"
                                     value={
-                                        goals.length > 0
+                                        trackedGoals.length > 0
                                             ? `${Math.round(averageProgress)}%`
                                             : undefined
                                     }
                                     href={goalsHref}
                                     preserveScroll
                                     tone={
-                                        goals.length > 0 &&
+                                        trackedGoals.length > 0 &&
                                         averageProgress >= 100
                                             ? 'success'
                                             : 'brand'
                                     }
                                 >
-                                    {goals.length > 0 ? (
+                                    {trackedGoals.length > 0 ? (
                                         <>
                                             <PageHeaderMeterBar
                                                 percent={averageProgress}
@@ -396,44 +386,50 @@ export default function StrategyShow({
                                     ) : (
                                         <>
                                             <PageHeaderMeterBig>
-                                                —
+                                                {goals.length > 0
+                                                    ? 'Not tracked'
+                                                    : '—'}
                                             </PageHeaderMeterBig>
                                             <PageHeaderMeterCaption>
-                                                No goals yet
+                                                {goals.length > 0
+                                                    ? 'Progress not tracked yet'
+                                                    : 'No goals yet'}
                                             </PageHeaderMeterCaption>
                                         </>
                                     )}
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Key results"
+                                    label="Measures of success"
                                     value={
-                                        keyResults.length > 0
-                                            ? `${achievedResults}/${keyResults.length}`
+                                        measuresTracked
+                                            ? `${achievedMeasures}/${measures.length}`
                                             : undefined
                                     }
                                     href={goalsHref}
                                     preserveScroll
                                 >
-                                    {keyResults.length > 0 ? (
+                                    {measuresTracked ? (
                                         <>
                                             <PageHeaderMeterBar
                                                 percent={
-                                                    (achievedResults /
-                                                        keyResults.length) *
+                                                    (achievedMeasures /
+                                                        measures.length) *
                                                     100
                                                 }
                                             />
                                             <PageHeaderMeterCaption>
-                                                Key results achieved
+                                                Measures met so far
                                             </PageHeaderMeterCaption>
                                         </>
                                     ) : (
                                         <>
                                             <PageHeaderMeterBig>
-                                                0
+                                                {measures.length}
                                             </PageHeaderMeterBig>
                                             <PageHeaderMeterCaption>
-                                                No key results set
+                                                {measures.length > 0
+                                                    ? 'Set · not tracked yet'
+                                                    : 'None set yet'}
                                             </PageHeaderMeterCaption>
                                         </>
                                     )}
@@ -447,34 +443,46 @@ export default function StrategyShow({
                                         {initiatives.length}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        Delivering the goals
+                                        Work delivering the goals
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Approval"
+                                    label="Board approval"
                                     href={
-                                        statusFilter
-                                            ? `/governance/strategy?status=${statusFilter}`
-                                            : '/governance/strategy'
+                                        approval.resolution
+                                            ? `/governance/resolutions/${approval.resolution.id}`
+                                            : undefined
+                                    }
+                                    onClick={
+                                        approval.resolution
+                                            ? undefined
+                                            : scrollToApproval
                                     }
                                     tone={
-                                        planStatusVariant(plan.status) ===
+                                        APPROVAL_VARIANT[approval.key] ===
                                         'success'
                                             ? 'success'
-                                            : planStatusVariant(plan.status) ===
-                                                'warning'
-                                              ? 'warning'
-                                              : 'brand'
+                                            : APPROVAL_VARIANT[approval.key] ===
+                                                'critical'
+                                              ? 'critical'
+                                              : APPROVAL_VARIANT[
+                                                      approval.key
+                                                  ] === 'warning'
+                                                ? 'warning'
+                                                : 'brand'
                                     }
-                                    ariaLabel={`View ${planStatusLabel(plan.status).toLowerCase()} plans`}
+                                    ariaLabel={
+                                        approval.resolution
+                                            ? `Open resolution: ${approval.resolution.title}`
+                                            : 'View where the board approval stands'
+                                    }
                                 >
                                     <PageHeaderMeterBig>
-                                        {planStatusLabel(plan.status)}
+                                        {statusChip.label}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        {plan.approval_resolution
-                                            ? `Resolution ${plan.approval_resolution.resolution_reference}`
-                                            : 'No board resolution yet'}
+                                        {approval.resolution?.title ??
+                                            approval.label}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                             </>
@@ -483,29 +491,138 @@ export default function StrategyShow({
                 }
             >
                 <div className="flex flex-col gap-5">
+                    <Card id="board-approval" className="scroll-mt-5">
+                        <CardHeader>
+                            <CardTitle className="text-section-title">
+                                Board approval
+                            </CardTitle>
+                            <CardDescription>
+                                Approved by the board when a resolution naming
+                                this version passes.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-3 text-sm">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <StatusBadge
+                                    variant={
+                                        APPROVAL_VARIANT[approval.key] ??
+                                        'neutral'
+                                    }
+                                >
+                                    {approval.label}
+                                </StatusBadge>
+                                {approval.resolution ? (
+                                    <>
+                                        <Link
+                                            href={`/governance/resolutions/${approval.resolution.id}`}
+                                            className="font-medium text-primary hover:underline"
+                                        >
+                                            {approval.resolution.title}
+                                        </Link>
+                                        {approval.resolution.reference ? (
+                                            <span className="text-caption">
+                                                {refSuffix(
+                                                    approval.resolution
+                                                        .reference,
+                                                )}
+                                            </span>
+                                        ) : null}
+                                    </>
+                                ) : null}
+                            </div>
+                            <p className="text-subtle">
+                                {approval.detail}
+                                {approval.key === 'waiting' &&
+                                canViewResolutions ? (
+                                    <>
+                                        {' '}
+                                        <Link
+                                            href="/governance/resolutions"
+                                            className="font-medium text-primary hover:underline"
+                                        >
+                                            Go to Resolutions
+                                        </Link>
+                                    </>
+                                ) : null}
+                            </p>
+                            {isApproved ? (
+                                <p className="text-subtle">
+                                    This version can&apos;t be edited. To
+                                    change the plan, create a new version and
+                                    put it to the board.
+                                </p>
+                            ) : null}
+                            {plan.supersedes ? (
+                                <p className="text-subtle">
+                                    Replaces{' '}
+                                    <Link
+                                        href={`/governance/strategy/${plan.supersedes.id}`}
+                                        className="font-medium text-primary hover:underline"
+                                    >
+                                        {plan.supersedes.title} (version{' '}
+                                        {plan.supersedes.version_number})
+                                    </Link>
+                                </p>
+                            ) : null}
+                            {plan.version_notes ? (
+                                <p className="text-subtle">
+                                    Why this version: {plan.version_notes}
+                                </p>
+                            ) : null}
+                        </CardContent>
+                    </Card>
+
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-section-title">
+                                <CardTitle className="text-section-title flex items-center gap-2">
+                                    <Eye className="h-4 w-4 text-primary" />
                                     Vision
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                                    {plan.vision_statement || '—'}
-                                </p>
+                                {plan.vision_statement ? (
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                        {plan.vision_statement}
+                                    </p>
+                                ) : (
+                                    <EmptyState
+                                        variant="compact"
+                                        icon={Eye}
+                                        title="Vision not written yet."
+                                        description={
+                                            canOpenWizard
+                                                ? 'Add it with Edit plan.'
+                                                : undefined
+                                        }
+                                    />
+                                )}
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-section-title">
+                                <CardTitle className="text-section-title flex items-center gap-2">
+                                    <Flag className="h-4 w-4 text-primary" />
                                     Mission
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                                    {plan.mission_statement || '—'}
-                                </p>
+                                {plan.mission_statement ? (
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                        {plan.mission_statement}
+                                    </p>
+                                ) : (
+                                    <EmptyState
+                                        variant="compact"
+                                        icon={Flag}
+                                        title="Mission not written yet."
+                                        description={
+                                            canOpenWizard
+                                                ? 'Add it with Edit plan.'
+                                                : undefined
+                                        }
+                                    />
+                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -539,66 +656,6 @@ export default function StrategyShow({
                         </Card>
                     ) : null}
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-section-title">
-                                Board approval
-                            </CardTitle>
-                            <CardDescription>
-                                A plan is approved only by a carried resolution
-                                that was explicitly bound to this version before
-                                voting.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-3 text-sm">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <StatusBadge
-                                    variant={planStatusVariant(plan.status)}
-                                >
-                                    {planStatusLabel(plan.status)}
-                                </StatusBadge>
-                                {plan.approval_resolution ? (
-                                    <Link
-                                        href={`/governance/resolutions/${plan.approval_resolution.id}`}
-                                        className="font-medium text-primary hover:underline"
-                                    >
-                                        Resolution{' '}
-                                        {
-                                            plan.approval_resolution
-                                                .resolution_reference
-                                        }{' '}
-                                        ·{' '}
-                                        {humanise(
-                                            plan.approval_resolution.outcome ??
-                                                '',
-                                        )}
-                                    </Link>
-                                ) : (
-                                    <span className="text-muted-foreground">
-                                        Not yet approved by the board
-                                    </span>
-                                )}
-                            </div>
-                            {plan.supersedes ? (
-                                <p className="text-muted-foreground">
-                                    Supersedes{' '}
-                                    <Link
-                                        href={`/governance/strategy/${plan.supersedes.id}`}
-                                        className="font-medium text-primary hover:underline"
-                                    >
-                                        {plan.supersedes.title} (version{' '}
-                                        {plan.supersedes.version_number})
-                                    </Link>
-                                </p>
-                            ) : null}
-                            {plan.version_notes ? (
-                                <p className="text-muted-foreground">
-                                    Version notes: {plan.version_notes}
-                                </p>
-                            ) : null}
-                        </CardContent>
-                    </Card>
-
                     <section
                         id="goals"
                         className="flex scroll-mt-5 flex-col gap-5"
@@ -608,8 +665,8 @@ export default function StrategyShow({
                         {goals.length === 0 ? (
                             <EmptyState
                                 icon={Target}
-                                title="No strategic goals yet"
-                                description="Goals turn the plan’s direction into measurable commitments."
+                                title="No goals yet"
+                                description="Goals turn the plan's direction into things the organisation commits to achieve."
                                 action={
                                     canOpenWizard && canAddGoal ? (
                                         <Button
@@ -632,7 +689,8 @@ export default function StrategyShow({
                                                 {pillarLabel(pillar)}
                                             </CardTitle>
                                             <CardDescription>
-                                                {pillarGoals.length} goal
+                                                Theme · {pillarGoals.length}{' '}
+                                                goal
                                                 {pillarGoals.length === 1
                                                     ? ''
                                                     : 's'}
@@ -640,242 +698,10 @@ export default function StrategyShow({
                                         </CardHeader>
                                         <CardContent className="flex flex-col gap-5 pt-4">
                                             {pillarGoals.map((goal) => (
-                                                <div
+                                                <GoalBlock
                                                     key={goal.id}
-                                                    className="border-l-4 border-border pl-4"
-                                                >
-                                                    <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
-                                                        <div className="min-w-0">
-                                                            <h3 className="font-semibold text-foreground">
-                                                                {goal.title}
-                                                            </h3>
-                                                            <p className="text-sm text-muted-foreground">
-                                                                {
-                                                                    goal.description
-                                                                }
-                                                            </p>
-                                                            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                                                {goal.lead_executive ? (
-                                                                    <span className="flex items-center gap-1">
-                                                                        <UserCheck className="h-3.5 w-3.5" />
-                                                                        Lead:{' '}
-                                                                        {
-                                                                            goal
-                                                                                .lead_executive
-                                                                                .name
-                                                                        }
-                                                                    </span>
-                                                                ) : null}
-                                                                {goal.roadmap_initiative ? (
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className="text-[10px]"
-                                                                    >
-                                                                        Roadmap:{' '}
-                                                                        {
-                                                                            goal
-                                                                                .roadmap_initiative
-                                                                                .title
-                                                                        }
-                                                                    </Badge>
-                                                                ) : null}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {goal.timeframe ? (
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="text-xs"
-                                                                >
-                                                                    {
-                                                                        goal.timeframe
-                                                                    }
-                                                                </Badge>
-                                                            ) : null}
-                                                            <StatusBadge
-                                                                variant={workStatusVariant(
-                                                                    goal.status,
-                                                                )}
-                                                            >
-                                                                {humanise(
-                                                                    goal.status,
-                                                                )}
-                                                            </StatusBadge>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="mt-2 mb-3">
-                                                        <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                                                            <span>
-                                                                Progress
-                                                            </span>
-                                                            <span className="font-medium">
-                                                                {Math.round(
-                                                                    Number(
-                                                                        goal.progress_pct ??
-                                                                            0,
-                                                                    ),
-                                                                )}
-                                                                %
-                                                            </span>
-                                                        </div>
-                                                        <Progress
-                                                            value={Number(
-                                                                goal.progress_pct ??
-                                                                    0,
-                                                            )}
-                                                            className="h-1.5"
-                                                        />
-                                                    </div>
-
-                                                    {(goal.key_results ?? [])
-                                                        .length > 0 ? (
-                                                        <div className="mt-3 flex flex-col gap-2">
-                                                            <p className="text-sm font-medium text-foreground">
-                                                                Key results
-                                                            </p>
-                                                            {(
-                                                                goal.key_results ??
-                                                                []
-                                                            ).map(
-                                                                (kr, index) => (
-                                                                    <div
-                                                                        key={
-                                                                            index
-                                                                        }
-                                                                        className="flex items-center gap-2 text-sm"
-                                                                    >
-                                                                        {kr.status ===
-                                                                        'achieved' ? (
-                                                                            <CheckCircle className="h-4 w-4 text-status-success" />
-                                                                        ) : kr.status ===
-                                                                          'in_progress' ? (
-                                                                            <Clock className="h-4 w-4 text-status-info" />
-                                                                        ) : (
-                                                                            <AlertTriangle className="h-4 w-4 text-status-warning" />
-                                                                        )}
-                                                                        <span
-                                                                            className={
-                                                                                kr.status ===
-                                                                                'achieved'
-                                                                                    ? 'text-muted-foreground line-through'
-                                                                                    : undefined
-                                                                            }
-                                                                        >
-                                                                            {
-                                                                                kr.result
-                                                                            }
-                                                                        </span>
-                                                                        <span className="sr-only">
-                                                                            (
-                                                                            {humanise(
-                                                                                kr.status ??
-                                                                                    'not_started',
-                                                                            )}
-                                                                            )
-                                                                        </span>
-                                                                    </div>
-                                                                ),
-                                                            )}
-                                                        </div>
-                                                    ) : null}
-
-                                                    {(goal.initiatives ?? [])
-                                                        .length > 0 ? (
-                                                        <div className="mt-4">
-                                                            <p className="mb-2 text-sm font-medium text-foreground">
-                                                                Initiatives
-                                                            </p>
-                                                            <div className="flex flex-col gap-3">
-                                                                {goal.initiatives.map(
-                                                                    (
-                                                                        initiative,
-                                                                    ) => {
-                                                                        const allocated =
-                                                                            Number(
-                                                                                initiative.budget_allocated,
-                                                                            ) ||
-                                                                            0;
-                                                                        const spent =
-                                                                            Number(
-                                                                                initiative.budget_spent,
-                                                                            ) ||
-                                                                            0;
-                                                                        return (
-                                                                            <div
-                                                                                key={
-                                                                                    initiative.id
-                                                                                }
-                                                                                className="rounded-lg bg-muted p-3"
-                                                                            >
-                                                                                <div className="flex items-start justify-between gap-3">
-                                                                                    <div className="min-w-0">
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <Rocket className="h-4 w-4 text-muted-foreground" />
-                                                                                            <p className="text-sm font-medium">
-                                                                                                {
-                                                                                                    initiative.name
-                                                                                                }
-                                                                                            </p>
-                                                                                        </div>
-                                                                                        <p className="text-caption mt-1">
-                                                                                            {initiative
-                                                                                                .owner
-                                                                                                ?.name ||
-                                                                                                'No owner'}
-                                                                                            {initiative.target_completion
-                                                                                                ? ` · Due ${formatDateOnly(dateOnly(initiative.target_completion))}`
-                                                                                                : ''}
-                                                                                        </p>
-                                                                                    </div>
-                                                                                    <StatusBadge
-                                                                                        variant={workStatusVariant(
-                                                                                            initiative.status,
-                                                                                        )}
-                                                                                    >
-                                                                                        {humanise(
-                                                                                            initiative.status,
-                                                                                        )}
-                                                                                    </StatusBadge>
-                                                                                </div>
-                                                                                <div className="mt-2">
-                                                                                    <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                                                                                        <span>
-                                                                                            Budget
-                                                                                        </span>
-                                                                                        <span>
-                                                                                            {formatNzd(
-                                                                                                spent,
-                                                                                            )}{' '}
-                                                                                            of{' '}
-                                                                                            {formatNzd(
-                                                                                                allocated,
-                                                                                            )}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <Progress
-                                                                                        value={
-                                                                                            allocated >
-                                                                                            0
-                                                                                                ? Math.min(
-                                                                                                      100,
-                                                                                                      (spent /
-                                                                                                          allocated) *
-                                                                                                          100,
-                                                                                                  )
-                                                                                                : 0
-                                                                                        }
-                                                                                        className="h-1"
-                                                                                    />
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    },
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ) : null}
-                                                </div>
+                                                    goal={goal}
+                                                />
                                             ))}
                                         </CardContent>
                                     </Card>
@@ -887,190 +713,20 @@ export default function StrategyShow({
             </PageLayout>
 
             {canApprove ? (
-                <Dialog
+                <ApproveDialog
                     open={isApproveOpen}
-                    onOpenChange={(open) => {
-                        setIsApproveOpen(open);
-                        if (!open) approveForm.clearErrors();
-                    }}
-                >
-                    <DialogContent style={{ maxWidth: 'min(92vw, 480px)' }}>
-                        <form onSubmit={handleApprove}>
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                    <CheckCircle className="h-4 w-4 text-primary" />
-                                    Approve strategic plan
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Approve version {plan.version_number} with
-                                    the carried board resolution bound to it.
-                                </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="py-4">
-                                {carriedResolutions.length === 0 ? (
-                                    <div className="flex items-start gap-3 rounded-lg border border-status-warning/40 bg-status-warning-bg p-3 text-status-warning">
-                                        <AlertTriangle className="h-5 w-5 shrink-0" />
-                                        <div>
-                                            <p className="text-sm font-semibold">
-                                                No bound resolution is ready
-                                            </p>
-                                            <p className="mt-1 text-xs text-foreground">
-                                                Bind a decision paper to this
-                                                plan while it is a draft; once
-                                                the board carries it, it appears
-                                                here. Only unused resolutions
-                                                bound to this plan are listed.
-                                            </p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col gap-2">
-                                        <Label htmlFor="resolution-select">
-                                            Carried resolution
-                                        </Label>
-                                        <Select
-                                            value={
-                                                approveForm.data
-                                                    .resolution_id || undefined
-                                            }
-                                            onValueChange={(value) =>
-                                                approveForm.setData(
-                                                    'resolution_id',
-                                                    value,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger
-                                                id="resolution-select"
-                                                className="w-full"
-                                            >
-                                                <SelectValue placeholder="Choose the bound resolution" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {carriedResolutions.map(
-                                                    (res) => (
-                                                        <SelectItem
-                                                            key={res.id}
-                                                            value={String(
-                                                                res.id,
-                                                            )}
-                                                        >
-                                                            {
-                                                                res.resolution_reference
-                                                            }{' '}
-                                                            — {res.title}
-                                                        </SelectItem>
-                                                    ),
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                        <InputError
-                                            message={
-                                                approveForm.errors.resolution_id
-                                            }
-                                        />
-                                    </div>
-                                )}
-                            </div>
-
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setIsApproveOpen(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={
-                                        !approveForm.data.resolution_id ||
-                                        carriedResolutions.length === 0 ||
-                                        approveForm.processing
-                                    }
-                                >
-                                    {approveForm.processing ? (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : null}
-                                    Approve plan
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                    onClose={() => setIsApproveOpen(false)}
+                    plan={plan}
+                    resolutions={carriedResolutions}
+                />
             ) : null}
 
             {canCreateVersion ? (
-                <Dialog
+                <VersionDialog
                     open={isVersionOpen}
-                    onOpenChange={(open) => {
-                        setIsVersionOpen(open);
-                        if (!open) versionForm.clearErrors();
-                    }}
-                >
-                    <DialogContent style={{ maxWidth: 'min(92vw, 480px)' }}>
-                        <form onSubmit={handleCreateVersion}>
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                    <GitBranch className="h-4 w-4 text-primary" />
-                                    Create new plan version
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Create version {plan.version_number + 1}{' '}
-                                    branched from this plan. Goals and
-                                    initiatives keep their lineage for change
-                                    comparisons.
-                                </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="flex flex-col gap-2 py-4">
-                                <Label htmlFor="version-notes">
-                                    Version notes
-                                </Label>
-                                <Textarea
-                                    id="version-notes"
-                                    value={versionForm.data.version_notes}
-                                    onChange={(e) =>
-                                        versionForm.setData(
-                                            'version_notes',
-                                            e.target.value,
-                                        )
-                                    }
-                                    required
-                                    maxLength={500}
-                                    placeholder="Why is a new version needed? e.g. Annual refresh after the 2026 review."
-                                    rows={3}
-                                />
-                                <InputError
-                                    message={versionForm.errors.version_notes}
-                                />
-                            </div>
-
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setIsVersionOpen(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={
-                                        !versionForm.data.version_notes.trim() ||
-                                        versionForm.processing
-                                    }
-                                >
-                                    {versionForm.processing ? (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : null}
-                                    Create version
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                    onClose={() => setIsVersionOpen(false)}
+                    plan={plan}
+                />
             ) : null}
 
             {canOpenWizard && formOptions ? (
@@ -1100,5 +756,331 @@ export default function StrategyShow({
                 />
             ) : null}
         </AppLayout>
+    );
+}
+
+function GoalBlock({ goal }: { goal: Goal }) {
+    const tracked = goalProgressTracked(goal);
+    const chip = governanceStatus('goal_status', goal.status ?? 'not_started');
+    const progress = Math.round(Number(goal.progress_pct ?? 0));
+
+    return (
+        <div className="border-l-4 border-border pl-4">
+            <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h3 className="font-semibold text-foreground">
+                        {goal.title}
+                    </h3>
+                    <p className="text-subtle">{goal.description}</p>
+                    <div className="text-caption mt-1 flex flex-wrap items-center gap-3">
+                        {goal.lead_executive ? (
+                            <span className="flex items-center gap-1">
+                                <UserCheck className="h-3.5 w-3.5" />
+                                Lead: {goal.lead_executive.name}
+                            </span>
+                        ) : null}
+                        {goal.roadmap_initiative ? (
+                            <EntityChip outline>
+                                Roadmap: {goal.roadmap_initiative.title}
+                            </EntityChip>
+                        ) : null}
+                    </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {goal.timeframe ? (
+                        <EntityChip>{formatTimeframe(goal.timeframe)}</EntityChip>
+                    ) : null}
+                    <StatusBadge variant={chip.variant}>{chip.label}</StatusBadge>
+                </div>
+            </div>
+
+            <div className="mt-2 mb-3">
+                {tracked ? (
+                    <>
+                        <div className="text-caption mb-1 flex items-center justify-between">
+                            <span>Progress</span>
+                            <span className="font-medium">{progress}%</span>
+                        </div>
+                        <Progress value={progress} className="h-1.5" />
+                    </>
+                ) : (
+                    <p className="text-caption">Progress not tracked yet</p>
+                )}
+            </div>
+
+            {(goal.key_results ?? []).length > 0 ? (
+                <div className="mt-3 flex flex-col gap-2">
+                    <p className="text-sm font-medium text-foreground">
+                        Measures of success
+                    </p>
+                    {(goal.key_results ?? []).map((measure, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                            <MeasureIcon status={measure.status} />
+                            <span
+                                className={
+                                    measure.status === 'achieved'
+                                        ? 'text-muted-foreground line-through'
+                                        : undefined
+                                }
+                            >
+                                {measure.result}
+                            </span>
+                            <span className="sr-only">
+                                ({goalStatusLabel(measure.status ?? 'not_started')})
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+
+            {(goal.initiatives ?? []).length > 0 ? (
+                <div className="mt-4">
+                    <p className="mb-2 text-sm font-medium text-foreground">
+                        Initiatives
+                    </p>
+                    <div className="flex flex-col gap-3">
+                        {goal.initiatives.map((initiative) => {
+                            const allocated =
+                                Number(initiative.budget_allocated) || 0;
+                            const spent = Number(initiative.budget_spent) || 0;
+                            const initiativeChip = governanceStatus(
+                                'goal_status',
+                                initiative.status,
+                            );
+                            return (
+                                <div
+                                    key={initiative.id}
+                                    className="rounded-lg bg-muted p-3"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <Rocket className="h-4 w-4 text-muted-foreground" />
+                                                <p className="text-sm font-medium">
+                                                    {initiative.name}
+                                                </p>
+                                            </div>
+                                            <p className="text-caption mt-1">
+                                                {initiative.owner?.name ||
+                                                    'No owner yet'}
+                                                {initiative.target_completion
+                                                    ? ` · Due ${formatDateOnly(dateOnly(initiative.target_completion))}`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                        <StatusBadge
+                                            variant={initiativeChip.variant}
+                                        >
+                                            {initiativeChip.label}
+                                        </StatusBadge>
+                                    </div>
+                                    {allocated > 0 ? (
+                                        <div className="mt-2">
+                                            <div className="text-caption mb-1 flex items-center justify-between">
+                                                <span>Budget</span>
+                                                <span>
+                                                    {formatNzd(spent)} spent of{' '}
+                                                    {formatNzd(allocated)}
+                                                </span>
+                                            </div>
+                                            <Progress
+                                                value={Math.min(
+                                                    100,
+                                                    (spent / allocated) * 100,
+                                                )}
+                                                className="h-1"
+                                            />
+                                        </div>
+                                    ) : null}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+function ApproveDialog({
+    open,
+    onClose,
+    plan,
+    resolutions,
+}: {
+    open: boolean;
+    onClose: () => void;
+    plan: StrategicPlan;
+    resolutions: CarriedResolution[];
+}) {
+    const form = useForm({
+        resolution_id:
+            resolutions.length === 1 ? String(resolutions[0].id) : NONE,
+    });
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        if (form.data.resolution_id === NONE) return;
+        form.transform((data) => ({
+            resolution_id: Number(data.resolution_id),
+        }));
+        form.post(`/governance/strategy/${plan.id}/approve`, {
+            preserveScroll: true,
+            onSuccess: (page: unknown) => {
+                if (!pageHasFlashError(page)) onClose();
+            },
+        });
+    };
+
+    return (
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                if (!next) {
+                    form.clearErrors();
+                    onClose();
+                }
+            }}
+        >
+            <DialogContent style={{ maxWidth: 'min(92vw, 520px)' }}>
+                <form onSubmit={submit} className="flex flex-col gap-4">
+                    <DialogHeader>
+                        <DialogTitle>Record board approval</DialogTitle>
+                        <DialogDescription>
+                            Record that the board passed a resolution approving
+                            version {plan.version_number} of this plan. It
+                            becomes the approved strategic plan
+                            {plan.supersedes
+                                ? `, replacing version ${plan.supersedes.version_number}`
+                                : ''}
+                            , and can no longer be edited.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-2">
+                        <Label>Resolution the board passed</Label>
+                        <SelectInput
+                            value={form.data.resolution_id}
+                            onChange={(value) =>
+                                form.setData('resolution_id', value)
+                            }
+                            placeholder="Choose the resolution"
+                            ariaLabel="Resolution the board passed"
+                            options={[
+                                { value: NONE, label: 'Choose the resolution' },
+                                ...resolutions.map((resolution) => ({
+                                    value: String(resolution.id),
+                                    label: `${resolution.title}${resolution.resolution_reference ? ` · ${refSuffix(resolution.resolution_reference)}` : ''}`,
+                                })),
+                            ]}
+                        />
+                        <InputError message={form.errors.resolution_id} />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={
+                                form.data.resolution_id === NONE ||
+                                form.processing
+                            }
+                        >
+                            {form.processing ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
+                            Record approval
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function VersionDialog({
+    open,
+    onClose,
+    plan,
+}: {
+    open: boolean;
+    onClose: () => void;
+    plan: StrategicPlan;
+}) {
+    const form = useForm({ version_notes: '' });
+    const nextVersion = plan.version_number + 1;
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        if (!form.data.version_notes.trim()) return;
+        form.post(`/governance/strategy/${plan.id}/version`, {
+            preserveScroll: true,
+            onSuccess: (page: unknown) => {
+                if (!pageHasFlashError(page)) {
+                    form.reset();
+                    onClose();
+                }
+            },
+        });
+    };
+
+    return (
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                if (!next) {
+                    form.clearErrors();
+                    onClose();
+                }
+            }}
+        >
+            <DialogContent style={{ maxWidth: 'min(92vw, 520px)' }}>
+                <form onSubmit={submit} className="flex flex-col gap-4">
+                    <DialogHeader>
+                        <DialogTitle>Create version {nextVersion}</DialogTitle>
+                        <DialogDescription>
+                            Create version {nextVersion}: a copy of this plan
+                            you can update and put to the board. This version
+                            stays approved until the board approves the new
+                            one.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-2">
+                        <Label htmlFor="version-notes">
+                            Why is a new version needed?{' '}
+                            <span className="text-status-critical">*</span>
+                        </Label>
+                        <Textarea
+                            id="version-notes"
+                            value={form.data.version_notes}
+                            onChange={(e) =>
+                                form.setData('version_notes', e.target.value)
+                            }
+                            maxLength={500}
+                            placeholder="e.g. Yearly refresh after the 2026 review."
+                            rows={3}
+                        />
+                        <InputError message={form.errors.version_notes} />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={
+                                !form.data.version_notes.trim() ||
+                                form.processing
+                            }
+                        >
+                            {form.processing ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
+                            Create version {nextVersion}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }

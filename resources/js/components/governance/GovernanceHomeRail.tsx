@@ -8,7 +8,7 @@ export type GovernanceHomeView = 'overview' | 'my-work' | 'calendar' | 'records'
 const HOME_VIEWS: Array<
     PageHeaderRailItem<GovernanceHomeView> & { href: string }
 > = [
-    { key: 'overview', label: 'Overview', icon: Landmark, href: '/governance/dashboard' },
+    { key: 'overview', label: 'Home', icon: Landmark, href: '/governance/dashboard' },
     { key: 'my-work', label: 'My work', icon: ListChecks, href: '/governance/my-work' },
     { key: 'calendar', label: 'Calendar', icon: CalendarDays, href: '/governance/calendar' },
     { key: 'records', label: 'Records', icon: FileSearch, href: '/governance/records' },

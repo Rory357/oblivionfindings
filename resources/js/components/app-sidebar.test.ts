@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildNavSearchCatalog, isIconActive } from './app-sidebar';
+import {
+    buildNavSearchCatalog,
+    governanceActionableTabKeys,
+    isIconActive,
+} from './app-sidebar';
 
 describe('app sidebar workforce navigation', () => {
     it('keeps IT destinations in the app sidebar without duplicating tabs or device navigation', () => {
@@ -374,5 +378,106 @@ describe('app sidebar workforce navigation', () => {
                 operationsGroups,
             ),
         ).toBe(true);
+    });
+});
+
+describe('app sidebar governance hubs', () => {
+    const governanceCatalog = (can: Record<string, unknown>) =>
+        buildNavSearchCatalog({ can }).filter(
+            (item) => item.section === 'Governance',
+        );
+
+    const memberBase = {
+        view: true,
+        meetings: { view: true },
+        resolutions: { view: true, vote: true },
+        risks: { view: true },
+        compliance: { view: true },
+        performance: { view: true },
+        strategy: { view: true },
+        packs: { view: true },
+        actions: { view: true },
+        policies: { view: true },
+        'ceo-reports': { view: true },
+        interests: { view: true, manage: true },
+        evaluations: { view: true },
+        documents: { view: true },
+        clinical: { view: true },
+    };
+
+    it('keeps view-only members on the four member destinations', () => {
+        const catalog = governanceCatalog({
+            governance: { ...memberBase, budgets: { view: true } },
+        });
+
+        expect(catalog.map((item) => item.href)).toEqual([
+            '/governance/dashboard',
+            '/governance/my-work',
+            '/governance/calendar',
+            '/governance/records',
+        ]);
+    });
+
+    it('gives a treasurer the Board finance hub, opening a page they act in', () => {
+        const catalog = governanceCatalog({
+            governance: {
+                ...memberBase,
+                budgets: { view: true, create: true, submit: true },
+                spend: { view: true, request: true },
+            },
+        });
+
+        expect(catalog.map((item) => item.label)).toEqual([
+            'Home',
+            'My work',
+            'Calendar',
+            'Records',
+            'Board finance',
+        ]);
+        expect(
+            catalog.find((item) => item.label === 'Board finance')?.href,
+        ).toBe('/governance/budgets');
+    });
+
+    it('routes the CEO to CEO reports and, as reviewee, to their own review', () => {
+        const ceo = {
+            view: true,
+            'ceo-reports': { view: true, manage: true },
+        };
+
+        expect(
+            governanceCatalog({
+                governance: { ...ceo, performance: { view: true } },
+            }).map((item) => [item.label, item.href]),
+        ).toEqual([
+            ['Home', '/governance/dashboard'],
+            ['My work', '/governance/my-work'],
+            ['Calendar', '/governance/calendar'],
+            ['Records', '/governance/records'],
+            ['Meetings', '/governance/ceo-reports'],
+        ]);
+
+        const reviewee = governanceCatalog({
+            governance: {
+                ...ceo,
+                performance: { view: true, reviewee: true },
+            },
+        });
+        expect(
+            reviewee.find((item) => item.label === 'Strategy & performance')
+                ?.href,
+        ).toBe('/governance/performance');
+    });
+
+    it('never treats hidden navigation as access: no view, no hub', () => {
+        const actions = governanceActionableTabKeys({
+            governance: { budgets: { approve: true } },
+        });
+        expect([...actions]).toEqual(['budgets']);
+        expect(
+            governanceCatalog({
+                governance: { budgets: { approve: true } },
+            }),
+        ).toEqual([]);
     });
 });

@@ -1,12 +1,14 @@
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
 import { CalendarClock, Info } from 'lucide-react';
+
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { formatDateOnly } from '@/lib/datetime';
+import { refSuffix } from '@/lib/governance-labels';
+import { cn } from '@/lib/utils';
+
 import { NextActionButton } from './NextActionButton';
 import {
     PriorityBadge,
@@ -42,137 +44,148 @@ interface BoardPriorityCardProps {
     action: WorkflowAction;
     whyItMatters?: string;
     className?: string;
-    dense?: boolean;
-}
-
-/**
- * Initials for the owner avatar (e.g. "Jane Smith" → "JS").
- */
-function ownerInitials(name: string | null): string {
-    if (!name) return '?';
-    return (
-        name
-            .split(/\s+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((part) => part[0]?.toUpperCase() ?? '')
-            .join('') || '?'
-    );
 }
 
 const AREA_LABELS: Record<string, string> = {
+    meetings: 'Meeting',
+    resolutions: 'Resolution',
+    risks: 'Risk',
+    risk_register: 'Risk',
+    compliance: 'Requirement',
+    budgets: 'Budget',
+    spend_approvals: 'Spend request',
+    action_items: 'Action',
+    actions: 'Action',
+    policies: 'Policy',
+    // Legacy area names
     Meetings: 'Meeting',
     Resolutions: 'Resolution',
     Risks: 'Risk',
-    Compliance: 'Compliance',
+    'Risk Register': 'Risk',
+    Compliance: 'Requirement',
     Budgets: 'Budget',
-    'Spend Approvals': 'Spend',
+    'Spend Approvals': 'Spend request',
     'Action Items': 'Action',
     Policies: 'Policy',
-    'CEO Reports': 'CEO Report',
+    'CEO Reports': 'CEO report',
 };
 
-const STATUS_HINT: Record<WorkflowStatus, string> = {
-    overdue: 'Past its due date — needs board attention now.',
-    due_soon: 'Due within the next 7 days.',
-    pending: 'Open and awaiting board action.',
+const WHY_BY_AREA: Record<string, string> = {
+    Meeting:
+        'Meetings work when the agenda is ready, members have read the board pack, and the minutes are written and approved afterwards.',
+    Resolution:
+        "The chair or secretary opens and closes voting, so the board's decision is properly recorded.",
+    Risk: 'The board has agreed the most risk it will accept for this kind of risk. This one is above that limit, so the board needs to see what is being done about it.',
+    Requirement:
+        'Requirements come from the law, standards or funding contracts. Missing one can lead to penalties or put funding at risk.',
+    Budget: "Budgets and budget changes need the board's approval before the money is committed.",
+    'Spend request':
+        'Spending above the set limit needs approval before it goes ahead.',
+    Action: "Actions are follow-up work the board asked for. When they slip, a board decision isn't being carried out on time.",
+    Policy: 'Policies are reviewed regularly so they stay accurate, legal and useful.',
 };
+
+const WHY_BY_STATUS: Record<string, string> = {
+    overdue: "It's past its due date.",
+    due_soon: "It's due in the next 7 days.",
+    blocked: "It's blocked, so it can't move until something else happens.",
+};
+
+export function priorityAreaLabel(action: Pick<WorkflowAction, 'area' | 'area_key'>): string {
+    return (
+        (action.area_key ? AREA_LABELS[action.area_key] : undefined) ??
+        AREA_LABELS[action.area] ??
+        action.area
+    );
+}
+
+/** A real explanation: why this kind of item matters, and why it's urgent now. */
+export function priorityExplanation(action: WorkflowAction): string {
+    return [
+        WHY_BY_AREA[priorityAreaLabel(action)] ??
+            'This needs the board to know about it or act on it.',
+        WHY_BY_STATUS[action.status],
+    ]
+        .filter(Boolean)
+        .join(' ');
+}
 
 /**
- * Single priority row in the cockpit. Every card answers:
- *   what is this? why does it matter? who owns it? when is it due?
- *   what should I do next?
+ * One board priority. Every card answers: what is this, why does it matter,
+ * who owns it, when is it due, and what do I do next? The record title leads;
+ * any reference sits last and muted.
  */
 export function BoardPriorityCard({
     action,
     whyItMatters,
     className,
-    dense = false,
 }: BoardPriorityCardProps) {
-    const areaLabel = AREA_LABELS[action.area] ?? action.area;
-    const why = whyItMatters ?? STATUS_HINT[action.status];
+    const areaLabel = priorityAreaLabel(action);
+    const why = whyItMatters ?? priorityExplanation(action);
+    const reference = refSuffix(action.source?.reference);
 
     return (
         <div
             className={cn(
-                'group flex flex-col gap-3 rounded-lg border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-sm lg:flex-row lg:items-center lg:justify-between',
-                action.status === 'overdue' &&
-                    'border-status-critical/30 bg-status-critical-bg/10',
+                'group flex flex-col gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/40 lg:flex-row lg:items-center lg:justify-between',
+                action.status === 'overdue' && 'border-status-critical/30',
                 className,
             )}
             data-dusk={`cockpit-priority-${action.id}`}
         >
-            <div className="flex min-w-0 flex-1 items-start gap-3">
-                {!dense && (
-                    <Avatar
-                        className="hidden h-9 w-9 shrink-0 md:flex"
-                        title={action.owner ?? 'Unassigned'}
-                    >
-                        <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
-                            {ownerInitials(action.owner)}
-                        </AvatarFallback>
-                    </Avatar>
-                )}
-
-                <div className="min-w-0 flex-1 space-y-1.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Badge
-                            variant="outline"
-                            className="text-[10px] tracking-wide uppercase"
-                        >
-                            {areaLabel}
-                        </Badge>
-                        <PriorityBadge
-                            priority={action.priority}
-                            status={action.status}
-                        />
-                        {action.due_date ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                <CalendarClock
-                                    className="h-3 w-3"
-                                    aria-hidden="true"
-                                />
-                                Due {action.due_date}
-                            </span>
-                        ) : null}
-                    </div>
-
-                    <p className="leading-snug font-medium text-foreground">
-                        {action.title}
-                    </p>
-
-                    {action.detail ? (
-                        <p className="text-sm leading-snug text-muted-foreground">
-                            {action.detail}
-                        </p>
+            <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2 text-caption">
+                    <span className="font-medium text-foreground">
+                        {areaLabel}
+                    </span>
+                    <PriorityBadge
+                        priority={action.priority}
+                        status={action.status}
+                    />
+                    {action.due_date ? (
+                        <span className="inline-flex items-center gap-1">
+                            <CalendarClock
+                                className="size-3"
+                                aria-hidden="true"
+                            />
+                            Due {formatDateOnly(action.due_date)}
+                        </span>
                     ) : null}
+                </div>
 
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        {action.owner ? (
-                            <span>
-                                <span className="text-muted-foreground/70">
-                                    Owner:
-                                </span>{' '}
-                                {action.owner}
-                            </span>
-                        ) : (
-                            <span className="italic">Unassigned</span>
-                        )}
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span className="inline-flex cursor-help items-center gap-1 text-muted-foreground hover:text-foreground">
-                                    <Info
-                                        className="h-3 w-3"
-                                        aria-hidden="true"
-                                    />
-                                    Why this matters
-                                </span>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs text-xs">
-                                {why}
-                            </TooltipContent>
-                        </Tooltip>
-                    </div>
+                <p className="leading-snug font-medium text-foreground">
+                    {action.title}
+                    {reference ? (
+                        <span className="ml-1.5 text-caption font-normal">
+                            {reference}
+                        </span>
+                    ) : null}
+                </p>
+
+                {action.detail ? (
+                    <p className="text-sm leading-snug text-muted-foreground">
+                        {action.detail}
+                    </p>
+                ) : null}
+
+                <div className="flex flex-wrap items-center gap-3 text-caption">
+                    <span>
+                        {action.owner ? `Owner: ${action.owner}` : 'No owner yet'}
+                    </span>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <button
+                                type="button"
+                                className="inline-flex items-center gap-1 rounded-sm underline decoration-dotted underline-offset-4 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            >
+                                <Info className="size-3" aria-hidden="true" />
+                                Why this matters
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-72">
+                            <p className="text-subtle">{why}</p>
+                        </PopoverContent>
+                    </Popover>
                 </div>
             </div>
 

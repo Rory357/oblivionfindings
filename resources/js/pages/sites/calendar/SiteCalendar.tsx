@@ -79,6 +79,7 @@ import { formatDateTime } from '@/lib/datetime';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    ArrowLeft,
     Bell,
     CalendarClock,
     CalendarDays,
@@ -196,6 +197,8 @@ export interface CalendarDataAdapter {
     onCreate?: (seed: CreateSeed) => void;
     showApprovalMeter?: boolean;
     mineLink?: { href: string; label: string };
+    /** Optional glass "back" link in the header (e.g. "Governance home"). Omitted → nothing renders. */
+    backLink?: { href: string; label: string };
     primaryAction?: { href: string; label: string };
     exportFilename?: string;
     searchPlaceholder?: string;
@@ -1436,6 +1439,14 @@ export default function SiteCalendar({
     // primary (PAGE_HEADER_STYLE_GUIDE.md §4).
     const headerActions = (
         <>
+            {dataAdapter?.backLink && (
+                <PageHeaderGlassButton
+                    icon={ArrowLeft}
+                    onClick={() => router.visit(dataAdapter.backLink!.href)}
+                >
+                    {dataAdapter.backLink.label}
+                </PageHeaderGlassButton>
+            )}
             <PageHeaderSearch
                 value={q}
                 onChange={setQ}
@@ -2299,7 +2310,10 @@ function EventDetailDialog({
 
                     <div className="space-y-3 text-sm">
                         <div className="flex flex-wrap items-center gap-2">
-                            <StatusBadge status={event.status} />
+                            <StatusBadge
+                                status={event.status}
+                                label={event.statusLabel}
+                            />
                             <span className="rounded-full bg-muted px-2 py-0.5 text-[12px] font-medium text-muted-foreground">
                                 {relativeDayLabel(event._start)}
                             </span>
@@ -2340,9 +2354,10 @@ function EventDetailDialog({
                                         {source.label}
                                     </p>
                                     <p className="truncate text-[11px] text-muted-foreground">
-                                        {event.group === 'manual'
-                                            ? 'Manual calendar entry'
-                                            : `Auto-synced from ${source.origin}`}
+                                        {source.note ??
+                                            (event.group === 'manual'
+                                                ? 'Manual calendar entry'
+                                                : `Auto-synced from ${source.origin}`)}
                                     </p>
                                 </div>
                             </div>
@@ -3754,7 +3769,7 @@ function EventHoverCard({
                 <p className="text-[14px] leading-tight font-semibold text-foreground">
                     {ev.title}
                 </p>
-                <StatusBadge status={ev.status} />
+                <StatusBadge status={ev.status} label={ev.statusLabel} />
                 <dl className="space-y-1 text-[12px] text-muted-foreground">
                     <div className="flex items-center gap-1.5">
                         <Clock className="h-3.5 w-3.5 shrink-0" />
@@ -3795,9 +3810,10 @@ function EventHoverCard({
                 )}
                 <p className="border-t pt-1.5 text-[10.5px] text-muted-foreground/70">
                     Click to open ·{' '}
-                    {ev.group === 'manual'
-                        ? 'Manual entry'
-                        : 'Auto-synced obligation'}
+                    {src?.note ??
+                        (ev.group === 'manual'
+                            ? 'Manual entry'
+                            : 'Auto-synced obligation')}
                 </p>
             </div>
         </div>,

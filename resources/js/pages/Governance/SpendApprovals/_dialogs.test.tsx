@@ -42,7 +42,11 @@ vi.mock('@inertiajs/react', async () => {
     };
 });
 
-import { SpendApprovalWizardDialog } from './_dialogs';
+import {
+    SpendApprovalWizardDialog,
+    needsBoardResolution,
+    whoApprovesText,
+} from './_dialogs';
 
 const options = {
     categories: { capex: 'Capital expenditure', opex: 'Operating expenditure' },
@@ -59,6 +63,16 @@ afterEach(() => {
     inertia.put.mockReset();
 });
 
+describe('who approves what', () => {
+    it('needs a board resolution from the threshold amount, not above it', () => {
+        expect(needsBoardResolution(4999.99, 5000)).toBe(false);
+        expect(needsBoardResolution(5000, 5000)).toBe(true);
+        expect(whoApprovesText(5000)).toBe(
+            'Below $5,000: approved by a finance approver. $5,000 and over: needs a board resolution.',
+        );
+    });
+});
+
 describe('SpendApprovalWizardDialog', () => {
     it('blocks Continue until the request step has its required fields', () => {
         render(
@@ -71,7 +85,7 @@ describe('SpendApprovalWizardDialog', () => {
         expect(
             screen.getByText('Choose the site this spend is for.'),
         ).toBeTruthy();
-        expect(screen.getByText('What needs sign-off?')).toBeTruthy();
+        expect(screen.getByText('What is the spend for?')).toBeTruthy();
     });
 
     it('edits with the version it opened and jumps to the step owning a server error', () => {
@@ -109,7 +123,7 @@ describe('SpendApprovalWizardDialog', () => {
             category: 'capex',
         });
 
-        expect(screen.getByText('Amount and validity')).toBeTruthy();
+        expect(screen.getByRole('heading', { name: 'Amount' })).toBeTruthy();
         expect(screen.getByText('The amount is too large.')).toBeTruthy();
     });
 });

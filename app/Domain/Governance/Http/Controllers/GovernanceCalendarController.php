@@ -12,6 +12,41 @@ use Inertia\Response;
 
 class GovernanceCalendarController extends Controller
 {
+    /**
+     * Plain source names for the shared calendar's filters. Mirrors
+     * GOVERNANCE_CALENDAR_SOURCES in resources/js/lib/governance-calendar-adapter.ts.
+     */
+    private const SOURCE_LABELS = [
+        'meetings' => [
+            'label' => 'Meetings',
+            'short' => 'Meetings',
+            'icon' => 'CalendarDays',
+            'origin' => 'Meetings',
+            'note' => 'Board or committee meeting',
+        ],
+        'decisions' => [
+            'label' => 'Voting deadlines',
+            'short' => 'Voting',
+            'icon' => 'Vote',
+            'origin' => 'Resolutions',
+            'note' => 'When voting on a resolution closes',
+        ],
+        'obligations' => [
+            'label' => 'Requirements',
+            'short' => 'Requirements',
+            'icon' => 'ShieldCheck',
+            'origin' => 'Compliance',
+            'note' => 'When a compliance requirement is due',
+        ],
+        'policies' => [
+            'label' => 'Policy reviews',
+            'short' => 'Policies',
+            'icon' => 'BookOpen',
+            'origin' => 'Policies',
+            'note' => 'When a policy is due for review',
+        ],
+    ];
+
     public function __construct(
         private readonly GovernanceCalendarQuery $calendarQuery,
     ) {}
@@ -20,46 +55,20 @@ class GovernanceCalendarController extends Controller
     {
         $user = $request->user();
 
-        $canCreate = $user->canDo('governance.meetings.create')
-            || $user->hasRole('admin', 'board_chair', 'board_secretary');
+        // Meetings are only stored by viewers who can manage them.
+        $canCreate = $user->canDo('governance.meetings.manage');
 
-        $sources = [
-            [
-                'key' => 'meetings',
-                'label' => 'Meetings',
-                'short' => 'Meetings',
-                'group' => 'manual',
-                'icon' => 'CalendarDays',
-                'origin' => 'Governance meetings',
-            ],
-            [
-                'key' => 'decisions',
-                'label' => 'Decision deadlines',
-                'short' => 'Decisions',
-                'group' => 'auto',
-                'icon' => 'Vote',
-                'origin' => 'Board resolutions',
-            ],
-            [
-                'key' => 'obligations',
-                'label' => 'Obligations',
-                'short' => 'Obligations',
-                'group' => 'auto',
-                'icon' => 'ShieldCheck',
-                'origin' => 'Compliance register',
-            ],
-            [
-                'key' => 'policies',
-                'label' => 'Policy reviews',
-                'short' => 'Policies',
-                'group' => 'auto',
-                'icon' => 'BookOpen',
-                'origin' => 'Policy register',
-            ],
-        ];
+        // Only offer the sources whose registers this viewer can open.
+        $allowed = $this->calendarQuery->sourcesFor($user);
+        $sources = array_map(
+            fn (string $key) => ['key' => $key, 'group' => 'auto', ...self::SOURCE_LABELS[$key]],
+            $allowed,
+        );
 
         $initialSource = $request->query('source');
-        $initialSources = $initialSource ? [$initialSource] : ['meetings', 'decisions', 'obligations', 'policies'];
+        $initialSources = is_string($initialSource) && in_array($initialSource, $allowed, true)
+            ? [$initialSource]
+            : $allowed;
 
         return Inertia::render('Governance/Calendar/Index', [
             'sources' => $sources,

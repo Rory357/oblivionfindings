@@ -183,7 +183,7 @@ class VotingServiceTest extends TestCase
         $service = new VotingService;
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Board member is not eligible to vote');
+        $this->expectExceptionMessage("You can't vote on this resolution.");
         $service->castVote($resolution, $observer, 'for');
     }
 
@@ -204,7 +204,7 @@ class VotingServiceTest extends TestCase
         $service = new VotingService;
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Board member is not eligible to vote');
+        $this->expectExceptionMessage("You can't vote on this resolution.");
         $service->castVote($resolution, $expiredMember, 'for');
     }
 
@@ -297,7 +297,7 @@ class VotingServiceTest extends TestCase
             $service->castVote($resolution, $m2, 'for');
             $this->fail('Non-committee member should not be able to vote on committee resolution');
         } catch (\InvalidArgumentException $e) {
-            $this->assertStringContainsString('not an eligible voting member of this committee', $e->getMessage());
+            $this->assertStringContainsString('Only voting members of the Finance Committee can vote', $e->getMessage());
         }
 
         // Quorum calculates strictly from committee membership
@@ -325,7 +325,7 @@ class VotingServiceTest extends TestCase
             $profileService->activateProfile($profile, $admin, null, 'Candidate Governance Profile (Pending D1 Legal Authority)');
             $this->fail('Activation with candidate reference must be rejected');
         } catch (\InvalidArgumentException $e) {
-            $this->assertStringContainsString('actual governing document reference', $e->getMessage());
+            $this->assertStringContainsString('actual governing document', $e->getMessage());
         }
 
         // Attempting activation without approval authority is rejected
@@ -333,7 +333,7 @@ class VotingServiceTest extends TestCase
             $profileService->activateProfile($profile, $admin, null, 'Trust Deed 2024');
             $this->fail('Activation without approval authority evidence must be rejected');
         } catch (\InvalidArgumentException $e) {
-            $this->assertStringContainsString('approval authority evidence', $e->getMessage());
+            $this->assertStringContainsString("board's approval hasn't been recorded", $e->getMessage());
         }
 
         // Activation with document reference and a resolution explicitly bound to
@@ -387,7 +387,7 @@ class VotingServiceTest extends TestCase
         $this->assertFalse($unconfirmedProfile->isConfirmed());
 
         $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('Voting rules not confirmed — live voting unavailable');
+        $this->expectExceptionMessage('Board voting is switched off');
         $service->openVoting($resolution);
     }
 
@@ -426,7 +426,7 @@ class VotingServiceTest extends TestCase
         $service->castVote($resolution, $boardMember, 'for');
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Board member has already cast a vote on this resolution');
+        $this->expectExceptionMessage("You've already voted on this resolution");
         $service->castVote($resolution, $boardMember, 'against');
     }
 
@@ -451,7 +451,7 @@ class VotingServiceTest extends TestCase
         );
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Board member has recused and withdrawn from voting on this resolution');
+        $this->expectExceptionMessage('You stepped aside from this vote');
         $service->castVote($resolution, $boardMember, 'for');
     }
 
@@ -501,7 +501,7 @@ class VotingServiceTest extends TestCase
 
         $service = new VotingService;
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Voting deadline has passed');
+        $this->expectExceptionMessage('Voting closed at the deadline');
         $service->castVote($resolution, $boardMember, 'for');
     }
 
@@ -515,7 +515,7 @@ class VotingServiceTest extends TestCase
         ]);
 
         $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage("Cannot implement resolution with outcome 'no_quorum'");
+        $this->expectExceptionMessage('Only resolutions that passed can be marked as done');
         $resolution->markImplemented('Attempting to implement unmet quorum');
     }
 
@@ -557,6 +557,228 @@ class VotingServiceTest extends TestCase
         $names = collect($results['individual_votes'])->pluck('board_member')->all();
         $this->assertContains('Alice Auditor', $names);
         $this->assertContains('Bob Trustee', $names);
+    }
+
+    // ── Plain-language UX audit 2026-09-14 ───────────────────────────────────
+
+    public function test_two_thirds_rule_counts_only_for_and_against_votes_and_special_is_the_same_rule(): void
+    {
+        $this->seedGovernance();
+        $admin = $this->createAdminUser();
+        $members = collect(range(1, 6))->map(fn (int $i) => $this->createBoardMember(
+            $this->createUserWithRole('board_member', ['email' => "two-thirds-{$i}@example.test"])
+        ))->values();
+        $service = new VotingService;
+
+        // 2 For, 1 Against, 3 abstain: two-thirds of the For and Against votes are For.
+        $passes = $this->createResolution($admin, ['status' => 'open', 'voting_threshold' => 'two_thirds', 'deadline' => now()->addDay()]);
+        foreach (['for', 'for', 'against', 'abstain', 'abstain', 'abstain'] as $i => $vote) {
+            $service->castVote($passes, $members[$i], $vote);
+        }
+        $service->closeVoting($passes);
+        $this->assertSame('carried', $passes->fresh()->outcome);
+        $this->assertSame('two_thirds', $passes->fresh()->vote_summary['decision_snapshot']['applied_threshold']);
+
+        // 3 For, 2 Against is 60% — more For than Against, but short of two-thirds.
+        $fails = $this->createResolution($admin, ['status' => 'open', 'voting_threshold' => 'two_thirds', 'deadline' => now()->addDay()]);
+        foreach (['for', 'for', 'for', 'against', 'against'] as $i => $vote) {
+            $service->castVote($fails, $members[$i], $vote);
+        }
+        $service->closeVoting($fails);
+        $this->assertSame('defeated', $fails->fresh()->outcome);
+
+        // The wizard's "special" key is the same two-thirds rule (it used to
+        // fall back to "more For than Against").
+        $special = $this->createResolution($admin, ['status' => 'open', 'voting_threshold' => 'special', 'deadline' => now()->addDay()]);
+        foreach (['for', 'for', 'for', 'against', 'against'] as $i => $vote) {
+            $service->castVote($special, $members[$i], $vote);
+        }
+        $service->closeVoting($special);
+        $this->assertSame('defeated', $special->fresh()->outcome);
+        $this->assertSame('two_thirds', $special->fresh()->appliedThreshold());
+    }
+
+    public function test_written_resolution_follows_the_everyones_agreement_rule_and_results_say_so(): void
+    {
+        $this->seedGovernance();
+        \App\Domain\Governance\Models\GovernanceVotingProfile::query()->update(['written_unanimity_required' => true]);
+        $admin = $this->createAdminUser();
+        $m1 = $this->createBoardMember($this->createUserWithRole('board_member', ['email' => 'written-1@example.test']));
+        $m2 = $this->createBoardMember($this->createUserWithRole('board_member', ['email' => 'written-2@example.test']));
+        $m3 = $this->createBoardMember($this->createUserWithRole('board_member', ['email' => 'written-3@example.test']));
+        $service = new VotingService;
+
+        $written = $this->createResolution($admin, ['status' => 'draft', 'voting_threshold' => 'simple_majority']);
+        $service->openVoting($written, now()->addDays(3));
+        $service->castVote($written, $m1, 'for');
+        $service->castVote($written, $m2, 'for');
+        $service->castVote($written, $m3, 'against');
+        $service->closeVoting($written);
+
+        $written->refresh();
+        $this->assertSame('defeated', $written->outcome, 'More For than Against is not enough when written votes need everyone.');
+
+        $results = $service->getVotingResults($written);
+        $this->assertSame('simple_majority', $results['threshold']);
+        $this->assertSame('unanimous', $results['applied_threshold']);
+        $this->assertTrue($results['written_unanimity_applied']);
+    }
+
+    public function test_a_reason_for_a_vote_is_never_recorded_as_a_conflict(): void
+    {
+        $this->seedGovernance();
+        $admin = $this->createAdminUser();
+        $member = $this->createBoardMember($admin);
+        $resolution = $this->createResolution($admin, ['status' => 'open', 'deadline' => now()->addDays(2)]);
+
+        $vote = (new VotingService)->castVote($resolution, $member, 'against', 'electronic', 'Not this year.');
+
+        $this->assertSame('Not this year.', $vote->fresh()->vote_note);
+        $this->assertFalse($vote->fresh()->conflict_declared);
+        $this->assertNull($vote->fresh()->conflict_note);
+    }
+
+    public function test_open_voting_refuses_papers_that_are_not_for_decision(): void
+    {
+        $this->seedGovernance();
+        $admin = $this->createAdminUser();
+        $paper = $this->createResolution($admin, ['purpose' => 'discussion', 'status' => 'draft']);
+
+        try {
+            (new VotingService)->openVoting($paper, now()->addDays(2));
+            $this->fail('A paper for discussion was opened for voting.');
+        } catch (\DomainException $e) {
+            $this->assertStringContainsString("the board doesn't vote on it", $e->getMessage());
+        }
+
+        $this->assertSame('draft', $paper->fresh()->status);
+    }
+
+    public function test_a_vote_outside_a_meeting_needs_a_deadline_before_voting_opens(): void
+    {
+        $this->seedGovernance();
+        $admin = $this->createAdminUser();
+        $paper = $this->createResolution($admin, ['status' => 'draft', 'deadline' => null]);
+
+        $this->assertArrayHasKey('deadline', $paper->validateForPublication());
+
+        try {
+            (new VotingService)->openVoting($paper);
+            $this->fail('A vote outside a meeting opened without a deadline.');
+        } catch (\DomainException $e) {
+            $this->assertStringContainsString('Set a voting deadline', $e->getMessage());
+        }
+
+        $this->assertSame('draft', $paper->fresh()->status);
+    }
+
+    public function test_first_switch_on_records_the_boards_existing_approval(): void
+    {
+        $this->seedGovernance();
+        \App\Domain\Governance\Models\GovernanceVotingProfile::query()->delete();
+        $chair = $this->createAdminUser();
+        $meeting = $this->createMeeting($chair, ['scheduled_at' => now()->subMonth()]);
+        $service = app(\App\Domain\Governance\Services\GovernanceVotingProfileService::class);
+        $profile = $service->getOrCreateCandidateDefault('board');
+        $profile->update(['governing_document_reference' => 'Trust deed 2019', 'governing_document_version' => 'v2']);
+        $this->assertFalse($service->votingIsSwitchedOn('board'));
+        $this->assertFalse($service->hasEverBeenActive('board'));
+
+        $activated = $service->recordBoardApproval($profile, $chair, [
+            'governing_document_reference' => 'Trust deed 2019',
+            'governing_document_version' => 'v2',
+            'approved_on' => \Carbon\Carbon::createFromFormat('!Y-m-d', now('Pacific/Auckland')->subMonth()->toDateString(), 'Pacific/Auckland'),
+            'approval_minutes_reference' => 'Minutes of the August board meeting, item 4',
+            'approval_meeting_id' => $meeting->id,
+        ]);
+
+        $this->assertTrue($activated->is_active);
+        $this->assertTrue($activated->isConfirmed());
+        $this->assertSame('recorded_board_approval', $activated->approval_source);
+        $this->assertSame('Minutes of the August board meeting, item 4', $activated->approval_minutes_reference);
+        $this->assertSame($meeting->id, $activated->approval_meeting_id);
+        $this->assertNull($activated->approved_by_resolution_id);
+        $this->assertSame($chair->id, $activated->approved_by_user_id);
+        $this->assertTrue($service->votingIsSwitchedOn('board'));
+        $this->assertDatabaseHas('governance_audit_log', [
+            'action' => 'governance_rules.activated',
+            'resource_type' => 'GovernanceVotingProfile',
+            'resource_id' => $profile->id,
+        ]);
+
+        // Board voting can now open.
+        $this->createBoardMember($chair);
+        $paper = $this->createResolution($chair, ['status' => 'draft', 'governance_meeting_id' => $meeting->id]);
+        (new VotingService)->openVoting($paper);
+        $this->assertSame('open', $paper->fresh()->status);
+    }
+
+    public function test_recorded_approval_is_refused_once_voting_rules_are_live_and_changes_need_a_resolution(): void
+    {
+        $this->seedGovernance(); // a live, approved board profile
+        $chair = $this->createAdminUser();
+        $service = app(\App\Domain\Governance\Services\GovernanceVotingProfileService::class);
+        $live = $service->getActiveProfile('board');
+        $this->assertTrue($live->isConfirmed());
+
+        $changes = $service->createProfile([
+            'governing_body' => 'board',
+            'governing_document_reference' => 'Trust deed 2026',
+            'governing_document_version' => 'v3',
+            'written_unanimity_required' => true,
+        ], $chair);
+
+        try {
+            $service->recordBoardApproval($changes, $chair, [
+                'governing_document_reference' => 'Trust deed 2026',
+                'approved_on' => now()->subDay(),
+                'approval_minutes_reference' => 'Minutes, 1 September',
+            ]);
+            $this->fail('A recorded approval replaced live voting rules without a resolution.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('already been switched on', $e->getMessage());
+        }
+
+        $this->assertFalse($changes->fresh()->is_active);
+        $this->assertTrue($live->fresh()->is_active, 'The live rules stay in force.');
+
+        // Changing the rules still works through a passed resolution linked to them.
+        $approval = $this->createBoundCarriedResolution(
+            $chair,
+            \App\Domain\Governance\Models\GovernanceResolutionBinding::SUBJECT_VOTING_PROFILE,
+            $changes->id,
+        );
+        $activated = $service->activateProfile($changes, $chair, $approval);
+        $this->assertTrue($activated->is_active);
+        $this->assertSame('resolution', $activated->approval_source);
+        $this->assertSame($approval->id, $activated->approved_by_resolution_id);
+        $this->assertFalse($live->fresh()->is_active);
+    }
+
+    public function test_recorded_approval_needs_a_real_document_a_past_date_and_the_minutes(): void
+    {
+        $this->seedGovernance();
+        \App\Domain\Governance\Models\GovernanceVotingProfile::query()->delete();
+        $chair = $this->createAdminUser();
+        $service = app(\App\Domain\Governance\Services\GovernanceVotingProfileService::class);
+        $profile = $service->getOrCreateCandidateDefault('board');
+
+        $attempts = [
+            'Enter the name of your governing document' => ['governing_document_reference' => '', 'approved_on' => now()->subDay(), 'approval_minutes_reference' => 'Minutes'],
+            "can't be in the future" => ['governing_document_reference' => 'Constitution', 'approved_on' => now()->addWeek(), 'approval_minutes_reference' => 'Minutes'],
+            'Enter where the approval is recorded' => ['governing_document_reference' => 'Constitution', 'approved_on' => now()->subDay(), 'approval_minutes_reference' => ' '],
+        ];
+
+        foreach ($attempts as $message => $record) {
+            try {
+                $service->recordBoardApproval($profile, $chair, $record);
+                $this->fail("Recorded approval accepted: {$message}");
+            } catch (\InvalidArgumentException $e) {
+                $this->assertStringContainsString($message, $e->getMessage());
+            }
+        }
+
+        $this->assertFalse($profile->fresh()->is_active);
     }
 }
 

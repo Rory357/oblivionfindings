@@ -3,6 +3,7 @@
 namespace App\Domain\Governance\Models;
 
 use App\Domain\Governance\Services\GovernanceResolutionAuthorityService;
+use App\Domain\Governance\Support\GovernanceLabels;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +17,9 @@ use Illuminate\Validation\ValidationException;
 class StrategicPlan extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
+
+    /** Resolution statuses in which a passed vote is final (matches budgets). */
+    public const PASSED_RESOLUTION_STATUSES = ['closed', 'implemented', 'archived'];
 
     protected $fillable = [
         'title',
@@ -136,13 +140,19 @@ class StrategicPlan extends Model
 
             if (! $resolution) {
                 throw ValidationException::withMessages([
-                    'resolution_id' => 'The selected resolution does not exist.',
+                    'resolution_id' => 'That resolution no longer exists.',
                 ]);
             }
 
-            if ($resolution->status !== 'closed' || $resolution->outcome !== 'carried') {
+            if (! in_array($resolution->status, self::PASSED_RESOLUTION_STATUSES, true) || $resolution->outcome !== 'carried') {
                 throw ValidationException::withMessages([
-                    'resolution_id' => 'Only a closed resolution with a carried outcome can approve a strategic plan.',
+                    'resolution_id' => "This resolution can't be used yet — voting must be finished and the result recorded as passed.",
+                ]);
+            }
+
+            if (! $lockedPlan->isDraft()) {
+                throw ValidationException::withMessages([
+                    'resolution_id' => 'Only a draft strategic plan can be approved. Create a new version to change an approved plan.',
                 ]);
             }
 
@@ -154,7 +164,7 @@ class StrategicPlan extends Model
 
             if ($alreadyUsed) {
                 throw ValidationException::withMessages([
-                    'resolution_id' => 'The selected resolution has already been applied to another active strategic plan.',
+                    'resolution_id' => 'This resolution has already been used to approve another strategic plan.',
                 ]);
             }
 
@@ -168,7 +178,7 @@ class StrategicPlan extends Model
                 );
             } catch (\DomainException $exception) {
                 throw ValidationException::withMessages([
-                    'resolution_id' => 'The selected resolution does not authorize approval of this strategic plan. '.$exception->getMessage(),
+                    'resolution_id' => $exception->getMessage(),
                 ]);
             }
 
@@ -260,21 +270,31 @@ class StrategicPlan extends Model
     }
 
     /**
-     * Get what changed since the last captured snapshot.
+     * What changed compared with the version the board approved.
+     *
+     * Goals are compared with this plan's own saved copy from approval or,
+     * for a new draft version, with the version it copies. For a new version
+     * the vision, mission and values are compared with that version too.
+     * Every change is described in plain words (labels, not stored values).
+     *
+     * @return array{has_snapshot: bool, baseline_label: string, compared_version: int|null, changes: array<int, array{type: string, area: string, goal: string, detail: string}>}
      */
     public function getChangesSinceLastSnapshot(): array
     {
         $baseline = null;
         $baselineLabel = 'Comparison not available';
+        $comparedVersion = null;
+        $prior = null;
 
         if (! empty($this->last_snapshot)) {
             $baseline = $this->last_snapshot;
-            $baselineLabel = "Version {$this->version_number} snapshot";
+            $baselineLabel = 'the version the board approved';
+            $comparedVersion = (int) $this->version_number;
         } elseif ($this->supersedes_plan_id && $this->supersedes) {
             $prior = $this->supersedes;
             if (! empty($prior->last_snapshot)) {
                 $baseline = $prior->last_snapshot;
-                $baselineLabel = "Version {$prior->version_number} approved baseline";
+                $baselineLabel = "version {$prior->version_number}, which the board approved";
             } elseif ($prior->goals()->exists()) {
                 $baseline = $prior->goals()->get()->map(fn ($g) => [
                     'id' => $g->id,
@@ -284,17 +304,24 @@ class StrategicPlan extends Model
                     'progress_pct' => (float) $g->progress_pct,
                     'status' => $g->status ?? null,
                 ])->toArray();
-                $baselineLabel = "Version {$prior->version_number} baseline";
+                $baselineLabel = "version {$prior->version_number}";
+            } else {
+                $baseline = [];
+                $baselineLabel = "version {$prior->version_number}";
             }
+            $comparedVersion = (int) $prior->version_number;
         }
 
-        if (empty($baseline)) {
+        if ($baseline === null || ($baseline === [] && $prior === null)) {
             return [
                 'has_snapshot' => false,
                 'baseline_label' => 'Comparison not available',
+                'compared_version' => null,
                 'changes' => [],
             ];
         }
+
+        $changes = $prior ? $this->directionChanges($prior) : [];
 
         $previousByLineage = [];
         $previousById = [];
@@ -308,7 +335,6 @@ class StrategicPlan extends Model
         }
 
         $currentGoals = $this->goals()->get();
-        $changes = [];
         $matchedBaselineLineageKeys = [];
 
         foreach ($currentGoals as $goal) {
@@ -331,9 +357,11 @@ class StrategicPlan extends Model
             if (! $old) {
                 $changes[] = [
                     'type' => 'added',
+                    'area' => 'goal',
                     'goal' => $goal->title,
-                    'detail' => 'New goal added',
+                    'detail' => 'New goal added.',
                 ];
+
                 continue;
             }
 
@@ -343,30 +371,39 @@ class StrategicPlan extends Model
             $oldProgress = (float) ($old['progress_pct'] ?? 0);
             $newProgress = (float) $goal->progress_pct;
             if (abs($oldProgress - $newProgress) >= 0.01) {
-                $diffs[] = "Progress: {$oldProgress}% → {$newProgress}%";
+                $diffs[] = sprintf('Progress %s%% → %s%%', self::percent($oldProgress), self::percent($newProgress));
             }
 
             $oldStatus = $old['status'] ?? 'not_started';
             $newStatus = $goal->status ?? 'not_started';
             if ($oldStatus !== $newStatus) {
-                $diffs[] = "Status: {$oldStatus} → {$newStatus}";
+                $diffs[] = sprintf(
+                    '%s → %s',
+                    GovernanceLabels::label('goal_status', $oldStatus),
+                    GovernanceLabels::label('goal_status', $newStatus),
+                );
             }
 
             $oldPillar = $old['pillar'] ?? null;
             $newPillar = $goal->pillar ?? null;
             if ($oldPillar !== $newPillar && $oldPillar && $newPillar) {
-                $diffs[] = "Pillar: {$oldPillar} → {$newPillar}";
+                $diffs[] = sprintf(
+                    'Theme %s → %s',
+                    GovernanceLabels::label('theme', $oldPillar),
+                    GovernanceLabels::label('theme', $newPillar),
+                );
             }
 
             if ($old['title'] !== $goal->title) {
-                $diffs[] = "Title: \"{$old['title']}\" → \"{$goal->title}\"";
+                $diffs[] = "Renamed from \"{$old['title']}\"";
             }
 
             if (! empty($diffs)) {
                 $changes[] = [
                     'type' => 'updated',
+                    'area' => 'goal',
                     'goal' => $goal->title,
-                    'detail' => implode('; ', $diffs),
+                    'detail' => implode(' · ', $diffs),
                 ];
             }
         }
@@ -376,8 +413,9 @@ class StrategicPlan extends Model
             if (! isset($matchedBaselineLineageKeys[$lineageKey])) {
                 $changes[] = [
                     'type' => 'removed',
+                    'area' => 'goal',
                     'goal' => $item['title'],
-                    'detail' => 'Goal removed from previous version',
+                    'detail' => 'Removed from this version.',
                 ];
             }
         }
@@ -385,7 +423,76 @@ class StrategicPlan extends Model
         return [
             'has_snapshot' => true,
             'baseline_label' => $baselineLabel,
+            'compared_version' => $comparedVersion,
             'changes' => $changes,
         ];
+    }
+
+    /**
+     * Vision, mission and values compared with the version this one copies.
+     *
+     * @return array<int, array{type: string, area: string, goal: string, detail: string}>
+     */
+    private function directionChanges(self $prior): array
+    {
+        $changes = [];
+
+        foreach (['vision_statement' => 'Vision', 'mission_statement' => 'Mission'] as $field => $label) {
+            $before = self::statement($prior->{$field});
+            $after = self::statement($this->{$field});
+
+            if ($before === $after) {
+                continue;
+            }
+
+            $changes[] = match (true) {
+                $before === null => ['type' => 'added', 'area' => 'direction', 'goal' => $label, 'detail' => "{$label} written for this version."],
+                $after === null => ['type' => 'removed', 'area' => 'direction', 'goal' => $label, 'detail' => "{$label} removed from this version."],
+                default => ['type' => 'updated', 'area' => 'direction', 'goal' => $label, 'detail' => "{$label} rewritten."],
+            };
+        }
+
+        $beforeValues = self::valueNames($prior->values);
+        $afterValues = self::valueNames($this->values);
+        $addedValues = array_values(array_diff($afterValues, $beforeValues));
+        $removedValues = array_values(array_diff($beforeValues, $afterValues));
+
+        if ($addedValues !== [] || $removedValues !== []) {
+            $parts = [];
+            if ($addedValues !== []) {
+                $parts[] = 'Added '.implode(', ', $addedValues);
+            }
+            if ($removedValues !== []) {
+                $parts[] = 'Removed '.implode(', ', $removedValues);
+            }
+
+            $changes[] = ['type' => 'updated', 'area' => 'direction', 'goal' => 'Values', 'detail' => implode(' · ', $parts).'.'];
+        }
+
+        return $changes;
+    }
+
+    /** Legacy plans stored "TBD" for a statement nobody had written. */
+    public static function statement(?string $value): ?string
+    {
+        $text = trim((string) $value);
+
+        return $text === '' || strcasecmp($text, 'TBD') === 0 ? null : $text;
+    }
+
+    /** @return array<int, string> */
+    private static function valueNames(mixed $values): array
+    {
+        return collect(is_array($values) ? $values : [])
+            ->map(fn ($entry) => trim((string) (is_array($entry) ? ($entry['value'] ?? '') : $entry)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private static function percent(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 1), '0'), '.');
     }
 }

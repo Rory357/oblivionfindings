@@ -156,13 +156,11 @@ class GovernanceDerivedAudienceTest extends TestCase
         $this->assertEquals($publicMeeting->id, $data['cockpit']['next_meeting']['meeting']['id']);
         $this->assertEquals('Open Board Meeting', $data['cockpit']['next_meeting']['meeting']['title']);
 
-        // KPI band should only count 1 upcoming meeting for this member
-        $upcomingCard = collect($data['cockpit']['kpi_band'])->firstWhere('key', 'upcoming_meetings');
-        $this->assertEquals('1', $upcomingCard['value']);
-
-        // Calendar events must NOT leak executive session title
-        $events = $data['cockpit']['calendar_events'];
-        $this->assertFalse(collect($events)->contains(fn ($e) => ($e['title'] ?? '') === 'Secret In-Camera Strategy Meeting'));
+        // "Coming up" on Home lists only the one meeting this member can open
+        $comingUp = collect($data['my_work']['coming_up']);
+        $this->assertSame([$publicMeeting->id], $comingUp->pluck('source.id')->all());
+        $this->assertSame(1, $data['my_work']['totals']['know']);
+        $this->assertFalse($comingUp->contains(fn ($e) => ($e['title'] ?? '') === 'Secret In-Camera Strategy Meeting'));
 
         // Response string as a whole must NOT contain the secret title
         $response->assertDontSee('Secret In-Camera Strategy Meeting');

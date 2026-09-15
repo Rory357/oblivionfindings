@@ -16,6 +16,7 @@ use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\Governance\Services\ExecutiveMeetingAccessService;
 use App\Domain\Governance\Services\GovernanceNestedMutationService;
 use App\Domain\Governance\Services\GovernanceRecordAccessService;
+use App\Domain\Governance\Services\GovernanceVotingProfileService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Domain\Governance\Services\MeetingMinuteService;
 use App\Domain\Governance\Services\VotingService;
@@ -338,9 +339,18 @@ class GovernanceMeetingController extends Controller
         $meeting->setRelation('resolutions', $visibleResolutions);
 
         $viewerBoardMember = $viewer->boardMember;
+        // Declaring a conflict needs an active board seat (the declare route
+        // refuses anyone else) plus the vote permission.
+        $viewerCanDeclare = $viewer->canDo('governance.resolutions.vote')
+            && BoardMember::active()->where('user_id', $viewer->id)->exists();
+        $votingProfiles = app(GovernanceVotingProfileService::class);
+        $votingSwitchedOn = [];
 
-        $enrichedResolutions = $visibleResolutions->map(function (Resolution $r) use ($viewer, $viewerBoardMember, $meeting) {
+        $enrichedResolutions = $visibleResolutions->map(function (Resolution $r) use ($viewer, $viewerBoardMember, $meeting, $viewerCanDeclare, $votingProfiles, &$votingSwitchedOn) {
             $myVote = $viewerBoardMember ? $r->getBoardMemberVote($viewerBoardMember->id) : null;
+            // Integrity hashes and the legacy conflict note are internal.
+            $myVote?->makeHidden(['vote_hash', 'conflict_note']);
+            $r->votes->each(fn ($vote) => $vote->makeHidden(['vote_hash', 'conflict_note']));
             $myConflict = $viewerBoardMember
                 ? $r->conflictDeclarations->firstWhere('board_member_id', $viewerBoardMember->id)
                 : null;
@@ -349,10 +359,28 @@ class GovernanceMeetingController extends Controller
                 : null;
             $canVote = $viewer->can('vote', $r) && (! $myConflict || ! $myConflict->withdrew_from_voting);
 
+            $committeeId = $r->board_committee_id ?? $meeting->board_committee_id;
+            $rulesKey = $committeeId ? "committee:{$committeeId}" : 'board';
+            $votingSwitchedOn[$rulesKey] ??= $votingProfiles->votingIsSwitchedOn(
+                $committeeId ? 'committee' : 'board',
+                $committeeId ? (int) $committeeId : null,
+            );
+
+            // The stored attachment rows and the frozen snapshot's copy of them
+            // carry storage paths; hide both from every serialisation of this
+            // model (including `meeting.resolutions`) and send presented copies.
+            $r->makeHidden(['attachments', 'paper_snapshot']);
+
             $arr = $r->toArray();
+            $arr['paper_snapshot'] = $r->presentPaperSnapshot();
             $arr['my_vote'] = $myVote;
             $arr['my_conflict'] = $myConflict;
             $arr['can_vote'] = $canVote;
+            $arr['can_declare_conflict'] = $viewerCanDeclare
+                && in_array($r->status, ['draft', 'proposed', 'open'], true);
+            $arr['ineligible_reason'] = $r->isOpen() ? $this->votingService->ineligibleReason($r, $viewer) : null;
+            $arr['applied_threshold'] = $r->appliedThreshold();
+            $arr['voting_rules_switched_on'] = $votingSwitchedOn[$rulesKey];
             $arr['can_manage'] = $viewer->can('update', $r);
             $arr['results'] = $results;
             $arr['quorum'] = $this->votingService->calculateQuorum($meeting->id, $r);

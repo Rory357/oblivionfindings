@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -7,46 +6,49 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { formatDateLong } from '@/lib/datetime';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
-import { Textarea } from '@/components/ui/textarea';
-import { formatDateTimeLong } from '@/lib/datetime';
-import { vote as voteResolution } from '@/routes/governance/resolutions';
-import { declare as declareConflictRoute } from '@/routes/governance/resolutions/conflict';
-import { Link, router } from '@inertiajs/react';
+    decisionTypeLabel,
+    formatNzd,
+    governanceStatus,
+    refSuffix,
+    resolutionChip,
+    resolutionPurposeLabel,
+} from '@/lib/governance-labels';
+import { Link, usePage } from '@inertiajs/react';
 import {
-    AlertCircle,
-    AlertTriangle,
     ArrowLeft,
     ArrowRight,
     CheckCircle,
-    CheckCircle2,
     DollarSign,
     Download,
     ExternalLink,
     FileText,
     Gavel,
     Lock,
-    MinusCircle,
     Paperclip,
     Scale,
     ShieldAlert,
     Users,
-    Vote,
-    XCircle,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { DeclareConflictDialog } from './DeclareConflictDialog';
+import { GovernanceTermHint } from './GovernanceTermHint';
 import {
     actionHrefWithReturn,
     type MeetingWorkspaceFocus,
 } from './meeting-workspace-links';
+import {
+    ResolutionBallot,
+    type BallotConflict,
+    type BallotVote,
+} from './ResolutionBallot';
+import {
+    ResolutionResultCard,
+    type ResolutionResultData,
+} from './ResolutionResultCard';
+import { canDeclareConflictOnStatus } from './resolution-voting';
 
 export interface OptionItem {
     label: string;
@@ -68,56 +70,39 @@ export interface PaperResolution {
     recommendation?: string | null;
     cost_impact?: {
         has_cost?: boolean;
+        is_none?: boolean;
         amount?: string | number;
         currency?: string;
         budget_source?: string;
+        funding_source?: string;
     } | null;
     service_user_implications?: string | null;
     risk_equity_implications?: string | null;
     status: string;
     outcome?: string | null;
     deadline?: string | null;
+    closed_at?: string | null;
     voting_threshold?: string | null;
+    quorum_required?: boolean | null;
+    version_number?: number | null;
+    governance_meeting_id?: number | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     paper_snapshot?: Record<string, any> | null;
-    my_vote?: {
-        id: number;
-        vote: string;
-        voting_method?: string;
-        conflict_declared: boolean;
-        voted_at: string;
-    } | null;
-    my_conflict?: {
-        id: number;
-        declaration_type: string;
-        declaration_text?: string;
-        withdrew_from_voting: boolean;
-        declared_at?: string;
-    } | null;
+    my_vote?: BallotVote | null;
+    my_conflict?: BallotConflict | null;
     can_vote?: boolean;
     can_manage?: boolean;
-    results?: {
-        outcome: string;
-        is_frozen?: boolean;
-        summary: { for: number; against: number; abstain: number };
-        percentages: { for: number; against: number; abstain: number };
-        individual_votes: Array<{
-            board_member?: { user?: { name?: string | null } | null } | string | null;
-            vote: string;
-            conflict_declared: boolean;
-            voted_at: string;
-        }>;
-        conflicts: Array<{
-            board_member?: { user?: { name?: string | null } | null } | string | null;
-            type: string;
-            description: string;
-            withdrew: boolean;
-        }>;
-    } | null;
+    /** Optional server hints (the meeting payload may add them). */
+    can_declare_conflict?: boolean;
+    ineligible_reason?: string | null;
+    applied_threshold?: string | null;
+    voting_rules_switched_on?: boolean;
+    results?: ResolutionResultData | null;
     quorum?: {
         met: boolean;
         required: number;
         present: number;
-        voted: number;
+        voted?: number;
         total_eligible: number;
     } | null;
     /** Follow-up actions the viewer may see (server-filtered by record audience). */
@@ -162,37 +147,27 @@ function formatFileSize(bytes?: number | null): string | null {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Decision outcome → the shared status token pairs. */
-function outcomeVariant(outcome: string | null | undefined): StatusVariant {
-    switch (outcome) {
-        case 'carried':
-            return 'success';
-        case 'defeated':
-            return 'critical';
-        case 'no_quorum':
-            return 'warning';
-        default:
-            return 'neutral';
-    }
+/** The rule the engine applies when the payload doesn't say (`special` is two-thirds). */
+function appliedThresholdFor(resolution: PaperResolution): string | null {
+    if (resolution.results?.applied_threshold) return resolution.results.applied_threshold;
+    if (resolution.applied_threshold) return resolution.applied_threshold;
+    return resolution.voting_threshold === 'special'
+        ? 'two_thirds'
+        : (resolution.voting_threshold ?? null);
 }
 
-function voteVariant(vote: string): StatusVariant {
-    if (vote === 'for') return 'success';
-    if (vote === 'against') return 'critical';
-    return 'neutral';
-}
-
-const outcomeLabel = (outcome: string) =>
-    outcome === 'no_quorum'
-        ? 'No quorum'
-        : outcome.charAt(0).toUpperCase() + outcome.slice(1).replace(/_/g, ' ');
+type SharedAuth = {
+    auth?: {
+        can?: { governance?: { resolutions?: { vote?: boolean } } };
+    };
+};
 
 interface Props {
     resolution: PaperResolution;
     meetingId: number;
     meetingTitle?: string;
     onClose: () => void;
-    /** The next paper in agenda order, so a member can move on after voting. */
+    /** The next resolution in agenda order, so a member can move on after voting. */
     nextPaper?: Pick<PaperResolution, 'id' | 'title' | 'resolution_reference'> | null;
     onOpenPaper?: (paperId: number) => void;
     /** Where to land when the workspace opens (e.g. back from an action). */
@@ -210,9 +185,11 @@ export function MeetingPaperWorkspace({
 }: Props) {
     const rootRef = useRef<HTMLDivElement>(null);
     const followUpsRef = useRef<HTMLDivElement>(null);
+    const [conflictOpen, setConflictOpen] = useState(false);
+    const page = usePage<SharedAuth>();
 
-    // Keep the member's place: opening a paper (or returning from one of its
-    // follow-up actions) scrolls to the paper, or straight to its follow-ups.
+    // Keep the member's place: opening a resolution (or returning from one of
+    // its follow-up actions) scrolls to it, or straight to its follow-ups.
     useEffect(() => {
         const target =
             focus === 'follow-ups' && followUpsRef.current
@@ -232,67 +209,43 @@ export function MeetingPaperWorkspace({
         }
     }, [resolution.id, focus]);
 
-    const [selectedVote, setSelectedVote] = useState<string>('');
-    const [conflictNote, setConflictNote] = useState<string>('');
-    const [submittingVote, setSubmittingVote] = useState(false);
-    const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
-    const [conflictType, setConflictType] = useState('material');
-    const [conflictDescription, setConflictDescription] = useState('');
-    const [submittingConflict, setSubmittingConflict] = useState(false);
-
-    // If paper has a frozen snapshot, prefer frozen terms
-    const displayData = resolution.paper_snapshot ?? resolution;
+    // The saved copy is the authoritative wording once it's published.
+    const displayData = (resolution.paper_snapshot ?? resolution) as PaperResolution;
     const options: OptionItem[] = Array.isArray(displayData.options) ? displayData.options : [];
     const isOpen = resolution.status === 'open';
     const isClosed = ['closed', 'implemented', 'archived'].includes(resolution.status);
+    const version =
+        (resolution.paper_snapshot?.version_number as number | undefined) ??
+        resolution.version_number ??
+        null;
+    const appliedThreshold = appliedThresholdFor(resolution);
+    const chip = resolutionChip(resolution.status, resolution.outcome);
 
-    const submitVote = () => {
-        if (!selectedVote) return;
-        setSubmittingVote(true);
-        router.post(
-            voteResolution.url({ resolution: resolution.id }),
-            {
-                vote: selectedVote,
-                voting_method: 'electronic',
-                conflict_note: conflictNote || null,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setSelectedVote('');
-                    setConflictNote('');
-                },
-                onFinish: () => setSubmittingVote(false),
-            },
-        );
-    };
+    // Declaring needs the vote permission; the server also checks the viewer
+    // has a board seat and shows its reason inline if not.
+    const canDeclareConflict =
+        (resolution.can_declare_conflict ??
+            Boolean(page?.props?.auth?.can?.governance?.resolutions?.vote)) &&
+        canDeclareConflictOnStatus(resolution.status);
 
-    const submitConflict = () => {
-        if (conflictDescription.length < 20) return;
-        setSubmittingConflict(true);
-        router.post(
-            declareConflictRoute.url({ resolution: resolution.id }),
-            {
-                declaration_type: conflictType,
-                declaration_text: conflictDescription,
-                withdrew_from_voting: true,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setConflictDialogOpen(false);
-                    setConflictDescription('');
-                },
-                onFinish: () => setSubmittingConflict(false),
-            },
-        );
-    };
+    const cost = displayData.cost_impact ?? null;
+    const costText = cost?.has_cost
+        ? formatNzd(cost.amount ?? null)
+        : cost && (cost.has_cost === false || cost.is_none)
+          ? 'No cost'
+          : 'Cost not stated';
+    const costSource = cost?.has_cost ? (cost.budget_source ?? cost.funding_source ?? null) : null;
 
-    const resolveMemberName = (m: any): string => {
-        if (!m) return 'Unknown Member';
-        if (typeof m === 'string') return m;
-        return m.user?.name ?? 'Board Member';
-    };
+    const followUpCount =
+        (resolution.action_items?.length ?? 0) + (resolution.restricted_action_items_count ?? 0);
+
+    const openNext =
+        nextPaper && onOpenPaper
+            ? {
+                  label: `Next resolution: ${nextPaper.title}`,
+                  onClick: () => onOpenPaper(nextPaper.id),
+              }
+            : null;
 
     return (
         <div
@@ -301,440 +254,248 @@ export function MeetingPaperWorkspace({
             data-test="meeting-paper-workspace"
             data-paper-id={resolution.id}
         >
-            {/* Top Return Header */}
+            {/* Where you are, and where to go next */}
             <Card className="flex-row flex-wrap items-center justify-between gap-3 p-4">
-                <div className="flex items-center gap-3">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onClose}
-                        className="gap-1.5"
-                    >
+                <div className="flex min-w-0 items-center gap-3">
+                    <Button variant="outline" size="sm" onClick={onClose}>
                         <ArrowLeft className="h-4 w-4" />
-                        Back to meeting papers
+                        Back to resolutions
                     </Button>
-                    <div className="hidden sm:block text-xs text-muted-foreground">
-                        {meetingTitle ? `Meeting: ${meetingTitle}` : 'Meeting Workspace'}
-                    </div>
+                    {meetingTitle ? (
+                        <span className="hidden truncate text-caption sm:block">
+                            {`Meeting: ${meetingTitle}`}
+                        </span>
+                    ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-mono font-medium text-muted-foreground">
-                        {resolution.resolution_reference}
-                    </span>
-                    <StatusBadge status={resolution.status} />
-                    {resolution.outcome && (
-                        <StatusBadge variant={outcomeVariant(resolution.outcome)}>
-                            {outcomeLabel(resolution.outcome)}
-                        </StatusBadge>
-                    )}
-                    {nextPaper && onOpenPaper && (
+                    <StatusBadge variant={chip.variant}>{chip.label}</StatusBadge>
+                    {nextPaper && onOpenPaper ? (
                         <Button
                             variant="outline"
                             size="sm"
-                            className="gap-1.5"
                             onClick={() => onOpenPaper(nextPaper.id)}
-                            aria-label={`Next paper: ${nextPaper.resolution_reference} ${nextPaper.title}`}
+                            aria-label={`Next resolution: ${nextPaper.title}`}
                             data-test="meeting-paper-next"
                         >
-                            Next paper
+                            Next resolution
                             <ArrowRight className="h-4 w-4" aria-hidden="true" />
                         </Button>
-                    )}
+                    ) : null}
                 </div>
             </Card>
 
-            {/* Paper Title & Snapshot Banner */}
-            <div className="space-y-2">
-                <h2 className="text-section-title tracking-tight">
-                    {resolution.title}
-                </h2>
-                {resolution.paper_snapshot && (
-                    <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3 text-xs text-foreground">
-                        <div className="flex items-center gap-2">
-                            <Lock className="h-4 w-4 text-primary shrink-0" />
-                            <span>
-                                <strong>Frozen Decision Paper:</strong> All votes evaluate these exact terms as frozen upon opening.
-                            </span>
-                        </div>
-                        <Badge variant="outline" className="bg-background text-primary shrink-0">
-                            Immutable Snapshot
-                        </Badge>
+            <div className="flex flex-col gap-2">
+                <h2 className="text-section-title">{resolution.title}</h2>
+                {refSuffix(resolution.resolution_reference) ? (
+                    <p className="text-caption">{refSuffix(resolution.resolution_reference)}</p>
+                ) : null}
+                {resolution.paper_snapshot ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+                        <Lock className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                        <span>
+                            <span className="font-semibold">
+                                {version ? `This is the final wording (version ${version}).` : 'This is the final wording.'}
+                            </span>{' '}
+                            {isOpen
+                                ? "It can't change while voting is open — everyone votes on these exact words."
+                                : "It can't be changed now it's published."}
+                        </span>
                     </div>
-                )}
+                ) : null}
             </div>
 
-            {/* Exact Motion Card */}
-            <Card className="border-primary/30 bg-card">
-                <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Gavel className="h-4 w-4 text-primary" />
-                            <CardTitle className="text-base font-semibold">Exact Motion</CardTitle>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="capitalize text-xs">
-                                {displayData.purpose ?? 'decision'} paper
-                            </Badge>
-                            {displayData.decision_type && (
-                                <Badge variant="secondary" className="capitalize text-xs">
-                                    {displayData.decision_type}
-                                </Badge>
-                            )}
+            {/* Resolution wording */}
+            <Card className="border-primary/30">
+                <CardHeader>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <CardTitle className="text-section-title flex items-center gap-2">
+                            <Gavel className="h-4 w-4 text-primary" aria-hidden="true" />
+                            What the board is asked to decide
+                            <GovernanceTermHint term="resolution_wording" />
+                        </CardTitle>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <StatusBadge variant="neutral">
+                                {resolutionPurposeLabel(displayData.purpose ?? 'decision')}
+                            </StatusBadge>
+                            {displayData.decision_type ? (
+                                <StatusBadge variant="neutral">
+                                    {decisionTypeLabel(displayData.decision_type)}
+                                </StatusBadge>
+                            ) : null}
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <blockquote className="border-l-4 border-primary pl-4 italic text-base font-medium text-foreground py-2.5 bg-primary/5 rounded-r">
+                    <blockquote className="rounded-r border-l-4 border-primary bg-primary/5 py-2.5 pl-4 text-base font-medium whitespace-pre-wrap text-foreground">
                         {displayData.exact_motion || resolution.title}
                     </blockquote>
                 </CardContent>
             </Card>
 
-            {/* Context & Background */}
+            {/* Why it's before the board */}
             <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-semibold flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-primary" />
-                        Context & Background (Why now?)
+                <CardHeader>
+                    <CardTitle className="text-section-title flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
+                        Why this is before the board
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
-                        {displayData.context || 'No background context provided.'}
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+                        {displayData.context || 'No background given.'}
                     </p>
                 </CardContent>
             </Card>
 
-            {/* Options Evaluated & Recommendation */}
+            {/* Options and recommendation */}
             <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-semibold flex items-center gap-2">
-                        <Scale className="h-4 w-4 text-primary" />
-                        Alternatives Evaluated ({options.length})
+                <CardHeader>
+                    <CardTitle className="text-section-title flex items-center gap-2">
+                        <Scale className="h-4 w-4 text-primary" aria-hidden="true" />
+                        {`Options considered (${options.length})`}
                     </CardTitle>
-                    <CardDescription className="text-xs">
-                        Consequential decisions evaluate alternatives with explicit benefits and drawbacks.
+                    <CardDescription>
+                        The choices the board could make, with what’s good and bad about each.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    {options.length > 0 && (
+                <CardContent className="flex flex-col gap-4">
+                    {options.length > 0 ? (
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             {options.map((option, idx) => (
                                 <div
                                     key={idx}
-                                    className="rounded-lg border p-3.5 bg-muted/15 space-y-2 flex flex-col justify-between text-xs"
+                                    className="flex flex-col gap-2 rounded-lg border border-border p-3.5 text-sm"
                                 >
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="font-semibold text-foreground">
-                                                {option.label}
-                                            </span>
-                                            <Badge variant="outline" className="text-[10px]">
-                                                Option {idx + 1}
-                                            </Badge>
-                                        </div>
-                                        {option.description && (
-                                            <p className="text-muted-foreground whitespace-pre-wrap">
-                                                {option.description}
-                                            </p>
-                                        )}
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="font-semibold text-foreground">{option.label}</span>
+                                        <StatusBadge variant="neutral" size="sm">
+                                            {`Option ${idx + 1}`}
+                                        </StatusBadge>
                                     </div>
-                                    <div className="space-y-1.5 pt-2 border-t">
-                                        {option.benefits && (
-                                            <div className="rounded bg-status-success-bg/20 border border-status-success/20 p-2">
-                                                <p className="font-semibold text-status-success mb-0.5">Benefits:</p>
-                                                <p className="text-foreground/90 whitespace-pre-wrap">{option.benefits}</p>
-                                            </div>
-                                        )}
-                                        {option.drawbacks && (
-                                            <div className="rounded bg-status-critical-bg/20 border border-status-critical/20 p-2">
-                                                <p className="font-semibold text-status-critical mb-0.5">Drawbacks & Costs:</p>
-                                                <p className="text-foreground/90 whitespace-pre-wrap">{option.drawbacks}</p>
-                                            </div>
-                                        )}
-                                    </div>
+                                    {option.description ? (
+                                        <p className="text-subtle whitespace-pre-wrap">{option.description}</p>
+                                    ) : null}
+                                    {option.benefits ? (
+                                        <p className="whitespace-pre-wrap">
+                                            <span className="font-semibold text-status-success">Good: </span>
+                                            {option.benefits}
+                                        </p>
+                                    ) : null}
+                                    {option.drawbacks ? (
+                                        <p className="whitespace-pre-wrap">
+                                            <span className="font-semibold text-status-critical">Downsides: </span>
+                                            {option.drawbacks}
+                                        </p>
+                                    ) : null}
                                 </div>
                             ))}
                         </div>
+                    ) : (
+                        <p className="text-subtle">No options described.</p>
                     )}
 
-                    {options.length < 2 && displayData.single_option_reason && (
-                        <div className="rounded-lg border border-status-warning/40 bg-status-warning-bg/15 p-3.5 space-y-1 text-xs">
-                            <div className="flex items-center gap-2 text-status-warning font-semibold uppercase tracking-wider">
-                                <AlertCircle className="h-4 w-4" />
-                                Sole Option Justification
-                            </div>
-                            <p className="text-foreground whitespace-pre-wrap">
+                    {options.length < 2 && displayData.single_option_reason ? (
+                        <div>
+                            <p className="text-caption font-semibold">Why there’s only one option</p>
+                            <p className="mt-1 text-sm whitespace-pre-wrap text-foreground">
                                 {displayData.single_option_reason}
                             </p>
                         </div>
-                    )}
+                    ) : null}
 
-                    {displayData.recommendation && (
-                        <div className="rounded-lg border border-status-info/30 bg-status-info-bg/25 p-3.5 space-y-1 text-xs">
-                            <p className="font-semibold uppercase tracking-wider text-status-info">
-                                Management Recommendation
-                            </p>
-                            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                    {displayData.recommendation ? (
+                        <div>
+                            <p className="text-caption font-semibold">Management’s recommendation</p>
+                            <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap text-foreground">
                                 {displayData.recommendation}
                             </p>
                         </div>
-                    )}
+                    ) : null}
                 </CardContent>
             </Card>
 
-            {/* Impact & Governance Assessments */}
+            {/* Effects */}
             <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-semibold flex items-center gap-2">
-                        <Scale className="h-4 w-4 text-primary" />
-                        Impact & Governance Assessments
+                <CardHeader>
+                    <CardTitle className="text-section-title flex items-center gap-2">
+                        <ShieldAlert className="h-4 w-4 text-primary" aria-hidden="true" />
+                        Effects
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Financial */}
-                        <div className="rounded-lg border p-3.5 space-y-1 bg-muted/10 text-xs">
-                            <div className="flex items-center gap-1.5 font-semibold text-muted-foreground uppercase tracking-wider">
-                                <DollarSign className="h-3.5 w-3.5 text-primary" />
-                                Financial Cost
-                            </div>
-                            {displayData.cost_impact?.has_cost ? (
-                                <div className="space-y-1">
-                                    <p className="text-base font-bold text-foreground">
-                                        {displayData.cost_impact.currency ?? 'NZD'} {displayData.cost_impact.amount}
-                                    </p>
-                                    {displayData.cost_impact.budget_source && (
-                                        <p className="text-muted-foreground">
-                                            Fund: {displayData.cost_impact.budget_source}
-                                        </p>
-                                    )}
-                                </div>
-                            ) : (
-                                <p className="text-muted-foreground">Confirmed: No direct financial cost.</p>
-                            )}
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div className="flex flex-col gap-1 text-sm">
+                            <p className="text-caption flex items-center gap-1.5 font-semibold">
+                                <DollarSign className="h-3.5 w-3.5" aria-hidden="true" />
+                                Cost
+                            </p>
+                            <p className="text-section-title">{costText}</p>
+                            {costSource ? <p className="text-subtle">{`Paid from: ${costSource}`}</p> : null}
                         </div>
-
-                        {/* Service User & Safety */}
-                        <div className="rounded-lg border p-3.5 space-y-1 bg-muted/10 text-xs">
-                            <div className="flex items-center gap-1.5 font-semibold text-muted-foreground uppercase tracking-wider">
-                                <Users className="h-3.5 w-3.5 text-primary" />
-                                Service-User & Safety
-                            </div>
-                            <p className="text-foreground whitespace-pre-wrap">
-                                {displayData.service_user_implications || 'None specified.'}
+                        <div className="flex flex-col gap-1 text-sm">
+                            <p className="text-caption flex items-center gap-1.5 font-semibold">
+                                <Users className="h-3.5 w-3.5" aria-hidden="true" />
+                                Effect on the people we support and safety
+                            </p>
+                            <p className="whitespace-pre-wrap text-foreground">
+                                {displayData.service_user_implications || 'Not stated.'}
                             </p>
                         </div>
-
-                        {/* Risk & Equity */}
-                        <div className="rounded-lg border p-3.5 space-y-1 bg-muted/10 text-xs">
-                            <div className="flex items-center gap-1.5 font-semibold text-muted-foreground uppercase tracking-wider">
-                                <ShieldAlert className="h-3.5 w-3.5 text-primary" />
-                                Risk & Equity
-                            </div>
-                            <p className="text-foreground whitespace-pre-wrap">
-                                {displayData.risk_equity_implications || 'None specified.'}
+                        <div className="flex flex-col gap-1 text-sm">
+                            <p className="text-caption flex items-center gap-1.5 font-semibold">
+                                <ShieldAlert className="h-3.5 w-3.5" aria-hidden="true" />
+                                Risks and fairness
+                            </p>
+                            <p className="whitespace-pre-wrap text-foreground">
+                                {displayData.risk_equity_implications || 'Not stated.'}
                             </p>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Voting & Decision Section */}
-            {isOpen && resolution.can_vote && !resolution.my_vote && !resolution.my_conflict?.withdrew_from_voting && (
-                <Card className="border-status-info/40 bg-card">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2">
-                            <Vote className="h-5 w-5 text-status-info" />
-                            Cast Your Vote in Context
-                        </CardTitle>
-                        <CardDescription>
-                            {resolution.deadline
-                                ? `Voting closes ${formatDateTimeLong(resolution.deadline)} (NZ time)`
-                                : 'Voting is currently open for eligible members.'}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <RadioGroup
-                            value={selectedVote}
-                            onValueChange={setSelectedVote}
-                            className="grid grid-cols-1 sm:grid-cols-3 gap-3"
-                        >
-                            <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted [&:has([data-state=checked])]:border-status-success [&:has([data-state=checked])]:bg-status-success-bg/15">
-                                <RadioGroupItem value="for" />
-                                <span className="flex items-center gap-2 text-sm font-medium">
-                                    <CheckCircle className="h-4 w-4 text-status-success" />
-                                    For (Yes)
-                                </span>
-                            </label>
-                            <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted [&:has([data-state=checked])]:border-status-critical [&:has([data-state=checked])]:bg-status-critical-bg/15">
-                                <RadioGroupItem value="against" />
-                                <span className="flex items-center gap-2 text-sm font-medium">
-                                    <XCircle className="h-4 w-4 text-status-critical" />
-                                    Against (No)
-                                </span>
-                            </label>
-                            <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5">
-                                <RadioGroupItem value="abstain" />
-                                <span className="flex items-center gap-2 text-sm font-medium">
-                                    <MinusCircle className="h-4 w-4 text-muted-foreground" />
-                                    Abstain
-                                </span>
-                            </label>
-                        </RadioGroup>
+            {/* Voting: always shown, with a plain state, the ballot or your receipt */}
+            <ResolutionBallot
+                id={`paper-${resolution.id}-voting`}
+                resolution={{
+                    id: resolution.id,
+                    title: resolution.title,
+                    status: resolution.status,
+                    purpose: resolution.purpose,
+                    deadline: resolution.deadline,
+                    closed_at: resolution.closed_at ?? null,
+                    voting_threshold: resolution.voting_threshold,
+                    applied_threshold: appliedThreshold,
+                    governance_meeting_id: resolution.governance_meeting_id ?? meetingId,
+                }}
+                version={version}
+                canVote={Boolean(resolution.can_vote)}
+                myVote={resolution.my_vote ?? null}
+                myConflict={resolution.my_conflict ?? null}
+                canDeclareConflict={canDeclareConflict}
+                onDeclareConflict={() => setConflictOpen(true)}
+                votingSwitchedOff={resolution.voting_rules_switched_on === false}
+                ineligibleReason={resolution.ineligible_reason ?? null}
+                next={openNext}
+                back={{ label: 'Back to resolutions', onClick: onClose }}
+            />
 
-                        <div>
-                            <label htmlFor="vote-note" className="text-xs font-medium text-foreground block mb-1">
-                                Vote Note (optional)
-                            </label>
-                            <Textarea
-                                id="vote-note"
-                                placeholder="Optional context or reason for your vote..."
-                                value={conflictNote}
-                                onChange={(e) => setConflictNote(e.target.value)}
-                                rows={2}
-                                className="text-xs"
-                            />
-                        </div>
+            {isClosed && resolution.results ? (
+                <ResolutionResultCard
+                    result={resolution.results}
+                    votingThreshold={resolution.voting_threshold}
+                    quorumRequired={resolution.quorum_required !== false}
+                    followUpCount={followUpCount}
+                    onViewFollowUps={
+                        followUpCount > 0
+                            ? () => followUpsRef.current?.scrollIntoView({ block: 'start' })
+                            : undefined
+                    }
+                />
+            ) : null}
 
-                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t">
-                            <Button
-                                onClick={submitVote}
-                                disabled={!selectedVote || submittingVote}
-                            >
-                                {submittingVote ? 'Submitting Vote...' : 'Submit Vote'}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setConflictDialogOpen(true)}
-                                className="gap-1.5"
-                            >
-                                <AlertTriangle className="h-4 w-4 text-status-warning" />
-                                Declare Conflict...
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Recusal notice */}
-            {resolution.my_conflict?.withdrew_from_voting && (
-                <Card className="border-status-warning/40 bg-status-warning-bg/10">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="flex items-center gap-2 text-status-warning text-base">
-                            <AlertTriangle className="h-5 w-5" />
-                            Conflict Declared — Recused from Voting
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                            You declared a conflict on this resolution and withdrew from voting. Your seat is excluded from quorum calculations.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-xs space-y-1">
-                        <p><strong>Nature:</strong> {resolution.my_conflict.declaration_type}</p>
-                        {resolution.my_conflict.declaration_text && (
-                            <p className="text-muted-foreground">{resolution.my_conflict.declaration_text}</p>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Vote Receipt */}
-            {resolution.my_vote && (
-                <Card className="border-status-success/30 bg-card">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <CheckCircle2 className="h-5 w-5 text-status-success" />
-                            Your Vote Receipt
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                            Official tamper-proof record of your vote for {resolution.resolution_reference}.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <StatusBadge variant={voteVariant(resolution.my_vote.vote)}>
-                                {resolution.my_vote.vote.toUpperCase()}
-                            </StatusBadge>
-                            <span className="text-xs text-muted-foreground" data-test="paper-vote-receipt-time">
-                                Recorded{' '}
-                                <time dateTime={resolution.my_vote.voted_at}>
-                                    {formatDateTimeLong(resolution.my_vote.voted_at)}
-                                </time>{' '}
-                                (NZ time) · Method:{' '}
-                                {resolution.my_vote.voting_method
-                                    ? resolution.my_vote.voting_method.charAt(0).toUpperCase() +
-                                      resolution.my_vote.voting_method.slice(1).replace(/_/g, ' ')
-                                    : 'Electronic'}
-                            </span>
-                            {resolution.my_vote.conflict_declared && (
-                                <Badge variant="outline" className="text-status-warning text-xs">
-                                    <AlertTriangle className="mr-1 h-3 w-3" />
-                                    Conflict Noted
-                                </Badge>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Results breakdown (for closed papers) */}
-            {isClosed && resolution.results && (
-                <Card>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">Official Decision Results</CardTitle>
-                            <StatusBadge variant={outcomeVariant(resolution.results.outcome)}>
-                                {outcomeLabel(resolution.results.outcome)}
-                            </StatusBadge>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid grid-cols-3 gap-3">
-                            <div className="rounded-lg bg-status-success-bg p-3 text-center">
-                                <p className="text-2xl font-bold text-status-success">
-                                    {resolution.results.summary.for}
-                                </p>
-                                <p className="text-xs text-status-success">For ({resolution.results.percentages.for}%)</p>
-                            </div>
-                            <div className="rounded-lg bg-status-critical-bg p-3 text-center">
-                                <p className="text-2xl font-bold text-status-critical">
-                                    {resolution.results.summary.against}
-                                </p>
-                                <p className="text-xs text-status-critical">Against ({resolution.results.percentages.against}%)</p>
-                            </div>
-                            <div className="rounded-lg bg-muted p-3 text-center">
-                                <p className="text-2xl font-bold text-muted-foreground">
-                                    {resolution.results.summary.abstain}
-                                </p>
-                                <p className="text-xs text-foreground">Abstain</p>
-                            </div>
-                        </div>
-
-                        {resolution.results.individual_votes.length > 0 && (
-                            <div className="space-y-1.5 pt-2">
-                                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                    Recorded Member Votes
-                                </h4>
-                                <div className="space-y-1">
-                                    {resolution.results.individual_votes.map((v, i) => (
-                                        <div key={i} className="flex items-center justify-between rounded border p-2 text-xs">
-                                            <span>{resolveMemberName(v.board_member)}</span>
-                                            <StatusBadge variant={voteVariant(v.vote)}>
-                                                {v.vote.charAt(0).toUpperCase() + v.vote.slice(1)}
-                                            </StatusBadge>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Follow-up Action Items */}
-            {((resolution.action_items?.length ?? 0) > 0 ||
-                (resolution.restricted_action_items_count ?? 0) > 0) && (
+            {/* Follow-up actions */}
+            {followUpCount > 0 ? (
                 <Card
                     ref={followUpsRef}
                     id={`paper-${resolution.id}-follow-ups`}
@@ -742,97 +503,111 @@ export function MeetingPaperWorkspace({
                     className="scroll-mt-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     data-test="paper-follow-up-actions"
                 >
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-primary" />
-                            Assigned Follow-up Actions ({resolution.action_items?.length ?? 0})
+                    <CardHeader>
+                        <CardTitle className="text-section-title flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-primary" aria-hidden="true" />
+                            {`Follow-up actions (${followUpCount})`}
                         </CardTitle>
-                        {(resolution.restricted_action_items_count ?? 0) > 0 && (
-                            <CardDescription className="flex items-center gap-1.5 text-xs">
+                        {(resolution.restricted_action_items_count ?? 0) > 0 ? (
+                            <CardDescription className="flex items-center gap-1.5">
                                 <Lock className="size-3.5" aria-hidden="true" />
-                                {resolution.restricted_action_items_count} further follow-up
-                                {resolution.restricted_action_items_count === 1 ? ' action is' : ' actions are'} restricted
-                                to their authorised audience.
+                                {`${resolution.restricted_action_items_count} more ${
+                                    resolution.restricted_action_items_count === 1 ? "isn't" : "aren't"
+                                } shown because you don't have access to ${
+                                    resolution.restricted_action_items_count === 1 ? 'it' : 'them'
+                                }.`}
                             </CardDescription>
-                        )}
+                        ) : null}
                     </CardHeader>
-                    {(resolution.action_items?.length ?? 0) > 0 && (
+                    {(resolution.action_items?.length ?? 0) > 0 ? (
                         <CardContent>
-                            <ul className="space-y-2">
-                                {(resolution.action_items ?? []).map((action) => (
-                                    <li
-                                        key={action.id}
-                                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-xs"
-                                        data-test="paper-follow-up-action"
-                                    >
-                                        <div className="min-w-0 space-y-0.5">
-                                            <p className="font-semibold text-foreground">
-                                                {action.title}
-                                            </p>
-                                            <p className="text-muted-foreground">
-                                                <span className="font-mono">{action.reference}</span>
-                                                {' · '}
-                                                {action.is_mine
-                                                    ? 'Assigned to you'
-                                                    : action.assignee_name
-                                                      ? `Assigned: ${action.assignee_name}`
-                                                      : 'Unassigned'}
-                                                {action.due_label ? ` · Due ${action.due_label}` : ''}
-                                            </p>
-                                        </div>
-                                        <div className="flex shrink-0 items-center gap-2">
-                                            <StatusBadge status={action.status} />
-                                            {action.can_open && action.open_url && (
-                                                <Button asChild variant="outline" size="sm">
-                                                    <Link
-                                                        href={actionHrefWithReturn(
-                                                            action.open_url,
-                                                            meetingId,
-                                                            resolution.id,
-                                                        )}
-                                                        aria-label={`${action.is_mine && action.status !== 'complete' ? 'Update' : 'Open'} follow-up action ${action.reference}: ${action.title}`}
-                                                        data-test="paper-follow-up-action-open"
-                                                    >
-                                                        <ExternalLink className="size-4" aria-hidden="true" />
-                                                        {action.is_mine && action.status !== 'complete' ? 'Update' : 'Open'}
-                                                    </Link>
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </li>
-                                ))}
+                            <ul className="flex flex-col gap-2">
+                                {(resolution.action_items ?? []).map((action) => {
+                                    const actionChip = governanceStatus('action_status', action.status);
+                                    const verb =
+                                        action.is_mine && !['complete', 'completed'].includes(action.status)
+                                            ? 'Update'
+                                            : 'Open';
+                                    return (
+                                        <li
+                                            key={action.id}
+                                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm"
+                                            data-test="paper-follow-up-action"
+                                        >
+                                            <div className="min-w-0">
+                                                <p className="font-semibold text-foreground">{action.title}</p>
+                                                <p className="text-caption">
+                                                    {[
+                                                        action.is_mine
+                                                            ? 'Yours'
+                                                            : action.assignee_name
+                                                              ? `For ${action.assignee_name}`
+                                                              : 'Nobody responsible yet',
+                                                        action.due_date
+                                                            ? `Due ${formatDateLong(action.due_date)}`
+                                                            : action.due_label
+                                                              ? `Due ${action.due_label}`
+                                                              : null,
+                                                        refSuffix(action.reference),
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(' · ')}
+                                                </p>
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-2">
+                                                <StatusBadge variant={actionChip.variant}>{actionChip.label}</StatusBadge>
+                                                {action.can_open && action.open_url ? (
+                                                    <Button asChild variant="outline" size="sm">
+                                                        <Link
+                                                            href={actionHrefWithReturn(
+                                                                action.open_url,
+                                                                meetingId,
+                                                                resolution.id,
+                                                            )}
+                                                            aria-label={`${verb} follow-up action: ${action.title}`}
+                                                            data-test="paper-follow-up-action-open"
+                                                        >
+                                                            <ExternalLink className="size-4" aria-hidden="true" />
+                                                            {verb}
+                                                        </Link>
+                                                    </Button>
+                                                ) : null}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         </CardContent>
-                    )}
+                    ) : null}
                 </Card>
-            )}
+            ) : null}
 
-            {/* Supporting Documents / Attachments */}
-            {resolution.attachments && resolution.attachments.length > 0 && (
+            {/* Supporting documents */}
+            {resolution.attachments && resolution.attachments.length > 0 ? (
                 <Card data-test="paper-supporting-documents">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <Paperclip className="h-4 w-4 text-primary" />
-                            Supporting Documents ({resolution.attachments.length})
+                    <CardHeader>
+                        <CardTitle className="text-section-title flex items-center gap-2">
+                            <Paperclip className="h-4 w-4 text-primary" aria-hidden="true" />
+                            {`Supporting documents (${resolution.attachments.length})`}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <ul className="space-y-2">
+                        <ul className="flex flex-col gap-2">
                             {resolution.attachments.map((doc, index) => {
                                 const size = formatFileSize(doc.size_bytes);
 
                                 return (
                                     <li
                                         key={doc.id ?? `${doc.original_name}-${index}`}
-                                        className="flex flex-wrap items-center justify-between gap-3 rounded border p-2 text-xs"
+                                        className="flex flex-wrap items-center justify-between gap-3 rounded border border-border p-2 text-sm"
                                         data-test="paper-supporting-document"
                                     >
                                         <div className="flex min-w-0 items-center gap-2">
                                             <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                                             <span className="truncate text-foreground">{doc.original_name}</span>
-                                            {size && <span className="shrink-0 text-muted-foreground">{size}</span>}
+                                            {size ? <span className="shrink-0 text-caption">{size}</span> : null}
                                         </div>
-                                        {doc.download_url && (
+                                        {doc.download_url ? (
                                             <Button asChild variant="outline" size="sm">
                                                 <a
                                                     href={doc.download_url}
@@ -843,77 +618,24 @@ export function MeetingPaperWorkspace({
                                                     Download
                                                 </a>
                                             </Button>
-                                        )}
+                                        ) : null}
                                     </li>
                                 );
                             })}
                         </ul>
                     </CardContent>
                 </Card>
-            )}
+            ) : null}
 
-            {/* Conflict Declaration Dialog */}
-            <Dialog open={conflictDialogOpen} onOpenChange={setConflictDialogOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Declare Conflict of Interest</DialogTitle>
-                        <DialogDescription className="text-xs">
-                            Formally declare an interest in {resolution.resolution_reference}. Withdrawing from voting excludes you from quorum participation without recording an abstention.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2 text-xs">
-                        <div>
-                            <label className="font-medium text-foreground block mb-1">
-                                Nature of Conflict <span className="text-status-critical">*</span>
-                            </label>
-                            <select
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs"
-                                value={conflictType}
-                                onChange={(e) => setConflictType(e.target.value)}
-                            >
-                                <option value="material">Material personal interest</option>
-                                <option value="related">Related party transaction</option>
-                                <option value="prejudicial">Prejudicial bias or loyalty conflict</option>
-                                <option value="other">Other perceived conflict</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="font-medium text-foreground block mb-1">
-                                Affected Matter & Detail <span className="text-status-critical">*</span>
-                            </label>
-                            <Textarea
-                                placeholder="Describe the nature of your interest and affected decisions (minimum 20 characters)..."
-                                value={conflictDescription}
-                                onChange={(e) => setConflictDescription(e.target.value)}
-                                rows={3}
-                                className="text-xs"
-                            />
-                            {conflictDescription.length > 0 && conflictDescription.length < 20 && (
-                                <p className="text-[11px] text-status-critical mt-1">
-                                    Must be at least 20 characters ({conflictDescription.length}/20).
-                                </p>
-                            )}
-                        </div>
-                        <div className="flex justify-end gap-2 pt-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setConflictDialogOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                size="sm"
-                                onClick={submitConflict}
-                                disabled={conflictDescription.length < 20 || submittingConflict}
-                            >
-                                {submittingConflict ? 'Submitting...' : 'Record Declaration & Recuse'}
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <DeclareConflictDialog
+                isOpen={conflictOpen}
+                onClose={() => setConflictOpen(false)}
+                resolutionId={resolution.id}
+                resolutionTitle={resolution.title}
+                existing={resolution.my_conflict ?? null}
+                hasVoted={Boolean(resolution.my_vote)}
+                appliedThreshold={appliedThreshold}
+            />
         </div>
     );
 }

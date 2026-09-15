@@ -1,5 +1,7 @@
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+import { Link } from '@inertiajs/react';
+import { ChevronDown, ChevronUp, History } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -9,20 +11,22 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Link } from '@inertiajs/react';
-import { ChevronDown, ChevronUp, History } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ErrorState } from '@/components/ui/error-state';
 
 export interface TimelineEvent {
     id: string;
     kind: 'action' | 'change' | string;
     actor: string;
+    /** Plain verb phrase completing "{actor} …" (e.g. "voted on a resolution"). */
     type: string;
+    /** Plain record name (e.g. "Resolution"). */
     entity_type: string;
     entity_id: number | null;
     description: string | null;
     occurred_at: string | null;
+    /** NZ time, e.g. "5:00 pm". */
     occurred_label: string | null;
+    /** NZ date, e.g. "7 September 2026". */
     day: string | null;
     href: string | null;
 }
@@ -31,10 +35,12 @@ export interface TimelinePayload {
     since: {
         meeting_id: number;
         title: string;
-        held_at: string;
-        held_label: string;
+        held_at: string | null;
+        held_label: string | null;
     } | null;
     events: TimelineEvent[];
+    /** True when the viewer has no audit access — nothing was sent. */
+    restricted?: boolean;
 }
 
 interface GovernanceTimelineProps {
@@ -50,13 +56,14 @@ function actorInitials(name: string): string {
             .filter(Boolean)
             .slice(0, 2)
             .map((p) => p[0]?.toUpperCase() ?? '')
-            .join('') || '?'
+            .join('') || '·'
     );
 }
 
 /**
- * What changed since the last board meeting — audit + change events
- * grouped by day, with actor avatars and a "show more" toggle.
+ * What has changed since the last meeting — audit and change events grouped
+ * by NZ day. Events are filtered on the server to the records the viewer can
+ * open, and only viewers with audit log access receive any.
  */
 export function GovernanceTimeline({
     timeline,
@@ -77,7 +84,7 @@ export function GovernanceTimeline({
             0,
             expanded ? events.length : defaultLimit,
         )) {
-            const day = e.day ?? 'Recent';
+            const day = e.day ?? 'Recently';
             const list = map.get(day) ?? [];
             list.push(e);
             map.set(day, list);
@@ -85,114 +92,93 @@ export function GovernanceTimeline({
         return Array.from(map.entries());
     }, [events, expanded, defaultLimit, isArray]);
 
+    if (timeline?.restricted) return null;
+
+    const since = timeline?.since ?? null;
+
     return (
         <Card data-dusk="cockpit-timeline">
             <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                         <CardTitle className="text-section-title">
-                            Governance Timeline
+                            What's changed since the last meeting
                         </CardTitle>
                         <CardDescription>
-                            {timeline?.since
-                                ? `What has changed since ${timeline.since.title} on ${timeline.since.held_label}.`
-                                : 'Recent governance activity across the organisation.'}
+                            {since
+                                ? `Since ${since.title}${since.held_label ? ` on ${since.held_label}` : ''}.`
+                                : 'Activity in the last 30 days.'}
                         </CardDescription>
                     </div>
-                    {timeline?.since && (
+                    {since ? (
                         <Link
-                            href={`/governance/meetings/${timeline.since.meeting_id}`}
-                            className="text-xs font-medium text-primary hover:underline"
+                            href={`/governance/meetings/${since.meeting_id}`}
+                            className="text-xs font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                         >
-                            View last meeting
+                            Open last meeting
                         </Link>
-                    )}
+                    ) : null}
                 </div>
             </CardHeader>
             <CardContent>
                 {!isArray ? (
-                    <div
-                        className="rounded-lg border border-dashed border-destructive/50 bg-destructive/5 p-8 text-center"
-                        data-dusk="timeline-error"
-                    >
-                        <History
-                            className="mx-auto h-5 w-5 text-destructive"
-                            aria-hidden="true"
+                    <div data-dusk="timeline-error">
+                        <ErrorState
+                            title="Recent activity couldn't be loaded"
+                            message="Nothing is shown rather than an incomplete list. Try again in a few minutes."
+                            onRetry={onRetry}
                         />
-                        <p className="mt-2 text-sm font-medium text-foreground">
-                            Recent activity could not be loaded
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Activity data was malformed or temporarily unavailable.
-                        </p>
-                        {onRetry && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={onRetry}
-                                className="mt-4"
-                            >
-                                Retry
-                            </Button>
-                        )}
                     </div>
                 ) : events.length === 0 ? (
                     <EmptyState
                         variant="compact"
                         icon={History}
-                        title={`Nothing has changed${timeline.since ? ` since ${timeline.since.title}` : ' recently'}.`}
-                        description="New governance activity will appear here automatically."
+                        title={
+                            since
+                                ? `Nothing has changed since ${since.title}`
+                                : 'Nothing has changed recently'
+                        }
+                        description="New activity will show here."
                     />
                 ) : (
-                    <div className="space-y-5">
+                    <div className="flex flex-col gap-5">
                         {grouped.map(([day, dayEvents]) => (
                             <div key={day}>
-                                <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                <p className="mb-2 text-caption font-medium">
                                     {day}
                                 </p>
                                 <ol className="relative space-y-3 border-l border-border pl-5">
                                     {dayEvents.map((event) => {
-                                        const Content = (
-                                            <div className="flex items-start gap-3">
-                                                <Avatar className="h-8 w-8 shrink-0">
-                                                    <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">
-                                                        {actorInitials(
-                                                            event.actor,
-                                                        )}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <div className="min-w-0 flex-1 space-y-0.5">
-                                                    <div className="flex flex-wrap items-center gap-1.5">
-                                                        <span className="text-sm font-medium text-foreground">
+                                        const content = (
+                                            <span className="flex items-start gap-3">
+                                                <span
+                                                    aria-hidden="true"
+                                                    className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground"
+                                                >
+                                                    {actorInitials(event.actor)}
+                                                </span>
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block text-sm text-foreground">
+                                                        <span className="font-medium">
                                                             {event.actor}
-                                                        </span>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-[10px] uppercase"
-                                                        >
-                                                            {event.type}
-                                                        </Badge>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-[10px]"
-                                                        >
-                                                            {event.entity_type}
-                                                        </Badge>
-                                                    </div>
+                                                        </span>{' '}
+                                                        {event.type}
+                                                    </span>
                                                     {event.description ? (
-                                                        <p className="text-xs text-muted-foreground">
+                                                        <span className="block text-caption">
                                                             {event.description}
-                                                        </p>
+                                                        </span>
                                                     ) : null}
-                                                    {event.occurred_label ? (
-                                                        <p className="text-[10px] tracking-wide text-muted-foreground/70 uppercase">
-                                                            {
-                                                                event.occurred_label
-                                                            }
-                                                        </p>
-                                                    ) : null}
-                                                </div>
-                                            </div>
+                                                    <span className="block text-caption">
+                                                        {[
+                                                            event.entity_type,
+                                                            event.occurred_label,
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(' · ')}
+                                                    </span>
+                                                </span>
+                                            </span>
                                         );
                                         return (
                                             <li
@@ -200,19 +186,19 @@ export function GovernanceTimeline({
                                                 className="relative"
                                             >
                                                 <span
-                                                    className="absolute top-2 -left-[1.41rem] h-2 w-2 rounded-full bg-primary"
+                                                    className="absolute top-3 -left-[1.41rem] size-2 rounded-full bg-primary"
                                                     aria-hidden="true"
                                                 />
                                                 {event.href ? (
                                                     <Link
                                                         href={event.href}
-                                                        className="-m-1 block rounded-md p-1 transition hover:bg-muted"
+                                                        className="-m-1 block rounded-md p-1 transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                                     >
-                                                        {Content}
+                                                        {content}
                                                     </Link>
                                                 ) : (
                                                     <div className="-m-1 rounded-md p-1">
-                                                        {Content}
+                                                        {content}
                                                     </div>
                                                 )}
                                             </li>
@@ -232,12 +218,18 @@ export function GovernanceTimeline({
                                 {expanded ? (
                                     <>
                                         Show less{' '}
-                                        <ChevronUp className="ml-1 h-4 w-4" />
+                                        <ChevronUp
+                                            className="ml-1 size-4"
+                                            aria-hidden="true"
+                                        />
                                     </>
                                 ) : (
                                     <>
-                                        Show all {events.length} events{' '}
-                                        <ChevronDown className="ml-1 h-4 w-4" />
+                                        Show all {events.length} changes{' '}
+                                        <ChevronDown
+                                            className="ml-1 size-4"
+                                            aria-hidden="true"
+                                        />
                                     </>
                                 )}
                             </Button>

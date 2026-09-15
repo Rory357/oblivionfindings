@@ -139,6 +139,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
             Route::post('/resolutions', [ResolutionController::class, 'store'])->name('resolutions.store');
             Route::put('/resolutions/{resolution}', [ResolutionController::class, 'update'])->name('resolutions.update');
             Route::post('/resolutions/{resolution}/open', [ResolutionController::class, 'openVoting'])->name('resolutions.open');
+            // For discussion / For information papers are shared, never voted on.
+            Route::post('/resolutions/{resolution}/publish', [ResolutionController::class, 'publish'])->name('resolutions.publish');
             Route::post('/resolutions/{resolution}/close', [ResolutionController::class, 'closeVoting'])->name('resolutions.close');
             Route::post('/resolutions/{resolution}/finalize', [ResolutionController::class, 'finalize'])->name('resolutions.finalize');
             Route::post('/resolutions/{resolution}/attachments', [ResolutionController::class, 'attachFiles'])->name('resolutions.attachments.store');
@@ -262,6 +264,7 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
 
         Route::middleware('permission:governance.budgets.submit')->group(function () {
             Route::post('/budgets/{budget}/propose', [BudgetController::class, 'propose'])->name('budgets.propose');
+            Route::post('/budgets/{budget}/return-to-drafting', [BudgetController::class, 'returnToDrafting'])->name('budgets.return-to-drafting');
         });
 
         Route::middleware('permission:governance.budgets.approve')->group(function () {
@@ -428,6 +431,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
             Route::put('/settings', [GovernanceSettingController::class, 'update'])->name('settings.update');
             Route::post('/settings/rules', [GovernanceSettingController::class, 'updateRules'])->name('settings.rules.update');
             Route::post('/settings/rules/activate', [GovernanceSettingController::class, 'activateRules'])->name('settings.rules.activate');
+            // First switch-on: the chair or secretary records the board's existing approval.
+            Route::post('/settings/rules/record-approval', [GovernanceSettingController::class, 'recordRulesApproval'])->name('settings.rules.record-approval');
         });
     });
 });

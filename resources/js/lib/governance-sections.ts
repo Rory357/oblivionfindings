@@ -89,7 +89,7 @@ export const GOVERNANCE_SECTIONS: GovernanceSection[] = [
     },
     {
         key: 'decisions',
-        label: 'Decisions & actions',
+        label: 'Resolutions & actions',
         icon: Gavel,
         group: 'board',
         tabs: [
@@ -103,7 +103,7 @@ export const GOVERNANCE_SECTIONS: GovernanceSection[] = [
             },
             {
                 key: 'actions',
-                label: 'Action items',
+                label: 'Actions',
                 href: '/governance/actions',
                 icon: ClipboardList,
                 prefixes: ['/governance/actions'],
@@ -113,7 +113,7 @@ export const GOVERNANCE_SECTIONS: GovernanceSection[] = [
     },
     {
         key: 'assurance',
-        label: 'Risk & assurance',
+        label: 'Risk & compliance',
         icon: ShieldCheck,
         group: 'oversight',
         tabs: [
@@ -135,7 +135,7 @@ export const GOVERNANCE_SECTIONS: GovernanceSection[] = [
             },
             {
                 key: 'clinical',
-                label: 'Clinical',
+                label: 'Care quality',
                 href: '/governance/clinical',
                 icon: HeartPulse,
                 prefixes: ['/governance/clinical'],
@@ -153,7 +153,7 @@ export const GOVERNANCE_SECTIONS: GovernanceSection[] = [
     },
     {
         key: 'finance',
-        label: 'Finance',
+        label: 'Board finance',
         icon: DollarSign,
         group: 'oversight',
         tabs: [
@@ -233,7 +233,7 @@ export const GOVERNANCE_SECTIONS: GovernanceSection[] = [
             },
             {
                 key: 'records',
-                label: 'Records search',
+                label: 'Records',
                 href: '/governance/records',
                 icon: FileSearch,
                 prefixes: ['/governance/records'],
@@ -249,7 +249,7 @@ export const GOVERNANCE_SECTIONS: GovernanceSection[] = [
         tabs: [
             {
                 key: 'members',
-                label: 'Members',
+                label: 'Board members',
                 href: '/governance/admin/board-members',
                 icon: Users,
                 prefixes: ['/governance/admin/board-members'],

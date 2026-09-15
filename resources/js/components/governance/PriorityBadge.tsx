@@ -1,68 +1,43 @@
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { AlertOctagon, AlertTriangle, Circle, Clock } from 'lucide-react';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { governanceStatus } from '@/lib/governance-labels';
 
 export type Priority = 'critical' | 'high' | 'medium' | 'low';
-export type WorkflowStatus = 'overdue' | 'due_soon' | 'pending';
+export type WorkflowStatus = 'overdue' | 'due_soon' | 'pending' | 'blocked';
 
 interface PriorityBadgeProps {
-    priority: Priority;
-    status?: WorkflowStatus;
-    showLabel?: boolean;
+    priority: Priority | string;
+    status?: WorkflowStatus | string;
     className?: string;
 }
 
-const PRIORITY_STYLES: Record<Priority, string> = {
-    critical:
-        'bg-status-critical-bg text-status-critical border-status-critical/30',
-    high: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    medium: 'bg-status-info-bg text-status-info border-status-info/30',
-    low: 'bg-muted text-muted-foreground border-border',
-};
-
-const PRIORITY_LABELS: Record<Priority, string> = {
-    critical: 'Critical',
-    high: 'High',
-    medium: 'Medium',
-    low: 'Low',
-};
-
-const PRIORITY_ICONS: Record<Priority, typeof AlertOctagon> = {
-    critical: AlertOctagon,
-    high: AlertTriangle,
-    medium: Clock,
-    low: Circle,
-};
-
 /**
- * Tone-coloured priority pill. When `status === 'overdue'` we always render
- * critical regardless of the source priority so overdue is impossible to miss.
+ * The one chip a board priority needs: its due state when it is overdue,
+ * blocked or due soon; otherwise its priority when that is high or critical.
+ * Routine items get no chip. Always a labelled StatusBadge — colour is never
+ * the only signal.
  */
-export function PriorityBadge({
-    priority,
-    status,
-    showLabel = true,
-    className,
-}: PriorityBadgeProps) {
-    const effective: Priority = status === 'overdue' ? 'critical' : priority;
-    const Icon = PRIORITY_ICONS[effective];
+export function priorityChip(
+    priority: Priority | string,
+    status?: WorkflowStatus | string,
+): { label: string; variant: StatusVariant } | null {
+    if (status === 'overdue') return { label: 'Overdue', variant: 'critical' };
+    if (status === 'blocked') return { label: 'Blocked', variant: 'critical' };
+    if (status === 'due_soon') return { label: 'Due soon', variant: 'warning' };
+    if (priority === 'critical' || priority === 'high') {
+        const chip = governanceStatus('priority', priority);
+        return { label: `${chip.label} priority`, variant: chip.variant };
+    }
+    return null;
+}
+
+export function PriorityBadge({ priority, status, className }: PriorityBadgeProps) {
+    const chip = priorityChip(priority, status);
+    if (!chip) return null;
 
     return (
-        <Badge
-            className={cn(
-                'inline-flex items-center gap-1 border',
-                PRIORITY_STYLES[effective],
-                className,
-            )}
-            aria-label={`Priority: ${PRIORITY_LABELS[effective]}`}
-        >
-            <Icon className="h-3 w-3" aria-hidden="true" />
-            {showLabel ? (
-                <span className="text-xs font-medium">
-                    {PRIORITY_LABELS[effective]}
-                </span>
-            ) : null}
-        </Badge>
+        <StatusBadge size="sm" variant={chip.variant} className={className}>
+            {chip.label}
+        </StatusBadge>
     );
 }
 

@@ -5,7 +5,6 @@ import {
 } from '@/components/governance/governance-dialog-deep-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
@@ -23,6 +22,7 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { formatDateOnly } from '@/lib/datetime';
+import { formatNzd, refSuffix } from '@/lib/governance-labels';
 import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -84,19 +84,19 @@ export const SPEND_APPROVAL_STEPS: readonly (WizardStep & { key: StepKey })[] =
         {
             key: 'request',
             label: 'Request',
-            blurb: 'Title, category & site',
+            blurb: 'Title, kind of spend and site',
             icon: HandCoins,
         },
         {
             key: 'amount',
             label: 'Amount',
-            blurb: 'NZD amount, threshold & expiry',
+            blurb: 'Amount and who approves it',
             icon: Wallet,
         },
         {
             key: 'details',
-            label: 'Justification',
-            blurb: 'What the spend is for',
+            label: 'Reason',
+            blurb: 'Why the spend is needed',
             icon: FileText,
         },
         {
@@ -129,43 +129,35 @@ const CATEGORY_META: Record<string, { icon: LucideIcon; description: string }> =
     {
         capex: {
             icon: Landmark,
-            description: 'Capital purchases and fit-outs.',
+            description: 'Buying equipment, vehicles or building work.',
         },
         opex: {
             icon: Receipt,
-            description: 'Operating spend outside the budget.',
+            description: 'Running costs that are not in the budget.',
         },
         supplier_contract: {
             icon: Handshake,
-            description: 'New or renewed supplier commitments.',
+            description: 'A new or renewed supplier agreement.',
         },
         donor_restricted: {
             icon: HandHeart,
-            description: 'Spend from restricted donor funds.',
+            description: 'Spending money a donor gave for a set purpose.',
         },
     };
 
-export const formatNzd = (amount: number | string | null | undefined) =>
-    new Intl.NumberFormat('en-NZ', {
-        style: 'currency',
-        currency: 'NZD',
-    }).format(Number(amount) || 0);
-
-export function spendStatusVariant(status: string): StatusVariant {
-    switch (status) {
-        case 'approved':
-            return 'success';
-        case 'rejected':
-            return 'critical';
-        case 'submitted':
-            return 'warning';
-        default:
-            return 'neutral';
-    }
+/**
+ * "Below $5,000: approved by a finance approver. $5,000 and over: needs a
+ * board resolution." Board sign-off starts AT the threshold.
+ */
+export function whoApprovesText(threshold: number): string {
+    const amount = formatNzd(threshold);
+    return `Below ${amount}: approved by a finance approver. ${amount} and over: needs a board resolution.`;
 }
 
-export const spendStatusLabel = (status: string) =>
-    status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
+/** Mirrors SpendApprovalCommandService::requiresBoard (amount ≥ threshold). */
+export function needsBoardResolution(amount: number, threshold: number) {
+    return amount > 0 && amount >= threshold;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Validation + completeness                                          */
@@ -178,7 +170,8 @@ function validateStep(
     const errors: Record<string, string> = {};
     if (step === 'request') {
         if (!data.title.trim()) errors.title = 'Give the request a title.';
-        if (!data.category) errors.category = 'Choose a spend category.';
+        if (!data.category)
+            errors.category = 'Choose what kind of spend this is.';
         if (!data.site_id) errors.site_id = 'Choose the site this spend is for.';
     }
     if (step === 'amount') {
@@ -186,7 +179,7 @@ function validateStep(
         if (data.amount.trim() === '' || !Number.isFinite(amount)) {
             errors.amount = 'Enter the amount in NZD.';
         } else if (amount < 0) {
-            errors.amount = 'The amount cannot be negative.';
+            errors.amount = "The amount can't be negative.";
         }
     }
     return errors;
@@ -236,7 +229,9 @@ function SpendApprovalWizardBody({
     const form = useForm<SpendApprovalForm>({
         title: approval?.title ?? '',
         description: approval?.description ?? '',
-        category: approval?.category ?? (categoryKeys.includes('capex') ? 'capex' : (categoryKeys[0] ?? '')),
+        category:
+            approval?.category ??
+            (categoryKeys.includes('capex') ? 'capex' : (categoryKeys[0] ?? '')),
         amount: approval ? String(approval.amount) : '',
         currency: approval?.currency ?? 'NZD',
         site_id: approval?.site_id
@@ -314,18 +309,18 @@ function SpendApprovalWizardBody({
 
     const threshold = thresholds[data.category] ?? 0;
     const numericAmount = Number(data.amount) || 0;
-    const requiresBoard = numericAmount > 0 && numericAmount >= threshold;
+    const requiresBoard = needsBoardResolution(numericAmount, threshold);
     const siteName =
         sites.find((site) => String(site.id) === data.site_id)?.name ?? null;
     const isReview = step.key === 'review';
 
     const success = done ? (
         <WizardSuccessPane
-            title={isEdit ? 'Request updated' : 'Request drafted'}
+            title={isEdit ? 'Request updated' : 'Request saved'}
             blurb={
                 isEdit
-                    ? `${approval?.reference ?? 'The request'} has been saved. It stays in draft until it is submitted for sign-off.`
-                    : 'The spend request is saved as a draft. Submit it for sign-off from the request page.'
+                    ? 'Your changes are saved. The request stays a draft until you send it for a decision.'
+                    : 'The spend request is saved as a draft. Add any quotes, then send it for a decision from the request page.'
             }
             actions={<Button onClick={onClose}>Close</Button>}
         />
@@ -336,14 +331,14 @@ function SpendApprovalWizardBody({
             <WizardShell
                 open={isOpen}
                 onClose={requestClose}
-                title={isEdit ? 'Edit spend approval' : 'Request spend approval'}
-                description="A guided wizard to draft a spend item for board or finance-committee sign-off."
+                title={isEdit ? 'Edit spend request' : 'New spend request'}
+                description="Ask for permission to spend money over the limit."
                 railIcon={HandCoins}
                 railTitle={isEdit ? 'Edit request' : 'New request'}
                 railSub={
-                    isEdit
-                        ? `${approval?.reference} · v${approval?.version}`
-                        : 'Spend approval'
+                    isEdit && approval
+                        ? refSuffix(approval.reference)
+                        : 'Spend request'
                 }
                 steps={SPEND_APPROVAL_STEPS}
                 stepIndex={stepIndex}
@@ -355,7 +350,9 @@ function SpendApprovalWizardBody({
                         <Button
                             type="button"
                             variant="ghost"
-                            onClick={() => setStepIndex((i) => Math.max(i - 1, 0))}
+                            onClick={() =>
+                                setStepIndex((i) => Math.max(i - 1, 0))
+                            }
                         >
                             <ChevronLeft className="h-4 w-4" /> Back
                         </Button>
@@ -397,8 +394,8 @@ function SpendApprovalWizardBody({
                             <div className="sm:col-span-2">
                                 <StepHead
                                     icon={HandCoins}
-                                    title="What needs sign-off?"
-                                    blurb="Name the spend, pick its category and the site it belongs to."
+                                    title="What is the spend for?"
+                                    blurb="Name the spend, choose what kind it is and the site it's for."
                                 />
                             </div>
                             <Field
@@ -417,7 +414,7 @@ function SpendApprovalWizardBody({
                                 />
                             </Field>
                             <Field
-                                label="Category"
+                                label="Kind of spend"
                                 required
                                 span
                                 error={err('category')}
@@ -433,7 +430,7 @@ function SpendApprovalWizardBody({
                                         description:
                                             CATEGORY_META[key]?.description,
                                         icon: CATEGORY_META[key]?.icon ?? Wallet,
-                                        meta: `Sign-off from ${formatNzd(thresholds[key] ?? 0)}`,
+                                        meta: `Board resolution from ${formatNzd(thresholds[key] ?? 0)}`,
                                     }))}
                                 />
                             </Field>
@@ -464,8 +461,8 @@ function SpendApprovalWizardBody({
                             <div className="sm:col-span-2">
                                 <StepHead
                                     icon={Wallet}
-                                    title="Amount and validity"
-                                    blurb="Amounts at or above the category threshold need a board resolution."
+                                    title="Amount"
+                                    blurb="The amount decides who can approve the request."
                                 />
                             </div>
                             <Field
@@ -487,8 +484,8 @@ function SpendApprovalWizardBody({
                                 />
                             </Field>
                             <Field
-                                label="Valid until"
-                                hint="optional"
+                                label="Approval needed by"
+                                hint="optional — the request expires after this date"
                                 error={err('valid_until')}
                             >
                                 <Input
@@ -504,12 +501,14 @@ function SpendApprovalWizardBody({
                                 icon={requiresBoard ? AlertTriangle : Wallet}
                                 tone={requiresBoard ? 'warn' : 'info'}
                             >
-                                Threshold for{' '}
-                                {categories[data.category] ?? data.category}:{' '}
-                                <strong>{formatNzd(threshold)}</strong>.{' '}
-                                {requiresBoard
-                                    ? 'This amount meets the threshold and will require a board resolution.'
-                                    : 'Amounts below the threshold are decided without a board resolution.'}
+                                <strong>Who approves what</strong> —{' '}
+                                {categories[data.category] ?? 'This kind of spend'}
+                                : {whoApprovesText(threshold)}{' '}
+                                {numericAmount > 0
+                                    ? requiresBoard
+                                        ? 'This amount needs a board resolution before it can be approved.'
+                                        : 'A finance approver can decide this amount.'
+                                    : ''}
                             </InfoCard>
                             {err('currency') ? (
                                 <InfoCard icon={AlertTriangle} tone="crit">
@@ -523,10 +522,10 @@ function SpendApprovalWizardBody({
                         <div className="grid gap-4">
                             <StepHead
                                 icon={FileText}
-                                title="Justification"
-                                blurb="Explain the spend so decision-makers can weigh it without chasing context."
+                                title="Why is it needed?"
+                                blurb="Explain the spend so the person deciding doesn't have to chase details."
                             />
-                            <Field label="Description" error={err('description')}>
+                            <Field label="Reason" error={err('description')}>
                                 <Textarea
                                     id="spend-description"
                                     rows={7}
@@ -534,7 +533,7 @@ function SpendApprovalWizardBody({
                                     onChange={(e) =>
                                         setData('description', e.target.value)
                                     }
-                                    placeholder="What is this spend for? Which site, service or project does it relate to?"
+                                    placeholder="What is this spend for, and what happens if it isn't approved?"
                                 />
                             </Field>
                         </div>
@@ -547,8 +546,8 @@ function SpendApprovalWizardBody({
                                 title="Review the request"
                                 blurb={
                                     isEdit
-                                        ? 'Changes are saved against the version you opened; if someone else changed it, reload first.'
-                                        : 'The request is saved as a draft. Supporting documents are attached on the request page.'
+                                        ? 'If someone else changed this request since you opened it, refresh the page first.'
+                                        : 'The request is saved as a draft. Add quotes on the request page, then send it for a decision.'
                                 }
                             />
                             {err('expected_version') ? (
@@ -564,7 +563,7 @@ function SpendApprovalWizardBody({
                                 >
                                     <ReviewRow label="Title" value={data.title} />
                                     <ReviewRow
-                                        label="Category"
+                                        label="Kind of spend"
                                         value={categories[data.category]}
                                     />
                                     <ReviewRow label="Site" value={siteName} />
@@ -578,22 +577,22 @@ function SpendApprovalWizardBody({
                                         label="Amount"
                                         value={
                                             data.amount.trim()
-                                                ? formatNzd(data.amount)
+                                                ? formatNzd(numericAmount)
                                                 : null
                                         }
                                     />
                                     <ReviewRow
-                                        label="Board sign-off"
+                                        label="Who approves"
                                         value={
                                             data.amount.trim()
                                                 ? requiresBoard
-                                                    ? 'Required'
-                                                    : 'Not required'
+                                                    ? 'Needs a board resolution'
+                                                    : 'A finance approver'
                                                 : null
                                         }
                                     />
                                     <ReviewRow
-                                        label="Valid until"
+                                        label="Approval needed by"
                                         value={
                                             data.valid_until
                                                 ? formatDateOnly(
@@ -605,13 +604,13 @@ function SpendApprovalWizardBody({
                                 </ReviewCard>
                                 <ReviewCard
                                     icon={FileText}
-                                    title="Justification"
+                                    title="Reason"
                                     onEdit={() => goTo('details')}
                                     span
                                 >
-                                    <p className="text-[13px] whitespace-pre-wrap text-muted-foreground">
+                                    <p className="text-subtle whitespace-pre-wrap">
                                         {data.description.trim() ||
-                                            'No description added.'}
+                                            'No reason added.'}
                                     </p>
                                 </ReviewCard>
                             </div>
@@ -622,12 +621,17 @@ function SpendApprovalWizardBody({
 
             <DiscardDraftDialog
                 open={confirmClose}
+                mode={isEdit ? 'edit' : 'create'}
                 onKeepEditing={() => setConfirmClose(false)}
                 onDiscard={() => {
                     setConfirmClose(false);
                     onClose();
                 }}
-                description="Any changes to this spend request will be lost."
+                description={
+                    isEdit
+                        ? 'Your changes to this spend request will be lost.'
+                        : 'The details you entered for this spend request will be lost.'
+                }
             />
         </>
     );

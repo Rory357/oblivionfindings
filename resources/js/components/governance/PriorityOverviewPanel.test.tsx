@@ -86,8 +86,11 @@ describe('PriorityOverviewPanel', () => {
         );
 
         expect(screen.getAllByTestId('priority-card')).toHaveLength(8);
+        // The heading lives with Home; the panel has no repeated title or count badges.
+        expect(screen.queryByText(/Priorities Requiring Board Attention/i)).not.toBeInTheDocument();
+        expect(screen.queryByText('128 total')).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Show all 128 priorities' }));
+        fireEvent.click(screen.getByRole('button', { name: 'See all 128 priorities' }));
         expect(screen.getAllByTestId('priority-card')).toHaveLength(100);
         expect(screen.getByText('Showing 100 of 128 priorities')).toBeInTheDocument();
         // The first page is already loaded: no request until more is asked for.
@@ -117,10 +120,10 @@ describe('PriorityOverviewPanel', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Show all 128 priorities' }));
+        fireEvent.click(screen.getByRole('button', { name: 'See all 128 priorities' }));
         fireEvent.click(screen.getByRole('button', { name: 'Load 28 more' }));
 
-        expect(await screen.findByRole('alert')).toHaveTextContent('More priorities could not be loaded');
+        expect(await screen.findByRole('alert')).toHaveTextContent("More priorities couldn't be loaded");
         expect(screen.getByText('Showing 100 of 128 priorities')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Load 28 more' })).toBeEnabled();
     });

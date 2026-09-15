@@ -132,7 +132,7 @@ class GovernanceResolutionsTest extends TestCase
             'vote' => 'for',
         ]);
         $r1->assertRedirect();
-        $r1->assertSessionHas('success', 'Vote recorded.');
+        $r1->assertSessionHas('success', 'Your vote is recorded.');
         $this->assertSame(1, Vote::where('resolution_id', $resolution->id)->count());
 
         // Replaying same vote succeeds idempotently
@@ -140,7 +140,7 @@ class GovernanceResolutionsTest extends TestCase
             'vote' => 'for',
         ]);
         $r2->assertRedirect();
-        $r2->assertSessionHas('success', 'Vote recorded.');
+        $r2->assertSessionHas('success', 'Your vote is recorded.');
         $this->assertSame(1, Vote::where('resolution_id', $resolution->id)->count());
 
         // Attempting a conflicting vote returns error
@@ -148,7 +148,7 @@ class GovernanceResolutionsTest extends TestCase
             'vote' => 'against',
         ]);
         $r3->assertRedirect();
-        $r3->assertSessionHas('error', 'Board member has already cast a vote on this resolution');
+        $r3->assertSessionHas('error', "You've already voted on this resolution, and a vote can't be changed once it's recorded.");
     }
 
     public function test_conflict_declaration_on_out_of_session_resolution(): void
@@ -193,7 +193,7 @@ class GovernanceResolutionsTest extends TestCase
         ]);
 
         $response->assertRedirect();
-        $response->assertSessionHas('error', "Cannot mark resolution as implemented unless outcome is carried (outcome is 'no_quorum').");
+        $response->assertSessionHas('error', "Only resolutions that passed can be marked as done. This one's result is: No decision — not enough members took part.");
         $resolution->refresh();
         $this->assertSame('closed', $resolution->status);
     }
@@ -281,7 +281,7 @@ class GovernanceResolutionsTest extends TestCase
 
         $response = $this->actingAs($admin)->post("/governance/resolutions/{$resolution->id}/open", []);
         $response->assertRedirect();
-        $response->assertSessionHas('success', 'Voting opened.');
+        $response->assertSessionHas('success', 'Voting is now open.');
 
         $resolution->refresh();
         $this->assertSame('open', $resolution->status);
@@ -367,7 +367,7 @@ class GovernanceResolutionsTest extends TestCase
 
         $response = $this->actingAs($admin)->post("/governance/resolutions/{$resolution->id}/open", []);
         $response->assertRedirect();
-        $response->assertSessionHas('success', 'Voting opened.');
+        $response->assertSessionHas('success', 'Voting is now open.');
     }
 
     // ── Decisions & actions hub: one wizard for authoring and editing ──────
@@ -576,6 +576,333 @@ class GovernanceResolutionsTest extends TestCase
 
         $this->assertSame(4, $resolution->fresh()->version_number);
         $this->assertNotSame('Edited from a stale tab', $resolution->fresh()->title);
+    }
+
+    // ── Plain-language UX audit 2026-09-14: voting, conflicts, resolutions ──
+
+    public function test_a_reason_given_with_a_vote_is_saved_as_a_vote_note_and_never_as_a_conflict(): void
+    {
+        $admin = $this->createAdminUser();
+        $boardMember = $this->createBoardMember($admin);
+        $meeting = $this->createMeeting($admin);
+        $resolution = $this->createResolution($admin, [
+            'status' => 'open',
+            'deadline' => now()->addDays(2),
+            'governance_meeting_id' => $meeting->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$resolution->id}/vote", [
+                'vote' => 'for',
+                'vote_note' => "The costs are covered in this year's budget.",
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Your vote is recorded.');
+
+        $vote = Vote::query()->where('resolution_id', $resolution->id)->where('board_member_id', $boardMember->id)->firstOrFail();
+        $this->assertSame("The costs are covered in this year's budget.", $vote->vote_note);
+        $this->assertFalse($vote->conflict_declared, 'A reason for a vote is not a conflict of interest.');
+        $this->assertNull($vote->conflict_note);
+        $this->assertSame(0, ConflictDeclaration::query()->count());
+
+        // Older ballots that still send the reason as `conflict_note` don't declare a conflict either.
+        $other = $this->createResolution($admin, [
+            'status' => 'open',
+            'deadline' => now()->addDays(2),
+            'governance_meeting_id' => $meeting->id,
+        ]);
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$other->id}/vote", [
+                'vote' => 'against',
+                'conflict_note' => 'Too expensive right now.',
+            ])
+            ->assertSessionHas('success');
+
+        $legacy = Vote::query()->where('resolution_id', $other->id)->firstOrFail();
+        $this->assertSame('Too expensive right now.', $legacy->vote_note);
+        $this->assertFalse($legacy->conflict_declared);
+        $this->assertNull($legacy->conflict_note);
+    }
+
+    public function test_the_shared_conflict_dialog_payload_is_recorded_through_the_real_route(): void
+    {
+        $admin = $this->createAdminUser();
+        $boardMember = $this->createBoardMember($admin);
+        $meeting = $this->createMeeting($admin);
+        $resolution = $this->createResolution($admin, [
+            'status' => 'open',
+            'deadline' => now()->addDays(2),
+            'governance_meeting_id' => $meeting->id,
+        ]);
+
+        // The keys the old meeting workspace sent were never accepted …
+        $this->actingAs($admin)
+            ->from("/governance/meetings/{$meeting->id}?tab=resolutions&paper={$resolution->id}")
+            ->post("/governance/resolutions/{$resolution->id}/conflict", [
+                'declaration_type' => 'material',
+                'declaration_text' => 'My sister is a director of the preferred supplier.',
+                'withdrew_from_voting' => true,
+            ])
+            ->assertSessionHasErrors([
+                'type' => 'Choose what kind of conflict of interest it is.',
+                'description' => 'Describe the conflict of interest.',
+            ]);
+        $this->assertSame(0, ConflictDeclaration::query()->count());
+
+        // … the shared dialog's payload (buildConflictPayload) is.
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$resolution->id}/conflict", [
+                'type' => 'related',
+                'description' => 'My sister is a director of the preferred supplier.',
+                'withdraw_from_voting' => true,
+                'withdraw_from_discussion' => false,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', "Your conflict of interest is recorded, and you've stepped aside from the vote.");
+
+        $this->assertDatabaseHas('conflict_declarations', [
+            'resolution_id' => $resolution->id,
+            'board_member_id' => $boardMember->id,
+            'declaration_type' => 'related',
+            'withdrew_from_voting' => 1,
+            'withdrew_from_discussion' => 0,
+        ]);
+
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$resolution->id}/conflict", [
+                'type' => 'related',
+                'description' => 'Too short',
+            ])
+            ->assertSessionHasErrors(['description' => 'Add a little more detail about the conflict (at least 20 characters).']);
+    }
+
+    public function test_a_member_can_declare_a_conflict_while_reading_a_draft_and_the_page_shows_it(): void
+    {
+        $admin = $this->createAdminUser();
+        $member = $this->createUserWithRole('board_member');
+        $this->createBoardMember($member);
+        $draft = $this->createResolution($admin, ['status' => 'draft', 'deadline' => now()->addWeek()]);
+
+        $this->actingAs($member)
+            ->get("/governance/resolutions/{$draft->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('can_declare_conflict', true)
+                ->where('can_vote', false)
+                ->where('my_conflict', null));
+
+        $this->actingAs($member)
+            ->post("/governance/resolutions/{$draft->id}/conflict", [
+                'type' => 'material',
+                'description' => 'I own shares in the company this resolution proposes to hire.',
+                'withdraw_from_voting' => false,
+            ])
+            ->assertSessionHas('success', 'Your conflict of interest is recorded.');
+
+        $this->actingAs($member)
+            ->get("/governance/resolutions/{$draft->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('my_conflict.declaration_type', 'material')
+                ->where('my_conflict.withdrew_from_voting', false));
+    }
+
+    public function test_a_member_who_declares_a_conflict_but_still_votes_has_the_vote_marked(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->createBoardMember($admin);
+        $resolution = $this->createResolution($admin, ['status' => 'open', 'deadline' => now()->addDays(2)]);
+
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$resolution->id}/vote", ['vote' => 'for'])
+            ->assertSessionHas('success');
+        $this->assertFalse(Vote::query()->firstOrFail()->conflict_declared);
+
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$resolution->id}/conflict", [
+                'type' => 'other',
+                'description' => 'I used to work for the organisation involved.',
+                'withdraw_from_voting' => false,
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertTrue(Vote::query()->firstOrFail()->conflict_declared, 'A real declaration marks the vote.');
+    }
+
+    public function test_papers_for_information_or_discussion_never_go_to_a_vote(): void
+    {
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin);
+        $paper = $this->createResolution($admin, [
+            'purpose' => 'information',
+            'status' => 'draft',
+            'governance_meeting_id' => $meeting->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->get("/governance/resolutions/{$paper->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('can_open_voting', false)
+                ->where('can_publish_to_members', true));
+
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$paper->id}/open", [])
+            ->assertRedirect()
+            ->assertSessionHas('error', 'This paper is for information, so the board doesn\'t vote on it. Use "Publish to members" to share it.');
+        $this->assertSame('draft', $paper->fresh()->status);
+        $this->assertNull($paper->fresh()->opened_at);
+
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$paper->id}/publish")
+            ->assertSessionHas('success', 'The paper is now published to board members.');
+        $this->assertSame('proposed', $paper->fresh()->status);
+        $this->assertNotNull($paper->fresh()->paper_snapshot);
+
+        // Still no ballot once it's published.
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$paper->id}/open", [])
+            ->assertSessionHas('error');
+        $this->assertSame('proposed', $paper->fresh()->status);
+
+        // A resolution for decision can't skip its vote by being "published".
+        $decision = $this->createResolution($admin, ['status' => 'draft', 'governance_meeting_id' => $meeting->id]);
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$decision->id}/publish")
+            ->assertSessionHas('error');
+        $this->assertSame('draft', $decision->fresh()->status);
+    }
+
+    public function test_follow_up_actions_from_the_wizard_are_created_when_the_resolution_passes(): void
+    {
+        $admin = $this->createAdminUser();
+        $boardMember = $this->createBoardMember($admin);
+        $meeting = $this->createMeeting($admin);
+        $assignee = $this->createUserWithRole('board_member', ['name' => 'Aroha Ngata']);
+
+        $this->actingAs($admin)
+            ->post('/governance/resolutions', [
+                'title' => 'Replace the house van',
+                'exact_motion' => 'That the board approves replacing the house van.',
+                'context' => 'The van failed its warrant of fitness.',
+                'purpose' => 'decision',
+                'options' => [['label' => 'Replace it'], ['label' => 'Repair it']],
+                'recommendation' => 'Replace it.',
+                'cost_impact' => ['has_cost' => false],
+                'service_user_implications' => 'Residents keep safe transport.',
+                'risk_equity_implications' => 'Low.',
+                'meeting_id' => $meeting->id,
+                'type' => 'ordinary',
+                'follow_up_actions' => [
+                    ['title' => 'Order the new van', 'assigned_to' => $assignee->id, 'due_date' => now()->addWeeks(3)->toDateString()],
+                ],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $resolution = \App\Domain\Governance\Models\Resolution::query()->where('title', 'Replace the house van')->firstOrFail();
+        $this->assertTrue($resolution->auto_generate_actions, 'Follow-up actions promised by the wizard must be created when it passes.');
+
+        $meeting->attendances()->create([
+            'board_member_id' => $boardMember->id,
+            'status' => 'present',
+            'marked_at' => now(),
+            'marked_by' => $admin->id,
+        ]);
+        $this->actingAs($admin)->post("/governance/resolutions/{$resolution->id}/open", [])->assertSessionHas('success');
+        $this->actingAs($admin)->post("/governance/resolutions/{$resolution->id}/vote", ['vote' => 'for'])->assertSessionHas('success');
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$resolution->id}/close", [])
+            ->assertSessionHas('success', 'Voting is closed. Result: Passed. 1 follow-up action was created.');
+
+        $this->assertDatabaseHas('action_items', [
+            'source_type' => 'resolution',
+            'source_id' => $resolution->id,
+            'title' => 'Order the new van',
+            'assigned_to' => $assignee->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->get("/governance/resolutions/{$resolution->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('results.outcome', 'carried')
+                ->has('action_items', 1)
+                ->where('action_items.0.title', 'Order the new van'));
+    }
+
+    public function test_a_5pm_voting_deadline_entered_in_nz_time_is_stored_as_5pm_nz(): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse('2026-09-01 00:00:00', 'UTC'));
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->post('/governance/resolutions', [
+                'title' => 'Written vote on the insurance renewal',
+                'type' => 'ordinary',
+                'voting_deadline' => '2026-09-18T17:00',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $resolution = \App\Domain\Governance\Models\Resolution::query()->where('title', 'Written vote on the insurance renewal')->firstOrFail();
+        // 5:00 pm NZST (UTC+12) is 5:00 am UTC — not 5:00 pm UTC (5:00 am the next day in NZ).
+        $this->assertSame('2026-09-18 05:00:00', $resolution->getRawOriginal('deadline'));
+        $this->assertSame('2026-09-18 17:00', $resolution->deadline->copy()->setTimezone('Pacific/Auckland')->format('Y-m-d H:i'));
+
+        $this->actingAs($admin)
+            ->put("/governance/resolutions/{$resolution->id}", ['voting_deadline' => '2026-09-19T17:00'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('2026-09-19 05:00:00', $resolution->fresh()->getRawOriginal('deadline'));
+
+        $this->actingAs($admin)
+            ->post('/governance/resolutions', ['title' => 'Too late', 'voting_deadline' => '2026-08-01T17:00'])
+            ->assertSessionHasErrors(['voting_deadline' => 'Pick a voting deadline in the future.']);
+    }
+
+    public function test_vote_now_from_the_register_opens_meeting_resolutions_in_the_meeting_workspace(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->createBoardMember($admin);
+        $meeting = $this->createMeeting($admin);
+        $meetingPaper = $this->createResolution($admin, [
+            'title' => 'Meeting paper',
+            'status' => 'open',
+            'deadline' => now()->addDays(2),
+            'governance_meeting_id' => $meeting->id,
+        ]);
+        $writtenPaper = $this->createResolution($admin, [
+            'title' => 'Written paper',
+            'status' => 'open',
+            'deadline' => now()->addDays(3),
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/governance/resolutions')
+            ->assertInertia(fn ($page) => $page
+                ->has('my_pending_votes', 2)
+                ->where('my_pending_votes.0.vote_href', "/governance/meetings/{$meeting->id}?tab=resolutions&paper={$meetingPaper->id}")
+                ->where('my_pending_votes.1.vote_href', "/governance/resolutions/{$writtenPaper->id}"));
+    }
+
+    public function test_resolution_pages_say_when_board_voting_is_switched_off_and_who_can_switch_it_on(): void
+    {
+        \App\Domain\Governance\Models\GovernanceVotingProfile::query()->update(['is_active' => false, 'approved_at' => null]);
+        $admin = $this->createAdminUser();
+        $resolution = $this->createResolution($admin);
+
+        $this->actingAs($admin)
+            ->get('/governance/resolutions')
+            ->assertInertia(fn ($page) => $page
+                ->where('voting_rules.switched_on', false)
+                ->where('voting_rules.can_switch_on', true));
+
+        $member = $this->createUserWithRole('board_member');
+        $this->createBoardMember($member);
+        $this->actingAs($member)
+            ->get("/governance/resolutions/{$resolution->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('voting_rules.switched_on', false)
+                ->where('voting_rules.can_switch_on', false));
+
+        $this->actingAs($admin)
+            ->post("/governance/resolutions/{$resolution->id}/open", [])
+            ->assertSessionHas('error', 'Board voting is switched off until the voting rules are confirmed. The chair or board secretary can confirm them in Settings, under "How the board votes".');
     }
 }
 

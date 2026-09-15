@@ -4,6 +4,7 @@ import {
     CalendarDays,
     CheckCircle2,
     FileText,
+    ListOrdered,
     MapPin,
     Scale,
     UserCheck,
@@ -12,6 +13,8 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
+import type { GovernanceTermKey } from '@/lib/governance-glossary';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -23,6 +26,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { formatDateTimeLong } from '@/lib/datetime';
+import { governanceStatus } from '@/lib/governance-labels';
 
 import type { NextMeetingPayload } from './MeetingReadinessPanel';
 
@@ -52,6 +56,7 @@ const plural = (count: number, one: string, many: string) =>
 function ReadinessRow({
     icon: Icon,
     label,
+    term,
     detail,
     status,
     action,
@@ -59,6 +64,7 @@ function ReadinessRow({
 }: {
     icon: LucideIcon;
     label: string;
+    term?: GovernanceTermKey;
     detail: string;
     status: { label: string; variant: StatusVariant };
     action?: ReactNode;
@@ -74,8 +80,9 @@ function ReadinessRow({
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-foreground">
+                    <p className="inline-flex items-center gap-1 text-sm font-medium text-foreground">
                         {label}
+                        {term ? <GovernanceTermHint term={term} /> : null}
                     </p>
                     <StatusBadge size="sm" variant={status.variant}>
                         {status.label}
@@ -97,12 +104,12 @@ function RowLink({ href, children }: { href: string; children: ReactNode }) {
 }
 
 /**
- * Member-focused Next meeting card for Governance Home: the date and time
- * (NZ), only the readiness that is the viewer's own to act on — the pack
- * published to them, papers to read, votes open for them, conflicts to
- * check, attendance — and one "Prepare for meeting" entry into that exact
- * meeting's workspace. Administrative preparation (CEO report, pack
- * generation, signing) lives in `MeetingReadinessPanel`, shown to managers.
+ * Next meeting on Governance Home: the date and time (NZ), only the
+ * preparation that is the viewer's own — the board pack sent to them, the
+ * agenda, decision papers, votes open for them, conflicts of interest and
+ * their reply to the invitation — and one "Prepare for meeting" entry into
+ * that meeting's workspace. The chair and secretary's preparation steps live
+ * in `MeetingReadinessPanel`.
  */
 export function NextMeetingCard({
     nextMeeting,
@@ -123,7 +130,7 @@ export function NextMeetingCard({
                         variant="compact"
                         icon={CalendarDays}
                         title="No upcoming meeting"
-                        description="There is no upcoming meeting you are invited to. Earlier meetings, decisions and minutes stay available."
+                        description="There's no upcoming meeting you're invited to. Earlier meetings, resolutions and minutes are still available."
                         action={
                             canViewMeetings || canViewRecords || canScheduleMeeting ? (
                                 <div className="flex flex-wrap items-center justify-center gap-2">
@@ -209,19 +216,20 @@ export function NextMeetingCard({
                             dusk="next-meeting-pack"
                             icon={BookOpen}
                             label="Board pack"
+                            term="board_pack"
                             status={
                                 !readiness.pack.published
-                                    ? { label: 'Not published', variant: 'neutral' }
+                                    ? { label: 'Not sent yet', variant: 'neutral' }
                                     : readiness.pack.read
                                       ? { label: 'Read', variant: 'success' }
                                       : { label: 'To read', variant: 'warning' }
                             }
                             detail={
                                 !readiness.pack.published
-                                    ? 'The pack has not been published to you yet.'
+                                    ? "The board pack hasn't been sent to you yet."
                                     : readiness.pack.read
-                                      ? `You have acknowledged revision ${readiness.pack.revision_number ?? 1}.`
-                                      : `Revision ${readiness.pack.revision_number ?? 1} is published — reading acknowledgement required.`
+                                      ? `You confirmed you read version ${readiness.pack.revision_number ?? 1}.`
+                                      : `Read version ${readiness.pack.revision_number ?? 1} and confirm you've read it.`
                             }
                             action={
                                 readiness.pack.published && readiness.pack.href ? (
@@ -231,22 +239,49 @@ export function NextMeetingCard({
                                 ) : undefined
                             }
                         />
+                        {readiness.agenda ? (
+                            <ReadinessRow
+                                dusk="next-meeting-agenda"
+                                icon={ListOrdered}
+                                label="Agenda"
+                                status={
+                                    readiness.agenda.count > 0
+                                        ? {
+                                              label: `${readiness.agenda.count} ${plural(readiness.agenda.count, 'item', 'items')}`,
+                                              variant: 'neutral',
+                                          }
+                                        : { label: 'Not ready yet', variant: 'neutral' }
+                                }
+                                detail={
+                                    readiness.agenda.count > 0
+                                        ? "What the board will talk about, in order."
+                                        : "The agenda hasn't been added yet."
+                                }
+                                action={
+                                    readiness.agenda.count > 0 ? (
+                                        <RowLink href={readiness.agenda.href}>
+                                            Open agenda
+                                        </RowLink>
+                                    ) : undefined
+                                }
+                            />
+                        ) : null}
                         <ReadinessRow
                             dusk="next-meeting-papers"
                             icon={FileText}
-                            label="Papers"
+                            label="Decision papers"
                             status={
                                 readiness.papers.count > 0
                                     ? {
                                           label: `${readiness.papers.count} ${plural(readiness.papers.count, 'paper', 'papers')}`,
-                                          variant: 'info',
+                                          variant: 'neutral',
                                       }
                                     : { label: 'None yet', variant: 'neutral' }
                             }
                             detail={
                                 readiness.papers.count > 0
-                                    ? `${readiness.papers.count} agenda ${plural(readiness.papers.count, 'item is', 'items are')} available for you to read.`
-                                    : 'No agenda papers are available to you yet.'
+                                    ? `${readiness.papers.count} ${plural(readiness.papers.count, 'paper is', 'papers are')} ready for you to read.`
+                                    : 'No decision papers yet. Papers appear here when the secretary adds them.'
                             }
                             action={
                                 readiness.papers.count > 0 ? (
@@ -262,7 +297,7 @@ export function NextMeetingCard({
                             label="Votes"
                             status={
                                 !readiness.votes.available
-                                    ? { label: 'Unavailable', variant: 'neutral' }
+                                    ? { label: 'Not available', variant: 'neutral' }
                                     : readiness.votes.open > 0
                                       ? {
                                             label: `${readiness.votes.open} open`,
@@ -272,10 +307,10 @@ export function NextMeetingCard({
                             }
                             detail={
                                 !readiness.votes.available
-                                    ? 'Voting status could not be loaded — open the meeting to check.'
+                                    ? "Your votes couldn't be loaded — open the meeting to check."
                                     : readiness.votes.open > 0
-                                      ? `${readiness.votes.open} ${plural(readiness.votes.open, 'decision is', 'decisions are')} open for your vote.`
-                                      : 'No votes are open for you on this meeting.'
+                                      ? `${readiness.votes.open} ${plural(readiness.votes.open, 'resolution is', 'resolutions are')} open for your vote.`
+                                      : 'Nothing is open for your vote at this meeting yet.'
                             }
                             action={
                                 readiness.votes.available && readiness.votes.open > 0 ? (
@@ -290,30 +325,20 @@ export function NextMeetingCard({
                                 dusk="next-meeting-conflicts"
                                 icon={Scale}
                                 label="Conflicts of interest"
+                                term="conflict_of_interest"
                                 status={
-                                    readiness.conflicts.decisions_to_check > 0
+                                    readiness.conflicts.declared > 0
                                         ? {
-                                              label: `${readiness.conflicts.decisions_to_check} to check`,
-                                              variant: 'info',
-                                          }
-                                        : {
-                                              label:
-                                                  readiness.conflicts.declared > 0
-                                                      ? `${readiness.conflicts.declared} declared`
-                                                      : 'Nothing to check',
+                                              label: `${readiness.conflicts.declared} declared`,
                                               variant: 'neutral',
                                           }
+                                        : { label: 'None declared', variant: 'neutral' }
                                 }
-                                detail={[
+                                detail={
                                     readiness.conflicts.decisions_to_check > 0
-                                        ? `Check ${readiness.conflicts.decisions_to_check} ${plural(readiness.conflicts.decisions_to_check, 'decision', 'decisions')} and declare any conflict before voting.`
-                                        : 'No decisions on this meeting need a conflict check.',
-                                    readiness.conflicts.declared > 0
-                                        ? `You have declared ${readiness.conflicts.declared}.`
-                                        : null,
-                                ]
-                                    .filter(Boolean)
-                                    .join(' ')}
+                                        ? `${readiness.conflicts.decisions_to_check} ${plural(readiness.conflicts.decisions_to_check, 'decision is', 'decisions are')} on this agenda — declare a conflict of interest if you have one.`
+                                        : 'No decisions on this agenda are waiting for you.'
+                                }
                                 action={
                                     readiness.conflicts.decisions_to_check > 0 ? (
                                         <RowLink href={readiness.conflicts.href}>
@@ -329,23 +354,19 @@ export function NextMeetingCard({
                                 icon={UserCheck}
                                 label="Attendance"
                                 status={
-                                    readiness.rsvp.response === 'accepted'
-                                        ? { label: 'Attending', variant: 'success' }
-                                        : readiness.rsvp.response === 'declined'
-                                          ? { label: 'Apologies sent', variant: 'neutral' }
-                                          : readiness.rsvp.response === 'tentative'
-                                            ? { label: 'Tentative', variant: 'info' }
-                                            : { label: 'Not confirmed', variant: 'warning' }
+                                    readiness.rsvp.response
+                                        ? governanceStatus('rsvp_response', readiness.rsvp.response)
+                                        : { label: 'Not replied', variant: 'warning' }
                                 }
                                 detail={
                                     readiness.rsvp.response
-                                        ? 'Your response is recorded on the meeting.'
-                                        : 'Confirm your attendance or send apologies.'
+                                        ? 'Your reply is recorded on the meeting.'
+                                        : "Let the secretary know if you're attending, or send apologies."
                                 }
                                 action={
                                     readiness.rsvp.response ? undefined : (
-                                        <RowLink href={workspaceHref}>
-                                            Respond
+                                        <RowLink href={`${workspaceHref}?tab=attendance`}>
+                                            Reply
                                         </RowLink>
                                     )
                                 }
@@ -355,7 +376,7 @@ export function NextMeetingCard({
                 ) : (
                     <p className="flex items-center gap-2 text-subtle">
                         <CheckCircle2 className="size-4" aria-hidden="true" />
-                        Open the meeting to see its agenda, papers and decisions.
+                        Open the meeting to see its agenda, papers and resolutions.
                     </p>
                 )}
 

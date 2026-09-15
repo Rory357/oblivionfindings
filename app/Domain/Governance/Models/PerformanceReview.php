@@ -3,6 +3,7 @@
 namespace App\Domain\Governance\Models;
 
 use App\Domain\Governance\Services\GovernanceResolutionAuthorityService;
+use App\Domain\Governance\Support\GovernanceLabels;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +17,9 @@ use Illuminate\Validation\ValidationException;
 class PerformanceReview extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
+
+    /** Resolution statuses in which a passed vote is final (matches budgets). */
+    public const PASSED_RESOLUTION_STATUSES = ['closed', 'implemented', 'archived'];
 
     protected $fillable = [
         'reviewee_id',
@@ -135,13 +139,66 @@ class PerformanceReview extends Model
         return round($weightedSum / $totalWeight, 2);
     }
 
+    /** The board has scored the review: its overall rating is recorded. */
+    public function hasBoardAssessment(): bool
+    {
+        return filled($this->overall_rating);
+    }
+
+    /**
+     * "Quarter 1, 2026" / "Annual review 2026" from stored cycles like
+     * "2026-Q1" / "2026-Annual". Mirrors `reviewCycleLabel()` in
+     * resources/js/lib/governance-labels.ts.
+     */
+    public static function cycleLabel(?string $cycle): string
+    {
+        $value = trim((string) $cycle);
+        if ($value === '') {
+            return 'Not set';
+        }
+
+        if (preg_match('/^(\d{4})[-\s]?Q([1-4])$/i', $value, $quarter) === 1) {
+            return "Quarter {$quarter[2]}, {$quarter[1]}";
+        }
+
+        if (preg_match('/^(\d{4})[-\s]?annual$/i', $value, $annual) === 1) {
+            return "Annual review {$annual[1]}";
+        }
+
+        return GovernanceLabels::humanise($value);
+    }
+
+    /**
+     * The reviewee sends their self-assessment to the board. It is sent once:
+     * board members may already have read it.
+     *
+     * @throws ValidationException when the review is complete or it was already sent
+     */
     public function submitSelfAssessment(string $assessment): void
     {
-        $this->update([
-            'self_assessment' => $assessment,
-            'self_assessment_submitted_at' => now(),
-            'status' => 'board_review',
-        ]);
+        DB::transaction(function () use ($assessment): void {
+            $locked = static::query()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($locked->isCompleted()) {
+                throw ValidationException::withMessages([
+                    'self_assessment' => 'This review is already complete, so the self-assessment can no longer be sent.',
+                ]);
+            }
+
+            if ($locked->self_assessment_submitted_at !== null) {
+                throw ValidationException::withMessages([
+                    'self_assessment' => 'This self-assessment has already been sent to the board.',
+                ]);
+            }
+
+            $locked->update([
+                'self_assessment' => $assessment,
+                'self_assessment_submitted_at' => now(),
+                'status' => 'board_review',
+            ]);
+        }, 3);
+
+        $this->refresh();
     }
 
     /**
@@ -159,11 +216,18 @@ class PerformanceReview extends Model
     public function approve(?int $resolutionId = null, ?int $actorId = null): void
     {
         if ($resolutionId === null) {
-            $this->update([
-                'status' => 'completed',
-                'approval_resolution_id' => null,
-                'approved_by_board_at' => now(),
-            ]);
+            DB::transaction(function (): void {
+                $lockedReview = static::query()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
+                $lockedReview->assertReadyToComplete('resolution_id');
+
+                $lockedReview->update([
+                    'status' => 'completed',
+                    'approval_resolution_id' => null,
+                    'approved_by_board_at' => now(),
+                ]);
+            }, 3);
+
+            $this->refresh();
 
             return;
         }
@@ -176,21 +240,17 @@ class PerformanceReview extends Model
 
             if (! $resolution) {
                 throw ValidationException::withMessages([
-                    'resolution_id' => 'The selected resolution does not exist.',
+                    'resolution_id' => 'That resolution no longer exists.',
                 ]);
             }
 
-            if ($resolution->status !== 'closed' || $resolution->outcome !== 'carried') {
+            if (! in_array($resolution->status, self::PASSED_RESOLUTION_STATUSES, true) || $resolution->outcome !== 'carried') {
                 throw ValidationException::withMessages([
-                    'resolution_id' => 'Only a closed resolution with a carried outcome can approve a performance review.',
+                    'resolution_id' => "This resolution can't be used yet — voting must be finished and the result recorded as passed.",
                 ]);
             }
 
-            if ($lockedReview->isCompleted()) {
-                throw ValidationException::withMessages([
-                    'resolution_id' => 'This performance review is already completed.',
-                ]);
-            }
+            $lockedReview->assertReadyToComplete('resolution_id');
 
             $alreadyUsed = static::query()
                 ->where('approval_resolution_id', $resolutionId)
@@ -199,7 +259,7 @@ class PerformanceReview extends Model
 
             if ($alreadyUsed) {
                 throw ValidationException::withMessages([
-                    'resolution_id' => 'The selected resolution has already been applied to another performance review.',
+                    'resolution_id' => 'This resolution has already been used to complete another performance review.',
                 ]);
             }
 
@@ -216,7 +276,7 @@ class PerformanceReview extends Model
                 );
             } catch (\DomainException $exception) {
                 throw ValidationException::withMessages([
-                    'resolution_id' => 'The selected resolution does not authorize approval of this performance review. '.$exception->getMessage(),
+                    'resolution_id' => $exception->getMessage(),
                 ]);
             }
 
@@ -228,5 +288,26 @@ class PerformanceReview extends Model
         }, 3);
 
         $this->refresh();
+    }
+
+    /**
+     * A review is completed once, and only after the board has recorded its
+     * rating and decision — completing releases them to the reviewee.
+     *
+     * @throws ValidationException
+     */
+    private function assertReadyToComplete(string $field): void
+    {
+        if ($this->isCompleted()) {
+            throw ValidationException::withMessages([
+                $field => 'This performance review is already complete.',
+            ]);
+        }
+
+        if (! $this->hasBoardAssessment() || blank($this->board_decision)) {
+            throw ValidationException::withMessages([
+                $field => "Record the board's assessment (overall rating and decision) before completing the review.",
+            ]);
+        }
     }
 }

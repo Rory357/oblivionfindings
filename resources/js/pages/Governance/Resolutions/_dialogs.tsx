@@ -1,21 +1,12 @@
 import { DiscardDraftDialog } from '@/components/governance/DiscardDraftDialog';
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
 import {
     firstErrorStep,
     pageHasFlashError,
 } from '@/components/governance/governance-dialog-deep-link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -40,9 +31,16 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/wizard/shell';
-import { formatDateLong, formatDateTimeLong } from '@/lib/datetime';
+import { formatDateLong, toDatetimeLocal } from '@/lib/datetime';
+import {
+    decisionTypeLabel,
+    formatNzd,
+    refSuffix,
+    resolutionPurposeLabel,
+    votingThresholdLabel,
+} from '@/lib/governance-labels';
 import { store as storeResolution } from '@/routes/governance/resolutions';
-import { useForm } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     BookOpen,
@@ -68,7 +66,7 @@ import {
     Vote,
     type LucideIcon,
 } from 'lucide-react';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState } from 'react';
 
 // ── Registries (tile pickers) ───────────────────────────────────────────────
 
@@ -82,25 +80,32 @@ interface TileDef<K extends string = string> {
     accent?: string;
 }
 
+/**
+ * How a resolution passes. Labels come from governance-labels and match
+ * Resolution::determineOutcome(): `special` is stored as `two_thirds`
+ * (at least two-thirds of the For and Against votes are For).
+ */
 export const RESOLUTION_TYPES: TileDef<ResolutionTypeKey>[] = [
     {
         key: 'ordinary',
-        label: 'Ordinary',
-        description: 'Simple majority (>50%) carries.',
+        label: votingThresholdLabel('ordinary'),
+        description: "Passes if more members vote For than Against. Abstentions don't count.",
         icon: Vote,
         accent: 'text-status-info',
     },
     {
         key: 'special',
-        label: 'Special',
-        description: 'Two-thirds majority required.',
+        label: votingThresholdLabel('special'),
+        description:
+            "Passes if at least two-thirds of the For and Against votes are For. Abstentions don't count.",
         icon: ScrollText,
         accent: 'text-status-warning',
     },
     {
         key: 'unanimous',
-        label: 'Unanimous',
-        description: 'All voting members must agree.',
+        label: votingThresholdLabel('unanimous'),
+        description:
+            "Passes only if every voting member votes For. Abstaining or stepping aside means it can't pass.",
         icon: Users,
         accent: 'text-primary',
     },
@@ -116,20 +121,20 @@ export function getResolutionType(value: string | null | undefined) {
 const PURPOSES: TileDef[] = [
     {
         key: 'decision',
-        label: 'For decision',
-        description: 'A formal vote is required.',
+        label: resolutionPurposeLabel('decision'),
+        description: 'The board votes on it.',
         icon: Gavel,
     },
     {
         key: 'discussion',
-        label: 'For discussion',
-        description: 'Strategic steering and feedback.',
+        label: resolutionPurposeLabel('discussion'),
+        description: 'The board talks it through — no vote.',
         icon: MessageSquare,
     },
     {
         key: 'information',
-        label: 'For information',
-        description: 'Noting only — no vote.',
+        label: resolutionPurposeLabel('information'),
+        description: 'For the board to read and note — no vote.',
         icon: BookOpen,
     },
 ];
@@ -137,45 +142,78 @@ const PURPOSES: TileDef[] = [
 const DECISION_CATEGORIES: TileDef[] = [
     {
         key: 'strategic',
-        label: 'Strategic',
+        label: decisionTypeLabel('strategic'),
         description: 'Direction and priorities.',
         icon: TrendingUp,
     },
     {
         key: 'financial',
-        label: 'Financial',
-        description: 'Budget, spend and funding.',
+        label: decisionTypeLabel('financial'),
+        description: 'Budget, spending and funding.',
         icon: DollarSign,
     },
     {
         key: 'policy',
-        label: 'Policy',
-        description: 'Policy and compliance.',
+        label: decisionTypeLabel('policy'),
+        description: 'Policies and how we work.',
         icon: ScrollText,
     },
     {
         key: 'operational',
-        label: 'Operational',
-        description: 'Service risk and safety.',
+        label: decisionTypeLabel('operational'),
+        description: 'Day-to-day services, risk and safety.',
         icon: Briefcase,
     },
     {
         key: 'statutory',
-        label: 'Statutory',
-        description: 'Legal and regulatory.',
+        label: decisionTypeLabel('statutory'),
+        description: 'Something the law requires.',
         icon: Landmark,
     },
     {
         key: 'governance',
-        label: 'Governance',
-        description: 'Constitution and board rules.',
+        label: decisionTypeLabel('governance'),
+        description: 'The board, its rules and its documents.',
         icon: Scale,
     },
 ];
 
-const CURRENCIES = ['NZD', 'AUD', 'USD', 'GBP', 'EUR'];
-
 const NONE = '__none';
+
+const MONTHS = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+];
+
+/**
+ * "20 September 2026, 5:00 pm" for a datetime-local wall time. The value is
+ * already New Zealand time, so it is never converted through the browser's
+ * own timezone.
+ */
+export function formatWallTime(value: string | null | undefined): string {
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value ?? '');
+    if (!match) return value ?? '';
+    const [, year, month, day, hours, minutes] = match;
+    const hour = Number(hours);
+    const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+    return `${Number(day)} ${MONTHS[Number(month) - 1]} ${year}, ${hour12}:${minutes} ${hour >= 12 ? 'pm' : 'am'}`;
+}
+
+function excerpt(text: string | null | undefined, max = 110): string {
+    const clean = (text ?? '').replace(/\s+/g, ' ').trim();
+    if (clean.length <= max) return clean;
+    return `${clean.slice(0, max - 1).trimEnd()}…`;
+}
 
 // ── Shapes ─────────────────────────────────────────────────────────────────
 
@@ -207,7 +245,7 @@ export type AuthoritySubjects = Record<
     AuthoritySubjectOption[] | undefined
 >;
 
-/** One server-described group of bindable records. */
+/** One server-described group of records a resolution can approve. */
 export interface AuthoritySubjectGroup {
     key: string;
     subject_type: string;
@@ -221,8 +259,16 @@ export interface AuthorityBinding {
     subject_label: string;
     subject_type_label: string;
     subject_revision?: string | number | null;
+    subject_version?: string | null;
     bound_at?: string | null;
     consumed_at?: string | null;
+}
+
+/** The board's voting rules as they affect authoring (ResolutionController). */
+export interface WizardVotingRules {
+    switched_on: boolean;
+    written_voting_permitted: boolean;
+    written_unanimity_required: boolean;
 }
 
 type OptionRow = {
@@ -284,45 +330,48 @@ export const RESOLUTION_WIZARD_STEPS: readonly (WizardStep & {
 })[] = [
     {
         key: 'paper',
-        label: 'Paper & meeting',
-        blurb: 'Title, meeting, committee & background',
+        label: 'Title and meeting',
+        blurb: 'Title, meeting and why it matters',
         icon: FileText,
     },
     {
         key: 'motion',
-        label: 'Motion & approval',
-        blurb: 'Exact motion, purpose & record approved',
+        label: 'Wording and purpose',
+        blurb: 'Exact wording and what it approves',
         icon: Gavel,
     },
     {
         key: 'options',
         label: 'Options',
-        blurb: 'Alternatives & recommendation',
+        blurb: 'Choices and recommendation',
         icon: Scale,
     },
     {
         key: 'implications',
-        label: 'Implications',
-        blurb: 'Cost, service-user safety, risk & equity',
+        label: 'Effects',
+        blurb: 'Cost, people, risk and fairness',
         icon: ShieldAlert,
     },
     {
         key: 'voting',
-        label: 'Voting & actions',
-        blurb: 'Threshold, deadline & follow-up actions',
+        label: 'How it passes',
+        blurb: 'Voting rule, deadline and actions',
         icon: Vote,
     },
     {
         key: 'review',
         label: 'Review',
-        blurb: 'Check readiness and save',
+        blurb: 'Check and save',
         icon: ClipboardCheck,
     },
 ];
 
-const STEP_INDEX = Object.fromEntries(
-    RESOLUTION_WIZARD_STEPS.map((step, index) => [step.key, index]),
-) as Record<StepKey, number>;
+/** Steps for a purpose: papers that don't go to a vote skip "How it passes". */
+export function wizardStepsFor(purpose: string) {
+    return purpose === 'decision' || purpose === ''
+        ? RESOLUTION_WIZARD_STEPS
+        : RESOLUTION_WIZARD_STEPS.filter((step) => step.key !== 'voting');
+}
 
 /** Server validation keys → the wizard step that owns the field. */
 const FIELD_STEPS: Record<string, StepKey> = {
@@ -346,6 +395,7 @@ const FIELD_STEPS: Record<string, StepKey> = {
     type: 'voting',
     voting_threshold: 'voting',
     voting_deadline: 'voting',
+    deadline: 'voting',
     follow_up_actions: 'voting',
     quorum_required: 'voting',
     expected_version: 'review',
@@ -366,7 +416,6 @@ type WizardData = {
     recommendation: string;
     has_cost: boolean;
     cost_amount: string;
-    cost_currency: string;
     cost_source: string;
     service_user_implications: string;
     risk_equity_implications: string;
@@ -377,13 +426,13 @@ type WizardData = {
 
 const DEFAULT_OPTIONS: OptionRow[] = [
     {
-        label: 'Option 1: Proposed action',
+        label: 'Option 1: Go ahead as proposed',
         description: '',
         benefits: '',
         drawbacks: '',
     },
     {
-        label: 'Option 2: Status quo / alternative',
+        label: 'Option 2: Keep things as they are',
         description: '',
         benefits: '',
         drawbacks: '',
@@ -397,10 +446,12 @@ function bindingKey(type: string, id: number | string): string {
 function thresholdType(threshold: string | null | undefined): string {
     switch (threshold) {
         case 'two_thirds':
+        case 'special':
             return 'special';
         case 'unanimous':
             return 'unanimous';
         case 'simple_majority':
+        case 'ordinary':
             return 'ordinary';
         default:
             return threshold ? '' : 'ordinary';
@@ -459,15 +510,15 @@ function initialData(
             cost?.amount != null && Number(cost.amount) > 0
                 ? String(cost.amount)
                 : '',
-        cost_currency: cost?.currency ?? 'NZD',
         cost_source: cost?.budget_source ?? cost?.funding_source ?? '',
         service_user_implications: resolution?.service_user_implications ?? '',
         risk_equity_implications: resolution?.risk_equity_implications ?? '',
         type: resolution
             ? thresholdType(resolution.voting_threshold)
             : 'ordinary',
+        // Stored as UTC; the input shows New Zealand wall time.
         voting_deadline: resolution?.deadline
-            ? resolution.deadline.slice(0, 16)
+            ? toDatetimeLocal(resolution.deadline)
             : '',
         follow_up_actions: (resolution?.follow_up_actions ?? []).map((a) => ({
             title: a.title ?? '',
@@ -504,16 +555,17 @@ function toPayload(data: WizardData): Record<string, unknown> {
             ? {
                   has_cost: true,
                   amount: data.cost_amount,
-                  currency: data.cost_currency,
+                  currency: 'NZD',
                   budget_source: data.cost_source,
               }
             : {
                   has_cost: false,
-                  note: 'Explicitly confirmed: No direct financial implications.',
+                  note: 'Confirmed: no cost.',
               },
         service_user_implications: data.service_user_implications,
         risk_equity_implications: data.risk_equity_implications,
         type: data.type || null,
+        // New Zealand wall time — the server converts it to UTC.
         voting_deadline: data.voting_deadline || null,
         follow_up_actions: data.follow_up_actions.filter(
             (a) => a.title.trim() !== '',
@@ -525,7 +577,7 @@ function toPayload(data: WizardData): Record<string, unknown> {
 function validateStep(step: StepKey, data: WizardData): Record<string, string> {
     const errors: Record<string, string> = {};
     if (step === 'paper' && !data.title.trim()) {
-        errors.title = 'Give the paper a title.';
+        errors.title = 'Give the resolution a title.';
     }
     if (step === 'voting') {
         data.follow_up_actions.forEach((action, index) => {
@@ -536,11 +588,11 @@ function validateStep(step: StepKey, data: WizardData): Record<string, string> {
             if (!hasContent) return;
             if (!action.title.trim()) {
                 errors[`follow_up_actions.${index}.title`] =
-                    'Describe the action.';
+                    'Say what needs doing.';
             }
             if (action.assigned_to == null) {
                 errors[`follow_up_actions.${index}.assigned_to`] =
-                    'Choose who is accountable.';
+                    'Choose the person responsible.';
             }
             if (!action.due_date) {
                 errors[`follow_up_actions.${index}.due_date`] =
@@ -551,77 +603,109 @@ function validateStep(step: StepKey, data: WizardData): Record<string, string> {
     return errors;
 }
 
-/** Publication readiness (drafts may still be saved). Mirrors validateForPublication. */
-function publicationIssues(
-    data: WizardData,
+/**
+ * What still stops the paper being published (drafts can always be saved).
+ * Mirrors Resolution::validateForPublication, in the same plain words.
+ */
+export function publicationIssues(
+    data: Pick<
+        WizardData,
+        | 'title'
+        | 'context'
+        | 'exact_motion'
+        | 'purpose'
+        | 'options'
+        | 'single_option_reason'
+        | 'recommendation'
+        | 'has_cost'
+        | 'cost_amount'
+        | 'service_user_implications'
+        | 'risk_equity_implications'
+        | 'meeting_id'
+        | 'voting_deadline'
+    >,
 ): { step: StepKey; message: string }[] {
     const issues: { step: StepKey; message: string }[] = [];
     if (!data.title.trim())
-        issues.push({ step: 'paper', message: 'Title is required.' });
+        issues.push({ step: 'paper', message: 'Give the resolution a title.' });
     if (!data.context.trim())
         issues.push({
             step: 'paper',
-            message: 'Background context and rationale are required.',
+            message: 'Explain why this is before the board now.',
         });
     if (!data.exact_motion.trim())
         issues.push({
             step: 'motion',
-            message: 'Exact motion wording is required.',
+            message:
+                'Write the resolution wording — the exact words the board votes on.',
         });
     if (!data.purpose)
-        issues.push({ step: 'motion', message: 'Choose the paper purpose.' });
+        issues.push({
+            step: 'motion',
+            message:
+                'Choose whether this paper is for decision, for discussion or for information.',
+        });
     if (data.purpose === 'decision') {
         const validOptions = data.options.filter((o) => o.label.trim() !== '');
         if (validOptions.length < 2 && !data.single_option_reason.trim()) {
             issues.push({
                 step: 'options',
                 message:
-                    'Evaluate at least two options, or explain why only one applies.',
+                    "Describe at least two options the board could choose, or explain why there's only one option.",
             });
         }
         if (!data.recommendation.trim()) {
             issues.push({
                 step: 'options',
-                message: 'A management recommendation is required.',
+                message: "Add management's recommendation and the reason for it.",
+            });
+        }
+        if (data.meeting_id === NONE && !data.voting_deadline) {
+            issues.push({
+                step: 'voting',
+                message:
+                    'Set a voting deadline — votes outside a meeting (written resolutions) need one.',
             });
         }
     }
     if (data.has_cost && !data.cost_amount.trim()) {
         issues.push({
             step: 'implications',
-            message: 'Enter the financial cost amount.',
+            message: 'Say how much it will cost.',
         });
     }
     if (!data.service_user_implications.trim()) {
         issues.push({
             step: 'implications',
-            message: 'Service-user and safety implications are required.',
+            message: 'Describe the effect on the people we support and on safety.',
         });
     }
     if (!data.risk_equity_implications.trim()) {
         issues.push({
             step: 'implications',
-            message: 'Risk and equity implications are required.',
+            message: 'Describe the risks and fairness, including Te Tiriti.',
         });
     }
     return issues;
 }
 
 function completeness(data: WizardData): number {
+    const isDecision = data.purpose === 'decision';
     const checks = [
         data.title.trim() !== '',
         data.context.trim() !== '',
         data.exact_motion.trim() !== '',
         data.purpose !== '',
         data.decision_type !== '',
-        data.purpose !== 'decision' ||
+        !isDecision ||
             data.options.filter((o) => o.label.trim() !== '').length >= 2 ||
             data.single_option_reason.trim() !== '',
-        data.purpose !== 'decision' || data.recommendation.trim() !== '',
+        !isDecision || data.recommendation.trim() !== '',
         !data.has_cost || data.cost_amount.trim() !== '',
         data.service_user_implications.trim() !== '',
         data.risk_equity_implications.trim() !== '',
-        data.type !== '',
+        !isDecision || data.type !== '',
+        !isDecision || data.meeting_id !== NONE || data.voting_deadline !== '',
     ];
     return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
@@ -634,225 +718,27 @@ export interface ResolutionWizardDialogProps {
     meetings: MeetingOption[];
     committees?: CommitteeOption[];
     users?: UserOption[];
-    /** Preselected meeting for a new paper. */
+    /** Preselected meeting for a new resolution. */
     meetingId?: number | string | null;
     /** Opened from a meeting: the meeting is shown as locked context. */
     lockMeeting?: boolean;
     /** Edit mode — the same wizard, prefilled. */
     resolution?: ResolutionRecord | null;
-    /** Records the author may bind; omit where authority is not editable. */
+    /** Records the author may link; omit where it isn't editable. */
     authoritySubjects?: AuthoritySubjects | null;
     authoritySubjectGroups?: AuthoritySubjectGroup[];
-    /** The paper's current binding(s) when editing. */
+    /** The resolution's current link(s) when editing. */
     authorityBindings?: AuthorityBinding[];
-    /** Whether "Publish for voting" is offered (server re-checks). */
+    /** Whether publishing is offered (server re-checks). */
     canPublish?: boolean;
+    /** The board's voting rules (switched on, written votes). */
+    votingRules?: WizardVotingRules | null;
     onCreated?: () => void;
 }
 
 export function ResolutionWizardDialog(props: ResolutionWizardDialogProps) {
     if (!props.isOpen) return null;
     return <ResolutionWizardBody {...props} />;
-}
-
-// ── Declare a conflict of interest (simple dialog) ──────────────────────────
-
-const CONFLICT_TYPES: TileDef[] = [
-    {
-        key: 'material',
-        label: 'Material interest',
-        description: 'A personal or financial interest.',
-        icon: DollarSign,
-    },
-    {
-        key: 'related',
-        label: 'Related party',
-        description: 'A related-party transaction.',
-        icon: Users,
-    },
-    {
-        key: 'prejudicial',
-        label: 'Bias or loyalty',
-        description: 'Prejudicial bias or a loyalty conflict.',
-        icon: Scale,
-    },
-    {
-        key: 'other',
-        label: 'Other',
-        description: 'Another perceived conflict.',
-        icon: AlertTriangle,
-    },
-];
-
-export function DeclareConflictDialog({
-    isOpen,
-    onClose,
-    resolutionId,
-    reference,
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    resolutionId: number;
-    reference: string;
-}) {
-    return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent
-                style={{
-                    maxWidth: 'min(92vw, 720px)',
-                    width: 'min(92vw, 720px)',
-                }}
-            >
-                {isOpen ? (
-                    <DeclareConflictBody
-                        onClose={onClose}
-                        resolutionId={resolutionId}
-                        reference={reference}
-                    />
-                ) : null}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function DeclareConflictBody({
-    onClose,
-    resolutionId,
-    reference,
-}: {
-    onClose: () => void;
-    resolutionId: number;
-    reference: string;
-}) {
-    const form = useForm({
-        type: 'material',
-        description: '',
-        withdraw_from_voting: true,
-        withdraw_from_discussion: false,
-    });
-    const tooShort = form.data.description.trim().length < 20;
-
-    const handleSubmit = (event: FormEvent) => {
-        event.preventDefault();
-        if (tooShort) return;
-        form.post(`/governance/resolutions/${resolutionId}/conflict`, {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                if (!pageHasFlashError(page)) onClose();
-            },
-        });
-    };
-
-    return (
-        <form onSubmit={handleSubmit}>
-            <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-status-warning" />
-                    Declare a conflict of interest
-                </DialogTitle>
-                <DialogDescription>
-                    Formally declare an interest in {reference}. Withdrawing
-                    from voting excludes your seat without recording an
-                    abstention.
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="mt-3 grid gap-4">
-                <Field
-                    label="Nature of conflict"
-                    required
-                    error={form.errors.type}
-                >
-                    <TilePicker
-                        value={form.data.type}
-                        onChange={(value) => form.setData('type', value)}
-                        options={CONFLICT_TYPES}
-                    />
-                </Field>
-                <Field
-                    label="Affected matter & detail"
-                    required
-                    hint="At least 20 characters"
-                    error={
-                        form.errors.description ??
-                        (form.data.description.length > 0 && tooShort
-                            ? `Add a little more detail (${form.data.description.trim().length}/20).`
-                            : undefined)
-                    }
-                >
-                    <Textarea
-                        id="conflict-description"
-                        rows={4}
-                        value={form.data.description}
-                        onChange={(e) =>
-                            form.setData('description', e.target.value)
-                        }
-                        placeholder="Describe your interest and the decisions it affects."
-                    />
-                </Field>
-                <div className="grid gap-3">
-                    <Label className="flex items-start gap-2.5 font-normal">
-                        <Checkbox
-                            checked={form.data.withdraw_from_voting}
-                            onCheckedChange={(checked) =>
-                                form.setData(
-                                    'withdraw_from_voting',
-                                    checked === true,
-                                )
-                            }
-                            className="mt-0.5"
-                        />
-                        <span>
-                            <span className="font-medium">
-                                Withdraw from voting
-                            </span>
-                            <span className="text-caption block">
-                                Excludes your seat from participation without
-                                recording an abstention.
-                            </span>
-                        </span>
-                    </Label>
-                    <Label className="flex items-start gap-2.5 font-normal">
-                        <Checkbox
-                            checked={form.data.withdraw_from_discussion}
-                            onCheckedChange={(checked) =>
-                                form.setData(
-                                    'withdraw_from_discussion',
-                                    checked === true,
-                                )
-                            }
-                            className="mt-0.5"
-                        />
-                        <span>
-                            <span className="font-medium">
-                                Withdraw from discussion
-                            </span>
-                            <span className="text-caption block">
-                                Leave the room or meeting during deliberation.
-                            </span>
-                        </span>
-                    </Label>
-                </div>
-                <InfoCard icon={Scale}>
-                    Declaring a conflict and withdrawing does not reduce the
-                    quorum denominator. Quorum requires enough non-conflicted
-                    members to take part.
-                </InfoCard>
-            </div>
-
-            <DialogFooter className="mt-4">
-                <Button type="button" variant="outline" onClick={onClose}>
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={form.processing || tooShort}>
-                    {form.processing ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : null}
-                    Record declaration
-                </Button>
-            </DialogFooter>
-        </form>
-    );
 }
 
 /** Backwards-compatible name used by meeting contexts. */
@@ -872,6 +758,7 @@ function ResolutionWizardBody({
     authoritySubjectGroups = [],
     authorityBindings = [],
     canPublish = true,
+    votingRules = null,
     onCreated,
 }: ResolutionWizardDialogProps) {
     const isEdit = resolution != null;
@@ -882,7 +769,11 @@ function ResolutionWizardBody({
     const data = form.data;
     const serverErrors = form.errors as Record<string, string | undefined>;
 
-    const [stepIndex, setStepIndex] = useState(0);
+    const isDecision = data.purpose === 'decision';
+    const isWritten = data.meeting_id === NONE;
+    const steps = useMemo(() => wizardStepsFor(data.purpose), [data.purpose]);
+
+    const [stepKey, setStepKey] = useState<StepKey>('paper');
     const [clientErrors, setClientErrors] = useState<Record<string, string>>(
         {},
     );
@@ -893,9 +784,15 @@ function ResolutionWizardBody({
     const [done, setDone] = useState<{
         message?: string;
         warning?: string;
+        published?: boolean;
+        createdId?: number | null;
     } | null>(null);
 
-    const step = RESOLUTION_WIZARD_STEPS[stepIndex]!;
+    const activeKey: StepKey = steps.some((s) => s.key === stepKey)
+        ? stepKey
+        : 'review';
+    const stepIndex = steps.findIndex((s) => s.key === activeKey);
+    const step = steps[stepIndex]!;
     const isReview = step.key === 'review';
     const errorFor = (key: string) => clientErrors[key] ?? serverErrors[key];
 
@@ -910,7 +807,7 @@ function ResolutionWizardBody({
         }
     };
 
-    // Authority picker: render whatever groups the server describes.
+    // "What will this resolution approve?" — render whatever groups the server describes.
     const showAuthority = authoritySubjects != null;
     const authorityGroups = useMemo(
         () =>
@@ -941,7 +838,7 @@ function ResolutionWizardBody({
             const match = group.options.find(
                 (option) => bindingKey(group.subject_type, option.id) === key,
             );
-            if (match) return `${group.label}: ${match.label}`;
+            if (match) return match.label;
         }
         if (
             currentBinding &&
@@ -953,13 +850,13 @@ function ResolutionWizardBody({
         ) {
             return `${currentBinding.subject_type_label}: ${currentBinding.subject_label}`;
         }
-        return key;
+        return null;
     };
 
     const meetingLabel = (id: string) => {
         if (id === NONE) return null;
         const meeting = meetings.find((m) => String(m.id) === id);
-        if (!meeting) return resolution?.meeting?.title ?? `Meeting #${id}`;
+        if (!meeting) return resolution?.meeting?.title ?? 'A meeting';
         return meeting.scheduled_at
             ? `${meeting.title} (${formatDateLong(meeting.scheduled_at)})`
             : meeting.title;
@@ -969,18 +866,23 @@ function ResolutionWizardBody({
             ? 'Whole board'
             : (committees.find((c) => String(c.id) === id)?.name ??
               resolution?.committee?.name ??
-              `Committee #${id}`);
+              'A committee');
     const lockedMeeting = lockMeeting && data.meeting_id !== NONE;
 
     const issues = publicationIssues(data);
     const isPublishReady = issues.length === 0;
+    const votingSwitchedOff = votingRules ? !votingRules.switched_on : false;
+    const publishBlockedByRules = isDecision && votingSwitchedOff;
+    const writtenNotAllowed =
+        isDecision && isWritten && votingRules != null && !votingRules.written_voting_permitted;
     const pct = completeness(data);
 
     const goTo = (index: number) => {
-        setStepIndex(
-            Math.max(0, Math.min(RESOLUTION_WIZARD_STEPS.length - 1, index)),
-        );
+        const clamped = Math.max(0, Math.min(steps.length - 1, index));
+        setStepKey(steps[clamped]!.key);
     };
+    const goToKey = (key: StepKey) =>
+        setStepKey(steps.some((s) => s.key === key) ? key : 'review');
 
     const next = () => {
         const errors = validateStep(step.key, data);
@@ -1000,12 +902,12 @@ function ResolutionWizardBody({
     const submit = (publish: boolean) => {
         const allErrors = {
             ...validateStep('paper', data),
-            ...validateStep('voting', data),
+            ...(isDecision ? validateStep('voting', data) : {}),
         };
         if (Object.keys(allErrors).length > 0) {
             setClientErrors(allErrors);
             const target = firstErrorStep(allErrors, FIELD_STEPS, 'review');
-            if (target) goTo(STEP_INDEX[target]);
+            if (target) goToKey(target);
             return;
         }
         setClientErrors({});
@@ -1016,8 +918,8 @@ function ResolutionWizardBody({
             if (!showAuthority) delete payload.authority_binding;
 
             if (isEdit && resolution) {
-                // Send only what changed: untouched fields (and the paper's
-                // current approval binding) stay exactly as recorded.
+                // Send only what changed: untouched fields (and the current
+                // link to the record it approves) stay exactly as recorded.
                 const changed: Record<string, unknown> = {};
                 for (const [key, value] of Object.entries(payload)) {
                     if (
@@ -1048,22 +950,30 @@ function ResolutionWizardBody({
             preserveState: true,
             onError: (errors: Record<string, string>) => {
                 const target = firstErrorStep(errors, FIELD_STEPS, 'review');
-                if (target) goTo(STEP_INDEX[target]);
+                if (target) goToKey(target);
             },
             onSuccess: (page: unknown) => {
-                const flash = (
+                const props = (
                     page as {
                         props?: {
                             flash?: { success?: string; error?: string };
+                            created_resolution_id?: number | null;
                         };
                     }
-                )?.props?.flash;
-                // The paper is saved; a flash error here means it could not
-                // also be published, which the success pane says plainly.
+                )?.props;
+                // The resolution is saved; a flash error here means it could
+                // not also be published, which the success pane says plainly.
                 setDone(
                     pageHasFlashError(page)
-                        ? { warning: flash?.error }
-                        : { message: flash?.success },
+                        ? {
+                              warning: props?.flash?.error,
+                              createdId: props?.created_resolution_id ?? null,
+                          }
+                        : {
+                              message: props?.flash?.success,
+                              published: publish,
+                              createdId: props?.created_resolution_id ?? null,
+                          },
                 );
                 onCreated?.();
             },
@@ -1081,19 +991,25 @@ function ResolutionWizardBody({
         form.clearErrors();
         form.setData(initialData(null, lockMeeting ? meetingId : null, []));
         setClientErrors({});
-        setStepIndex(0);
+        setStepKey('paper');
         setDone(null);
     };
 
+    const successTitle = !done
+        ? ''
+        : done.warning
+          ? 'Saved as a draft'
+          : isEdit
+            ? 'Resolution updated'
+            : done.published
+              ? isDecision
+                  ? 'Voting is open'
+                  : 'Published to board members'
+              : 'Resolution saved';
+
     const success = done ? (
         <WizardSuccessPane
-            title={
-                done.warning
-                    ? 'Saved as a draft'
-                    : isEdit
-                      ? 'Decision paper updated'
-                      : 'Decision paper created'
-            }
+            title={successTitle}
             blurb={
                 <>
                     {done.warning ?? done.message ?? (
@@ -1101,10 +1017,9 @@ function ResolutionWizardBody({
                             <strong>{data.title}</strong> has been saved.
                         </>
                     )}
-                    {!isEdit && !done.warning ? (
+                    {!isEdit && done.createdId ? (
                         <span className="mt-1 block">
-                            Open it from the register to attach supporting
-                            documents.
+                            Open the resolution to attach supporting documents.
                         </span>
                     ) : null}
                 </>
@@ -1121,11 +1036,21 @@ function ResolutionWizardBody({
                             variant="outline"
                             onClick={startAnother}
                         >
-                            <Plus className="h-4 w-4" /> Author another
+                            <Plus className="h-4 w-4" /> Write another
                         </Button>
-                        <Button type="button" onClick={onClose}>
-                            Done
-                        </Button>
+                        {done.createdId ? (
+                            <Button asChild>
+                                <Link
+                                    href={`/governance/resolutions/${done.createdId}`}
+                                >
+                                    Open resolution to attach documents
+                                </Link>
+                            </Button>
+                        ) : (
+                            <Button type="button" onClick={onClose}>
+                                Done
+                            </Button>
+                        )}
                     </>
                 )
             }
@@ -1133,26 +1058,32 @@ function ResolutionWizardBody({
     ) : undefined;
 
     const processing = form.processing || submitting !== null;
+    const publishLabel = isDecision
+        ? 'Publish & open voting'
+        : 'Publish to members';
 
     return (
         <>
             <WizardShell
                 open
                 onClose={requestClose}
-                title={
-                    isEdit ? 'Edit decision paper' : 'Author a decision paper'
-                }
-                description="Structured decision paper authoring for informed, accountable board decisions."
+                title={isEdit ? 'Edit resolution' : 'New resolution'}
+                description="Set out a matter for the board to decide, discuss or note."
                 railIcon={Gavel}
-                railTitle={isEdit ? 'Edit paper' : 'New paper'}
+                railTitle={isEdit ? 'Edit resolution' : 'New resolution'}
                 railSub={
                     isEdit
-                        ? `${resolution?.resolution_reference ?? 'Draft'} · v${resolution?.version_number ?? 1}`
+                        ? [
+                              `Version ${resolution?.version_number ?? 1}`,
+                              refSuffix(resolution?.resolution_reference),
+                          ]
+                              .filter(Boolean)
+                              .join(' · ')
                         : lockedMeeting
-                          ? 'Meeting paper'
-                          : 'Board decision'
+                          ? 'For this meeting'
+                          : 'For the board'
                 }
-                steps={RESOLUTION_WIZARD_STEPS}
+                steps={steps}
                 stepIndex={stepIndex}
                 onStepClick={goTo}
                 pct={pct}
@@ -1208,12 +1139,16 @@ function ResolutionWizardBody({
                                 <Button
                                     type="button"
                                     onClick={() => submit(true)}
-                                    disabled={processing || !isPublishReady}
+                                    disabled={
+                                        processing ||
+                                        !isPublishReady ||
+                                        publishBlockedByRules
+                                    }
                                 >
                                     {submitting === 'publish' ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                     ) : null}
-                                    Publish for voting
+                                    {publishLabel}
                                 </Button>
                             </>
                         ) : (
@@ -1237,12 +1172,12 @@ function ResolutionWizardBody({
                             <>
                                 <StepHead
                                     icon={FileText}
-                                    title="Paper & meeting"
-                                    blurb="Name the paper, place it on a meeting and explain why it is before the board."
+                                    title="Title and meeting"
+                                    blurb="Name the resolution, choose the meeting, and explain why it's before the board."
                                 />
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <Field
-                                        label="Paper title"
+                                        label="Title"
                                         required
                                         error={errorFor('title')}
                                         span
@@ -1253,7 +1188,7 @@ function ResolutionWizardBody({
                                             onChange={(e) =>
                                                 set('title', e.target.value)
                                             }
-                                            placeholder="e.g. Approval of the 2026/27 strategic plan"
+                                            placeholder="e.g. Approve the 2026/27 budget"
                                         />
                                     </Field>
                                     <Field
@@ -1271,8 +1206,8 @@ function ResolutionWizardBody({
                                                     )}
                                                 </span>
                                                 <span className="block text-xs text-muted-foreground">
-                                                    Locked from the meeting you
-                                                    opened.
+                                                    This resolution belongs to
+                                                    the meeting you opened.
                                                 </span>
                                             </InfoCard>
                                         ) : (
@@ -1286,12 +1221,12 @@ function ResolutionWizardBody({
                                                     id="resolution-meeting"
                                                     aria-label="Meeting"
                                                 >
-                                                    <SelectValue placeholder="No meeting" />
+                                                    <SelectValue placeholder="Vote outside a meeting (written resolution)" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value={NONE}>
-                                                        Standalone paper (no
-                                                        meeting)
+                                                        Vote outside a meeting
+                                                        (written resolution)
                                                     </SelectItem>
                                                     {meetings.map((m) => (
                                                         <SelectItem
@@ -1306,9 +1241,16 @@ function ResolutionWizardBody({
                                                 </SelectContent>
                                             </Select>
                                         )}
+                                        {!lockedMeeting && isWritten ? (
+                                            <p className="text-caption mt-1.5">
+                                                Members read it and vote in the
+                                                app by a deadline you set.{' '}
+                                                <GovernanceTermHint term="written_resolution" />
+                                            </p>
+                                        ) : null}
                                     </Field>
                                     <Field
-                                        label="Board committee"
+                                        label="Committee"
                                         error={errorFor('board_committee_id')}
                                     >
                                         <Select
@@ -1319,7 +1261,7 @@ function ResolutionWizardBody({
                                         >
                                             <SelectTrigger
                                                 id="resolution-committee"
-                                                aria-label="Board committee"
+                                                aria-label="Committee"
                                             >
                                                 <SelectValue placeholder="Whole board" />
                                             </SelectTrigger>
@@ -1339,8 +1281,7 @@ function ResolutionWizardBody({
                                         </Select>
                                     </Field>
                                     <Field
-                                        label="Background & rationale"
-                                        hint="Why now?"
+                                        label="Why is this before the board?"
                                         error={
                                             errorFor('context') ??
                                             errorFor('description')
@@ -1354,7 +1295,7 @@ function ResolutionWizardBody({
                                             onChange={(e) =>
                                                 set('context', e.target.value)
                                             }
-                                            placeholder="Background, drivers for change, previous decisions and why this needs a board determination."
+                                            placeholder="What has happened, what's needed, and why the board should look at it now."
                                         />
                                     </Field>
                                 </div>
@@ -1365,12 +1306,12 @@ function ResolutionWizardBody({
                             <>
                                 <StepHead
                                     icon={Gavel}
-                                    title="Motion & approval"
-                                    blurb="The exact words the board votes on, and the one record a carried motion approves."
+                                    title="Wording and purpose"
+                                    blurb="The exact words the board votes on, what kind of paper this is, and anything it approves."
                                 />
                                 <div className="grid gap-4">
                                     <Field
-                                        label="Exact motion"
+                                        label="Resolution wording"
                                         error={errorFor('exact_motion')}
                                     >
                                         <Textarea
@@ -1383,9 +1324,13 @@ function ResolutionWizardBody({
                                                     e.target.value,
                                                 )
                                             }
-                                            placeholder="That the Board resolves to: (1) approve … (2) authorise the CEO to …"
+                                            placeholder="That the board approves … and asks the CEO to …"
                                         />
                                     </Field>
+                                    <p className="text-caption -mt-2 flex items-center gap-1">
+                                        The exact words the board votes on.
+                                        <GovernanceTermHint term="resolution_wording" />
+                                    </p>
                                     <Field
                                         label="Purpose"
                                         error={errorFor('purpose')}
@@ -1399,8 +1344,16 @@ function ResolutionWizardBody({
                                             options={PURPOSES}
                                         />
                                     </Field>
+                                    {data.purpose && !isDecision ? (
+                                        <InfoCard icon={MessageSquare}>
+                                            Papers for discussion or for
+                                            information don’t go to a vote, so
+                                            there’s no voting rule, deadline or
+                                            follow-up actions to set.
+                                        </InfoCard>
+                                    ) : null}
                                     <Field
-                                        label="Decision category"
+                                        label="What is it about?"
                                         error={errorFor('decision_type')}
                                     >
                                         <TilePicker
@@ -1412,9 +1365,9 @@ function ResolutionWizardBody({
                                             options={DECISION_CATEGORIES}
                                         />
                                     </Field>
-                                    {showAuthority ? (
+                                    {showAuthority && isDecision ? (
                                         <Field
-                                            label="Record this paper approves"
+                                            label="What will this resolution approve? (optional)"
                                             error={
                                                 errorFor('authority_binding') ??
                                                 errorFor(
@@ -1438,19 +1391,20 @@ function ResolutionWizardBody({
                                             >
                                                 <SelectTrigger
                                                     id="resolution-authority"
-                                                    aria-label="Record this paper approves"
+                                                    aria-label="What will this resolution approve?"
                                                 >
-                                                    <SelectValue placeholder="No specific record" />
+                                                    <SelectValue placeholder="Nothing specific — a general resolution" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value={NONE}>
-                                                        No specific record
+                                                        Nothing specific — a
+                                                        general resolution
                                                     </SelectItem>
                                                     {currentBinding &&
                                                     !currentBindingListed ? (
                                                         <SelectGroup>
                                                             <SelectLabel>
-                                                                Currently bound
+                                                                Currently linked
                                                             </SelectLabel>
                                                             <SelectItem
                                                                 value={bindingKey(
@@ -1458,13 +1412,7 @@ function ResolutionWizardBody({
                                                                     currentBinding.subject_id,
                                                                 )}
                                                             >
-                                                                {
-                                                                    currentBinding.subject_type_label
-                                                                }
-                                                                :{' '}
-                                                                {
-                                                                    currentBinding.subject_label
-                                                                }
+                                                                {`${currentBinding.subject_type_label}: ${currentBinding.subject_label}`}
                                                             </SelectItem>
                                                         </SelectGroup>
                                                     ) : null}
@@ -1504,11 +1452,12 @@ function ResolutionWizardBody({
                                                 </SelectContent>
                                             </Select>
                                             <p className="text-caption mt-1.5">
-                                                A carried resolution can only
-                                                approve the exact record and
-                                                revision selected here. Choose
-                                                “No specific record” to remove a
-                                                binding.
+                                                If the resolution passes, the
+                                                app applies it to this exact
+                                                version. If someone changes the
+                                                record before then, the board
+                                                will need to approve the new
+                                                version.
                                             </p>
                                         </Field>
                                     ) : null}
@@ -1520,17 +1469,15 @@ function ResolutionWizardBody({
                             <>
                                 <StepHead
                                     icon={Scale}
-                                    title="Options & recommendation"
-                                    blurb="Consequential decisions evaluate real alternatives, or explain why only one path exists."
+                                    title="Options"
+                                    blurb="The choices the board could make, and what management recommends."
                                 />
                                 <div className="grid gap-4">
                                     <div className="flex items-center justify-between gap-3">
                                         <p className="text-subtle">
-                                            {data.options.length} option
                                             {data.options.length === 1
-                                                ? ''
-                                                : 's'}{' '}
-                                            evaluated
+                                                ? '1 option considered'
+                                                : `${data.options.length} options considered`}
                                         </p>
                                         <Button
                                             type="button"
@@ -1615,7 +1562,7 @@ function ResolutionWizardBody({
                                                             e.target.value,
                                                         )
                                                     }
-                                                    placeholder="What this course of action involves…"
+                                                    placeholder="What this option would involve…"
                                                 />
                                                 <div className="grid gap-3 sm:grid-cols-2">
                                                     <Textarea
@@ -1628,7 +1575,7 @@ function ResolutionWizardBody({
                                                                 e.target.value,
                                                             )
                                                         }
-                                                        placeholder="Benefits and opportunities"
+                                                        placeholder="What's good about it"
                                                     />
                                                     <Textarea
                                                         aria-label={`Option ${index + 1} drawbacks`}
@@ -1640,7 +1587,7 @@ function ResolutionWizardBody({
                                                                 e.target.value,
                                                             )
                                                         }
-                                                        placeholder="Drawbacks, costs and risks"
+                                                        placeholder="Downsides, costs and risks"
                                                     />
                                                 </div>
                                             </Card>
@@ -1655,7 +1602,7 @@ function ResolutionWizardBody({
                                         (o) => o.label.trim() !== '',
                                     ).length < 2 ? (
                                         <Field
-                                            label="Single option justification"
+                                            label="Why there's only one option"
                                             error={errorFor(
                                                 'single_option_reason',
                                             )}
@@ -1672,12 +1619,12 @@ function ResolutionWizardBody({
                                                         e.target.value,
                                                     )
                                                 }
-                                                placeholder="Why only one option is feasible (e.g. statutory mandate, sole provider)."
+                                                placeholder="e.g. The law requires it, or there's only one supplier."
                                             />
                                         </Field>
                                     ) : null}
                                     <Field
-                                        label="Management recommendation & rationale"
+                                        label="Management's recommendation"
                                         error={errorFor('recommendation')}
                                     >
                                         <Textarea
@@ -1701,12 +1648,12 @@ function ResolutionWizardBody({
                             <>
                                 <StepHead
                                     icon={ShieldAlert}
-                                    title="Implications"
-                                    blurb="Account honestly for cost, service-user safety, risk and equity (including Te Tiriti)."
+                                    title="Effects"
+                                    blurb="What it will cost, and how it affects the people we support, risk and fairness (including Te Tiriti)."
                                 />
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <Field
-                                        label="Financial cost"
+                                        label="Cost"
                                         error={errorFor('cost_impact')}
                                         span
                                     >
@@ -1723,16 +1670,16 @@ function ResolutionWizardBody({
                                             options={[
                                                 {
                                                     key: 'none',
-                                                    label: 'No direct cost',
+                                                    label: 'No cost',
                                                     description:
-                                                        'Explicitly confirmed: no capital or operating spend.',
+                                                        "Confirmed: this won't cost anything.",
                                                     icon: CheckCircle2,
                                                 },
                                                 {
                                                     key: 'cost',
-                                                    label: 'Has budget impact',
+                                                    label: 'Has a cost',
                                                     description:
-                                                        'Spend, funding or a budget adjustment.',
+                                                        'Spending, funding or a budget change.',
                                                     icon: DollarSign,
                                                 },
                                             ]}
@@ -1741,60 +1688,32 @@ function ResolutionWizardBody({
                                     {data.has_cost ? (
                                         <>
                                             <Field
-                                                label="Estimated amount"
+                                                label="How much will it cost?"
                                                 required
                                             >
-                                                <Input
-                                                    id="resolution-cost-amount"
-                                                    inputMode="decimal"
-                                                    value={data.cost_amount}
-                                                    onChange={(e) =>
-                                                        set(
-                                                            'cost_amount',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="e.g. 85000"
-                                                />
-                                            </Field>
-                                            <Field label="Currency">
-                                                <Select
-                                                    value={data.cost_currency}
-                                                    onValueChange={(value) =>
-                                                        set(
-                                                            'cost_currency',
-                                                            value,
-                                                        )
-                                                    }
-                                                >
-                                                    <SelectTrigger
-                                                        id="resolution-cost-currency"
-                                                        aria-label="Currency"
+                                                <div className="relative">
+                                                    <span
+                                                        aria-hidden="true"
+                                                        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground"
                                                     >
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {CURRENCIES.map(
-                                                            (currency) => (
-                                                                <SelectItem
-                                                                    key={
-                                                                        currency
-                                                                    }
-                                                                    value={
-                                                                        currency
-                                                                    }
-                                                                >
-                                                                    {currency}
-                                                                </SelectItem>
-                                                            ),
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
+                                                        $
+                                                    </span>
+                                                    <Input
+                                                        id="resolution-cost-amount"
+                                                        inputMode="decimal"
+                                                        className="pl-7"
+                                                        value={data.cost_amount}
+                                                        onChange={(e) =>
+                                                            set(
+                                                                'cost_amount',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="85000"
+                                                    />
+                                                </div>
                                             </Field>
-                                            <Field
-                                                label="Budget source / fund"
-                                                span
-                                            >
+                                            <Field label="Where will the money come from?">
                                                 <Input
                                                     id="resolution-cost-source"
                                                     value={data.cost_source}
@@ -1804,13 +1723,13 @@ function ResolutionWizardBody({
                                                             e.target.value,
                                                         )
                                                     }
-                                                    placeholder="e.g. OPEX FY27 regional services"
+                                                    placeholder="e.g. 2026/27 operating budget — regional services"
                                                 />
                                             </Field>
                                         </>
                                     ) : null}
                                     <Field
-                                        label="Service-user & safety implications"
+                                        label="Effect on the people we support and safety"
                                         error={errorFor(
                                             'service_user_implications',
                                         )}
@@ -1828,11 +1747,11 @@ function ResolutionWizardBody({
                                                     e.target.value,
                                                 )
                                             }
-                                            placeholder="Effects on the people we support, service quality and safeguarding."
+                                            placeholder="How it changes support, service quality or safety for the people we support."
                                         />
                                     </Field>
                                     <Field
-                                        label="Risk, equity & Te Tiriti implications"
+                                        label="Risks and fairness (including Te Tiriti o Waitangi)"
                                         error={errorFor(
                                             'risk_equity_implications',
                                         )}
@@ -1850,7 +1769,7 @@ function ResolutionWizardBody({
                                                     e.target.value,
                                                 )
                                             }
-                                            placeholder="Key risks and controls, equity impacts and Te Tiriti o Waitangi obligations."
+                                            placeholder="The main risks and how they're managed, who could be treated unfairly, and our Te Tiriti commitments."
                                         />
                                     </Field>
                                 </div>
@@ -1861,12 +1780,12 @@ function ResolutionWizardBody({
                             <>
                                 <StepHead
                                     icon={Vote}
-                                    title="Voting & follow-up actions"
-                                    blurb="Set the threshold and deadline, and the accountable actions a carried decision creates."
+                                    title="How it passes"
+                                    blurb="Choose the voting rule and when voting closes, and the follow-up actions if it passes."
                                 />
                                 <div className="grid gap-4">
                                     <Field
-                                        label="Voting threshold"
+                                        label="How does it pass?"
                                         error={
                                             errorFor('type') ??
                                             errorFor('voting_threshold')
@@ -1881,10 +1800,42 @@ function ResolutionWizardBody({
                                             options={RESOLUTION_TYPES}
                                         />
                                     </Field>
+                                    {isWritten &&
+                                    votingRules?.written_unanimity_required ? (
+                                        <InfoCard icon={Users}>
+                                            The board’s voting rules say votes
+                                            outside a meeting need everyone’s
+                                            agreement, so this resolution will
+                                            only pass if every voting member
+                                            votes For — whichever rule you
+                                            choose.
+                                        </InfoCard>
+                                    ) : null}
+                                    {writtenNotAllowed ? (
+                                        <InfoCard
+                                            icon={AlertTriangle}
+                                            tone="warn"
+                                        >
+                                            The board’s voting rules don’t
+                                            allow voting outside a meeting yet.
+                                            Add this resolution to a meeting,
+                                            or ask the chair or board secretary
+                                            to change the voting rules in
+                                            Settings.
+                                        </InfoCard>
+                                    ) : null}
                                     <Field
-                                        label="Voting deadline"
-                                        hint="Leave blank to decide at the meeting"
-                                        error={errorFor('voting_deadline')}
+                                        label="Voting closes"
+                                        required={isWritten}
+                                        hint={
+                                            isWritten
+                                                ? 'New Zealand time — needed before voting can open'
+                                                : 'New Zealand time — optional; leave blank if voting closes at the meeting'
+                                        }
+                                        error={
+                                            errorFor('voting_deadline') ??
+                                            errorFor('deadline')
+                                        }
                                     >
                                         <Input
                                             id="resolution-deadline"
@@ -1905,8 +1856,9 @@ function ResolutionWizardBody({
                                                 Follow-up actions
                                             </p>
                                             <p className="text-caption">
-                                                Created as accountable actions
-                                                when the motion carries.
+                                                If the resolution passes, each
+                                                one becomes an action for the
+                                                person responsible.
                                             </p>
                                         </div>
                                         <Button
@@ -1971,7 +1923,7 @@ function ResolutionWizardBody({
                                                 >
                                                     <div className="grid gap-3 sm:grid-cols-[2fr_1.2fr_1fr_auto] sm:items-start">
                                                         <Field
-                                                            label="Action"
+                                                            label="What needs doing"
                                                             required
                                                             error={errorFor(
                                                                 `follow_up_actions.${index}.title`,
@@ -1988,15 +1940,17 @@ function ResolutionWizardBody({
                                                                             .value,
                                                                     })
                                                                 }
-                                                                placeholder="e.g. Issue the revised contract"
+                                                                placeholder="e.g. Sign the new contract"
                                                             />
                                                         </Field>
                                                         <Field
-                                                            label="Accountable"
+                                                            label="Person responsible"
                                                             required
-                                                            error={errorFor(
-                                                                `follow_up_actions.${index}.assigned_to`,
-                                                            )}
+                                                            error={
+                                                                errorFor(
+                                                                    `follow_up_actions.${index}.assigned_to`,
+                                                                )
+                                                            }
                                                         >
                                                             <Select
                                                                 value={
@@ -2032,7 +1986,7 @@ function ResolutionWizardBody({
                                                                 }}
                                                             >
                                                                 <SelectTrigger
-                                                                    aria-label={`Action ${index + 1} accountable person`}
+                                                                    aria-label={`Action ${index + 1} person responsible`}
                                                                 >
                                                                     <SelectValue placeholder="Choose a person" />
                                                                 </SelectTrigger>
@@ -2045,7 +1999,7 @@ function ResolutionWizardBody({
                                                                         {action.assignee_name &&
                                                                         action.assigned_to ==
                                                                             null
-                                                                            ? `${action.assignee_name} (not linked)`
+                                                                            ? `${action.assignee_name} (no account)`
                                                                             : 'Choose a person'}
                                                                     </SelectItem>
                                                                     {users.map(
@@ -2127,8 +2081,10 @@ function ResolutionWizardBody({
                                     title="Review"
                                     blurb={
                                         isEdit
-                                            ? 'Check the changes before saving this draft.'
-                                            : 'Check the paper. Drafts can be saved at any time; publishing opens voting.'
+                                            ? 'Check your changes before saving.'
+                                            : isDecision
+                                              ? 'Check the resolution. You can save a draft at any time; publishing opens voting.'
+                                              : 'Check the paper. You can save a draft at any time; publishing shares it with board members.'
                                     }
                                 />
                                 <div className="grid gap-4">
@@ -2150,8 +2106,8 @@ function ResolutionWizardBody({
                                     >
                                         <span className="font-medium">
                                             {isPublishReady
-                                                ? 'This paper meets the publication standard.'
-                                                : 'This paper is an incomplete draft. It can be saved, but not published yet:'}
+                                                ? 'This resolution is ready to publish.'
+                                                : "This is an incomplete draft. You can save it, but it can't be published until:"}
                                         </span>
                                         {!isPublishReady ? (
                                             <ul className="mt-1 list-inside list-disc">
@@ -2163,13 +2119,39 @@ function ResolutionWizardBody({
                                             </ul>
                                         ) : null}
                                     </InfoCard>
+                                    {!isEdit &&
+                                    canPublish &&
+                                    publishBlockedByRules ? (
+                                        <InfoCard
+                                            icon={AlertTriangle}
+                                            tone="warn"
+                                        >
+                                            Board voting is switched off until
+                                            the voting rules are confirmed, so
+                                            for now this can only be saved as a
+                                            draft. The chair or board secretary
+                                            can confirm the rules in Settings.
+                                        </InfoCard>
+                                    ) : null}
+                                    <Card className="gap-1.5 p-4 shadow-none">
+                                        <p className="text-caption font-semibold">
+                                            Resolution wording
+                                        </p>
+                                        {data.exact_motion.trim() ? (
+                                            <blockquote className="border-l-4 border-primary pl-3 text-sm whitespace-pre-wrap">
+                                                {data.exact_motion}
+                                            </blockquote>
+                                        ) : (
+                                            <p className="text-subtle">
+                                                Not written yet.
+                                            </p>
+                                        )}
+                                    </Card>
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         <ReviewCard
                                             icon={FileText}
-                                            title="Paper & meeting"
-                                            onEdit={() =>
-                                                goTo(STEP_INDEX.paper)
-                                            }
+                                            title="Title and meeting"
+                                            onEdit={() => goToKey('paper')}
                                         >
                                             <ReviewRow
                                                 label="Title"
@@ -2180,7 +2162,8 @@ function ResolutionWizardBody({
                                                 value={
                                                     meetingLabel(
                                                         data.meeting_id,
-                                                    ) ?? 'Standalone paper'
+                                                    ) ??
+                                                    'Vote outside a meeting (written resolution)'
                                                 }
                                             />
                                             <ReviewRow
@@ -2190,20 +2173,14 @@ function ResolutionWizardBody({
                                                 )}
                                             />
                                             <ReviewRow
-                                                label="Background"
-                                                value={
-                                                    data.context
-                                                        ? `${data.context.length} characters`
-                                                        : ''
-                                                }
+                                                label="Why it's before the board"
+                                                value={excerpt(data.context)}
                                             />
                                         </ReviewCard>
                                         <ReviewCard
                                             icon={Gavel}
-                                            title="Motion & approval"
-                                            onEdit={() =>
-                                                goTo(STEP_INDEX.motion)
-                                            }
+                                            title="Wording and purpose"
+                                            onEdit={() => goToKey('motion')}
                                         >
                                             <ReviewRow
                                                 label="Purpose"
@@ -2216,32 +2193,23 @@ function ResolutionWizardBody({
                                                 }
                                             />
                                             <ReviewRow
-                                                label="Category"
+                                                label="About"
                                                 value={
-                                                    DECISION_CATEGORIES.find(
-                                                        (c) =>
-                                                            c.key ===
-                                                            data.decision_type,
-                                                    )?.label ??
                                                     data.decision_type
-                                                }
-                                            />
-                                            <ReviewRow
-                                                label="Motion"
-                                                value={
-                                                    data.exact_motion
-                                                        ? 'Provided'
+                                                        ? decisionTypeLabel(
+                                                              data.decision_type,
+                                                          )
                                                         : ''
                                                 }
                                             />
-                                            {showAuthority ? (
+                                            {showAuthority && isDecision ? (
                                                 <ReviewRow
                                                     label="Approves"
                                                     value={
                                                         authorityLabel(
                                                             data.authority_binding_key,
                                                         ) ??
-                                                        'No specific record'
+                                                        'Nothing specific'
                                                     }
                                                 />
                                             ) : null}
@@ -2249,117 +2217,120 @@ function ResolutionWizardBody({
                                         <ReviewCard
                                             icon={Scale}
                                             title="Options"
-                                            onEdit={() =>
-                                                goTo(STEP_INDEX.options)
-                                            }
+                                            onEdit={() => goToKey('options')}
                                         >
                                             <ReviewRow
-                                                label="Options evaluated"
-                                                value={String(
-                                                    data.options.filter(
-                                                        (o) =>
-                                                            o.label.trim() !==
-                                                            '',
-                                                    ).length,
+                                                label="Options considered"
+                                                value={excerpt(
+                                                    data.options
+                                                        .map((o) =>
+                                                            o.label.trim(),
+                                                        )
+                                                        .filter(Boolean)
+                                                        .join('; '),
                                                 )}
                                             />
-                                            <ReviewRow
-                                                label="Single-option reason"
-                                                value={
-                                                    data.single_option_reason
-                                                        ? 'Provided'
-                                                        : ''
-                                                }
-                                            />
+                                            {data.single_option_reason.trim() ? (
+                                                <ReviewRow
+                                                    label="Why only one option"
+                                                    value={excerpt(
+                                                        data.single_option_reason,
+                                                    )}
+                                                />
+                                            ) : null}
                                             <ReviewRow
                                                 label="Recommendation"
-                                                value={
-                                                    data.recommendation
-                                                        ? 'Provided'
-                                                        : ''
-                                                }
+                                                value={excerpt(
+                                                    data.recommendation,
+                                                )}
                                             />
                                         </ReviewCard>
                                         <ReviewCard
                                             icon={ShieldAlert}
-                                            title="Implications"
+                                            title="Effects"
                                             onEdit={() =>
-                                                goTo(STEP_INDEX.implications)
+                                                goToKey('implications')
                                             }
                                         >
                                             <ReviewRow
                                                 label="Cost"
                                                 value={
                                                     data.has_cost
-                                                        ? `${data.cost_currency} ${data.cost_amount || '—'}`
-                                                        : 'No direct cost'
+                                                        ? [
+                                                              formatNzd(
+                                                                  data.cost_amount,
+                                                              ),
+                                                              data.cost_source.trim(),
+                                                          ]
+                                                              .filter(Boolean)
+                                                              .join(' · ')
+                                                        : 'No cost'
                                                 }
                                             />
                                             <ReviewRow
-                                                label="Service-user & safety"
-                                                value={
-                                                    data.service_user_implications
-                                                        ? 'Provided'
-                                                        : ''
-                                                }
+                                                label="People we support"
+                                                value={excerpt(
+                                                    data.service_user_implications,
+                                                )}
                                             />
                                             <ReviewRow
-                                                label="Risk & equity"
-                                                value={
-                                                    data.risk_equity_implications
-                                                        ? 'Provided'
-                                                        : ''
-                                                }
-                                            />
-                                        </ReviewCard>
-                                        <ReviewCard
-                                            icon={ListChecks}
-                                            title="Voting & actions"
-                                            onEdit={() =>
-                                                goTo(STEP_INDEX.voting)
-                                            }
-                                            span
-                                        >
-                                            <ReviewRow
-                                                label="Threshold"
-                                                value={
-                                                    RESOLUTION_TYPES.find(
-                                                        (t) =>
-                                                            t.key === data.type,
-                                                    )?.label
-                                                }
-                                            />
-                                            <ReviewRow
-                                                label="Deadline"
-                                                value={
-                                                    data.voting_deadline
-                                                        ? formatDateTimeLong(
-                                                              data.voting_deadline,
-                                                          )
-                                                        : 'Decided at the meeting'
-                                                }
-                                            />
-                                            <ReviewRow
-                                                label="Follow-up actions"
-                                                value={String(
-                                                    data.follow_up_actions.filter(
-                                                        (a) =>
-                                                            a.title.trim() !==
-                                                            '',
-                                                    ).length,
+                                                label="Risks and fairness"
+                                                value={excerpt(
+                                                    data.risk_equity_implications,
                                                 )}
                                             />
                                         </ReviewCard>
+                                        {isDecision ? (
+                                            <ReviewCard
+                                                icon={ListChecks}
+                                                title="How it passes"
+                                                onEdit={() =>
+                                                    goToKey('voting')
+                                                }
+                                                span
+                                            >
+                                                <ReviewRow
+                                                    label="Voting rule"
+                                                    value={
+                                                        RESOLUTION_TYPES.find(
+                                                            (t) =>
+                                                                t.key ===
+                                                                data.type,
+                                                        )?.label
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="Voting closes"
+                                                    value={
+                                                        data.voting_deadline
+                                                            ? `${formatWallTime(data.voting_deadline)} (NZ time)`
+                                                            : isWritten
+                                                              ? 'Not set yet'
+                                                              : 'At the meeting'
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="Follow-up actions"
+                                                    value={String(
+                                                        data.follow_up_actions.filter(
+                                                            (a) =>
+                                                                a.title.trim() !==
+                                                                '',
+                                                        ).length,
+                                                    )}
+                                                />
+                                            </ReviewCard>
+                                        ) : null}
                                     </div>
                                     {showAuthority &&
+                                    isDecision &&
                                     data.authority_binding_key !== NONE ? (
                                         <InfoCard icon={Link2}>
-                                            The binding records the selected
-                                            record&apos;s current revision. If
-                                            that record changes before the
-                                            decision is applied, the approval
-                                            will not apply to the changed
-                                            version.
+                                            If the resolution passes, the app
+                                            applies it to this exact version of
+                                            the record. If someone changes the
+                                            record before then, the board will
+                                            need to approve the new version.
                                         </InfoCard>
                                     ) : null}
                                 </div>
@@ -2371,6 +2342,7 @@ function ResolutionWizardBody({
 
             <DiscardDraftDialog
                 open={confirmClose}
+                mode={isEdit ? 'edit' : 'create'}
                 onKeepEditing={() => setConfirmClose(false)}
                 onDiscard={() => {
                     setConfirmClose(false);
@@ -2378,8 +2350,8 @@ function ResolutionWizardBody({
                 }}
                 description={
                     isEdit
-                        ? 'Your unsaved changes to this decision paper will be lost.'
-                        : 'This decision paper has not been saved and will be lost.'
+                        ? 'Your unsaved changes to this resolution will be lost.'
+                        : "This resolution hasn't been saved and will be lost."
                 }
             />
         </>

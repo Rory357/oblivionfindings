@@ -1,26 +1,23 @@
-import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import { TabsContent } from '@/components/ui/tabs';
-import { data as dashboardData } from '@/routes/governance/dashboard';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import {
     BookOpen,
     Calendar,
+    CheckCircle2,
     ClipboardList,
     FileText,
     LayoutGrid,
     ShieldAlert,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+
+import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { TabsContent } from '@/components/ui/tabs';
+import { data as dashboardData } from '@/routes/governance/dashboard';
+
 import { BoardPriorityCard, type WorkflowAction } from './BoardPriorityCard';
 
 /**
@@ -51,6 +48,10 @@ interface PriorityOverviewPanelProps {
     };
     /** Pagination for the initial `actions` page (the "all" tab). */
     pagination?: PriorityPagination | null;
+    /** How many priorities show before "See all" (members see the top 3). */
+    collapsedCount?: number;
+    /** Area tabs (meeting managers). Members get the single ranked list. */
+    showTabs?: boolean;
 }
 
 export type TabKey =
@@ -66,39 +67,92 @@ interface TabList {
     pagination: PriorityPagination;
 }
 
-const COLLAPSED_COUNT = 8;
-
 const TAB_DEFS: Array<{
     key: TabKey;
     label: string;
+    noun: string;
     icon: PageTabItem['icon'];
     areas?: string[];
     areaKeys?: string[];
+    register: { href: string; label: string };
+    empty: { title: string; body: string };
 }> = [
-    { key: 'all', label: 'All', icon: LayoutGrid },
-    { key: 'meetings', label: 'Meetings', icon: Calendar, areas: ['Meetings'], areaKeys: ['meetings'] },
+    {
+        key: 'all',
+        label: 'All',
+        noun: 'priorities',
+        icon: LayoutGrid,
+        register: { href: '/governance/records', label: 'Search records' },
+        empty: {
+            title: 'Nothing needs the board right now',
+            body: 'Nothing in the areas you can see needs attention.',
+        },
+    },
+    {
+        key: 'meetings',
+        label: 'Meetings',
+        noun: 'meeting tasks',
+        icon: Calendar,
+        areas: ['Meetings'],
+        areaKeys: ['meetings'],
+        register: { href: '/governance/meetings', label: 'Open meetings' },
+        empty: {
+            title: 'No meeting work waiting',
+            body: 'No agenda, board pack or minutes work is waiting.',
+        },
+    },
     {
         key: 'actions',
         label: 'Actions',
+        noun: 'actions',
         icon: ClipboardList,
         areas: ['Action Items'],
         areaKeys: ['action_items', 'actions'],
+        register: { href: '/governance/actions', label: 'Open actions' },
+        empty: {
+            title: 'No open actions',
+            body: 'No board or committee actions are open.',
+        },
     },
     {
         key: 'risks',
         label: 'Risks',
+        noun: 'risks',
         icon: ShieldAlert,
         areas: ['Risks', 'Risk Register'],
         areaKeys: ['risks', 'risk_register'],
+        register: { href: '/governance/risks', label: 'Open risk register' },
+        empty: {
+            title: 'No risks need board attention right now',
+            body: "No open risks are above the board's limit.",
+        },
     },
     {
         key: 'compliance',
         label: 'Compliance',
+        noun: 'requirements',
         icon: FileText,
         areas: ['Compliance'],
         areaKeys: ['compliance'],
+        register: { href: '/governance/compliance', label: 'Open compliance' },
+        empty: {
+            title: 'No requirements due',
+            body: 'No requirements are overdue or due in the next 30 days.',
+        },
     },
-    { key: 'policies', label: 'Policies', icon: BookOpen, areas: ['Policies'], areaKeys: ['policies'] },
+    {
+        key: 'policies',
+        label: 'Policies',
+        noun: 'policy reviews',
+        icon: BookOpen,
+        areas: ['Policies'],
+        areaKeys: ['policies'],
+        register: { href: '/governance/policies', label: 'Open policies' },
+        empty: {
+            title: 'No policy reviews due',
+            body: 'No policies are due for review in the next 30 days.',
+        },
+    },
 ];
 
 function filterFor(tab: TabKey, actions: WorkflowAction[]): WorkflowAction[] {
@@ -112,76 +166,22 @@ function filterFor(tab: TabKey, actions: WorkflowAction[]): WorkflowAction[] {
     });
 }
 
-function EmptyForTab({ tab }: { tab: TabKey }) {
-    const COPY: Record<TabKey, { title: string; body: string }> = {
-        all: {
-            title: 'No board decisions waiting',
-            body: 'Nothing requires the board’s attention right now. Check back after the next meeting.',
-        },
-        meetings: {
-            title: 'No meeting actions outstanding',
-            body: 'Agenda, pack and minutes are all on track.',
-        },
-        actions: {
-            title: 'No open action items',
-            body: 'Board and committee actions are all complete.',
-        },
-        risks: {
-            title: 'No risks need board attention',
-            body: 'All tracked risks are within appetite.',
-        },
-        compliance: {
-            title: 'No compliance gaps',
-            body: 'All upcoming obligations have evidence assigned.',
-        },
-        policies: {
-            title: 'No outstanding policy work',
-            body: 'Attestations are up to date and reviews are not yet due.',
-        },
-    };
-    const { title, body } = COPY[tab];
-
-    return (
-        <div className="rounded-lg border border-dashed border-border p-8 text-center">
-            <p className="text-sm font-medium text-foreground">{title}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{body}</p>
-        </div>
-    );
-}
-
-function scopedViewUrl(tab: TabKey): string {
-    switch (tab) {
-        case 'meetings':
-            return '/governance/meetings';
-        case 'actions':
-            return '/governance/actions';
-        case 'risks':
-            return '/governance/risks';
-        case 'compliance':
-            return '/governance/compliance';
-        case 'policies':
-            return '/governance/policies';
-        case 'all':
-        default:
-            return '/governance/records';
-    }
-}
-
 /**
- * Tabbed list of priority cards. Tabs use the same `PageTabs` component the
- * Sites module uses, so visual styling is identical (underlined trigger,
- * primary fill on active, dropdown overflow on narrow screens).
+ * The ranked board priorities. The section heading lives with the caller
+ * (Home says "Board priorities" once); this panel is the list itself.
  *
- * Completeness contract: the header total and tab counts describe the
- * viewer's full population. "Show all" fetches the tab's ranked list from the
- * server page by page (same viewer, same tab definition), and the footer
- * always states how many of the counted items are loaded — the panel never
- * claims more than the user can reach.
+ * Completeness contract: tab counts describe the viewer's full population.
+ * "See all" loads the tab's ranked list from the server page by page (same
+ * viewer, same tab definition), and the footer always states how many of the
+ * counted items are shown — the panel never claims more than the user can
+ * reach.
  */
 export function PriorityOverviewPanel({
     actions,
     summary,
     pagination,
+    collapsedCount = 8,
+    showTabs = true,
 }: PriorityOverviewPanelProps) {
     const [tab, setTab] = useState<TabKey>('all');
     const [isExpanded, setIsExpanded] = useState(false);
@@ -189,8 +189,8 @@ export function PriorityOverviewPanel({
     const [loadingTab, setLoadingTab] = useState<TabKey | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
 
-    // A refreshed dashboard payload (new period, Refresh) supersedes any
-    // pages fetched against the previous ranking.
+    // A refreshed dashboard payload (Refresh) supersedes any pages fetched
+    // against the previous ranking.
     useEffect(() => {
         setFetched({});
         setIsExpanded(false);
@@ -211,7 +211,11 @@ export function PriorityOverviewPanel({
         };
         for (const a of actions) {
             for (const def of TAB_DEFS) {
-                if ((def.areaKeys && a.area_key && def.areaKeys.includes(a.area_key)) || (def.areas && a.area && def.areas.includes(a.area))) {
+                if (def.key === 'all') continue;
+                if (
+                    (def.areaKeys && a.area_key && def.areaKeys.includes(a.area_key)) ||
+                    (def.areas && a.area && def.areas.includes(a.area))
+                ) {
                     c[def.key] += 1;
                 }
             }
@@ -219,22 +223,10 @@ export function PriorityOverviewPanel({
         return c;
     }, [actions, summary]);
 
-    const tabs: PageTabItem[] = TAB_DEFS.map((def) => {
-        const count = counts[def.key];
-        return {
-            value: def.key,
-            key: def.key,
-            label: def.label,
-            icon: def.icon,
-            count: count,
-            tone: count > 0 ? 'brand' : 'neutral',
-        };
-    });
-
     /**
      * The list a tab currently holds: a server-fetched ranked list when one
      * exists, the initial page for "all", otherwise the tab's share of the
-     * initial page (a sample that "Show all" completes from the server).
+     * initial page (a sample that "See all" completes from the server).
      */
     const listFor = (key: TabKey): { items: WorkflowAction[]; complete: boolean; list: TabList | null } => {
         const serverList = fetched[key] ?? (key === 'all' && pagination ? { actions, pagination } : null);
@@ -277,7 +269,7 @@ export function PriorityOverviewPanel({
                 };
             });
         } catch {
-            setLoadError('More priorities could not be loaded. Try again.');
+            setLoadError("More priorities couldn't be loaded. Try again.");
         } finally {
             setLoadingTab(null);
         }
@@ -291,39 +283,138 @@ export function PriorityOverviewPanel({
         }
     };
 
+    const renderTab = (def: (typeof TAB_DEFS)[number]) => {
+        const { items, complete, list } = listFor(def.key);
+        const totalInTab = counts[def.key];
+        const displayActions = isExpanded ? items : items.slice(0, collapsedCount);
+        const isLoading = loadingTab === def.key;
+        const nextPage = list ? list.pagination.page + 1 : 1;
+        const hasMoreThanShown = totalInTab > collapsedCount || !complete;
+
+        return (
+            <div className="flex flex-col gap-3">
+                {totalInTab === 0 && items.length === 0 ? (
+                    <EmptyState
+                        variant="compact"
+                        icon={CheckCircle2}
+                        title={def.empty.title}
+                        description={def.empty.body}
+                    />
+                ) : items.length === 0 ? (
+                    <EmptyState
+                        variant="compact"
+                        icon={LayoutGrid}
+                        title={
+                            isLoading
+                                ? `Loading ${totalInTab} ${def.noun}…`
+                                : `${totalInTab} ${def.noun} are further down the list`
+                        }
+                        description={
+                            isLoading ? undefined : 'Choose See all to load them.'
+                        }
+                    />
+                ) : (
+                    displayActions.map((action) => (
+                        <BoardPriorityCard key={action.id} action={action} />
+                    ))
+                )}
+                {hasMoreThanShown ? (
+                    <div
+                        className="flex flex-wrap items-center justify-center gap-3 pt-2"
+                        data-test="priority-overview-footer"
+                    >
+                        {isExpanded ? (
+                            <>
+                                <span
+                                    className="text-caption"
+                                    aria-live="polite"
+                                >
+                                    Showing {items.length} of {totalInTab} {def.noun}
+                                </span>
+                                {!complete ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="xs"
+                                        disabled={isLoading}
+                                        aria-busy={isLoading}
+                                        onClick={() => void loadPage(def.key, nextPage)}
+                                    >
+                                        {isLoading
+                                            ? 'Loading…'
+                                            : `Load ${Math.min(
+                                                  list?.pagination.per_page ?? totalInTab,
+                                                  Math.max(totalInTab - items.length, 0),
+                                              )} more`}
+                                    </Button>
+                                ) : null}
+                                {items.length > collapsedCount ? (
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        size="xs"
+                                        onClick={() => setIsExpanded(false)}
+                                    >
+                                        Show fewer
+                                    </Button>
+                                ) : null}
+                            </>
+                        ) : (
+                            <Button
+                                type="button"
+                                variant="link"
+                                size="xs"
+                                onClick={() => showAll(def.key)}
+                            >
+                                See all {totalInTab} {def.noun}
+                            </Button>
+                        )}
+                        {showTabs ? (
+                            <Link
+                                href={def.register.href}
+                                className="text-caption hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            >
+                                {def.register.label}
+                            </Link>
+                        ) : null}
+                        {loadError ? (
+                            <p
+                                role="alert"
+                                className="w-full text-center text-xs text-status-critical"
+                            >
+                                {loadError}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : null}
+            </div>
+        );
+    };
+
+    if (!showTabs) {
+        return (
+            <Card data-dusk="cockpit-priority-overview">
+                <CardContent>
+                    {renderTab(TAB_DEFS[0])}
+                </CardContent>
+            </Card>
+        );
+    }
+
+    const tabs: PageTabItem[] = TAB_DEFS.map((def) => {
+        const count = counts[def.key];
+        return {
+            value: def.key,
+            key: def.key,
+            label: def.label,
+            icon: def.icon,
+            count,
+            tone: count > 0 ? 'brand' : 'neutral',
+        };
+    });
+
     return (
         <Card data-dusk="cockpit-priority-overview">
-            <CardHeader className="pb-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <CardTitle className="text-lg">
-                            Priorities Requiring Board Attention
-                        </CardTitle>
-                        <CardDescription>
-                            Ranked by urgency across meetings, risks,
-                            compliance, and assigned actions
-                        </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Badge
-                            variant="outline"
-                            className="text-xs font-normal"
-                        >
-                            {summary.total} total
-                        </Badge>
-                        {summary.critical > 0 && (
-                            <Badge className="border border-status-critical/30 bg-status-critical-bg text-status-critical">
-                                {summary.critical} critical
-                            </Badge>
-                        )}
-                        {summary.overdue > 0 && (
-                            <Badge className="border border-status-warning/30 bg-status-warning-bg text-status-warning">
-                                {summary.overdue} overdue
-                            </Badge>
-                        )}
-                    </div>
-                </div>
-            </CardHeader>
             <CardContent>
                 <PageTabs
                     value={tab}
@@ -334,114 +425,11 @@ export function PriorityOverviewPanel({
                     }}
                     items={tabs}
                 >
-                    {TAB_DEFS.map((def) => {
-                        const { items, complete, list } = listFor(def.key);
-                        const totalInTab = counts[def.key];
-                        const displayActions = isExpanded ? items : items.slice(0, COLLAPSED_COUNT);
-                        const isActiveTab = def.key === tab;
-                        const isLoading = loadingTab === def.key;
-                        const noun = def.key === 'all' ? 'priorities' : def.label.toLowerCase();
-                        const nextPage = list ? list.pagination.page + 1 : 1;
-
-                        return (
-                            <TabsContent
-                                key={def.key}
-                                value={def.key}
-                                className="space-y-3"
-                            >
-                                {totalInTab === 0 && items.length === 0 ? (
-                                    <EmptyForTab tab={def.key} />
-                                ) : items.length === 0 ? (
-                                    <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                                        <p className="text-sm font-medium text-foreground">
-                                            {isLoading ? `Loading ${totalInTab} ${noun}…` : `${totalInTab} ${noun} rank below the first page`}
-                                        </p>
-                                        {!isLoading ? (
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                Use Show all to load every one of them.
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                ) : (
-                                    displayActions.map((action) => (
-                                        <BoardPriorityCard
-                                            key={action.id}
-                                            action={action}
-                                        />
-                                    ))
-                                )}
-                                {isActiveTab && (totalInTab > COLLAPSED_COUNT || !complete) ? (
-                                    <div
-                                        className="flex flex-wrap items-center justify-center gap-3 pt-2"
-                                        data-test="priority-overview-footer"
-                                    >
-                                        {isExpanded ? (
-                                            <>
-                                                <span
-                                                    className="text-xs text-muted-foreground"
-                                                    aria-live="polite"
-                                                >
-                                                    Showing {items.length} of {totalInTab} {noun}
-                                                </span>
-                                                {!complete ? (
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="xs"
-                                                        disabled={isLoading}
-                                                        aria-busy={isLoading}
-                                                        onClick={() => void loadPage(def.key, nextPage)}
-                                                    >
-                                                        {isLoading
-                                                            ? 'Loading…'
-                                                            : `Load ${Math.min(
-                                                                  list?.pagination.per_page ?? totalInTab,
-                                                                  Math.max(totalInTab - items.length, 0),
-                                                              )} more`}
-                                                    </Button>
-                                                ) : null}
-                                                {items.length > COLLAPSED_COUNT ? (
-                                                    <Button
-                                                        type="button"
-                                                        variant="link"
-                                                        size="xs"
-                                                        onClick={() => setIsExpanded(false)}
-                                                    >
-                                                        Show top {COLLAPSED_COUNT} only
-                                                    </Button>
-                                                ) : null}
-                                            </>
-                                        ) : (
-                                            <Button
-                                                type="button"
-                                                variant="link"
-                                                size="xs"
-                                                onClick={() => showAll(def.key)}
-                                            >
-                                                Show all {totalInTab} {noun}
-                                            </Button>
-                                        )}
-                                        <Link
-                                            href={scopedViewUrl(def.key)}
-                                            className="text-xs text-muted-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                                        >
-                                            {def.key !== 'all'
-                                                ? `Open ${def.label} register →`
-                                                : 'Explore Records & Archives →'}
-                                        </Link>
-                                        {loadError ? (
-                                            <p
-                                                role="alert"
-                                                className="w-full text-center text-xs text-status-critical"
-                                            >
-                                                {loadError}
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                ) : null}
-                            </TabsContent>
-                        );
-                    })}
+                    {TAB_DEFS.map((def) => (
+                        <TabsContent key={def.key} value={def.key}>
+                            {def.key === tab ? renderTab(def) : null}
+                        </TabsContent>
+                    ))}
                 </PageTabs>
             </CardContent>
         </Card>

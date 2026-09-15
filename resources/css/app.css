@@ -341,6 +341,21 @@
     --src-medication: oklch(50% 0.15 172);
     --src-medication-bg: oklch(96% 0.04 172);
     --src-medication-ln: oklch(87% 0.07 172);
+    /* Governance → Calendar sources: meetings, voting deadlines (decisions),
+       requirements (obligations) and policy reviews. Same fixed, distinct-hue
+       rule as above, spaced apart so the four stay legible side by side. */
+    --src-meetings: oklch(50% 0.16 262);
+    --src-meetings-bg: oklch(96% 0.035 262);
+    --src-meetings-ln: oklch(87% 0.07 262);
+    --src-decisions: oklch(50% 0.18 310);
+    --src-decisions-bg: oklch(96% 0.04 310);
+    --src-decisions-ln: oklch(88% 0.07 310);
+    --src-obligations: oklch(48% 0.13 150);
+    --src-obligations-bg: oklch(95% 0.05 150);
+    --src-obligations-ln: oklch(85% 0.08 150);
+    --src-policies: oklch(52% 0.14 65);
+    --src-policies-bg: oklch(96% 0.05 70);
+    --src-policies-ln: oklch(86% 0.09 70);
     /* External busy (two-way sync, pull-only) — deliberately desaturated slate so it
        reads as "not ours / blocked" against the chromatic obligation sources. */
     --src-external: oklch(46% 0.03 265);

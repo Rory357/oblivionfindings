@@ -49,7 +49,7 @@ lucide-react icons, Recharts.
 | Live | `live` / `live-bg` | In-progress/running things (distinct from info) |
 | Category | `category-ops/hr/compliance/incidents/governance/sites/fleet/finance` (+ `-bg`) | Module-level tinting, hue-rotated from brand |
 | Charts | `--chart-1`…`--chart-5` | Recharts fills — `fill="var(--chart-1)"` |
-| Calendar sources | `--src-event/inspection/compliance/…` (+ `-bg`, `-ln`) | Site Calendar obligation sources only |
+| Calendar sources | `--src-event/inspection/compliance/…` (+ `-bg`, `-ln`); Governance calendar: `--src-meetings/decisions/obligations/policies` | Shared SiteCalendar sources only (Sites + Governance adapters) |
 | Sidebar | `sidebar-*` | The app sidebar only |
 
 Status → **always** `<StatusBadge>` (`components/ui/status-badge.tsx`) or
@@ -444,6 +444,22 @@ before.
   the sidebar entry staying lit across the hub). Don't orphan a module
   that has no other entry (Roadmap became a Strategy hub tab), and never
   use hidden nav as the security boundary.
+- **Auditor and developer language in member-facing copy** (corrected
+  2026-09-14, Governance: "for a normal person it is difficult to
+  understand") — reference codes used as names (`RES-2026-004` as a title
+  or breadcrumb), raw enum values (`full_board`, `no_quorum`,
+  `charitable_trust`), formulas (`floor(N/2)+1`), Title Case, US spelling,
+  and words like immutable, frozen, snapshot, electorate, recuse,
+  attestation, fingerprint or "bound". Write for a volunteer: follow
+  `docs/audits/2026-09-14-governance-plain-language-ux/vocabulary.md` —
+  sentence case, NZ English, the record title first with the code as a
+  muted `refSuffix()`, every enum through `lib/governance-labels.ts`
+  (server: `GovernanceLabels`), a `GovernanceTermHint` for any term that
+  needs explaining, "Not available" instead of a green 0 when data is
+  missing, a confirm dialog that states the effect for consequential
+  actions, and visible text saying why something is blocked and who can
+  unblock it. Server-generated titles, flash and validation messages
+  count as UI copy.
 - **A global "Live"/sync chip in the top bar** — removed from the
   approved shell (2026-09-05); live/sync status belongs on the page
   surfaces that need it, not in the global chrome.

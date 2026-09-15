@@ -314,6 +314,124 @@ class GovernanceCalendarScopeTest extends TestCase
         $this->assertFalse($events->contains('id', "governance:meeting:{$meetingB->id}"));
     }
 
+    /**
+     * Requirements and policy reviews are only offered to viewers who can
+     * open those registers — no entry links to a page that returns 403.
+     */
+    public function test_calendar_only_offers_sources_whose_registers_the_viewer_can_open(): void
+    {
+        $chairUser = User::find($this->fixtures['users']['chair']);
+        $member = $this->createUserWithRole('board_member');
+        $this->createBoardMember($member);
+        foreach (['governance.compliance.view', 'governance.policies.view'] as $key) {
+            $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key]);
+            $member->permissionOverrides()->attach($permission->id, ['allowed' => false]);
+        }
+
+        $this->createComplianceObligation($chairUser, [
+            'obligation_code' => 'SECRET-REQ',
+            'obligation_title' => 'SECRET requirement',
+            'due_date' => now()->addDays(2)->toDateString(),
+        ]);
+        GovernancePolicy::create([
+            'title' => 'SECRET policy review',
+            'policy_code' => 'POL-SECRET-CAL',
+            'category' => 'privacy',
+            'content' => 'Policy text.',
+            'status' => 'approved',
+            'next_review_date' => now()->addDays(2)->toDateString(),
+            'owner_id' => $chairUser->id,
+            'created_by' => $chairUser->id,
+        ]);
+
+        $this->actingAs($member)
+            ->get('/governance/calendar')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Calendar/Index')
+                ->has('sources', 2)
+                ->where('sources.0.key', 'meetings')
+                ->where('sources.1.key', 'decisions')
+                ->where('initialSources', ['meetings', 'decisions'])
+            );
+
+        $feed = $this->actingAs($member)->getJson(
+            '/governance/calendar/items?start='.urlencode(now()->subDays(5)->toIso8601String())
+                .'&end='.urlencode(now()->addDays(10)->toIso8601String())
+                .'&sources=obligations,policies,meetings'
+        );
+
+        $feed->assertOk();
+        $sources = collect($feed->json('events'))->pluck('source')->unique()->values()->all();
+        $this->assertNotContains('obligations', $sources);
+        $this->assertNotContains('policies', $sources);
+        $this->assertSame(0, $feed->json('totals.obligations'));
+        $this->assertStringNotContainsString('SECRET', $feed->getContent());
+    }
+
+    public function test_calendar_entries_use_plain_labels_and_past_meetings_show_minutes_due(): void
+    {
+        $chairUser = User::find($this->fixtures['users']['chair']);
+        $member = $this->createUserWithRole('board_member');
+        $this->createBoardMember($member);
+
+        $held = GovernanceMeeting::create([
+            'title' => 'August board meeting',
+            'meeting_type' => 'full_board',
+            'scheduled_at' => now()->subDays(2),
+            'duration_minutes' => 90,
+            'status' => 'scheduled',
+            'created_by' => $chairUser->id,
+        ]);
+        $resolution = $this->createResolution($chairUser, [
+            'title' => 'Approve the new rosters',
+            'decision_type' => 'budget_approval',
+            'deadline' => now()->addDays(3)->setTime(17, 0),
+            'status' => 'open',
+        ]);
+        $policy = GovernancePolicy::create([
+            'title' => 'Privacy policy',
+            'policy_code' => 'POL-PRIV-02',
+            'category' => 'privacy',
+            'content' => 'Policy text.',
+            'status' => 'approved',
+            'next_review_date' => now()->addDays(4)->toDateString(),
+            'owner_id' => $chairUser->id,
+            'created_by' => $chairUser->id,
+        ]);
+
+        $response = $this->actingAs($member)->getJson(
+            '/governance/calendar/items?start='.urlencode(now()->subDays(10)->toIso8601String())
+                .'&end='.urlencode(now()->addDays(10)->toIso8601String())
+        );
+
+        $response->assertOk();
+        $events = collect($response->json('events'))->keyBy('id');
+
+        $meeting = $events->get("governance:meeting:{$held->id}");
+        $this->assertSame('pending', $meeting['status'], 'A held meeting is not overdue.');
+        $this->assertSame('Minutes due', $meeting['statusLabel']);
+        $this->assertSame('auto', $meeting['group']);
+        $this->assertSame('Full board meeting', $meeting['typeLabel']);
+        $this->assertNull($meeting['eventType']);
+        // Invited members count the meeting as theirs.
+        $this->assertTrue($meeting['mine']);
+        $this->assertSame([$member->id], $meeting['attendeeIds']);
+
+        $decision = $events->get("governance:decision:{$resolution->id}");
+        $this->assertSame('Approve the new rosters', $decision['title']);
+        $this->assertSame('Voting deadline · Budget approval', $decision['typeLabel']);
+        $this->assertSame('Open for voting', $decision['statusLabel']);
+
+        $review = $events->get("governance:policy:{$policy->id}");
+        $this->assertSame('Privacy policy', $review['title']);
+        $this->assertSame('Policy review · Privacy', $review['typeLabel']);
+
+        $this->assertStringNotContainsString('[Vote deadline]', $response->getContent());
+        $this->assertStringNotContainsString('[Policy review]', $response->getContent());
+        $this->assertStringNotContainsString('full_board', $response->getContent());
+    }
+
     public function test_calendar_items_feed_maps_terminal_and_cancelled_statuses_correctly(): void
     {
         $chairUser = User::find($this->fixtures['users']['chair']);

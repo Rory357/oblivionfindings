@@ -1,9 +1,22 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DeclareConflictDialog } from '@/components/governance/DeclareConflictDialog';
 import {
     GovernanceAttachmentsPanel,
     type GovernanceAttachment,
 } from '@/components/governance/GovernanceAttachmentsPanel';
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
+import {
+    ResolutionBallot,
+    type BallotConflict,
+    type BallotVote,
+} from '@/components/governance/ResolutionBallot';
+import {
+    ResolutionResultCard,
+    type ResolutionResultData,
+} from '@/components/governance/ResolutionResultCard';
 import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import { isDecisionPurpose } from '@/components/governance/resolution-voting';
+import { VotingSwitchedOffBanner } from '@/components/governance/VotingSwitchedOffBanner';
 import {
     PageHeader,
     PageHeaderGlassButton,
@@ -25,40 +38,43 @@ import {
 } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateLong, formatDateTimeLong } from '@/lib/datetime';
 import {
-    close as closeResolution,
-    open as openResolution,
-    vote as voteResolution,
-} from '@/routes/governance/resolutions';
+    decisionTypeLabel,
+    formatNzd,
+    governanceStatus,
+    refSuffix,
+    resolutionChip,
+    resolutionPurposeLabel,
+    votingThresholdLabel,
+} from '@/lib/governance-labels';
 import { PageProps } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertCircle,
     AlertTriangle,
-    CheckCircle,
     CheckCircle2,
     DollarSign,
+    ExternalLink,
+    FileText,
     Gavel,
     Link2,
+    ListChecks,
     Lock,
-    MinusCircle,
     Paperclip,
     Pencil,
     Scale,
+    Send,
     ShieldAlert,
     Square,
     Users,
     Vote as VoteIcon,
-    XCircle,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import {
-    DeclareConflictDialog,
     ResolutionWizardDialog,
     type AuthorityBinding,
     type AuthoritySubjectGroup,
@@ -67,36 +83,9 @@ import {
     type MeetingOption,
     type ResolutionRecord,
     type UserOption,
+    type WizardVotingRules,
 } from './_dialogs';
-import {
-    formatThreshold,
-    resolutionOutcomeLabel,
-    resolutionOutcomeVariant,
-    resolutionStatusLabel,
-    resolutionStatusVariant,
-} from './_helpers';
-
-interface VoteRecord {
-    id: number;
-    vote: string;
-    voting_method?: string | null;
-    conflict_declared: boolean;
-    voted_at: string;
-}
-
-interface ConflictRecord {
-    id: number;
-    declaration_type: string;
-    declaration_text?: string | null;
-    withdrew_from_voting: boolean;
-    declared_at?: string | null;
-}
-
-type ResultMember =
-    | string
-    | { user?: { name?: string | null } | null }
-    | null
-    | undefined;
+import { resolutionWorkspaceHref } from './_helpers';
 
 interface OptionItem {
     label: string;
@@ -107,6 +96,7 @@ interface OptionItem {
 
 interface CostImpact {
     has_cost?: boolean;
+    is_none?: boolean;
     amount?: string | number | null;
     currency?: string | null;
     budget_source?: string | null;
@@ -133,78 +123,63 @@ interface Resolution extends ResolutionRecord {
     outcome: string | null;
     outcome_notes?: string | null;
     voting_threshold: string;
+    quorum_required?: boolean;
+    closed_at?: string | null;
     proposed_by?: { name: string } | null;
-    votes: VoteRecord[];
-    conflict_declarations: ConflictRecord[];
+    votes?: Array<{ id: number }>;
+    conflict_declarations?: Array<{ id: number }>;
+}
+
+interface Results extends ResolutionResultData {
+    quorum_met: boolean;
+}
+
+interface FollowUpAction {
+    id: number;
+    reference: string;
+    title: string;
+    status: string;
+    due_date?: string | null;
+    assignee_name?: string | null;
+    is_mine: boolean;
+    can_open: boolean;
+    open_url: string | null;
 }
 
 interface Props extends PageProps {
     resolution: Resolution;
-    results: {
-        summary: { for: number; against: number; abstain: number };
-        percentages: { for: number; against: number };
-        outcome: string;
-        quorum_met: boolean;
-        individual_votes: Array<{
-            board_member: ResultMember;
-            vote: string;
-            conflict_declared: boolean;
-            voted_at: string;
-        }>;
-        conflicts: Array<{
-            board_member: ResultMember;
-            type: string;
-            description: string;
-            withdrew: boolean;
-        }>;
-        is_frozen?: boolean;
-    } | null;
-    my_vote: VoteRecord | null;
-    my_conflict?: ConflictRecord | null;
+    applied_threshold?: string | null;
+    results: Results | null;
+    my_vote: BallotVote | null;
+    my_conflict?: BallotConflict | null;
     can_vote: boolean;
+    ineligible_reason?: string | null;
+    can_declare_conflict?: boolean;
     can_manage?: boolean;
     can_open_voting?: boolean;
+    can_publish_to_members?: boolean;
     can_close_voting?: boolean;
     can_finalize?: boolean;
-    quorum: { present: number; required: number; met: boolean } | null;
+    voting_rules?: { switched_on: boolean; can_switch_on: boolean };
+    quorum: {
+        present: number;
+        required: number;
+        met: boolean;
+        total_eligible?: number;
+    } | null;
     attachments: GovernanceAttachment[];
     paper_snapshot?: PaperContent | null;
     authority_bindings?: AuthorityBinding[];
     validation_errors?: Record<string, string> | string[];
+    action_items?: FollowUpAction[];
+    restricted_action_items_count?: number;
+    next_pending_vote?: { id: number; title: string; href: string } | null;
     meetings?: MeetingOption[];
     committees?: CommitteeOption[];
     users?: UserOption[];
     authoritySubjects?: AuthoritySubjects | null;
     authoritySubjectGroups?: AuthoritySubjectGroup[];
-}
-
-const VOTE_CHOICES = [
-    {
-        value: 'for',
-        label: 'For',
-        icon: CheckCircle,
-        tone: 'text-status-success',
-    },
-    {
-        value: 'against',
-        label: 'Against',
-        icon: XCircle,
-        tone: 'text-status-critical',
-    },
-    {
-        value: 'abstain',
-        label: 'Abstain',
-        icon: MinusCircle,
-        tone: 'text-muted-foreground',
-    },
-] as const;
-
-function voteVariant(vote: string) {
-    return vote === 'for'
-        ? 'success'
-        : vote === 'against'
-          ? 'critical'
-          : 'neutral';
+    votingRules?: WizardVotingRules | null;
 }
 
 function scrollToSection(id: string) {
@@ -224,7 +199,7 @@ function Section({
 }: {
     id?: string;
     icon?: typeof Gavel;
-    title: string;
+    title: ReactNode;
     description?: ReactNode;
     action?: ReactNode;
     className?: string;
@@ -253,26 +228,39 @@ function Section({
     );
 }
 
+function SubHeading({ children }: { children: ReactNode }) {
+    return <p className="text-caption font-semibold">{children}</p>;
+}
+
 export default function ResolutionShow({
     resolution,
+    applied_threshold = null,
     results,
     my_vote,
-    my_conflict,
+    my_conflict = null,
     can_vote,
+    ineligible_reason = null,
+    can_declare_conflict = false,
     can_manage = false,
     can_open_voting = false,
+    can_publish_to_members = false,
     can_close_voting = false,
     can_finalize = false,
+    voting_rules,
     quorum,
     attachments,
     paper_snapshot,
     authority_bindings = [],
     validation_errors = [],
+    action_items = [],
+    restricted_action_items_count = 0,
+    next_pending_vote = null,
     meetings = [],
     committees = [],
     users = [],
     authoritySubjects = null,
     authoritySubjectGroups = [],
+    votingRules = null,
 }: Props) {
     const isDraft = resolution.status === 'draft';
     const isOpen = resolution.status === 'open';
@@ -280,13 +268,20 @@ export default function ResolutionShow({
         resolution.status,
     );
     const canEdit = isDraft && can_manage;
+    const isDecision = isDecisionPurpose(resolution.purpose);
+    const votingSwitchedOff = voting_rules ? !voting_rules.switched_on : false;
+    const appliedThreshold =
+        results?.applied_threshold ??
+        applied_threshold ??
+        resolution.voting_threshold;
 
     const [editOpen, setEditOpen] = useDialogDeepLink('edit', canEdit);
     const [conflictOpen, setConflictOpen] = useState(false);
-    const [confirmClose, setConfirmClose] = useState(false);
-    const [selectedVote, setSelectedVote] = useState('');
-    const [voteNote, setVoteNote] = useState('');
+    const [confirm, setConfirm] = useState<
+        null | 'open' | 'publish' | 'close' | 'done' | 'archive'
+    >(null);
     const [busy, setBusy] = useState<string | null>(null);
+    const [commandError, setCommandError] = useState<string | null>(null);
     const [finalNotes, setFinalNotes] = useState('');
     const [noActionReason, setNoActionReason] = useState('');
 
@@ -295,7 +290,7 @@ export default function ResolutionShow({
         : Object.values(validation_errors);
     const isPublishReady = readinessErrors.length === 0;
 
-    // A frozen snapshot is the authoritative text once voting has opened.
+    // The saved copy is the authoritative wording once it's published.
     const paper: PaperContent = paper_snapshot ?? {
         exact_motion: resolution.exact_motion,
         purpose: resolution.purpose,
@@ -318,24 +313,26 @@ export default function ResolutionShow({
         data: Record<string, string | undefined> = {},
     ) => {
         setBusy(key);
+        setCommandError(null);
         router.post(url, data, {
             preserveScroll: true,
+            onSuccess: (page) => {
+                const flashError = (
+                    page as { props?: { flash?: { error?: unknown } } }
+                )?.props?.flash?.error;
+                if (flashError) setCommandError(String(flashError));
+            },
             onFinish: () => setBusy(null),
         });
     };
 
-    const memberName = (member: ResultMember) => {
-        if (!member) return 'Unknown';
-        if (typeof member === 'string') return member;
-        return member.user?.name ?? 'Unknown';
-    };
-
     const meetingContextHref = resolution.meeting
-        ? `/governance/meetings/${resolution.meeting.id}?tab=resolutions&paper=${resolution.id}`
+        ? resolutionWorkspaceHref(resolution)
         : null;
 
     const votesCast = resolution.votes?.length ?? 0;
     const conflictCount = resolution.conflict_declarations?.length ?? 0;
+    const votingMembers = quorum?.total_eligible ?? null;
     const quorumPct =
         quorum && quorum.required > 0
             ? Math.min(
@@ -343,6 +340,35 @@ export default function ResolutionShow({
                   Math.round((quorum.present / quorum.required) * 100),
               )
             : null;
+
+    const cost = paper.cost_impact ?? null;
+    const costText = cost?.has_cost
+        ? formatNzd(cost.amount ?? null)
+        : cost && (cost.has_cost === false || cost.is_none)
+          ? 'No cost'
+          : 'Cost not stated';
+    const costSource = cost?.has_cost
+        ? (cost.budget_source ?? cost.funding_source ?? null)
+        : null;
+
+    const statusChip = resolutionChip(resolution.status, resolution.outcome);
+    const carried = resolution.outcome === 'carried';
+    const sharedPaper = resolution.status === 'proposed' && !isDecision;
+    const openActions = action_items.filter(
+        (action) => !['complete', 'completed', 'cancelled'].includes(action.status),
+    );
+
+    const openVotingDescription = `Open voting on "${resolution.title}"? The wording can't be changed after this${
+        votingMembers !== null
+            ? `, and ${votingMembers} voting member${votingMembers === 1 ? '' : 's'} will be asked to vote`
+            : ''
+    }${
+        resolution.deadline
+            ? ` by ${formatDateTimeLong(resolution.deadline)}`
+            : resolution.meeting
+              ? ' at the meeting'
+              : ''
+    }.`;
 
     const header = (
         <PageHeader
@@ -352,37 +378,23 @@ export default function ResolutionShow({
             title={resolution.title}
             wrapTitle
             titleChip={
-                <>
-                    <PageHeaderStatusChip variant="neutral">
-                        v{version}
-                    </PageHeaderStatusChip>
-                    <PageHeaderStatusChip
-                        variant={resolutionStatusVariant(resolution.status)}
-                    >
-                        {resolutionStatusLabel(resolution.status)}
-                    </PageHeaderStatusChip>
-                    {resolution.outcome ? (
-                        <PageHeaderStatusChip
-                            variant={resolutionOutcomeVariant(
-                                resolution.outcome,
-                            )}
-                        >
-                            {resolutionOutcomeLabel(resolution.outcome)}
-                        </PageHeaderStatusChip>
-                    ) : null}
-                </>
+                <PageHeaderStatusChip variant={statusChip.variant}>
+                    {statusChip.label}
+                </PageHeaderStatusChip>
             }
             subline={[
-                resolution.resolution_reference,
                 resolution.meeting
                     ? `Meeting: ${resolution.meeting.title}`
-                    : 'Standalone paper',
+                    : isDecision
+                      ? 'Vote outside a meeting (written resolution)'
+                      : 'Not linked to a meeting',
                 resolution.committee
                     ? `Committee: ${resolution.committee.name}`
                     : null,
                 resolution.proposed_by
-                    ? `Proposed by ${resolution.proposed_by.name}`
+                    ? `Written by ${resolution.proposed_by.name}`
                     : null,
+                refSuffix(resolution.resolution_reference),
             ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -393,13 +405,24 @@ export default function ResolutionShow({
                             icon={Pencil}
                             onClick={() => setEditOpen(true)}
                         >
-                            Edit paper
+                            Edit resolution
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {can_declare_conflict ? (
+                        <PageHeaderGlassButton
+                            icon={AlertTriangle}
+                            onClick={() => setConflictOpen(true)}
+                        >
+                            {my_conflict
+                                ? 'Update conflict declaration'
+                                : 'Declare a conflict'}
                         </PageHeaderGlassButton>
                     ) : null}
                     {can_close_voting ? (
                         <PageHeaderGlassButton
                             icon={Square}
-                            onClick={() => setConfirmClose(true)}
+                            disabled={busy === 'close'}
+                            onClick={() => setConfirm('close')}
                         >
                             Close voting
                         </PageHeaderGlassButton>
@@ -407,31 +430,34 @@ export default function ResolutionShow({
                     {can_open_voting ? (
                         <PageHeaderPrimaryButton
                             icon={VoteIcon}
-                            disabled={!isPublishReady || busy === 'open'}
-                            title={
-                                isPublishReady
-                                    ? undefined
-                                    : 'Complete the paper before opening voting'
+                            disabled={
+                                !isPublishReady ||
+                                votingSwitchedOff ||
+                                busy === 'open'
                             }
-                            onClick={() =>
-                                post(
-                                    'open',
-                                    openResolution.url({
-                                        resolution: resolution.id,
-                                    }),
-                                )
-                            }
+                            onClick={() => setConfirm('open')}
                         >
                             {busy === 'open'
                                 ? 'Opening…'
                                 : 'Publish & open voting'}
                         </PageHeaderPrimaryButton>
                     ) : null}
+                    {can_publish_to_members ? (
+                        <PageHeaderPrimaryButton
+                            icon={Send}
+                            disabled={!isPublishReady || busy === 'publish'}
+                            onClick={() => setConfirm('publish')}
+                        >
+                            {busy === 'publish'
+                                ? 'Publishing…'
+                                : 'Publish to members'}
+                        </PageHeaderPrimaryButton>
+                    ) : null}
                 </>
             }
             meters={
                 <>
-                    {quorum ? (
+                    {isDecision && quorum ? (
                         <PageHeaderMeterBlock
                             label="Quorum"
                             value={`${quorum.present}/${quorum.required}`}
@@ -442,52 +468,75 @@ export default function ResolutionShow({
                             <PageHeaderMeterBar percent={quorumPct ?? 0} />
                             <PageHeaderMeterCaption>
                                 {quorum.met
-                                    ? 'Quorum met'
-                                    : 'Quorum not yet met'}
+                                    ? 'Enough members taking part'
+                                    : 'Not enough members taking part yet'}
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                     ) : null}
-                    <PageHeaderMeterBlock
-                        label="Votes cast"
-                        onClick={() => scrollToSection('voting')}
-                        ariaLabel="View votes"
-                    >
-                        <PageHeaderMeterBig>{votesCast}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            {results
-                                ? `For ${results.summary.for} · Against ${results.summary.against} · Abstain ${results.summary.abstain}`
-                                : isOpen
-                                  ? 'Ballots recorded so far'
-                                  : 'Voting not yet open'}
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
+                    {isDecision ? (
+                        <PageHeaderMeterBlock
+                            label="Votes"
+                            onClick={() => scrollToSection('voting')}
+                            ariaLabel="View votes"
+                        >
+                            <PageHeaderMeterBig>
+                                {results
+                                    ? results.summary.for +
+                                      results.summary.against +
+                                      results.summary.abstain
+                                    : votesCast}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {results
+                                    ? `For ${results.summary.for} · Against ${results.summary.against} · Abstain ${results.summary.abstain}`
+                                    : isOpen
+                                      ? 'Recorded so far'
+                                      : "Voting hasn't opened"}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ) : (
+                        <PageHeaderMeterBlock
+                            label="Purpose"
+                            onClick={() => scrollToSection('voting')}
+                            ariaLabel="View why there is no vote"
+                        >
+                            <PageHeaderMeterBig>No vote</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {resolutionPurposeLabel(resolution.purpose)}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    )}
                     <PageHeaderMeterBlock
                         label="Conflicts"
                         tone={conflictCount > 0 ? 'warning' : 'brand'}
                         onClick={() => scrollToSection('voting')}
-                        ariaLabel="View conflict declarations"
+                        ariaLabel="View conflicts of interest"
                     >
                         <PageHeaderMeterBig>{conflictCount}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Declared interests
+                            {conflictCount === 1
+                                ? 'Conflict of interest declared'
+                                : 'Conflicts of interest declared'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Deadline"
-                        onClick={() => scrollToSection('voting')}
-                        ariaLabel="View voting deadline"
-                    >
-                        <PageHeaderMeterBig>
-                            {resolution.deadline
-                                ? formatDateLong(resolution.deadline)
-                                : '—'}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            {resolution.deadline
-                                ? formatThreshold(resolution.voting_threshold)
-                                : 'Decided at the meeting'}
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
+                    {isDecision ? (
+                        <PageHeaderMeterBlock
+                            label="Voting closes"
+                            onClick={() => scrollToSection('voting')}
+                            ariaLabel="View when voting closes"
+                        >
+                            <PageHeaderMeterBig>
+                                {resolution.deadline
+                                    ? formatDateLong(resolution.deadline)
+                                    : resolution.meeting
+                                      ? 'At the meeting'
+                                      : 'Not set'}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {votingThresholdLabel(appliedThreshold)}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ) : null}
                     <PageHeaderMeterBlock
                         label="Documents"
                         onClick={() => scrollToSection('documents')}
@@ -497,7 +546,7 @@ export default function ResolutionShow({
                             {attachments.length}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Supporting papers
+                            Supporting documents
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
@@ -521,15 +570,36 @@ export default function ResolutionShow({
 
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
+                    {votingSwitchedOff && isDecision && (isDraft || isOpen) ? (
+                        <VotingSwitchedOffBanner
+                            canSwitchOn={Boolean(voting_rules?.can_switch_on)}
+                        />
+                    ) : null}
+
+                    {commandError ? (
+                        <div
+                            role="alert"
+                            className="flex items-start gap-3 rounded-xl border border-status-critical/40 bg-status-critical-bg p-4 text-sm"
+                        >
+                            <AlertCircle className="mt-0.5 size-4 shrink-0 text-status-critical" />
+                            <span className="text-foreground">
+                                {commandError}
+                            </span>
+                        </div>
+                    ) : null}
+
                     {paper_snapshot ? (
                         <Card className="flex-row items-center gap-3 border-primary/30 px-5 py-4">
                             <Lock className="size-4 shrink-0 text-primary" />
                             <p className="text-sm">
                                 <span className="font-semibold">
-                                    Frozen paper (v{version}).
+                                    {`This is the final wording (version ${version}).`}
                                 </span>{' '}
-                                This text was locked when voting opened; every
-                                vote evaluates these exact terms.
+                                {isOpen
+                                    ? "It can't change while voting is open."
+                                    : isClosed && isDecision
+                                      ? 'It is the wording the board voted on.'
+                                      : "It can't be changed now it's published."}
                             </p>
                         </Card>
                     ) : null}
@@ -540,12 +610,12 @@ export default function ResolutionShow({
                             title={
                                 isPublishReady
                                     ? 'Ready to publish'
-                                    : 'Not ready to publish'
+                                    : 'Not ready to publish yet'
                             }
                             description={
                                 isPublishReady
-                                    ? 'Every mandatory element (motion, context, options, recommendation, cost, service-user and risk implications) is present.'
-                                    : 'Drafts can be saved freely, but voting can only open once these are complete:'
+                                    ? 'Everything the board needs is in place.'
+                                    : 'You can keep saving the draft. It can be published once these are done:'
                             }
                             className={
                                 isPublishReady
@@ -560,7 +630,7 @@ export default function ResolutionShow({
                                         onClick={() => setEditOpen(true)}
                                     >
                                         <Pencil className="h-3.5 w-3.5" /> Edit
-                                        paper
+                                        resolution
                                     </Button>
                                 ) : null
                             }
@@ -568,8 +638,12 @@ export default function ResolutionShow({
                             {isPublishReady ? (
                                 <p className="text-subtle">
                                     {can_open_voting
-                                        ? 'Use “Publish & open voting” in the header when the board is ready to vote.'
-                                        : 'A chair or secretary can open voting.'}
+                                        ? votingSwitchedOff
+                                            ? "Voting can't open until the board's voting rules are confirmed."
+                                            : 'Use “Publish & open voting” at the top of the page when the board is ready to vote.'
+                                        : can_publish_to_members
+                                          ? 'Use “Publish to members” at the top of the page to share it with the board.'
+                                          : 'The chair or board secretary can publish it.'}
                                 </p>
                             ) : (
                                 <ul className="list-inside list-disc space-y-1 text-sm text-status-critical">
@@ -581,16 +655,17 @@ export default function ResolutionShow({
                         </Section>
                     ) : null}
 
-                    {authority_bindings.length > 0 || canEdit ? (
+                    {isDecision && (authority_bindings.length > 0 || canEdit) ? (
                         <Section
                             icon={Link2}
-                            title="Record this paper approves"
-                            description="A carried resolution applies only to the exact record and revision bound here."
+                            title="This resolution approves"
+                            description="If it passes, the app applies it to this exact version."
                         >
                             {authority_bindings.length === 0 ? (
                                 <p className="text-subtle">
-                                    No specific record is bound. Edit the paper
-                                    to choose the budget, plan, review or rules
+                                    Nothing specific — a general resolution.
+                                    Edit the resolution to choose a budget,
+                                    budget change, plan, review or voting rules
                                     it approves.
                                 </p>
                             ) : (
@@ -606,12 +681,8 @@ export default function ResolutionShow({
                                                 </p>
                                                 <p className="text-caption">
                                                     {binding.subject_type_label}
-                                                    {binding.subject_revision !=
-                                                    null
-                                                        ? ` · revision ${binding.subject_revision}`
-                                                        : ''}
-                                                    {binding.bound_at
-                                                        ? ` · bound ${formatDateTimeLong(binding.bound_at)}`
+                                                    {binding.subject_version
+                                                        ? ` · version ${binding.subject_version}`
                                                         : ''}
                                                 </p>
                                             </div>
@@ -619,12 +690,12 @@ export default function ResolutionShow({
                                                 variant={
                                                     binding.consumed_at
                                                         ? 'success'
-                                                        : 'info'
+                                                        : 'neutral'
                                                 }
                                             >
                                                 {binding.consumed_at
-                                                    ? `Applied ${formatDateLong(binding.consumed_at)}`
-                                                    : 'Awaiting decision'}
+                                                    ? `Applied on ${formatDateLong(binding.consumed_at)}`
+                                                    : 'Not yet applied'}
                                             </StatusBadge>
                                         </div>
                                     ))}
@@ -635,33 +706,41 @@ export default function ResolutionShow({
 
                     <Section
                         icon={Gavel}
-                        title="Exact motion"
+                        title={
+                            <span className="flex items-center gap-1">
+                                Resolution wording
+                                <GovernanceTermHint term="resolution_wording" />
+                            </span>
+                        }
                         action={
                             <div className="flex flex-wrap items-center gap-1.5">
                                 <StatusBadge variant="neutral">
-                                    {paper.purpose ?? 'decision'} paper
+                                    {resolutionPurposeLabel(
+                                        paper.purpose ?? 'decision',
+                                    )}
                                 </StatusBadge>
                                 {paper.decision_type ? (
                                     <StatusBadge variant="neutral">
-                                        {paper.decision_type}
+                                        {decisionTypeLabel(paper.decision_type)}
                                     </StatusBadge>
                                 ) : null}
                             </div>
                         }
                     >
-                        <blockquote className="rounded-r-lg border-l-4 border-primary bg-primary/5 py-2.5 pl-4 text-base font-medium">
-                            {paper.exact_motion || resolution.title}
+                        <blockquote className="rounded-r-lg border-l-4 border-primary bg-primary/5 py-2.5 pl-4 text-base font-medium whitespace-pre-wrap">
+                            {paper.exact_motion || (
+                                <span className="text-muted-foreground">
+                                    The wording hasn’t been written yet.
+                                </span>
+                            )}
                         </blockquote>
                     </Section>
 
-                    <Section
-                        title="Context & background"
-                        description="Why this is before the board now."
-                    >
+                    <Section title="Why this is before the board">
                         <p className="leading-relaxed whitespace-pre-wrap">
                             {paper.context || (
                                 <span className="text-muted-foreground">
-                                    No background provided.
+                                    No background given.
                                 </span>
                             )}
                         </p>
@@ -669,8 +748,8 @@ export default function ResolutionShow({
 
                     <Section
                         icon={Scale}
-                        title={`Alternatives evaluated (${options.length})`}
-                        description="Consequential decisions weigh alternatives with explicit benefits and drawbacks."
+                        title={`Options considered (${options.length})`}
+                        description="The choices the board could make, with what's good and bad about each."
                     >
                         <div className="flex flex-col gap-5">
                             {options.length > 0 ? (
@@ -688,7 +767,7 @@ export default function ResolutionShow({
                                                     variant="neutral"
                                                     size="sm"
                                                 >
-                                                    Option {index + 1}
+                                                    {`Option ${index + 1}`}
                                                 </StatusBadge>
                                             </div>
                                             {option.description ? (
@@ -699,7 +778,7 @@ export default function ResolutionShow({
                                             {option.benefits ? (
                                                 <p className="text-sm whitespace-pre-wrap">
                                                     <span className="font-semibold text-status-success">
-                                                        Benefits:{' '}
+                                                        Good:{' '}
                                                     </span>
                                                     {option.benefits}
                                                 </p>
@@ -707,7 +786,7 @@ export default function ResolutionShow({
                                             {option.drawbacks ? (
                                                 <p className="text-sm whitespace-pre-wrap">
                                                     <span className="font-semibold text-status-critical">
-                                                        Drawbacks:{' '}
+                                                        Downsides:{' '}
                                                     </span>
                                                     {option.drawbacks}
                                                 </p>
@@ -717,15 +796,15 @@ export default function ResolutionShow({
                                 </div>
                             ) : (
                                 <p className="text-subtle">
-                                    No options recorded.
+                                    No options described.
                                 </p>
                             )}
                             {options.length < 2 &&
                             paper.single_option_reason ? (
                                 <div>
-                                    <p className="text-caption font-semibold uppercase">
-                                        Single option justification
-                                    </p>
+                                    <SubHeading>
+                                        Why there’s only one option
+                                    </SubHeading>
                                     <p className="mt-1 text-sm whitespace-pre-wrap">
                                         {paper.single_option_reason}
                                     </p>
@@ -733,9 +812,9 @@ export default function ResolutionShow({
                             ) : null}
                             {paper.recommendation ? (
                                 <div>
-                                    <p className="text-caption font-semibold uppercase">
-                                        Management recommendation
-                                    </p>
+                                    <SubHeading>
+                                        Management’s recommendation
+                                    </SubHeading>
                                     <p className="mt-1 leading-relaxed whitespace-pre-wrap">
                                         {paper.recommendation}
                                     </p>
@@ -744,59 +823,43 @@ export default function ResolutionShow({
                         </div>
                     </Section>
 
-                    <Section icon={ShieldAlert} title="Implications">
+                    <Section icon={ShieldAlert} title="Effects">
                         <div className="grid gap-5 md:grid-cols-3">
                             <div>
-                                <p className="text-caption flex items-center gap-1.5 font-semibold uppercase">
-                                    <DollarSign className="size-3.5" />{' '}
-                                    Financial cost
+                                <p className="text-caption flex items-center gap-1.5 font-semibold">
+                                    <DollarSign className="size-3.5" /> Cost
                                 </p>
-                                {paper.cost_impact?.has_cost ? (
-                                    <>
-                                        <p className="text-section-title mt-1">
-                                            {paper.cost_impact.currency ??
-                                                'NZD'}{' '}
-                                            {paper.cost_impact.amount}
-                                        </p>
-                                        {paper.cost_impact.budget_source ||
-                                        paper.cost_impact.funding_source ? (
-                                            <p className="text-subtle">
-                                                Fund:{' '}
-                                                {paper.cost_impact
-                                                    .budget_source ??
-                                                    paper.cost_impact
-                                                        .funding_source}
-                                            </p>
-                                        ) : null}
-                                    </>
-                                ) : (
-                                    <p className="text-subtle mt-1">
-                                        Explicitly confirmed: no direct cost.
+                                <p className="text-section-title mt-1">
+                                    {costText}
+                                </p>
+                                {costSource ? (
+                                    <p className="text-subtle">
+                                        {`Paid from: ${costSource}`}
                                     </p>
-                                )}
+                                ) : null}
                             </div>
                             <div>
-                                <p className="text-caption flex items-center gap-1.5 font-semibold uppercase">
-                                    <Users className="size-3.5" /> Service-user
-                                    & safety
+                                <p className="text-caption flex items-center gap-1.5 font-semibold">
+                                    <Users className="size-3.5" /> Effect on the
+                                    people we support and safety
                                 </p>
                                 <p className="mt-1 text-sm whitespace-pre-wrap">
                                     {paper.service_user_implications || (
                                         <span className="text-muted-foreground">
-                                            None specified.
+                                            Not stated.
                                         </span>
                                     )}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-caption flex items-center gap-1.5 font-semibold uppercase">
-                                    <ShieldAlert className="size-3.5" /> Risk &
-                                    equity
+                                <p className="text-caption flex items-center gap-1.5 font-semibold">
+                                    <ShieldAlert className="size-3.5" /> Risks
+                                    and fairness
                                 </p>
                                 <p className="mt-1 text-sm whitespace-pre-wrap">
                                     {paper.risk_equity_implications || (
                                         <span className="text-muted-foreground">
-                                            None specified.
+                                            Not stated.
                                         </span>
                                     )}
                                 </p>
@@ -805,285 +868,162 @@ export default function ResolutionShow({
                     </Section>
 
                     <div id="voting" className="flex flex-col gap-5">
-                        {isOpen &&
-                        can_vote &&
-                        !my_vote &&
-                        !my_conflict?.withdrew_from_voting ? (
-                            <Section
-                                icon={VoteIcon}
-                                title="Cast your vote"
-                                description={
-                                    resolution.deadline
-                                        ? `Voting closes ${formatDateTimeLong(resolution.deadline)} · ${formatThreshold(resolution.voting_threshold)}`
-                                        : formatThreshold(
-                                              resolution.voting_threshold,
-                                          )
-                                }
-                            >
-                                <div className="flex flex-col gap-4">
-                                    <RadioGroup
-                                        value={selectedVote}
-                                        onValueChange={setSelectedVote}
-                                        className="grid gap-2 sm:grid-cols-3"
-                                        aria-label="Your vote"
-                                    >
-                                        {VOTE_CHOICES.map((choice) => (
-                                            <Label
-                                                key={choice.value}
-                                                className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 font-normal transition-colors hover:bg-accent has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
-                                            >
-                                                <RadioGroupItem
-                                                    value={choice.value}
-                                                />
-                                                <choice.icon
-                                                    className={`size-5 ${choice.tone}`}
-                                                />
-                                                {choice.label}
-                                            </Label>
-                                        ))}
-                                    </RadioGroup>
-                                    <div>
-                                        <Label htmlFor="vote-note">
-                                            Vote note (optional)
-                                        </Label>
-                                        <Textarea
-                                            id="vote-note"
-                                            className="mt-1.5"
-                                            value={voteNote}
-                                            onChange={(e) =>
-                                                setVoteNote(e.target.value)
-                                            }
-                                            placeholder="An optional explanation for your vote…"
-                                        />
-                                    </div>
-                                    <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <Button
-                                            disabled={
-                                                !selectedVote || busy === 'vote'
-                                            }
-                                            onClick={() =>
-                                                post(
-                                                    'vote',
-                                                    voteResolution.url({
-                                                        resolution:
-                                                            resolution.id,
-                                                    }),
-                                                    {
-                                                        vote: selectedVote,
-                                                        conflict_note:
-                                                            voteNote ||
-                                                            undefined,
-                                                    },
-                                                )
-                                            }
-                                        >
-                                            {busy === 'vote'
-                                                ? 'Recording…'
-                                                : 'Submit vote'}
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            onClick={() =>
-                                                setConflictOpen(true)
-                                            }
-                                        >
-                                            <AlertTriangle className="h-4 w-4 text-status-warning" />
-                                            Declare a conflict
-                                        </Button>
-                                    </div>
-                                </div>
-                            </Section>
-                        ) : null}
-
-                        {my_conflict?.withdrew_from_voting ? (
-                            <Section
-                                icon={AlertTriangle}
-                                title="Conflict declared — recused from voting"
-                                description="You declared an interest in this paper and withdrew from voting. Your seat is excluded from participation."
-                                className="border-status-warning/40"
-                            >
-                                <p className="text-sm">
-                                    <span className="font-medium">Nature:</span>{' '}
-                                    {my_conflict.declaration_type}
-                                </p>
-                                {my_conflict.declaration_text ? (
-                                    <p className="text-subtle mt-1">
-                                        {my_conflict.declaration_text}
-                                    </p>
-                                ) : null}
-                            </Section>
-                        ) : null}
-
-                        {my_vote ? (
-                            <Section
-                                icon={CheckCircle2}
-                                title="Your vote receipt"
-                                description={`Official record of your vote on ${resolution.resolution_reference} (paper v${version}).`}
-                            >
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <StatusBadge
-                                        variant={voteVariant(my_vote.vote)}
-                                    >
-                                        {my_vote.vote.toUpperCase()}
-                                    </StatusBadge>
-                                    <span className="text-subtle">
-                                        Recorded{' '}
-                                        {formatDateTimeLong(my_vote.voted_at)} ·
-                                        Method:{' '}
-                                        {my_vote.voting_method ?? 'electronic'}
-                                    </span>
-                                    {my_vote.conflict_declared ? (
-                                        <StatusBadge variant="warning">
-                                            <AlertTriangle className="size-3" />{' '}
-                                            Conflict noted
-                                        </StatusBadge>
-                                    ) : null}
-                                </div>
-                            </Section>
-                        ) : null}
+                        <ResolutionBallot
+                            resolution={{
+                                id: resolution.id,
+                                title: resolution.title,
+                                status: resolution.status,
+                                purpose: resolution.purpose,
+                                deadline: resolution.deadline,
+                                closed_at: resolution.closed_at ?? null,
+                                voting_threshold: resolution.voting_threshold,
+                                applied_threshold: appliedThreshold,
+                                governance_meeting_id:
+                                    resolution.governance_meeting_id,
+                            }}
+                            version={version}
+                            canVote={can_vote}
+                            myVote={my_vote}
+                            myConflict={my_conflict}
+                            canDeclareConflict={can_declare_conflict}
+                            onDeclareConflict={() => setConflictOpen(true)}
+                            votingSwitchedOff={votingSwitchedOff}
+                            ineligibleReason={ineligible_reason}
+                            next={
+                                next_pending_vote
+                                    ? {
+                                          label: `Next resolution: ${next_pending_vote.title}`,
+                                          href: next_pending_vote.href,
+                                      }
+                                    : null
+                            }
+                            back={{
+                                label: 'Back to resolutions',
+                                href: '/governance/resolutions',
+                            }}
+                        />
 
                         {isClosed && results ? (
-                            <Section
-                                icon={VoteIcon}
-                                title="Voting results"
-                                description={
-                                    results.is_frozen
-                                        ? 'Immutable decision snapshot captured at closure.'
-                                        : 'Official voting tally.'
+                            <ResolutionResultCard
+                                result={results}
+                                votingThreshold={resolution.voting_threshold}
+                                quorumRequired={resolution.quorum_required !== false}
+                                followUpCount={
+                                    action_items.length +
+                                    restricted_action_items_count
                                 }
-                                action={
-                                    <StatusBadge
-                                        variant={resolutionOutcomeVariant(
-                                            results.outcome,
-                                        )}
-                                    >
-                                        {resolutionOutcomeLabel(
-                                            results.outcome,
-                                        )}
-                                    </StatusBadge>
+                                onViewFollowUps={() =>
+                                    scrollToSection('follow-up-actions')
+                                }
+                            />
+                        ) : null}
+
+                        {action_items.length > 0 ||
+                        restricted_action_items_count > 0 ? (
+                            <Section
+                                id="follow-up-actions"
+                                icon={ListChecks}
+                                title={`Follow-up actions (${action_items.length + restricted_action_items_count})`}
+                                description={
+                                    restricted_action_items_count > 0
+                                        ? `${restricted_action_items_count} more ${restricted_action_items_count === 1 ? "isn't" : "aren't"} shown because you don't have access to ${restricted_action_items_count === 1 ? 'it' : 'them'}.`
+                                        : 'Work the board asked for when this resolution passed.'
                                 }
                             >
-                                <div className="flex flex-col gap-5">
-                                    {results.outcome === 'no_quorum' ? (
-                                        <p className="text-sm text-status-warning">
-                                            <span className="font-semibold">
-                                                No valid decision:
-                                            </span>{' '}
-                                            quorum was not met, so the required
-                                            participation was not reached.
-                                        </p>
-                                    ) : null}
-                                    <div className="grid grid-cols-3 gap-5">
-                                        {[
-                                            {
-                                                label: `For (${results.percentages.for}%)`,
-                                                value: results.summary.for,
-                                                variant: 'success' as const,
-                                            },
-                                            {
-                                                label: `Against (${results.percentages.against}%)`,
-                                                value: results.summary.against,
-                                                variant: 'critical' as const,
-                                            },
-                                            {
-                                                label: 'Abstain',
-                                                value: results.summary.abstain,
-                                                variant: 'neutral' as const,
-                                            },
-                                        ].map((tile) => (
-                                            <Card
-                                                key={tile.label}
-                                                className="items-center gap-1 p-4 text-center shadow-none"
-                                            >
-                                                <span className="text-page-title">
-                                                    {tile.value}
-                                                </span>
-                                                <StatusBadge
-                                                    variant={tile.variant}
+                                {action_items.length === 0 ? (
+                                    <p className="text-subtle">
+                                        None you have access to.
+                                    </p>
+                                ) : (
+                                    <ul className="flex flex-col divide-y divide-border">
+                                        {action_items.map((action) => {
+                                            const chip = governanceStatus(
+                                                'action_status',
+                                                action.status,
+                                            );
+                                            return (
+                                                <li
+                                                    key={action.id}
+                                                    className="flex flex-wrap items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
                                                 >
-                                                    {tile.label}
-                                                </StatusBadge>
-                                            </Card>
-                                        ))}
-                                    </div>
-                                    <div>
-                                        <p className="mb-2 text-sm font-semibold">
-                                            Individual votes
-                                        </p>
-                                        {results.individual_votes.length ===
-                                        0 ? (
-                                            <p className="text-subtle">
-                                                No votes were recorded.
-                                            </p>
-                                        ) : (
-                                            <div className="flex flex-col divide-y divide-border">
-                                                {results.individual_votes.map(
-                                                    (vote, index) => (
-                                                        <div
-                                                            key={`${memberName(vote.board_member)}-${index}`}
-                                                            className="flex items-center justify-between gap-3 py-2"
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-medium">
+                                                            {action.title}
+                                                        </p>
+                                                        <p className="text-caption">
+                                                            {[
+                                                                action.is_mine
+                                                                    ? 'Yours'
+                                                                    : action.assignee_name
+                                                                      ? `For ${action.assignee_name}`
+                                                                      : 'Nobody responsible yet',
+                                                                action.due_date
+                                                                    ? `Due ${formatDateLong(action.due_date)}`
+                                                                    : null,
+                                                                refSuffix(
+                                                                    action.reference,
+                                                                ),
+                                                            ]
+                                                                .filter(Boolean)
+                                                                .join(' · ')}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex shrink-0 items-center gap-2">
+                                                        <StatusBadge
+                                                            variant={
+                                                                chip.variant
+                                                            }
                                                         >
-                                                            <span className="text-sm">
-                                                                {memberName(
-                                                                    vote.board_member,
-                                                                )}
-                                                            </span>
-                                                            <StatusBadge
-                                                                variant={voteVariant(
-                                                                    vote.vote,
-                                                                )}
+                                                            {chip.label}
+                                                        </StatusBadge>
+                                                        {action.can_open &&
+                                                        action.open_url ? (
+                                                            <Button
+                                                                asChild
+                                                                variant="outline"
+                                                                size="sm"
                                                             >
-                                                                {vote.vote}
-                                                            </StatusBadge>
-                                                        </div>
-                                                    ),
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                    {results.conflicts.length > 0 ? (
-                                        <div>
-                                            <p className="mb-2 text-sm font-semibold">
-                                                Conflict declarations
-                                            </p>
-                                            <ul className="flex flex-col gap-1 text-sm">
-                                                {results.conflicts.map(
-                                                    (conflict, index) => (
-                                                        <li key={index}>
-                                                            {memberName(
-                                                                conflict.board_member,
-                                                            )}{' '}
-                                                            — {conflict.type}
-                                                            {conflict.withdrew
-                                                                ? ' (withdrew from voting)'
-                                                                : ''}
-                                                        </li>
-                                                    ),
-                                                )}
-                                            </ul>
-                                        </div>
-                                    ) : null}
-                                </div>
+                                                                <Link
+                                                                    href={
+                                                                        action.open_url
+                                                                    }
+                                                                    aria-label={`Open action: ${action.title}`}
+                                                                >
+                                                                    <ExternalLink className="size-4" />
+                                                                    Open
+                                                                </Link>
+                                                            </Button>
+                                                        ) : null}
+                                                    </div>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                )}
                             </Section>
                         ) : null}
 
-                        {isClosed ? (
+                        {isClosed || sharedPaper ? (
                             <Section
-                                title="Decision summary"
-                                description="Finalise the resolution once its outcome has been actioned."
+                                icon={FileText}
+                                title="What happens next"
+                                description={
+                                    sharedPaper
+                                        ? 'Once the board has discussed or noted this paper, it can be marked as done.'
+                                        : 'Once the board’s decision has been carried out, mark the resolution as done.'
+                                }
                             >
                                 <div className="flex flex-col gap-3">
                                     {resolution.outcome_notes ? (
                                         <p className="text-subtle whitespace-pre-wrap">
-                                            Recorded notes:{' '}
-                                            {resolution.outcome_notes}
+                                            {`Notes: ${resolution.outcome_notes}`}
                                         </p>
                                     ) : null}
                                     {can_finalize ? (
                                         <>
                                             <div>
                                                 <Label htmlFor="final-notes">
-                                                    Outcome notes
+                                                    Notes (optional)
                                                 </Label>
                                                 <Textarea
                                                     id="final-notes"
@@ -1094,16 +1034,16 @@ export default function ResolutionShow({
                                                             e.target.value,
                                                         )
                                                     }
-                                                    placeholder="Outcome notes or implementation summary…"
+                                                    placeholder="What was done, or anything the minutes should record."
                                                 />
                                             </div>
-                                            {resolution.outcome ===
-                                            'carried' ? (
+                                            {carried && openActions.length > 0 ? (
                                                 <div>
                                                     <Label htmlFor="no-action-reason">
-                                                        Reason remaining
-                                                        follow-up actions are
-                                                        not required (optional)
+                                                        Follow-up actions are
+                                                        still open — say why the
+                                                        resolution is done
+                                                        anyway
                                                     </Label>
                                                     <Textarea
                                                         id="no-action-reason"
@@ -1114,40 +1054,22 @@ export default function ResolutionShow({
                                                                 e.target.value,
                                                             )
                                                         }
-                                                        placeholder="Only if the decision is implemented while follow-up actions remain open."
+                                                        placeholder="e.g. The remaining action was replaced by a new resolution."
                                                     />
                                                 </div>
                                             ) : null}
-                                            <div className="flex flex-wrap gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <Button
                                                     disabled={
-                                                        resolution.outcome !==
-                                                            'carried' ||
+                                                        (!sharedPaper &&
+                                                            !carried) ||
                                                         busy === 'finalize'
                                                     }
-                                                    title={
-                                                        resolution.outcome ===
-                                                        'carried'
-                                                            ? undefined
-                                                            : 'Only carried resolutions can be marked implemented'
-                                                    }
                                                     onClick={() =>
-                                                        post(
-                                                            'finalize',
-                                                            `/governance/resolutions/${resolution.id}/finalize`,
-                                                            {
-                                                                status: 'implemented',
-                                                                notes:
-                                                                    finalNotes ||
-                                                                    undefined,
-                                                                no_action_reason:
-                                                                    noActionReason ||
-                                                                    undefined,
-                                                            },
-                                                        )
+                                                        setConfirm('done')
                                                     }
                                                 >
-                                                    Mark implemented
+                                                    Mark as done
                                                 </Button>
                                                 <Button
                                                     variant="outline"
@@ -1155,27 +1077,27 @@ export default function ResolutionShow({
                                                         busy === 'finalize'
                                                     }
                                                     onClick={() =>
-                                                        post(
-                                                            'finalize',
-                                                            `/governance/resolutions/${resolution.id}/finalize`,
-                                                            {
-                                                                status: 'archived',
-                                                                notes:
-                                                                    finalNotes ||
-                                                                    undefined,
-                                                            },
-                                                        )
+                                                        setConfirm('archive')
                                                     }
                                                 >
                                                     Archive
                                                 </Button>
+                                                {!sharedPaper && !carried ? (
+                                                    <p className="text-caption">
+                                                        Only resolutions that
+                                                        passed can be marked as
+                                                        done. You can archive
+                                                        this one.
+                                                    </p>
+                                                ) : null}
                                             </div>
                                         </>
                                     ) : (
                                         <p className="text-subtle">
-                                            {resolution.status === 'closed'
-                                                ? 'Awaiting finalisation by the chair or board secretary.'
-                                                : `This resolution is ${resolutionStatusLabel(resolution.status).toLowerCase()}.`}
+                                            {resolution.status === 'closed' ||
+                                            sharedPaper
+                                                ? 'Waiting for the chair or board secretary to mark it as done.'
+                                                : `This resolution is ${statusChip.label.toLowerCase()}.`}
                                         </p>
                                     )}
                                 </div>
@@ -1187,13 +1109,13 @@ export default function ResolutionShow({
                         id="documents"
                         icon={Paperclip}
                         title={`Supporting documents (${attachments.length})`}
-                        description="Analyses, draft contracts, legal opinions and other papers to read alongside this resolution."
+                        description="Reports, quotes, advice and other papers to read alongside this resolution."
                     >
                         {attachments.length === 0 && !canEdit ? (
                             <EmptyState
                                 icon={Paperclip}
                                 title="No supporting documents"
-                                description="No documents have been attached to this resolution."
+                                description="Nobody has added documents to this resolution."
                             />
                         ) : (
                             <GovernanceAttachmentsPanel
@@ -1205,12 +1127,12 @@ export default function ResolutionShow({
                                         `/governance/resolutions/${resolution.id}/attachments/${id}`,
                                 }}
                                 reloadProp="attachments"
-                                helperText="PDF, Office, images, CSV / TXT — up to 20 MB each."
+                                helperText="PDF, Word, Excel, PowerPoint, images, CSV or text — up to 20 MB each."
                                 emptyText={{
                                     managed:
-                                        'No supporting documents yet. Drop files above to attach one.',
+                                        'No supporting documents yet. Drop files above to add one.',
                                     readOnly:
-                                        'No supporting documents have been attached to this resolution.',
+                                        'Nobody has added documents to this resolution.',
                                 }}
                             />
                         )}
@@ -1222,23 +1144,91 @@ export default function ResolutionShow({
                 isOpen={conflictOpen}
                 onClose={() => setConflictOpen(false)}
                 resolutionId={resolution.id}
-                reference={resolution.resolution_reference}
+                resolutionTitle={resolution.title}
+                existing={my_conflict}
+                hasVoted={Boolean(my_vote)}
+                appliedThreshold={appliedThreshold}
             />
 
             <ConfirmDialog
-                open={confirmClose}
-                onClose={() => setConfirmClose(false)}
-                onConfirm={() => {
-                    setConfirmClose(false);
+                open={confirm === 'open'}
+                onClose={() => setConfirm(null)}
+                onConfirm={() =>
+                    post('open', `/governance/resolutions/${resolution.id}/open`)
+                }
+                title="Open voting?"
+                description={openVotingDescription}
+                confirmText="Open voting"
+                variant="default"
+            />
+
+            <ConfirmDialog
+                open={confirm === 'publish'}
+                onClose={() => setConfirm(null)}
+                onConfirm={() =>
+                    post(
+                        'publish',
+                        `/governance/resolutions/${resolution.id}/publish`,
+                    )
+                }
+                title="Publish to board members?"
+                description={`Board members will be able to read "${resolution.title}". The wording can't be changed after this. It's ${resolutionPurposeLabel(resolution.purpose).toLowerCase()}, so there's no vote.`}
+                confirmText="Publish to members"
+                variant="default"
+            />
+
+            <ConfirmDialog
+                open={confirm === 'close'}
+                onClose={() => setConfirm(null)}
+                onConfirm={() =>
                     post(
                         'close',
-                        closeResolution.url({ resolution: resolution.id }),
-                    );
-                }}
+                        `/governance/resolutions/${resolution.id}/close`,
+                    )
+                }
                 title="Close voting?"
-                description="The tally and outcome are frozen when voting closes. Members who have not voted can no longer vote."
+                description={`Voting on "${resolution.title}" will close and the result will be recorded. Members who haven't voted can no longer vote. This can't be undone.`}
                 confirmText="Close voting"
-                variant="destructive"
+                variant="default"
+            />
+
+            <ConfirmDialog
+                open={confirm === 'done'}
+                onClose={() => setConfirm(null)}
+                onConfirm={() =>
+                    post(
+                        'finalize',
+                        `/governance/resolutions/${resolution.id}/finalize`,
+                        {
+                            status: 'implemented',
+                            notes: finalNotes || undefined,
+                            no_action_reason: noActionReason || undefined,
+                        },
+                    )
+                }
+                title="Mark as done?"
+                description={`"${resolution.title}" will be marked as done. This can't be undone.`}
+                confirmText="Mark as done"
+                variant="default"
+            />
+
+            <ConfirmDialog
+                open={confirm === 'archive'}
+                onClose={() => setConfirm(null)}
+                onConfirm={() =>
+                    post(
+                        'finalize',
+                        `/governance/resolutions/${resolution.id}/finalize`,
+                        {
+                            status: 'archived',
+                            notes: finalNotes || undefined,
+                        },
+                    )
+                }
+                title="Archive this resolution?"
+                description={`"${resolution.title}" will move out of the active list. You can still find it in Records. This can't be undone.`}
+                confirmText="Archive"
+                variant="default"
             />
 
             {canEdit ? (
@@ -1252,6 +1242,7 @@ export default function ResolutionShow({
                     authoritySubjects={authoritySubjects}
                     authoritySubjectGroups={authoritySubjectGroups}
                     authorityBindings={authority_bindings}
+                    votingRules={votingRules}
                 />
             ) : null}
         </AppLayout>

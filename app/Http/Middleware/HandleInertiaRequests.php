@@ -483,7 +483,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v7';
+    protected const PERMISSIONS_CACHE_VERSION = 'v8';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -1006,6 +1006,13 @@ class HandleInertiaRequests extends Middleware
                 'performance' => [
                     'view' => $user->canDo('governance.performance.view'),
                     'manage' => $user->canDo('governance.performance.manage'),
+                    // The person being reviewed (e.g. the CEO) reaches their
+                    // own review from the sidebar. Navigation only — the
+                    // review policy still authorises every page.
+                    'reviewee' => $user->canDo('governance.performance.view')
+                        && \App\Domain\Governance\Models\PerformanceReview::query()
+                            ->where('reviewee_id', $user->id)
+                            ->exists(),
                 ],
                 'strategy' => [
                     'view' => $user->canDo('governance.strategy.view'),

@@ -31,6 +31,9 @@ class GovernanceVotingProfile extends Model
         'approved_by_resolution_id',
         'approved_by_user_id',
         'approved_at',
+        'approval_source',
+        'approval_minutes_reference',
+        'approval_meeting_id',
         'effective_from',
         'effective_to',
         'metadata',
@@ -60,6 +63,26 @@ class GovernanceVotingProfile extends Model
     public function approvedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by_user_id');
+    }
+
+    /** The meeting whose minutes record the board's approval (optional). */
+    public function approvalMeeting(): BelongsTo
+    {
+        return $this->belongsTo(GovernanceMeeting::class, 'approval_meeting_id');
+    }
+
+    /**
+     * The governing document reference, or null while it is still a
+     * placeholder ("Candidate … Pending …") rather than a real document.
+     */
+    public function realDocumentReference(): ?string
+    {
+        $reference = trim((string) $this->governing_document_reference);
+        $lower = strtolower($reference);
+
+        return $reference === '' || str_contains($lower, 'candidate') || str_contains($lower, 'pending')
+            ? null
+            : $reference;
     }
 
     public function creator(): BelongsTo
@@ -93,8 +116,10 @@ class GovernanceVotingProfile extends Model
             'governing_body' => $governingBody,
             'board_committee_id' => $committeeId,
             'legal_form' => 'charitable_trust',
-            'governing_document_reference' => 'Candidate Governance Profile (Pending D1 Legal Authority)',
-            'governing_document_version' => '1.0-candidate',
+            // No placeholder document name: the chair or secretary enters the
+            // real trust deed or constitution when recording the approval.
+            'governing_document_reference' => null,
+            'governing_document_version' => null,
             'quorum_mode' => 'majority_floor_plus_one',
             'quorum_formula' => 'floor(N/2)+1',
             'ordinary_threshold_formula' => 'for > against of valid votes cast',
@@ -104,7 +129,7 @@ class GovernanceVotingProfile extends Model
             'recusal_policy' => 'exclude_from_presence_and_tally_without_reducing_N',
             'is_active' => false,
             'metadata' => [
-                'status_note' => 'Candidate D1 default profile. Live voting requires recording actual constitution/trust deed authority and approval.',
+                'status_note' => 'Draft voting rules. Board voting stays switched off until the board\'s approval of these rules is recorded.',
             ],
         ];
     }

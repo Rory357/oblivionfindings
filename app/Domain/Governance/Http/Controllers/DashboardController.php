@@ -29,12 +29,6 @@ class DashboardController extends Controller
         $myWork = $this->myWork($user);
 
         return Inertia::render('Governance/Dashboard', [
-            'periods' => [
-                ['value' => 'today', 'label' => 'Today'],
-                ['value' => 'week', 'label' => 'This Week'],
-                ['value' => 'month', 'label' => 'This Month'],
-                ['value' => 'year', 'label' => 'This Year'],
-            ],
             'isBoardMember' => $boardMember !== null,
             'boardRole' => $boardMember?->board_role,
             'workTotals' => $myWork['totals'] ?? null,
@@ -56,7 +50,9 @@ class DashboardController extends Controller
             return $this->priorities($request);
         }
 
-        $period = $request->validate(['period' => 'required|in:today,week,month,year'])['period'];
+        // Home always reports the current month; `period` is kept for
+        // existing callers (reports, integrations) and defaults to month.
+        $period = $request->validate(['period' => 'sometimes|in:today,week,month,year'])['period'] ?? 'month';
         $user = $request->user();
         $workflow = $this->workflowService->dashboardWorkflow($user, self::PRIORITIES_PER_PAGE);
         $myWork = $this->myWork($user);
@@ -84,7 +80,7 @@ class DashboardController extends Controller
                 'start' => now()->startOfMonth()->toDateString(),
                 'end' => now()->toDateString(),
             ];
-            $widgets = $result['data']['widgets'] ?? [];
+            $widgets = $this->widgetsForViewer($result['data']['widgets'] ?? [], $user);
             $freshness = $result['freshness'] ?? [];
 
             return response()->json([
@@ -107,15 +103,48 @@ class DashboardController extends Controller
         }
     }
 
+    /**
+     * Widgets that carry record titles from a Governance register (risk or
+     * requirement titles) and the permission that opens that register. The
+     * roadmap summary isn't listed: its page (/roadmap/dashboard) is open to
+     * everyone who can open Governance Home.
+     */
+    private const WIDGET_PERMISSIONS = [
+        'top_risks' => 'governance.risks.view',
+        'risk_changes' => 'governance.risks.view',
+        'voided_risks' => 'governance.risks.view',
+        'compliance_calendar' => 'governance.compliance.view',
+    ];
+
+    /**
+     * Masks, on the server, the register widgets the viewer can't open, so
+     * neither the raw widgets nor the Home cards built from them carry those
+     * records' titles or counts.
+     *
+     * @param  array<string, mixed>  $widgets
+     * @return array<string, mixed>
+     */
+    protected function widgetsForViewer(array $widgets, User $user): array
+    {
+        foreach (self::WIDGET_PERMISSIONS as $key => $permission) {
+            if (array_key_exists($key, $widgets) && ! $user->canDo($permission)) {
+                unset($widgets[$key]);
+            }
+        }
+
+        return $widgets;
+    }
+
     /** Personal obligations previewed on Home; the full list lives on My work. */
     public const MY_WORK_PREVIEW = 5;
 
     /**
      * The viewer's personal obligations exactly as `/governance/my-work` builds
-     * them (default filters: pending, all kinds): the top items plus the full
+     * them (default filters: to do, all kinds): the top items plus the full
      * authorised totals, so Home never reports the number of cards displayed.
-     * Null when the work feed could not be built — Home then shows an
-     * unavailable state instead of "all caught up".
+     * Upcoming meetings arrive separately as `coming_up` and are never counted
+     * as work to do. Null when the work feed could not be built — Home then
+     * shows an unavailable state instead of "all caught up".
      *
      * @return array<string, mixed>|null
      */
@@ -135,6 +164,7 @@ class DashboardController extends Controller
 
         return [
             'items' => $feed['items'] ?? [],
+            'coming_up' => $feed['coming_up'] ?? [],
             'totals' => $feed['totals'] ?? null,
             'pagination' => $feed['pagination'] ?? null,
             'availability' => $feed['availability'] ?? [],
@@ -172,6 +202,10 @@ class DashboardController extends Controller
     {
         $period = $request->validate(['period' => 'required|in:today,week,month,year'])['period'];
         $range = $this->getDateRange($period);
+
+        // Same audience as Home: no register titles for viewers who can't open the register.
+        $permission = self::WIDGET_PERMISSIONS[$widget] ?? null;
+        abort_if($permission !== null && ! $request->user()->canDo($permission), 403);
 
         $data = match ($widget) {
             'top_risks' => $this->aggregator->getTopRisks(),

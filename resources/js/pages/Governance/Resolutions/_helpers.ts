@@ -1,94 +1,41 @@
-import type { StatusVariant } from '@/components/ui/status-badge';
+/**
+ * Resolutions page helpers. Every label comes from the shared Governance
+ * label helpers (`@/lib/governance-labels`) so the register, the record page
+ * and the meeting workspace say the same thing (vocabulary.md).
+ */
+import { isDecisionPurpose } from '@/components/governance/resolution-voting';
+import {
+    governanceStatus,
+    votingThresholdLabel,
+} from '@/lib/governance-labels';
 
-/** Lifecycle status → verified status pair. */
-export function resolutionStatusVariant(
-    status: string | null | undefined,
-): StatusVariant {
-    switch (status) {
-        case 'open':
-            return 'info';
-        case 'closed':
-            return 'warning';
-        case 'implemented':
-            return 'success';
-        default:
-            return 'neutral';
-    }
+/** "More For than Against" for the rule the engine applies; papers with no vote say so. */
+export function howItPassesLabel(row: {
+    purpose?: string | null;
+    voting_threshold?: string | null;
+    applied_threshold?: string | null;
+}): string {
+    if (!isDecisionPurpose(row.purpose)) return 'No vote';
+    return votingThresholdLabel(row.applied_threshold || row.voting_threshold);
 }
 
-export function resolutionStatusLabel(
-    status: string | null | undefined,
-): string {
-    switch (status) {
-        case 'open':
-            return 'Open for voting';
-        case 'closed':
-            return 'Voting closed';
-        case null:
-        case undefined:
-        case '':
-            return 'Unknown';
-        default:
-            return (
-                status.charAt(0).toUpperCase() +
-                status.slice(1).replace(/_/g, ' ')
-            );
-    }
+/** Outcome chip for a resolution outcome (Passed / Not passed / No decision). */
+export function outcomeChip(outcome: string | null | undefined) {
+    return governanceStatus('resolution_outcome', outcome);
 }
 
-export function resolutionOutcomeVariant(
-    outcome: string | null | undefined,
-): StatusVariant {
-    switch (outcome) {
-        case 'carried':
-            return 'success';
-        case 'defeated':
-            return 'critical';
-        case 'no_quorum':
-            return 'warning';
-        default:
-            return 'neutral';
-    }
-}
-
-export function resolutionOutcomeLabel(
-    outcome: string | null | undefined,
-): string {
-    switch (outcome) {
-        case 'carried':
-            return 'Carried';
-        case 'defeated':
-            return 'Defeated';
-        case 'no_quorum':
-            return 'No valid decision — quorum not met';
-        case null:
-        case undefined:
-        case '':
-            return 'No outcome';
-        default:
-            return (
-                outcome.charAt(0).toUpperCase() +
-                outcome.slice(1).replace(/_/g, ' ')
-            );
-    }
-}
-
-export function formatThreshold(threshold: string | null | undefined): string {
-    switch (threshold) {
-        case 'simple_majority':
-            return 'Simple majority (50% + 1)';
-        case 'two_thirds':
-            return 'Two-thirds majority (66.7%)';
-        case 'special_majority':
-        case 'three_quarters':
-            return 'Special majority (75%)';
-        case 'unanimous':
-            return 'Unanimous (100% entitled)';
-        case null:
-        case undefined:
-        case '':
-            return 'Not set';
-        default:
-            return threshold.replace(/_/g, ' ');
-    }
+/**
+ * Canonical place to read and vote on a resolution: meeting resolutions
+ * open inside their meeting workspace (GovernanceWorkQuery's
+ * decisionWorkspaceHref), others on their own record page.
+ */
+export function resolutionWorkspaceHref(resolution: {
+    id: number;
+    governance_meeting_id?: number | null;
+    meeting?: { id: number } | null;
+}): string {
+    const meetingId = resolution.meeting?.id ?? resolution.governance_meeting_id;
+    return meetingId
+        ? `/governance/meetings/${meetingId}?tab=resolutions&paper=${resolution.id}`
+        : `/governance/resolutions/${resolution.id}`;
 }

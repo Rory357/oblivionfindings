@@ -67,9 +67,137 @@ class GovernanceStrategyTest extends TestCase
                 ->component('Governance/Strategy/Show')
                 ->where('canEdit', true)
                 ->where('canAddGoal', true)
-                ->where('canApprove', true)
+                // Nothing to record until a linked resolution has passed.
+                ->where('canApprove', false)
+                ->where('approval.key', 'waiting')
                 ->where('canCreateVersion', false)
                 ->has('formOptions.pillars', 6));
+    }
+
+    /** P1: "Record board approval" is only offered once a linked resolution has passed. */
+    public function test_board_approval_is_offered_only_after_a_linked_resolution_passes(): void
+    {
+        $admin = $this->createAdminUser();
+        $plan = $this->createStrategicPlan($admin);
+
+        $paper = $this->createResolution($admin, ['title' => 'Approve the strategic plan']);
+        app(\App\Domain\Governance\Services\GovernanceResolutionAuthorityService::class)
+            ->bind($paper, GovernanceResolutionBinding::SUBJECT_STRATEGIC_PLAN, $plan->id, $admin);
+
+        $this->actingAs($admin)->get("/governance/strategy/{$plan->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('approval.key', 'drafted')
+                ->where('approval.resolution.id', $paper->id)
+                ->where('canApprove', false)
+                ->has('carriedResolutions', 0));
+
+        // An unpassed resolution can't approve the plan even if posted directly.
+        $this->actingAs($admin)->post("/governance/strategy/{$plan->id}/approve", [
+            'resolution_id' => $paper->id,
+        ])->assertSessionHasErrors(['resolution_id' => "This resolution can't be used yet — voting must be finished and the result recorded as passed."]);
+
+        // A passed resolution that has since been implemented still counts.
+        $paper->update(['status' => 'implemented', 'outcome' => 'carried', 'closed_at' => now()]);
+
+        $this->actingAs($admin)->get("/governance/strategy/{$plan->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('approval.key', 'passed')
+                ->where('canApprove', true)
+                ->has('carriedResolutions', 1)
+                ->where('carriedResolutions.0.id', $paper->id));
+
+        $this->actingAs($admin)->post("/governance/strategy/{$plan->id}/approve", [
+            'resolution_id' => $paper->id,
+        ])->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Board approval recorded. This version is now the approved strategic plan.');
+
+        $this->assertSame('approved', $plan->fresh()->status);
+    }
+
+    public function test_approved_plan_is_read_only_until_a_new_version_is_created(): void
+    {
+        $admin = $this->createAdminUser();
+        $plan = $this->createStrategicPlan($admin, ['title' => 'Approved plan']);
+        $resolution = $this->createBoundCarriedResolution($admin, GovernanceResolutionBinding::SUBJECT_STRATEGIC_PLAN, $plan->id);
+        $plan->approve($resolution->id, $admin->id);
+
+        $this->actingAs($admin)->get("/governance/strategy/{$plan->id}?edit=1")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('canEdit', false)
+                ->where('canAddGoal', false)
+                ->where('canApprove', false)
+                ->where('canCreateVersion', true)
+                ->where('formOptions', null)
+                ->where('approval.key', 'approved'));
+
+        $this->actingAs($admin)->put("/governance/strategy/{$plan->id}", [
+            'title' => 'Quietly renamed',
+            'period_start' => $plan->period_start->toDateString(),
+            'period_end' => $plan->period_end->toDateString(),
+        ])->assertSessionHas('error', "This plan has been approved by the board, so it can't be edited. Create a new version to change it.");
+
+        $this->actingAs($admin)->post("/governance/strategy/{$plan->id}/goals", [
+            'title' => 'Sneaked-in goal',
+            'description' => 'Not approved by the board',
+        ])->assertSessionHas('error', "This plan has been approved by the board, so it can't be edited. Create a new version to change it.");
+
+        $plan->refresh();
+        $this->assertSame('Approved plan', $plan->title);
+        $this->assertSame(0, $plan->goals()->count());
+
+        $this->actingAs($admin)->post("/governance/strategy/{$plan->id}/version", [
+            'version_notes' => 'Annual refresh',
+        ])->assertSessionHasNoErrors();
+
+        $version = StrategicPlan::query()->where('supersedes_plan_id', $plan->id)->firstOrFail();
+        $this->assertSame('draft', $version->status);
+
+        $this->actingAs($admin)->get("/governance/strategy/{$version->id}")
+            ->assertInertia(fn ($page) => $page->where('canEdit', true));
+    }
+
+    public function test_editing_a_plan_cannot_mark_it_approved(): void
+    {
+        $admin = $this->createAdminUser();
+        $plan = $this->createStrategicPlan($admin);
+
+        $this->actingAs($admin)->put("/governance/strategy/{$plan->id}", [
+            'title' => 'Strategic Plan',
+            'period_start' => $plan->period_start->toDateString(),
+            'period_end' => $plan->period_end->toDateString(),
+            'status' => 'approved',
+        ])->assertSessionHasErrors(['status' => 'A plan is approved by recording the board’s approval, not by editing it.']);
+
+        $this->assertSame('draft', $plan->fresh()->status);
+    }
+
+    public function test_unwritten_vision_and_mission_are_empty_not_placeholders(): void
+    {
+        $admin = $this->createAdminUser();
+        $legacy = $this->createStrategicPlan($admin, ['vision_statement' => 'TBD', 'mission_statement' => 'tbd']);
+
+        $this->actingAs($admin)->get("/governance/strategy/{$legacy->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('plan.vision_statement', null)
+                ->where('plan.mission_statement', null));
+
+        $this->actingAs($admin)->post('/governance/strategy', [
+            'title' => 'Plan without a vision yet',
+            'planning_horizon' => '3_year',
+            'period_start' => now()->toDateString(),
+            'period_end' => now()->addYears(3)->toDateString(),
+            'vision_statement' => '',
+            'mission_statement' => null,
+        ])->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Strategic plan saved as a draft.');
+
+        $plan = StrategicPlan::query()->where('title', 'Plan without a vision yet')->firstOrFail();
+        $this->assertNull($plan->vision_statement);
+        $this->assertNull($plan->mission_statement);
     }
 
     public function test_view_only_member_gets_no_plan_wizard_or_approval_options(): void
@@ -368,7 +496,7 @@ class GovernanceStrategyTest extends TestCase
         // Compare changes on planB before modifications
         $changeData = $planB->getChangesSinceLastSnapshot();
         $this->assertTrue($changeData['has_snapshot']);
-        $this->assertStringContainsString('approved baseline', $changeData['baseline_label']);
+        $this->assertSame('version 1, which the board approved', $changeData['baseline_label']);
         $this->assertEmpty($changeData['changes'], 'Cloned goals must preserve lineage and not be falsely reported as added.');
 
         // Now modify goal on Plan B
@@ -393,6 +521,25 @@ class GovernanceStrategyTest extends TestCase
         $types = collect($diffs['changes'])->pluck('type')->toArray();
         $this->assertContains('updated', $types);
         $this->assertContains('added', $types);
+
+        // Changes read as plain sentences, not field names.
+        $updated = collect($diffs['changes'])->firstWhere('type', 'updated');
+        $this->assertSame('goal', $updated['area']);
+        $this->assertStringContainsString('Progress 10% → 60%', $updated['detail']);
+        $this->assertSame('New goal added.', collect($diffs['changes'])->firstWhere('type', 'added')['detail']);
+
+        // Direction changes are listed alongside goal changes.
+        $planB->update(['vision_statement' => 'A new vision for the next three years']);
+
+        $this->actingAs($admin)->get("/governance/strategy/{$planB->id}/changes")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Governance/Strategy/Changes')
+                ->where('changes.baseline_label', 'version 1, which the board approved')
+                ->has('changes.changes', 3)
+                ->where('changes.changes.0.area', 'direction')
+                ->where('changes.changes.0.goal', 'Vision')
+                ->where('changes.changes.0.detail', 'Vision rewritten.'));
     }
 
     public function test_get_changes_without_snapshot_or_prior_baseline_returns_explicit_unavailable(): void

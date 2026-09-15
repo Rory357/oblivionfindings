@@ -422,7 +422,166 @@ class GovernanceRecordsBoardSettingsHubsTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('canManage', false)
                 ->where('rulesProfile.activation', null)
-                ->has('rulesProfile.approvalResolutions', 0));
+                ->has('rulesProfile.approvalResolutions', 0)
+                // The person picker's user directory is for managers only.
+                ->has('people', 0)
+                ->has('rulesProfile.approvalMeetings', 0));
+    }
+
+    public function test_settings_explains_how_the_board_votes_and_why_members_cannot_vote(): void
+    {
+        $admin = $this->createAdminUser(['name' => 'Chair Person']);
+        $this->createBoardMember($admin, ['board_role' => 'chair']);
+        $this->createBoardMember(
+            $this->createUserWithRole('board_observer', ['name' => 'Olive Observer']),
+            ['board_role' => 'observer', 'has_voting_seat' => false],
+        );
+        $this->createBoardMember(
+            $this->createUserWithRole('board_member', ['name' => 'Eru Ended']),
+            ['term_start' => now()->subYears(3)->toDateString(), 'term_end' => now()->subMonth()->toDateString()],
+        );
+
+        $this->actingAs($admin)
+            ->get('/governance/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('rulesProfile.status', 'on')
+                ->where('rulesProfile.eligibleVoterCount', 1)
+                ->where('rulesProfile.memberCount', 3)
+                ->where('rulesProfile.quorumRequired', 1)
+                ->where('rulesProfile.members.0.name', 'Chair Person')
+                ->where('rulesProfile.members.0.can_vote', true)
+                ->where('rulesProfile.members.0.why_not', null)
+                ->where('rulesProfile.members.1.name', 'Eru Ended')
+                ->where('rulesProfile.members.1.why_not', fn ($reason) => str_starts_with((string) $reason, 'Term ended '))
+                ->where('rulesProfile.members.2.why_not', "Observer (observers can't vote)")
+                // Only settings the app actually reads are offered.
+                ->has('settings', 6)
+                ->where('settings.0.default_label', '$5,000'));
+    }
+
+    public function test_settings_save_counts_only_the_values_that_changed(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->from('/governance/settings')
+            ->put('/governance/settings', [
+                'settings' => [
+                    'spend_approval.threshold.capex' => '5000',
+                    'spend_approval.threshold.opex' => '12000',
+                    'compliance.escalation.max_level' => '3',
+                    'compliance.escalation.final_notify_user_id' => (string) $admin->id,
+                ],
+            ])
+            ->assertRedirect('/governance/settings')
+            ->assertSessionHas('success', 'Saved 2 changes.');
+
+        $this->assertSame('12000', \App\Domain\Governance\Models\GovernanceSetting::query()->where('key', 'spend_approval.threshold.opex')->value('value'));
+        $this->assertNull(\App\Domain\Governance\Models\GovernanceSetting::query()->where('key', 'spend_approval.threshold.capex')->value('value'));
+
+        $this->actingAs($admin)
+            ->from('/governance/settings')
+            ->put('/governance/settings', ['settings' => ['spend_approval.threshold.opex' => '12000']])
+            ->assertSessionHas('success', 'No changes to save.');
+
+        $this->actingAs($admin)
+            ->from('/governance/settings')
+            ->put('/governance/settings', ['settings' => ['compliance.escalation.final_notify_user_id' => '999999']])
+            ->assertSessionHasErrors(['settings.compliance.escalation.final_notify_user_id' => 'Choose a person from the list.']);
+    }
+
+    public function test_chair_records_the_boards_first_approval_and_switches_voting_on(): void
+    {
+        $admin = $this->createAdminUser();
+        \App\Domain\Governance\Models\GovernanceVotingProfile::query()->delete();
+        $meeting = $this->createMeeting($admin, ['scheduled_at' => now()->subMonths(2), 'title' => 'July board meeting']);
+
+        $this->actingAs($admin)
+            ->get('/governance/settings')
+            ->assertInertia(fn ($page) => $page
+                ->where('rulesProfile.status', 'off')
+                ->where('rulesProfile.activation.mode', 'record_first_approval')
+                ->where('rulesProfile.approvalMeetings.0.id', $meeting->id));
+
+        // Without the governing document saved, the approval can't be recorded yet.
+        $this->actingAs($admin)
+            ->from('/governance/settings')
+            ->post('/governance/settings/rules/record-approval', [
+                'approved_on' => now('Pacific/Auckland')->subMonths(2)->toDateString(),
+                'approval_minutes_reference' => 'July board meeting minutes, item 6',
+            ])
+            ->assertSessionHas('error');
+
+        $this->actingAs($admin)
+            ->from('/governance/settings')
+            ->post('/governance/settings/rules', [
+                'legal_form' => 'charitable_trust',
+                'governing_document_reference' => 'Trust deed',
+                'governing_document_version' => '2019',
+                'quorum_mode' => 'majority_floor_plus_one',
+                'written_voting_permitted' => true,
+                'written_unanimity_required' => true,
+            ])
+            ->assertSessionHas('success', 'Voting rules saved.');
+
+        $this->actingAs($admin)
+            ->from('/governance/settings')
+            ->post('/governance/settings/rules/record-approval', [
+                'approved_on' => now('Pacific/Auckland')->subMonths(2)->toDateString(),
+                'approval_minutes_reference' => 'July board meeting minutes, item 6',
+                'approval_meeting_id' => $meeting->id,
+            ])
+            ->assertRedirect('/governance/settings')
+            ->assertSessionHas('success', "Board voting is switched on. The board's approval of these voting rules is recorded.");
+
+        $profile = \App\Domain\Governance\Models\GovernanceVotingProfile::query()->where('is_active', true)->firstOrFail();
+        $this->assertSame('Trust deed', $profile->governing_document_reference);
+        $this->assertSame('recorded_board_approval', $profile->approval_source);
+        $this->assertSame($admin->id, $profile->approved_by_user_id);
+        $this->assertTrue($profile->written_voting_permitted);
+
+        $this->actingAs($admin)
+            ->get('/governance/settings')
+            ->assertInertia(fn ($page) => $page
+                ->where('rulesProfile.status', 'on')
+                ->where('rulesProfile.inForce.approval_minutes_reference', 'July board meeting minutes, item 6')
+                ->where('rulesProfile.inForce.approval_meeting_title', 'July board meeting')
+                ->where('rulesProfile.activation.mode', 'none'));
+
+        // After the first switch-on, changes wait for a passed resolution.
+        $this->actingAs($admin)
+            ->from('/governance/settings')
+            ->post('/governance/settings/rules', [
+                'legal_form' => 'charitable_trust',
+                'governing_document_reference' => 'Trust deed',
+                'governing_document_version' => '2019',
+                'quorum_mode' => 'fixed_count',
+                'quorum_formula' => '3',
+                'written_voting_permitted' => true,
+                'written_unanimity_required' => true,
+            ])
+            ->assertSessionHas('success', "Your changes are saved as proposed voting rules. They'll be used once the board passes a resolution that approves them.");
+
+        $this->actingAs($admin)
+            ->from('/governance/settings')
+            ->post('/governance/settings/rules/record-approval', [
+                'approved_on' => now('Pacific/Auckland')->toDateString(),
+                'approval_minutes_reference' => 'Minutes, today',
+            ])
+            ->assertSessionHas('error', 'Voting rules have already been switched on for this board. To change them, the board needs to pass a resolution that approves the new rules.');
+
+        $live = \App\Domain\Governance\Models\GovernanceVotingProfile::query()->where('is_active', true)->get();
+        $this->assertCount(1, $live);
+        $this->assertSame('majority_floor_plus_one', $live->first()->quorum_mode);
+
+        $this->actingAs($admin)
+            ->get('/governance/settings')
+            ->assertInertia(fn ($page) => $page
+                ->where('rulesProfile.hasPendingChanges', true)
+                ->where('rulesProfile.activation.mode', 'resolution')
+                ->where('rulesProfile.rules.quorum_mode', 'fixed_count')
+                ->where('rulesProfile.rules.quorum_formula', '3'));
     }
 
     public function test_audit_log_carries_header_meter_totals_and_filter_preserving_links(): void

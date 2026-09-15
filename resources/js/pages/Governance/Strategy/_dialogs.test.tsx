@@ -48,7 +48,12 @@ vi.mock('@inertiajs/react', async () => {
     };
 });
 
-import { StrategicPlanWizardDialog } from './_dialogs';
+import {
+    StrategicPlanWizardDialog,
+    formatTimeframe,
+    planLengthMismatch,
+    suggestedPlanEnd,
+} from './_dialogs';
 
 const options = {
     horizons: { '3_year': '3-year plan', '5_year': '5-year plan' },
@@ -65,6 +70,32 @@ afterEach(() => {
     inertia.serverErrors = null;
 });
 
+describe('plan dates', () => {
+    it('suggests the end date from the plan length', () => {
+        expect(suggestedPlanEnd('2026-07-01', '3_year')).toBe('2029-06-30');
+        expect(suggestedPlanEnd('2027-01-01', '5_year')).toBe('2031-12-31');
+        expect(suggestedPlanEnd('', '3_year')).toBe('');
+    });
+
+    it('warns only when the dates do not match the plan length', () => {
+        expect(
+            planLengthMismatch('2026-07-01', '2029-06-30', '3_year'),
+        ).toBeNull();
+        expect(
+            planLengthMismatch('2026-07-01', '2027-08-31', '3_year'),
+        ).toBe(
+            'A 3-year plan usually runs about 3 years, but these dates cover 1 year and 2 months.',
+        );
+    });
+
+    it('formats stored goal timeframes as NZ dates', () => {
+        expect(formatTimeframe('2026-07-01 - 2029-06-30')).toBe(
+            '1 Jul 2026 – 30 Jun 2029',
+        );
+        expect(formatTimeframe('First year')).toBe('First year');
+    });
+});
+
 describe('StrategicPlanWizardDialog', () => {
     it('validates the plan and nested goals, then creates with values and goals', () => {
         const { container } = render(
@@ -79,7 +110,7 @@ describe('StrategicPlanWizardDialog', () => {
         expect(screen.getByText('Give the plan a title.')).toBeTruthy();
         expect(screen.getByText('Choose the start date.')).toBeTruthy();
 
-        fireEvent.change(screen.getByPlaceholderText(/Strategic Plan 2026/), {
+        fireEvent.change(screen.getByPlaceholderText(/Strategic plan 2026/), {
             target: { value: 'Strategic Plan 2027–2029' },
         });
         clickButton(/5-year plan/i);
@@ -125,8 +156,8 @@ describe('StrategicPlanWizardDialog', () => {
             ),
             { target: { value: 'Reduce restrictive practice.' } },
         );
-        clickButton(/add key result/i);
-        fireEvent.change(screen.getByLabelText('Goal 1 key result 1'), {
+        clickButton(/add measure of success/i);
+        fireEvent.change(screen.getByLabelText('Goal 1 measure of success 1'), {
             target: { value: 'Restraint use halved' },
         });
         clickButton(/continue/i);

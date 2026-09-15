@@ -11,7 +11,9 @@ import {
  * The connected-tab rail for a Governance hub (lib/governance-sections.ts).
  * Pass it to <PageHeader rail>. The hub and active tab are resolved from
  * the current URL, so a register page only needs `rail={<GovernanceSectionRail />}`.
- * Renders nothing when the viewer can reach fewer than two of the hub's tabs.
+ *
+ * A viewer who can reach only one of the hub's pages still gets the rail —
+ * one tab plus the Find chip (DESIGN.md "Rail without the Find chip").
  */
 export function GovernanceSectionRail({
     counts,
@@ -33,6 +35,11 @@ export function GovernanceSectionRail({
     );
 }
 
+/** "Board finance pages" — names what the rail's tabs are. */
+export function sectionRailLabel(section: Pick<GovernanceSection, 'label'>) {
+    return `${section.label} pages`;
+}
+
 function SectionRail({
     section,
     activeKey,
@@ -44,18 +51,26 @@ function SectionRail({
     can: Record<string, unknown> | undefined;
     counts?: Partial<Record<string, number>>;
 }) {
-    const tabs = visibleSectionTabs(section, can);
-    if (tabs.length < 2) return null;
+    const visibleKeys = new Set(
+        visibleSectionTabs(section, can).map((tab) => tab.key),
+    );
+    // The page being viewed is always a tab (in the hub's own order), even if
+    // the shared permission map is momentarily stale — the server authorised
+    // the page itself.
+    const items = section.tabs.filter(
+        (tab) => visibleKeys.has(tab.key) || tab.key === activeKey,
+    );
+    if (items.length === 0) return null;
 
     return (
         <PageHeaderRail
-            ariaLabel={`${section.label} registers`}
+            ariaLabel={sectionRailLabel(section)}
             value={activeKey}
             onSelect={(key) => {
-                const tab = tabs.find((candidate) => candidate.key === key);
+                const tab = items.find((candidate) => candidate.key === key);
                 if (tab && key !== activeKey) router.visit(tab.href);
             }}
-            items={tabs.map((tab) => ({
+            items={items.map((tab) => ({
                 key: tab.key,
                 label: tab.label,
                 icon: tab.icon,

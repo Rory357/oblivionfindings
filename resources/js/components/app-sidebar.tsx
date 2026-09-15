@@ -1777,28 +1777,62 @@ function buildFleetAssetsSubPanelGroups({
     return groups;
 }
 
+/**
+ * Governance pages a viewer can act in — manage, decide, request, or (for
+ * the person being reviewed) take part in — keyed by hub tab key
+ * (lib/governance-sections.ts). Viewing alone never earns a sidebar entry:
+ * ordinary members keep their focused navigation. Navigation only — every
+ * page is still authorised on the server.
+ */
+export function governanceActionableTabKeys(can?: any): Set<string> {
+    const gov = can?.governance ?? {};
+    const keys = new Set<string>();
+    const add = (key: string, allowed: unknown) => {
+        if (allowed) keys.add(key);
+    };
+
+    add('meetings', gov.meetings?.manage);
+    add('packs', gov.packs?.manage);
+    add('ceo-reports', gov['ceo-reports']?.manage);
+    add('resolutions', gov.resolutions?.manage);
+    add('actions', gov.actions?.manage);
+    add('risks', gov.risks?.manage);
+    add('compliance', gov.compliance?.manage);
+    add('clinical', gov.clinical?.manage);
+    add('te-tiriti', gov['te-tiriti']?.manage);
+    add(
+        'budgets',
+        gov.budgets?.create || gov.budgets?.submit || gov.budgets?.approve,
+    );
+    add('spend-approvals', gov.spend?.request || gov.spend?.approve);
+    add('strategy', gov.strategy?.manage);
+    add(
+        'performance',
+        gov.performance?.manage || gov.performance?.reviewee,
+    );
+    add('roadmap', can?.roadmap?.manage);
+    add('policies', gov.policies?.manage);
+    add('documents', gov.documents?.manage);
+    add('members', gov.meetings?.manage);
+    add('evaluations', gov.evaluations?.manage);
+    add('settings', gov.settings?.manage);
+
+    return keys;
+}
+
 function buildGovernanceSubPanelGroups({
     can,
 }: {
     can?: any;
 }): SubPanelGroup[] {
-    // Permission-gated builders for each group. Ordinary board members
-    // receive a focused 4-destination navigation (Home, My work, Calendar,
-    // Records). Chairs, secretaries, and managers retain access to the
-    // administration sections (Meetings & decisions, Oversight, Board admin).
+    // Everyone with Governance access gets Home, My work, Calendar and
+    // Records. A hub (lib/governance-sections.ts) is added only when the
+    // viewer can act in one of its pages — a treasurer gets Board finance,
+    // the CEO gets Meetings (CEO reports) and, once they have a review,
+    // Strategy & performance. Each hub entry opens the first page the viewer
+    // can act in; its sibling pages are the hub's header rail.
     const groups: SubPanelGroup[] = [];
-
-    const isGovernanceAdmin = Boolean(
-        can?.governance?.meetings?.manage ||
-        can?.governance?.actions?.manage ||
-        can?.governance?.settings?.manage ||
-        can?.governance?.performance?.manage ||
-        can?.governance?.policies?.manage ||
-        can?.governance?.documents?.manage ||
-        can?.governance?.evaluations?.manage ||
-        can?.governance?.packs?.manage ||
-        can?.governance?.resolutions?.manage,
-    );
+    const actionable = governanceActionableTabKeys(can);
 
     // 1. Primary Member destinations
     const overview: NavItem[] = [];
@@ -1825,54 +1859,61 @@ function buildGovernanceSubPanelGroups({
         });
     }
 
-    // For ordinary members (non-admins), provide only the clean 4-destination group
-    if (!isGovernanceAdmin) {
-        if (overview.length > 0) {
-            groups.push({ label: 'Governance', items: overview });
-        } else if (can?.roadmap?.view) {
-            // Roadmap-only viewers still need a way in (it has no other entry).
-            groups.push({
-                label: 'Governance',
-                items: [
-                    { title: 'Roadmap', href: '/roadmap/dashboard', icon: Map },
-                ],
-            });
-        }
-        return groups;
-    }
-
-    // Records search lives inside the "Policies & records" hub for managers.
-    const managerOverview = overview.filter(
-        (item) => item.href !== '/governance/records',
-    );
-    if (managerOverview.length > 0) {
-        groups.push({ label: 'Governance', items: managerOverview });
-    }
-
-    // One entry per hub (lib/governance-sections.ts); a hub's registers are
-    // the connected-tab rail in its page header, so the sidebar stays short.
-    // The entry opens the first register the viewer can reach.
+    // One entry per hub the viewer acts in; the hub's pages are the
+    // connected-tab rail in its page header, so the sidebar stays short.
+    const hubGroups: SubPanelGroup[] = [];
+    let recordsHubShown = false;
     for (const group of ['board', 'oversight', 'admin'] as const) {
         const items: NavItem[] = [];
         for (const section of GOVERNANCE_SECTIONS) {
             if (section.group !== group) continue;
-            const [first] = visibleSectionTabs(section, can);
-            if (!first) continue;
+            const visible = visibleSectionTabs(section, can);
+            // The page being reviewed is reachable for its reviewee even
+            // though reviews are otherwise limited to the board's reviewers.
+            const reachable = [
+                ...visible,
+                ...section.tabs.filter(
+                    (tab) =>
+                        !visible.includes(tab) &&
+                        tab.key === 'performance' &&
+                        actionable.has('performance'),
+                ),
+            ];
+            const entry = reachable.find((tab) => actionable.has(tab.key));
+            if (!entry) continue;
+            if (section.key === 'records') recordsHubShown = true;
             items.push({
                 title: section.label,
-                href: first.href,
+                href: entry.href,
                 icon: section.icon,
             });
         }
         if (items.length > 0) {
-            groups.push({
+            hubGroups.push({
                 label: GOVERNANCE_SECTION_GROUP_LABELS[group],
                 items,
             });
         }
     }
 
-    return groups;
+    // Records search lives inside the "Policies & records" hub when that
+    // hub is shown; everyone else keeps it in the main list.
+    const primary = recordsHubShown
+        ? overview.filter((item) => item.href !== '/governance/records')
+        : overview;
+    if (primary.length > 0) {
+        groups.push({ label: 'Governance', items: primary });
+    } else if (hubGroups.length === 0 && can?.roadmap?.view) {
+        // Roadmap-only viewers still need a way in (it has no other entry).
+        groups.push({
+            label: 'Governance',
+            items: [
+                { title: 'Roadmap', href: '/roadmap/dashboard', icon: Map },
+            ],
+        });
+    }
+
+    return [...groups, ...hubGroups];
 }
 
 function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {

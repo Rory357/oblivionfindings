@@ -9,6 +9,7 @@ use App\Domain\Governance\Models\GovernanceVotingProfile;
 use App\Domain\Governance\Models\PerformanceReview;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\StrategicPlan;
+use App\Domain\Governance\Support\GovernanceLabels;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -28,9 +29,54 @@ class GovernanceResolutionAuthorityService
     private const LABELS = [
         GovernanceResolutionBinding::SUBJECT_VOTING_PROFILE => 'voting rules profile',
         GovernanceResolutionBinding::SUBJECT_STRATEGIC_PLAN => 'strategic plan',
-        GovernanceResolutionBinding::SUBJECT_BUDGET_ADJUSTMENT => 'budget adjustment',
+        GovernanceResolutionBinding::SUBJECT_BUDGET_ADJUSTMENT => 'budget change',
         GovernanceResolutionBinding::SUBJECT_BUDGET => 'budget',
         GovernanceResolutionBinding::SUBJECT_PERFORMANCE_REVIEW => 'performance review',
+    ];
+
+    /**
+     * Plain-language messages board members see when a resolution cannot
+     * approve a budget, budget change, strategic plan or performance review
+     * (vocabulary.md: say what happened and what to do; "linked", "used",
+     * never "bound"/"consumed"). Voting-rules messages live with that flow.
+     *
+     * @var array<string, array{not_linked: string, used: string, changed: string}>
+     */
+    private const PLAIN_MESSAGES = [
+        GovernanceResolutionBinding::SUBJECT_BUDGET => [
+            'not_linked' => "This resolution wasn't linked to this budget before the board voted, so it can't approve it. Prepare a new resolution that names this budget.",
+            'used' => 'This resolution has already been used to approve this budget.',
+            'changed' => "The budget was edited after its resolution was prepared, so the board hasn't approved these figures. Put the updated budget to the board.",
+        ],
+        GovernanceResolutionBinding::SUBJECT_BUDGET_ADJUSTMENT => [
+            'not_linked' => "This resolution wasn't linked to this budget change before the board voted, so it can't approve it. Prepare a new resolution that names this change.",
+            'used' => 'This resolution has already been used to approve this budget change.',
+            'changed' => "The budget change was edited after its resolution was prepared, so the board hasn't approved it as it is now. Prepare a new resolution for the change.",
+        ],
+        GovernanceResolutionBinding::SUBJECT_STRATEGIC_PLAN => [
+            'not_linked' => "This resolution wasn't linked to this version of the strategic plan before the board voted, so it can't approve it. Prepare a new resolution that names this version.",
+            'used' => 'This resolution has already been used to approve this strategic plan.',
+            'changed' => "The strategic plan was edited after its resolution was prepared, so the board hasn't approved this version. Put the updated plan to the board.",
+        ],
+        GovernanceResolutionBinding::SUBJECT_PERFORMANCE_REVIEW => [
+            'not_linked' => "This resolution wasn't linked to this performance review before the board voted, so it can't complete it. Prepare a new resolution that names this review.",
+            'used' => 'This resolution has already been used to complete this performance review.',
+            'changed' => "The board's assessment was changed after the resolution was prepared, so the board hasn't approved it as it is now. Prepare a new resolution for the review.",
+        ],
+        GovernanceResolutionBinding::SUBJECT_VOTING_PROFILE => [
+            'not_linked' => "This resolution wasn't linked to these voting rules before the board voted, so it can't approve them. Prepare a new resolution that names these voting rules.",
+            'used' => 'This resolution has already been used to approve these voting rules.',
+            'changed' => "The voting rules were changed after the resolution was prepared, so the board hasn't approved them as they are now. Put the updated rules to the board.",
+        ],
+    ];
+
+    /** "What will this resolution approve?" picker group names (vocabulary.md). */
+    private const GROUP_LABELS = [
+        'budgets' => 'A budget',
+        'budget_adjustments' => 'A budget change',
+        'strategic_plans' => 'The strategic plan',
+        'performance_reviews' => 'CEO performance review',
+        'voting_profiles' => 'Voting rules',
     ];
 
     /**
@@ -40,14 +86,16 @@ class GovernanceResolutionAuthorityService
     public function bind(Resolution $resolution, string $subjectType, int $subjectId, User $actor): GovernanceResolutionBinding
     {
         if (! in_array($subjectType, GovernanceResolutionBinding::SUBJECT_TYPES, true)) {
-            throw new \DomainException('Unsupported decision authority subject.');
+            throw new \DomainException('Choose a budget, budget change, strategic plan, CEO performance review or voting rules for this resolution to approve.');
         }
 
         return DB::transaction(function () use ($resolution, $subjectType, $subjectId, $actor): GovernanceResolutionBinding {
             $lockedResolution = Resolution::query()->whereKey($resolution->getKey())->lockForUpdate()->firstOrFail();
 
             if (! $lockedResolution->isDraft()) {
-                throw new \DomainException('Decision authority can only be bound while the paper is a draft.');
+                throw new \DomainException(isset(self::PLAIN_MESSAGES[$subjectType])
+                    ? 'You can only change what a resolution approves before voting opens.'
+                    : 'Decision authority can only be bound while the paper is a draft.');
             }
 
             $attributes = match ($subjectType) {
@@ -135,7 +183,7 @@ class GovernanceResolutionAuthorityService
             $groups[] = [
                 'key' => (string) $key,
                 'subject_type' => $subjectType,
-                'label' => \Illuminate\Support\Str::ucfirst(str_replace('_', ' ', (string) $key)),
+                'label' => self::GROUP_LABELS[(string) $key] ?? GovernanceLabels::humanise((string) $key),
             ];
         }
 
@@ -167,12 +215,17 @@ class GovernanceResolutionAuthorityService
             ->filter(fn (BudgetAdjustment $adjustment) => $adjustment->budget && $gate->allows('view', $adjustment->budget))
             ->map(fn (BudgetAdjustment $adjustment) => [
                 'id' => (int) $adjustment->id,
+                // "Care budget: increase Support worker wages by $6,000"
                 'label' => sprintf(
-                    '%s — %s: %s $%s',
-                    $adjustment->budget->title ?: 'Budget '.$adjustment->budget->fiscal_year,
-                    $adjustment->lineItem?->description ?? 'Line #'.$adjustment->budget_line_item_id,
-                    ucfirst((string) $adjustment->adjustment_type),
-                    number_format((float) $adjustment->amount, 2),
+                    '%s: %s %s by %s',
+                    $adjustment->budget->title ?: GovernanceLabels::financialYear((string) $adjustment->budget->fiscal_year).' budget',
+                    match ($adjustment->adjustment_type) {
+                        'increase' => 'increase',
+                        'decrease' => 'decrease',
+                        default => 'change',
+                    },
+                    $adjustment->lineItem?->description ?? 'a budget line',
+                    GovernanceLabels::money($adjustment->amount),
                 ),
                 'budget_id' => (int) $adjustment->budget_id,
                 'budget_line_item_id' => (int) $adjustment->budget_line_item_id,
@@ -210,11 +263,14 @@ class GovernanceResolutionAuthorityService
             })
             ->map(fn (GovernanceVotingProfile $profile) => [
                 'id' => (int) $profile->id,
+                // "Board voting rules under Trust deed 2026, version 12"
                 'label' => sprintf(
-                    '%s voting rules — %s%s',
+                    '%s voting rules under %s%s',
                     $profile->committee?->name ?? 'Board',
                     $profile->governing_document_reference,
-                    $profile->governing_document_version ? ' ('.$profile->governing_document_version.')' : '',
+                    $profile->governing_document_version
+                        ? ', version '.preg_replace('/^v(?=\d)/i', '', (string) $profile->governing_document_version)
+                        : '',
                 ),
                 'governing_body' => $profile->governing_body,
                 'board_committee_id' => $profile->board_committee_id ? (int) $profile->board_committee_id : null,
@@ -230,12 +286,13 @@ class GovernanceResolutionAuthorityService
             ->filter(fn (Budget $budget) => $gate->allows('view', $budget))
             ->map(fn (Budget $budget) => [
                 'id' => (int) $budget->id,
+                // "Care budget — 2025/26, version 1, $100,000"
                 'label' => sprintf(
-                    '%s — FY %s (version %d): $%s',
-                    $budget->title ?: 'Budget '.$budget->fiscal_year,
-                    $budget->fiscal_year,
+                    '%s — %s, version %d, %s',
+                    $budget->title ?: GovernanceLabels::financialYear((string) $budget->fiscal_year).' budget',
+                    GovernanceLabels::financialYear((string) $budget->fiscal_year),
                     (int) ($budget->version_number ?? 1),
-                    number_format((float) $budget->total_budget, 2),
+                    GovernanceLabels::money($budget->total_budget),
                 ),
                 'fiscal_year' => (string) $budget->fiscal_year,
                 'version_number' => (int) ($budget->version_number ?? 1),
@@ -262,9 +319,9 @@ class GovernanceResolutionAuthorityService
                 ->map(fn (PerformanceReview $review) => [
                     'id' => (int) $review->id,
                     'label' => sprintf(
-                        'Performance review — %s · %s',
-                        $review->reviewee?->name ?? 'Reviewee #'.$review->reviewee_id,
-                        $review->review_cycle,
+                        'Performance review — %s, %s',
+                        $review->reviewee?->name ?? 'a former user',
+                        PerformanceReview::cycleLabel($review->review_cycle),
                     ),
                     'review_cycle' => (string) $review->review_cycle,
                     'review_type' => (string) $review->review_type,
@@ -291,7 +348,7 @@ class GovernanceResolutionAuthorityService
             $lockedResolution = Resolution::query()->whereKey($resolution->getKey())->lockForUpdate()->firstOrFail();
 
             if (! $lockedResolution->isDraft()) {
-                throw new \DomainException('Decision authority can only be changed while the paper is a draft.');
+                throw new \DomainException('You can only change what a resolution approves before voting opens.');
             }
 
             $bindings = GovernanceResolutionBinding::query()
@@ -342,16 +399,18 @@ class GovernanceResolutionAuthorityService
             ->lockForUpdate()
             ->first();
 
+        $plain = self::PLAIN_MESSAGES[$subjectType] ?? null;
+
         if (! $binding) {
-            throw new \DomainException("The resolution was not explicitly bound to this {$label} before it was published for voting.");
+            throw new \DomainException($plain['not_linked'] ?? "The resolution was not explicitly bound to this {$label} before it was published for voting.");
         }
 
         if ($binding->isConsumed()) {
-            throw new \DomainException("This resolution's authority over the {$label} has already been used.");
+            throw new \DomainException($plain['used'] ?? "This resolution's authority over the {$label} has already been used.");
         }
 
         if (! hash_equals((string) $binding->subject_fingerprint, self::fingerprint($currentTerms))) {
-            throw new \DomainException("The {$label} has changed since the resolution was bound to it; the board has not approved the current terms.");
+            throw new \DomainException($plain['changed'] ?? "The {$label} has changed since the resolution was bound to it; the board has not approved the current terms.");
         }
 
         $binding->forceFill([
@@ -392,7 +451,7 @@ class GovernanceResolutionAuthorityService
         }
 
         if ($profileCommitteeId === null || $resolutionCommitteeId !== $profileCommitteeId) {
-            throw new \DomainException('A committee resolution cannot approve voting rules for a different governing body.');
+            throw new \DomainException("A committee's resolution can only approve that committee's own voting rules, not the board's or another committee's.");
         }
     }
 
@@ -584,16 +643,16 @@ class GovernanceResolutionAuthorityService
 
         $profile = GovernanceVotingProfile::query()->whereKey($profileId)->lockForUpdate()->first();
         if (! $profile) {
-            throw new \DomainException('The selected voting rules profile does not exist.');
+            throw new \DomainException('Those voting rules no longer exist.');
         }
 
         if ($profile->is_active) {
-            throw new \DomainException('The selected voting rules profile is already active; record proposed rule changes as a new profile first.');
+            throw new \DomainException('Those voting rules are already in use. Save your changes to the voting rules in Settings first, then choose the changed rules here.');
         }
 
         $reference = strtolower(trim((string) $profile->governing_document_reference));
         if ($reference === '' || str_contains($reference, 'candidate') || str_contains($reference, 'pending')) {
-            throw new \DomainException('Record the actual governing document reference on the voting rules profile before binding a decision paper to it.');
+            throw new \DomainException('Add the name of your governing document (such as your trust deed or constitution) to the voting rules in Settings before a resolution can approve them.');
         }
 
         $this->assertBodyMayApproveProfile($resolution, $profile);
@@ -617,13 +676,13 @@ class GovernanceResolutionAuthorityService
     {
         $plan = StrategicPlan::query()->whereKey($planId)->lockForUpdate()->first();
         if (! $plan) {
-            throw new \DomainException('The selected strategic plan does not exist.');
+            throw new \DomainException('That strategic plan no longer exists.');
         }
 
         abort_unless(Gate::forUser($actor)->allows('view', $plan), 403);
 
         if (! $plan->isDraft()) {
-            throw new \DomainException('Only a draft or in-review strategic plan can be bound to a decision paper.');
+            throw new \DomainException('Only a strategic plan that is still a draft can be linked to a resolution. Create a new version to change an approved plan.');
         }
 
         $terms = $this->strategicPlanTerms($plan);
@@ -641,13 +700,13 @@ class GovernanceResolutionAuthorityService
     {
         $adjustment = BudgetAdjustment::query()->whereKey($adjustmentId)->lockForUpdate()->first();
         if (! $adjustment || ! $adjustment->budget) {
-            throw new \DomainException('The selected budget adjustment does not exist.');
+            throw new \DomainException('That budget change no longer exists.');
         }
 
         abort_unless(Gate::forUser($actor)->allows('view', $adjustment->budget), 403);
 
         if ($adjustment->status !== 'submitted') {
-            throw new \DomainException('Only a submitted budget adjustment awaiting decision can be bound to a decision paper.');
+            throw new \DomainException('Only a budget change that is waiting for a decision can be linked to a resolution.');
         }
 
         $terms = $this->budgetAdjustmentTerms($adjustment);
@@ -669,13 +728,13 @@ class GovernanceResolutionAuthorityService
     {
         $budget = Budget::query()->whereKey($budgetId)->lockForUpdate()->first();
         if (! $budget) {
-            throw new \DomainException('The selected budget does not exist.');
+            throw new \DomainException('That budget no longer exists.');
         }
 
         abort_unless(Gate::forUser($actor)->allows('view', $budget), 403);
 
         if (! $budget->isDrafting() && ! $budget->isProposed()) {
-            throw new \DomainException('Only a drafting or proposed budget awaiting board approval can be bound to a decision paper.');
+            throw new \DomainException('Only a draft budget, or one waiting for the board, can be linked to a resolution. Approved budgets are changed with a budget change.');
         }
 
         $terms = $this->budgetTerms($budget);
@@ -695,7 +754,7 @@ class GovernanceResolutionAuthorityService
     {
         $review = PerformanceReview::query()->whereKey($reviewId)->lockForUpdate()->first();
         if (! $review) {
-            throw new \DomainException('The selected performance review does not exist.');
+            throw new \DomainException('That performance review no longer exists.');
         }
 
         $gate = Gate::forUser($actor);
@@ -707,7 +766,7 @@ class GovernanceResolutionAuthorityService
         );
 
         if ($review->isCompleted()) {
-            throw new \DomainException('Only a performance review still awaiting the board decision can be bound to a decision paper.');
+            throw new \DomainException('Only a performance review that has not been completed can be linked to a resolution.');
         }
 
         return [

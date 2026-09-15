@@ -8,6 +8,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 use App\Models\Concerns\AuditableChanges;
+
+/**
+ * One board member's recorded vote on a resolution.
+ *
+ * `vote_note` is the member's optional reason for their vote.
+ * `conflict_declared` is only ever true when the member made a real
+ * conflict-of-interest declaration (ConflictDeclaration) on the resolution
+ * and still voted — a note never sets it. `conflict_note` is kept for rows
+ * recorded before the 2026-09-14 repair.
+ */
 class Vote extends Model
 {
     use HasFactory, AuditableChanges;
@@ -20,6 +30,7 @@ class Vote extends Model
         'voting_method',
         'conflict_declared',
         'conflict_note',
+        'vote_note',
         'vote_hash',
         'recorded_by',
     ];
@@ -57,6 +68,12 @@ class Vote extends Model
     public function isAbstain(): bool
     {
         return $this->vote === 'abstain';
+    }
+
+    /** The receipt reference members also see in My work. */
+    public function receiptId(): string
+    {
+        return "VOTE-RCP-{$this->id}";
     }
 
     public function generateHash(): string

@@ -5,23 +5,83 @@ namespace App\Domain\Governance\Support;
 use App\Domain\Governance\Models\ActionItem;
 use App\Domain\Governance\Models\BoardCommittee;
 use App\Domain\Governance\Models\ComplianceObligation;
+use App\Domain\Governance\Models\ConflictDeclaration;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\GovernancePolicy;
 use App\Domain\Governance\Models\MeetingMinute;
+use App\Domain\Governance\Models\PerformanceReview;
+use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\RiskRegisterEntry;
 use App\Domain\Governance\Models\SpendApproval;
+use App\Domain\Governance\Models\Vote;
 use App\Domain\Governance\Services\BoardPackAccessService;
+use App\Domain\Governance\Services\ExecutiveMeetingAccessService;
 use App\Domain\Governance\Services\GovernanceAuditService;
+use App\Domain\Governance\Services\GovernanceRecordAccessService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
+use App\Domain\Governance\Services\GovernanceWorkQuery;
 use App\Domain\Governance\Services\SpendApprovalCommandService;
 use App\Models\User;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
+/**
+ * Builds the Governance Home payload (and the report card sets that share its
+ * cards). Every label here reaches board members, so it follows vocabulary.md:
+ * sentence case, NZ English, NZ dates, NZD money, no abbreviations, and
+ * "Not available" — never 0 — for a source that could not be read.
+ *
+ * Audience rule: each section is filtered by the same permission and record
+ * audience as the register its links open (timeline events, recently
+ * completed work, assurance counts).
+ */
 class GovernancePresenter
 {
+    /** Spending this far over or under budget (either way) is flagged for the board. */
+    public const BUDGET_FLAG_PERCENT = 5;
+
+    /**
+     * Audit entity types with no record-level audience rule: the register
+     * view permission that opens them. Types with record-level rules are
+     * handled in readableTimelineRecords().
+     */
+    protected const TIMELINE_REGISTER_PERMISSIONS = [
+        'RiskRegisterEntry' => 'governance.risks.view',
+        'RiskTreatment' => 'governance.risks.view',
+        'ComplianceObligation' => 'governance.compliance.view',
+        'NotifiableIncident' => 'governance.compliance.view',
+        'IncidentGovernanceEscalation' => 'governance.compliance.view',
+        'GovernancePolicy' => 'governance.policies.view',
+        'CeoBoardReport' => 'governance.ceo-reports.view',
+        'Budget' => 'governance.budgets.view',
+        'BudgetAdjustment' => 'governance.budgets.view',
+        'BudgetAllocation' => 'governance.budgets.view',
+        'GovernanceDocument' => 'governance.documents.view',
+        'StrategicPlan' => 'governance.strategy.view',
+        'BoardEvaluation' => 'governance.evaluations.view',
+        'BoardMemberInterest' => 'governance.interests.view',
+        'TeTiritiObligation' => 'governance.te-tiriti.view',
+        'BoardMember' => 'governance.meetings.manage',
+        'GovernanceSetting' => 'governance.settings.view',
+        'GovernanceVotingProfile' => 'governance.settings.view',
+        'SafeguardingConcern' => 'safeguarding.viewAny',
+    ];
+
+    /** Audit entity types whose events are filtered record by record. */
+    protected const TIMELINE_RECORD_TYPES = [
+        'GovernanceMeeting',
+        'Resolution',
+        'ActionItem',
+        'MeetingMinute',
+        'PerformanceReview',
+        'SpendApproval',
+        'BoardPack',
+    ];
+
     public function __construct(
         protected SpendApprovalCommandService $spendApprovalReader,
         protected BoardPackAccessService $boardPackAccess,
@@ -69,32 +129,32 @@ class GovernancePresenter
             'sections' => [
                 [
                     'key' => 'board_focus',
-                    'title' => 'Board Focus',
-                    'description' => 'Decisions, meeting readiness, plan delivery, and follow-through.',
+                    'title' => 'Board focus',
+                    'description' => 'Resolutions, meeting preparation, plans and actions.',
                     'cards' => $this->cardsForKeys($cardsByKey, ['meeting_readiness', 'follow_through', 'decisions_required', 'roadmap']),
                 ],
                 [
                     'key' => 'financial_governance',
-                    'title' => 'Financial Governance',
-                    'description' => 'Budget posture, sites over budget, pending spend approvals, donor funding.',
+                    'title' => 'Board finance',
+                    'description' => 'Spending against budget, sites over budget and spend requests.',
                     'cards' => $this->cardsForKeys($cardsByKey, ['financial', 'sites_over_budget', 'spend_approvals']),
                 ],
                 [
                     'key' => 'assurance',
-                    'title' => 'Assurance & Compliance',
-                    'description' => 'Risk posture, changes, privacy, and upcoming obligations.',
+                    'title' => 'Risk and compliance',
+                    'description' => 'Risks, changes to risks, privacy and requirements coming up.',
                     'cards' => $this->cardsForKeys($cardsByKey, ['top_risks', 'risk_changes', 'voided_risks', 'compliance_calendar', 'privacy_data']),
                 ],
                 [
                     'key' => 'operations',
-                    'title' => 'Operations & People',
-                    'description' => 'Safety, staffing, and workforce posture.',
+                    'title' => 'Operations and people',
+                    'description' => 'Safety, staffing and training.',
                     'cards' => $this->cardsForKeys($cardsByKey, ['client_safety', 'operational_safety', 'workforce']),
                 ],
                 [
                     'key' => 'controls',
-                    'title' => 'Controls & Backbone',
-                    'description' => 'Control room, cyber posture, safeguarding, fleet, and H&S.',
+                    'title' => 'Controls and safety',
+                    'description' => 'Control room, IT security, incidents, safeguarding, vehicles and health and safety.',
                     'cards' => $this->cardsForKeys($cardsByKey, ['control_room', 'it_cyber', 'incidents', 'safeguarding', 'fleet_assets', 'hs_backbone']),
                 ],
             ],
@@ -102,133 +162,16 @@ class GovernancePresenter
             'cards_by_key' => $cardsByKey->all(),
             'workflow_summary' => $workflow['summary'] ?? ['total' => 0, 'critical' => 0, 'overdue' => 0],
             'role_actions' => $this->roleActions($user),
-            'kpi_band' => $this->buildKpiBand($widgets, $workflow, $user),
             'assurance' => $this->buildAssurance($widgets, $user),
             'next_meeting' => $this->buildNextMeeting($user),
-            'board_pack' => $this->buildBoardPack($user),
-            'calendar_events' => $this->buildCalendarEvents($user),
             'timeline' => $this->buildTimeline($user),
             'recently_completed' => $this->buildRecentlyCompleted($user),
         ];
     }
 
     /**
-     * 4-tile board-friendly KPI band for the top of the cockpit.
-     * Derived from already-aggregated widgets so no extra queries fire.
-     */
-    protected function buildKpiBand(array $widgets, array $workflow, ?User $user = null): array
-    {
-        $upcomingMeetingsQuery = GovernanceMeeting::query()
-            ->where('scheduled_at', '>=', now())
-            ->where('scheduled_at', '<=', now()->addDays(30))
-            ->whereNotIn('status', ['cancelled', 'archived']);
-
-        $nextMeetingQuery = GovernanceMeeting::query()
-            ->where('scheduled_at', '>=', now())
-            ->whereNotIn('status', ['cancelled', 'archived'])
-            ->orderBy('scheduled_at');
-
-        if ($user !== null) {
-            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                ->scopeMeetings($upcomingMeetingsQuery, $user);
-            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                ->scopeMeetings($nextMeetingQuery, $user);
-        }
-
-        $upcomingMeetings = Schema::hasTable('governance_meetings')
-            ? $upcomingMeetingsQuery->count()
-            : 0;
-
-        $nextMeeting = Schema::hasTable('governance_meetings')
-            ? $nextMeetingQuery->first()
-            : null;
-
-        if (Schema::hasTable('action_items')) {
-            $actionItemQuery = ActionItem::query()
-                ->whereIn('status', ['open', 'in_progress', 'blocked']);
-            if ($user !== null) {
-                app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                    ->scopeActionItems($actionItemQuery, $user);
-            }
-            $openActions = (clone $actionItemQuery)->count();
-            $overdueActions = (clone $actionItemQuery)
-                ->where('due_date', '<', now())
-                ->whereIn('status', ['open', 'in_progress'])
-                ->count();
-        } else {
-            $openActions = (int) ($workflow['summary']['total'] ?? 0);
-            $overdueActions = (int) ($workflow['summary']['overdue'] ?? 0);
-        }
-
-        $topRisks = is_array($widgets['top_risks'] ?? null) ? $widgets['top_risks'] : [];
-        $risksAvailable = array_key_exists('above_appetite', $topRisks);
-        $risksOverAppetite = (int) ($topRisks['above_appetite'] ?? 0);
-
-        $attestation = $this->policyAttestationPercent();
-
-        return [
-            [
-                'key' => 'upcoming_meetings',
-                'label' => 'Upcoming Meetings',
-                'value' => (string) $upcomingMeetings,
-                'sublabel' => $nextMeeting
-                    ? 'Next: '.$nextMeeting->scheduled_at->timezone('Pacific/Auckland')->format('j M Y')
-                    : 'No meeting scheduled',
-                'tone' => $upcomingMeetings > 0 ? 'info' : 'muted',
-                'href' => '/governance/meetings',
-            ],
-            [
-                'key' => 'open_actions',
-                'label' => 'Open Actions',
-                'value' => (string) $openActions,
-                'sublabel' => $overdueActions > 0 ? "{$overdueActions} overdue" : 'On track',
-                'tone' => $overdueActions > 0 ? 'critical' : ($openActions > 0 ? 'warning' : 'success'),
-                'href' => '/governance/actions',
-            ],
-            [
-                'key' => 'risks_over_appetite',
-                'label' => 'Risks Over Appetite',
-                'value' => $risksAvailable ? (string) $risksOverAppetite : '—',
-                'sublabel' => ! $risksAvailable
-                    ? 'Risk data unavailable'
-                    : ($risksOverAppetite > 0 ? 'Review required' : 'None above appetite'),
-                'tone' => ! $risksAvailable ? 'muted' : ($risksOverAppetite > 0 ? 'critical' : 'success'),
-                'href' => '/governance/risks',
-            ],
-            [
-                'key' => 'policy_attestations',
-                'label' => 'Policy Attestations',
-                'value' => $attestation['percent'].'%',
-                'sublabel' => $attestation['percent'] >= 90
-                    ? 'Board complete'
-                    : 'Board completion',
-                'tone' => $attestation['percent'] >= 90 ? 'success' : ($attestation['percent'] >= 60 ? 'warning' : 'critical'),
-                'href' => '/governance/policies/attestations',
-            ],
-        ];
-    }
-
-    /**
-     * Policy attestation completion percentage across all active policies.
-     */
-    protected function policyAttestationPercent(): array
-    {
-        if (! Schema::hasTable('policy_attestations') || ! Schema::hasTable('governance_policies')) {
-            return ['percent' => 0, 'required' => 0, 'completed' => 0];
-        }
-
-        $required = DB::table('policy_attestations')->count();
-        $completed = DB::table('policy_attestations')
-            ->whereNotNull('acknowledged_at')
-            ->count();
-
-        $percent = $required > 0 ? (int) round(($completed / $required) * 100) : 0;
-
-        return ['percent' => $percent, 'required' => $required, 'completed' => $completed];
-    }
-
-    /**
-     * Next upcoming meeting with its readiness checklist.
+     * Next upcoming meeting with its preparation checklist and the viewer's
+     * own readiness.
      */
     protected function buildNextMeeting(?User $user): ?array
     {
@@ -243,8 +186,7 @@ class GovernancePresenter
             ->orderBy('scheduled_at');
 
         if ($user !== null) {
-            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                ->scopeMeetings($meetingQuery, $user);
+            app(GovernanceRecordAccessService::class)->scopeMeetings($meetingQuery, $user);
         }
 
         $meeting = $meetingQuery->first();
@@ -263,9 +205,11 @@ class GovernancePresenter
                 'id' => $meeting->id,
                 'title' => $meeting->title,
                 'scheduled_at' => $meeting->scheduled_at?->toIso8601String(),
-                'scheduled_label' => $meeting->scheduled_at?->timezone('Pacific/Auckland')->format('j M Y, g:i A'),
-                'days_until' => $meeting->scheduled_at ? (int) now()->startOfDay()->diffInDays($meeting->scheduled_at->copy()->startOfDay(), false) : null,
+                'scheduled_label' => $meeting->scheduled_at ? GovernanceLabels::date($meeting->scheduled_at, true) : null,
+                'days_until' => GovernanceWording::daysFromToday($meeting->scheduled_at),
                 'status' => $meeting->status,
+                'status_label' => GovernanceLabels::label('meeting_status', $meeting->status),
+                'type_label' => GovernanceLabels::label('meeting_type', $meeting->meeting_type),
                 'location' => $meeting->location,
                 'chair' => $meeting->chair?->user?->name,
                 'secretary' => $meeting->secretary?->user?->name,
@@ -287,9 +231,9 @@ class GovernancePresenter
     /**
      * What the viewer personally has to do before this meeting. Derived from
      * the same permitted records as their meeting workspace (visible agenda,
-     * the pack they may open, resolutions they may view) and from the same
-     * vote obligations as My work — never the administrative preparation
-     * steps (CEO report, pack generation, signing) of the checklist.
+     * the resolutions they may view, the pack they may open) and from the
+     * same vote obligations as My work — never the administrative
+     * preparation steps (CEO report, pack generation, signing).
      *
      * @return array<string, mixed>
      */
@@ -304,24 +248,27 @@ class GovernancePresenter
             ? $pack->hasMemberRead($boardMember->id)
             : collect($pack->read_tracking ?? [])->contains(fn ($entry) => (int) ($entry['user_id'] ?? 0) === (int) $user->id));
 
-        $papers = app(\App\Domain\Governance\Services\ExecutiveMeetingAccessService::class)
+        // The Agenda tab lists exactly these items.
+        $agendaCount = app(ExecutiveMeetingAccessService::class)
             ->visibleAgendaItems($user, $meeting)
             ->count();
 
-        $recordAccess = app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class);
+        // The Decision papers tab lists exactly these resolutions.
+        $recordAccess = app(GovernanceRecordAccessService::class);
         $visibleResolutions = $meeting->resolutions
-            ->filter(fn ($resolution) => $recordAccess->canViewResolution($user, $resolution))
+            ->filter(fn (Resolution $resolution) => $recordAccess->canViewResolution($user, $resolution))
             ->values();
         $visibleResolutionIds = $visibleResolutions->pluck('id')->map(fn ($id) => (int) $id);
 
-        // Votes open for me: exactly the vote obligations My work lists, limited
-        // to this meeting's resolutions.
+        // Votes open for me: exactly the vote obligations My work lists for
+        // this meeting, leaving out any whose voting deadline has passed.
         $votesAvailable = true;
         $votesOpen = 0;
         try {
             $availability = [];
-            $voteSourceIds = app(\App\Domain\Governance\Services\GovernanceWorkQuery::class)
+            $voteSourceIds = app(GovernanceWorkQuery::class)
                 ->queryVoteItems($user, $availability)
+                ->reject(fn ($item) => $item->status === 'overdue')
                 ->map(fn ($item) => (int) ($item->source['id'] ?? 0));
             $votesAvailable = ($availability['resolutions'] ?? 'available') !== 'unavailable';
             $votesOpen = $visibleResolutionIds->intersect($voteSourceIds)->count();
@@ -333,19 +280,32 @@ class GovernancePresenter
         $declaredConflicts = 0;
         $decisionsToCheck = 0;
         if ($boardMember !== null) {
-            $declaredResolutionIds = \App\Domain\Governance\Models\ConflictDeclaration::query()
+            $declarations = ConflictDeclaration::query()
                 ->where('board_member_id', $boardMember->id)
                 ->where(function ($query) use ($meeting, $visibleResolutionIds) {
                     $query->where('governance_meeting_id', $meeting->id)
                         ->orWhereIn('resolution_id', $visibleResolutionIds->all());
                 })
                 ->get(['id', 'resolution_id']);
-            $declaredConflicts = $declaredResolutionIds->count();
-            $declaredIds = $declaredResolutionIds->pluck('resolution_id')->filter()->map(fn ($id) => (int) $id);
+            $declaredConflicts = $declarations->count();
+
+            // A decision is settled for this member once they have declared a
+            // conflict on it or voted — it no longer needs checking.
+            $votedIds = $visibleResolutionIds->isEmpty()
+                ? collect()
+                : Vote::query()
+                    ->where('board_member_id', $boardMember->id)
+                    ->whereIn('resolution_id', $visibleResolutionIds->all())
+                    ->pluck('resolution_id');
+            $settledIds = $declarations->pluck('resolution_id')
+                ->filter()
+                ->merge($votedIds)
+                ->map(fn ($id) => (int) $id);
 
             $decisionsToCheck = $visibleResolutions
+                ->filter(fn (Resolution $resolution) => ($resolution->purpose ?? 'decision') === 'decision')
                 ->whereIn('status', ['draft', 'open'])
-                ->reject(fn ($resolution) => $declaredIds->contains((int) $resolution->id))
+                ->reject(fn (Resolution $resolution) => $settledIds->contains((int) $resolution->id))
                 ->count();
         }
 
@@ -363,9 +323,13 @@ class GovernancePresenter
                 'revision_number' => $packPublished ? ($pack->revision_number ?? 1) : null,
                 'href' => $packPublished ? "/governance/packs/{$pack->id}" : null,
             ],
-            'papers' => [
-                'count' => $papers,
+            'agenda' => [
+                'count' => $agendaCount,
                 'href' => "{$meetingHref}?tab=agenda",
+            ],
+            'papers' => [
+                'count' => $visibleResolutions->count(),
+                'href' => "{$meetingHref}?tab=resolutions",
             ],
             'votes' => [
                 'available' => $votesAvailable,
@@ -384,276 +348,156 @@ class GovernancePresenter
 
     /**
      * Concise board assurance for Home. Every count uses the same query as the
-     * register view its link opens, and a source that failed is reported as
-     * unavailable — never as zero or "within appetite".
+     * register view its link opens; a source the viewer may not open is not
+     * counted at all (`permitted: false`), and a source that failed is
+     * reported as unavailable — never as zero or "within the limit".
      *
      * @return array<string, array<string, mixed>>
      */
     protected function buildAssurance(array $widgets, ?User $user): array
     {
+        $can = fn (string $permission): bool => $user === null || $user->canDo($permission);
+        $canRisks = $can('governance.risks.view');
+        $canCompliance = $can('governance.compliance.view');
+        $canActions = $can('governance.actions.view');
+        $canBudgets = $can('governance.budgets.view');
+
         $topRisks = is_array($widgets['top_risks'] ?? null) ? $widgets['top_risks'] : null;
-        $risksAvailable = $topRisks !== null && ($topRisks['status'] ?? null) !== 'unavailable' && array_key_exists('above_appetite', $topRisks);
+        $risksAvailable = $canRisks
+            && $topRisks !== null
+            && ($topRisks['status'] ?? null) !== 'unavailable'
+            && array_key_exists('above_appetite', $topRisks);
 
         $obligationsOverdue = null;
-        try {
-            if (Schema::hasTable('compliance_obligations')) {
-                $obligationsOverdue = ComplianceObligation::query()->overdue()->count();
+        if ($canCompliance) {
+            try {
+                if (Schema::hasTable('compliance_obligations')) {
+                    $obligationsOverdue = ComplianceObligation::query()->overdue()->count();
+                }
+            } catch (\Throwable $e) {
+                report($e);
             }
-        } catch (\Throwable $e) {
-            report($e);
         }
 
         $actionsOverdue = null;
-        try {
-            if (Schema::hasTable('action_items')) {
-                $actionQuery = ActionItem::query()->overdue();
-                if ($user !== null) {
-                    app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                        ->scopeActionItems($actionQuery, $user);
+        if ($canActions) {
+            try {
+                if (Schema::hasTable('action_items')) {
+                    $actionQuery = ActionItem::query()->overdue();
+                    if ($user !== null) {
+                        app(GovernanceRecordAccessService::class)->scopeActionItems($actionQuery, $user);
+                    }
+                    $actionsOverdue = $actionQuery->count();
                 }
-                $actionsOverdue = $actionQuery->count();
+            } catch (\Throwable $e) {
+                report($e);
             }
-        } catch (\Throwable $e) {
-            report($e);
         }
 
         $financial = is_array($widgets['financial'] ?? null) ? $widgets['financial'] : [];
         $financialStatus = $financial['status'] ?? 'unknown';
         $variance = isset($financial['variance']) && is_numeric($financial['variance']) ? (float) $financial['variance'] : null;
-        $financialAvailable = ! in_array($financialStatus, ['unknown', 'unavailable'], true) && $variance !== null;
+        $financialAvailable = $canBudgets
+            && ! in_array($financialStatus, ['unknown', 'unavailable'], true)
+            && $variance !== null;
 
         return [
             'risks_above_appetite' => [
+                'permitted' => $canRisks,
                 'available' => $risksAvailable,
                 'count' => $risksAvailable ? (int) $topRisks['above_appetite'] : null,
                 'tracked' => $risksAvailable ? (int) ($topRisks['count'] ?? 0) : null,
                 'href' => '/governance/risks?above_appetite=1',
             ],
             'obligations_overdue' => [
+                'permitted' => $canCompliance,
                 'available' => $obligationsOverdue !== null,
                 'count' => $obligationsOverdue,
                 'href' => '/governance/compliance?status=overdue',
             ],
             'actions_overdue' => [
+                'permitted' => $canActions,
                 'available' => $actionsOverdue !== null,
                 'count' => $actionsOverdue,
                 'href' => '/governance/actions?status=overdue',
             ],
             'financial_variance' => [
+                'permitted' => $canBudgets,
                 'available' => $financialAvailable,
                 'variance_percent' => $financialAvailable ? round($variance, 1) : null,
-                'material' => $financialAvailable ? abs($variance) > 5 : null,
-                'threshold_percent' => 5,
+                'material' => $financialAvailable ? abs($variance) > self::BUDGET_FLAG_PERCENT : null,
+                'threshold_percent' => self::BUDGET_FLAG_PERCENT,
                 'href' => '/governance/budgets',
             ],
         ];
     }
 
     /**
-     * Board pack readiness for the next upcoming meeting.
-     */
-    protected function buildBoardPack(?User $user): ?array
-    {
-        if (! $user
-            || ! $this->boardPackAccess->canViewPacks($user)
-            || ! Schema::hasTable('governance_meetings')) {
-            return null;
-        }
-
-        $meetingQuery = GovernanceMeeting::query()
-            ->with(['boardPack'])
-            ->where('scheduled_at', '>=', now())
-            ->whereNotIn('status', ['cancelled', 'archived'])
-            ->orderBy('scheduled_at');
-
-        if ($user !== null) {
-            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                ->scopeMeetings($meetingQuery, $user);
-        }
-
-        $meeting = $meetingQuery->first();
-
-        if (! $meeting) {
-            return null;
-        }
-
-        $pack = $this->boardPackAccess->visiblePack($user, $meeting->boardPack);
-        if (! $pack && ! $this->boardPackAccess->canManage($user)) {
-            return null;
-        }
-
-        $distributed = $pack ? count(array_unique($pack->distributed_to ?? [])) : 0;
-        $readCount = $pack?->readCount() ?? 0;
-
-        return [
-            'meeting_id' => $meeting->id,
-            'meeting_title' => $meeting->title,
-            'ready' => $pack !== null,
-            'distributed' => $pack?->distributed_at !== null,
-            'distributed_label' => $pack?->distributed_at?->timezone('Pacific/Auckland')->format('j M g:i A'),
-            'doc_count' => $pack ? $pack->actualDocumentCount() : 0,
-            'revision_number' => $pack?->revision_number ?? 1,
-            'distributed_count' => $distributed,
-            'read_count' => $readCount,
-            'href' => $pack ? "/governance/packs/{$pack->id}" : "/governance/meetings/{$meeting->id}",
-            'updated_at' => $pack?->updated_at?->toIso8601String(),
-        ];
-    }
-
-    /**
-     * Calendar feed: upcoming meetings + compliance due dates + policy review dates.
-     */
-    protected function buildCalendarEvents(?User $user = null): array
-    {
-        $events = collect();
-        $start = now()->startOfMonth();
-        $end = now()->copy()->addMonths(2)->endOfMonth();
-
-        if (Schema::hasTable('governance_meetings')) {
-            $meetingQuery = GovernanceMeeting::query()
-                ->whereBetween('scheduled_at', [$start, $end])
-                ->whereNotIn('status', ['cancelled', 'archived']);
-
-            if ($user !== null) {
-                app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                    ->scopeMeetings($meetingQuery, $user);
-            }
-
-            $meetingQuery->get()
-                ->each(function (GovernanceMeeting $meeting) use ($events) {
-                    $events->push([
-                        'id' => 'meeting-'.$meeting->id,
-                        'kind' => 'meeting',
-                        'date' => $meeting->scheduled_at?->toDateString(),
-                        'title' => $meeting->title,
-                        'href' => "/governance/meetings/{$meeting->id}",
-                    ]);
-                });
-        }
-
-        if (Schema::hasTable('compliance_obligations')) {
-            ComplianceObligation::query()
-                ->whereBetween('due_date', [$start, $end])
-                ->whereNotIn('status', ['complete'])
-                ->limit(50)
-                ->get()
-                ->each(function (ComplianceObligation $obligation) use ($events) {
-                    $events->push([
-                        'id' => 'compliance-'.$obligation->id,
-                        'kind' => 'compliance',
-                        'date' => $obligation->due_date?->toDateString(),
-                        'title' => $obligation->obligation_title,
-                        'href' => "/governance/compliance/{$obligation->id}",
-                    ]);
-                });
-        }
-
-        if (Schema::hasTable('governance_policies')) {
-            GovernancePolicy::query()
-                ->whereBetween('next_review_date', [$start, $end])
-                ->limit(50)
-                ->get()
-                ->each(function (GovernancePolicy $policy) use ($events) {
-                    $events->push([
-                        'id' => 'policy-'.$policy->id,
-                        'kind' => 'policy',
-                        'date' => $policy->next_review_date?->toDateString(),
-                        'title' => 'Review: '.($policy->title ?? $policy->name ?? 'Policy'),
-                        'href' => "/governance/policies/{$policy->id}",
-                    ]);
-                });
-        }
-
-        return $events
-            ->filter(fn (array $event) => ! empty($event['date']))
-            ->sortBy('date')
-            ->values()
-            ->take(80)
-            ->all();
-    }
-
-    /**
-     * What changed since the last completed board meeting.
+     * What changed since the last meeting the viewer could attend. The
+     * timeline is part of the audit trail, so it is only built for viewers
+     * with audit log access — and each event is only kept when the viewer
+     * may open the record it is about.
      */
     protected function buildTimeline(?User $user): array
     {
-        $sinceMeeting = Schema::hasTable('governance_meetings')
-            ? GovernanceMeeting::query()
+        if ($user !== null && ! $user->canDo('governance.audit.view')) {
+            return ['since' => null, 'events' => [], 'restricted' => true];
+        }
+
+        $sinceMeeting = null;
+        if (Schema::hasTable('governance_meetings')) {
+            $sinceQuery = GovernanceMeeting::query()
                 ->where('scheduled_at', '<', now())
                 ->whereNotIn('status', ['cancelled'])
-                ->orderByDesc('scheduled_at')
-                ->first()
-            : null;
+                ->orderByDesc('scheduled_at');
+
+            if ($user !== null) {
+                app(GovernanceRecordAccessService::class)->scopeMeetings($sinceQuery, $user);
+            }
+
+            $sinceMeeting = $sinceQuery->first();
+        }
 
         $since = $sinceMeeting?->scheduled_at?->copy() ?? now()->subDays(30);
 
-        $events = GovernanceAuditService::recentEventsSince($since, 60);
+        $events = collect(GovernanceAuditService::recentEventsSince($since, 60));
+        $readable = $user !== null ? $this->readableTimelineRecords($events, $user) : [];
 
-        $spendEventIds = collect($events)
-            ->filter(fn (array $row) => class_basename($row['entity_type'] ?? '') === 'SpendApproval')
-            ->pluck('entity_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-        $readableSpendIds = collect();
-        if ($spendEventIds->isNotEmpty()) {
-            $spendQuery = $this->spendApprovalReader->readableApprovalQuery($user);
-            if ($spendQuery) {
-                $readableSpendIds = $spendQuery
-                    ->whereKey($spendEventIds->all())
-                    ->pluck('id')
-                    ->map(fn ($id) => (int) $id);
-            }
-        }
-
-        $boardPackEventIds = collect($events)
-            ->filter(fn (array $row) => class_basename($row['entity_type'] ?? '') === 'BoardPack')
-            ->pluck('entity_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-        $readableBoardPackIds = collect();
-        if ($user
-            && $this->boardPackAccess->canManage($user)
-            && $boardPackEventIds->isNotEmpty()) {
-            $readableBoardPackIds = $this->boardPackAccess
-                ->visibleQuery($user)
-                ->whereKey($boardPackEventIds->all())
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id);
-        }
-
-        $formatted = collect($events)
-            ->filter(function (array $row) use ($readableSpendIds, $readableBoardPackIds) {
-                $entityType = class_basename($row['entity_type'] ?? '');
-
-                if ($entityType === 'SpendApproval') {
-                    return $readableSpendIds->contains((int) ($row['entity_id'] ?? 0));
+        $formatted = $events
+            ->filter(function (array $row) use ($readable, $user) {
+                if ($user === null) {
+                    return true;
                 }
 
-                if ($entityType === 'BoardPack') {
-                    return $readableBoardPackIds->contains((int) ($row['entity_id'] ?? 0));
+                $type = $this->timelineEntityBase($row['entity_type'] ?? '');
+
+                if (in_array($type, self::TIMELINE_RECORD_TYPES, true)) {
+                    return ($readable[$type] ?? collect())->contains((int) ($row['entity_id'] ?? 0));
                 }
 
+                if (isset(self::TIMELINE_REGISTER_PERMISSIONS[$type])) {
+                    return $user->canDo(self::TIMELINE_REGISTER_PERMISSIONS[$type]);
+                }
+
+                // Same as the audit log register for anything else.
                 return true;
             })
             ->map(function (array $row) {
-                $createdAt = isset($row['created_at']) ? Carbon::parse($row['created_at']) : null;
+                $createdAt = isset($row['created_at']) ? Carbon::parse($row['created_at'], 'UTC') : null;
+                $type = $this->timelineEntityBase($row['entity_type'] ?? '');
 
                 return [
                     'id' => ($row['kind'] ?? 'event').'-'.($row['id'] ?? 0),
                     'kind' => $row['kind'] ?? 'event',
-                    'actor' => $row['actor_name'] ?? 'System',
-                    'type' => $this->humaniseEventType($row['type'] ?? ''),
-                    'entity_type' => $this->humaniseEntityType($row['entity_type'] ?? ''),
+                    'actor' => ($row['actor_name'] ?? null) ?: 'The system',
+                    'type' => GovernanceLabels::auditEvent($row['type'] ?? null),
+                    'entity_type' => $type !== '' ? GovernanceLabels::label('audit_entity_type', Str::snake($type)) : 'Record',
                     'entity_id' => $row['entity_id'] ?? null,
                     'description' => $row['description'] ?? null,
                     'occurred_at' => $createdAt?->toIso8601String(),
-                    'occurred_label' => $createdAt?->timezone('Pacific/Auckland')->format('j M g:i A'),
-                    'day' => $createdAt?->timezone('Pacific/Auckland')->format('j M Y'),
-                    'href' => $this->entityHref($row['entity_type'] ?? '', $row['entity_id'] ?? null),
+                    'occurred_label' => $createdAt?->copy()->setTimezone($this->timezone())->format('g:i a'),
+                    'day' => $createdAt ? GovernanceLabels::date($createdAt) : null,
+                    'href' => $this->entityHref($type, $row['entity_id'] ?? null),
                 ];
             });
 
@@ -662,90 +506,150 @@ class GovernancePresenter
                 'meeting_id' => $sinceMeeting->id,
                 'title' => $sinceMeeting->title,
                 'held_at' => $sinceMeeting->scheduled_at?->toIso8601String(),
-                'held_label' => $sinceMeeting->scheduled_at?->timezone('Pacific/Auckland')->format('j M Y'),
+                'held_label' => $sinceMeeting->scheduled_at ? GovernanceLabels::date($sinceMeeting->scheduled_at) : null,
             ] : null,
             'events' => $formatted->values()->all(),
         ];
     }
 
     /**
-     * Recently completed items so the board can see what no longer needs action.
+     * The record ids the viewer may open for each record-level audit type,
+     * using the registers' own audience rules.
+     *
+     * @param  Collection<int, array<string, mixed>>  $events
+     * @return array<string, Collection<int, int>>
+     */
+    protected function readableTimelineRecords(Collection $events, User $user): array
+    {
+        $recordAccess = app(GovernanceRecordAccessService::class);
+        $readable = [];
+
+        $resolve = function (string $type, bool $allowed, callable $build) use ($events, &$readable): void {
+            $ids = $events
+                ->filter(fn (array $row) => $this->timelineEntityBase($row['entity_type'] ?? '') === $type)
+                ->pluck('entity_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $readable[$type] = $allowed && $ids->isNotEmpty()
+                ? $build($ids)->pluck('id')->map(fn ($id) => (int) $id)
+                : collect();
+        };
+
+        $resolve('GovernanceMeeting', $user->canDo('governance.meetings.view'),
+            fn (Collection $ids) => $recordAccess->scopeMeetings(GovernanceMeeting::query()->whereKey($ids->all()), $user));
+        $resolve('Resolution', $user->canDo('governance.resolutions.view'),
+            fn (Collection $ids) => $recordAccess->scopeResolutions(Resolution::query()->whereKey($ids->all()), $user));
+        $resolve('ActionItem', $user->canDo('governance.actions.view'),
+            fn (Collection $ids) => $recordAccess->scopeActionItems(ActionItem::query()->whereKey($ids->all()), $user));
+        $resolve('MeetingMinute', $user->canDo('governance.meetings.view'),
+            fn (Collection $ids) => MeetingMinute::query()
+                ->whereKey($ids->all())
+                ->whereHas('meeting', fn (Builder $meetings) => $recordAccess->scopeMeetings($meetings, $user)));
+        $resolve('PerformanceReview', $user->canDo('governance.performance.view'),
+            fn (Collection $ids) => $recordAccess->scopePerformanceReviews(PerformanceReview::query()->whereKey($ids->all()), $user));
+
+        $spendQuery = $this->spendApprovalReader->readableApprovalQuery($user);
+        $resolve('SpendApproval', $spendQuery !== null,
+            fn (Collection $ids) => $spendQuery->whereKey($ids->all()));
+        $resolve('BoardPack', $this->boardPackAccess->canManage($user),
+            fn (Collection $ids) => $this->boardPackAccess->visibleQuery($user)->whereKey($ids->all()));
+
+        return $readable;
+    }
+
+    /** "App\Domain\Governance\Models\Resolution" / "resolution" → "Resolution". */
+    protected function timelineEntityBase(mixed $entityType): string
+    {
+        $base = class_basename((string) $entityType);
+
+        return $base === '' ? '' : Str::studly($base);
+    }
+
+    /**
+     * Work finished in the last 14 days, so the board can see what no longer
+     * needs action. Each source is scoped like its register.
      */
     protected function buildRecentlyCompleted(?User $user): array
     {
         $since = now()->subDays(14);
         $items = collect();
+        $recordAccess = app(GovernanceRecordAccessService::class);
+        $can = fn (string $permission): bool => $user === null || $user->canDo($permission);
 
-        if (Schema::hasTable('risk_register_entries')) {
+        if (Schema::hasTable('risk_register_entries') && $can('governance.risks.view')) {
             RiskRegisterEntry::query()
-                ->where('status', 'voided')
+                ->with('riskOwner:id,name')
+                ->whereIn('status', ['voided', 'closed', 'avoided'])
                 ->where('closed_at', '>=', $since)
                 ->orderByDesc('closed_at')
                 ->limit(8)
                 ->get()
                 ->each(function (RiskRegisterEntry $risk) use ($items) {
-                    $items->push([
-                        'kind' => 'risk_closed',
-                        'title' => ($risk->risk_reference ? "{$risk->risk_reference} " : '').$risk->title,
-                        'completed_at' => $risk->closed_at?->toIso8601String(),
-                        'completed_label' => $risk->closed_at?->diffForHumans(),
-                        'href' => "/governance/risks/{$risk->id}",
-                        'owner' => $risk->riskOwner?->name,
-                    ]);
+                    $items->push($this->completedItem(
+                        $risk->status === 'voided' ? 'risk_removed' : 'risk_closed',
+                        (string) $risk->title,
+                        $risk->risk_reference,
+                        $risk->closed_at,
+                        "/governance/risks/{$risk->id}",
+                        $risk->riskOwner?->name,
+                    ));
                 });
         }
 
-        if (Schema::hasTable('action_items')) {
-            ActionItem::query()
+        if (Schema::hasTable('action_items') && $can('governance.actions.view')) {
+            $actionQuery = ActionItem::query()
                 ->with('assignedTo:id,name')
                 ->whereIn('status', ['complete', 'completed'])
                 ->where('completed_at', '>=', $since)
                 ->orderByDesc('completed_at')
-                ->limit(8)
-                ->get()
-                ->each(function (ActionItem $action) use ($items) {
-                    $items->push([
-                        'kind' => 'action_completed',
-                        'title' => ($action->action_reference ? "{$action->action_reference} " : '').$action->description,
-                        'completed_at' => $action->completed_at?->toIso8601String(),
-                        'completed_label' => $action->completed_at?->diffForHumans(),
-                        'href' => "/governance/actions/{$action->id}",
-                        'owner' => $action->assignedTo?->name,
-                    ]);
-                });
+                ->limit(8);
+
+            if ($user !== null) {
+                $recordAccess->scopeActionItems($actionQuery, $user);
+            }
+
+            $actionQuery->get()->each(function (ActionItem $action) use ($items) {
+                $title = trim((string) ($action->title ?: $action->description));
+
+                $items->push($this->completedItem(
+                    'action_completed',
+                    Str::limit($title === '' ? 'Action' : $title, 90),
+                    $action->action_reference,
+                    $action->completed_at,
+                    "/governance/actions/{$action->id}",
+                    $action->assignedTo?->name,
+                ));
+            });
         }
 
-        if (Schema::hasTable('meeting_minutes')) {
-            MeetingMinute::query()
+        if (Schema::hasTable('meeting_minutes') && $can('governance.meetings.view')) {
+            $minutesQuery = MeetingMinute::query()
                 ->with('meeting:id,title')
                 ->whereIn('status', ['approved', 'signed', 'archived'])
                 ->where('updated_at', '>=', $since)
                 ->orderByDesc('updated_at')
-                ->limit(6)
-                ->get()
-                ->each(function (MeetingMinute $minute) use ($items) {
-                    $meetingId = $minute->governance_meeting_id;
-                    $meetingTitle = $minute->meeting?->title ?? "Meeting #{$meetingId}";
-                    $kind = $minute->status === 'signed' ? 'minutes_signed' : 'minutes_approved';
-                    $statusLabel = match ($minute->status) {
-                        'signed' => 'Minutes signed',
-                        'approved' => 'Minutes approved',
-                        'archived' => 'Minutes archived',
-                        default => 'Minutes updated',
-                    };
+                ->limit(6);
 
-                    $items->push([
-                        'kind' => $kind,
-                        'title' => "{$statusLabel} for {$meetingTitle}",
-                        'completed_at' => ($minute->signed_at ?? $minute->reviewed_at ?? $minute->updated_at)?->toIso8601String(),
-                        'completed_label' => ($minute->signed_at ?? $minute->reviewed_at ?? $minute->updated_at)?->diffForHumans(),
-                        'href' => "/governance/meetings/{$meetingId}?tab=minutes",
-                        'owner' => $minute->signer_name ?? $minute->reviewer_name,
-                    ]);
-                });
+            if ($user !== null) {
+                $minutesQuery->whereHas('meeting', fn (Builder $meetings) => $recordAccess->scopeMeetings($meetings, $user));
+            }
+
+            $minutesQuery->get()->each(function (MeetingMinute $minute) use ($items) {
+                $items->push($this->completedItem(
+                    $minute->status === 'approved' ? 'minutes_approved' : 'minutes_signed',
+                    (string) ($minute->meeting?->title ?? 'Meeting'),
+                    null,
+                    $minute->signed_at ?? $minute->reviewed_at ?? $minute->updated_at,
+                    "/governance/meetings/{$minute->governance_meeting_id}?tab=minutes",
+                    $minute->signer_name ?? $minute->reviewer_name,
+                ));
+            });
         }
 
-        if (Schema::hasTable('governance_policies')) {
+        if (Schema::hasTable('governance_policies') && $can('governance.policies.view')) {
             GovernancePolicy::query()
                 ->whereNotNull('approved_at')
                 ->where('approved_at', '>=', $since)
@@ -753,14 +657,14 @@ class GovernancePresenter
                 ->limit(6)
                 ->get()
                 ->each(function (GovernancePolicy $policy) use ($items) {
-                    $items->push([
-                        'kind' => 'policy_approved',
-                        'title' => 'Policy approved: '.($policy->title ?? $policy->name ?? 'Policy #'.$policy->id),
-                        'completed_at' => $policy->approved_at?->toIso8601String(),
-                        'completed_label' => $policy->approved_at?->diffForHumans(),
-                        'href' => "/governance/policies/{$policy->id}",
-                        'owner' => null,
-                    ]);
+                    $items->push($this->completedItem(
+                        'policy_approved',
+                        (string) ($policy->title ?? 'Policy'),
+                        $policy->policy_code,
+                        $policy->approved_at,
+                        "/governance/policies/{$policy->id}",
+                        null,
+                    ));
                 });
         }
 
@@ -774,14 +678,14 @@ class GovernancePresenter
                     ->limit(6)
                     ->get()
                     ->each(function (SpendApproval $approval) use ($items) {
-                        $items->push([
-                            'kind' => 'spend_approved',
-                            'title' => 'Spend approved: '.($approval->description ?? 'Request #'.$approval->id),
-                            'completed_at' => $approval->updated_at?->toIso8601String(),
-                            'completed_label' => $approval->updated_at?->diffForHumans(),
-                            'href' => "/governance/spend-approvals/{$approval->id}",
-                            'owner' => null,
-                        ]);
+                        $items->push($this->completedItem(
+                            'spend_approved',
+                            (string) ($approval->title ?: ($approval->description ?? 'Spend request')),
+                            null,
+                            $approval->updated_at,
+                            "/governance/spend-approvals/{$approval->id}",
+                            null,
+                        ));
                     });
             }
         }
@@ -793,16 +697,20 @@ class GovernancePresenter
             ->all();
     }
 
-    protected function humaniseEventType(string $type): string
+    /** @return array<string, mixed> */
+    protected function completedItem(string $kind, string $title, ?string $reference, mixed $completedAt, string $href, ?string $owner): array
     {
-        return ucwords(str_replace(['_', '-'], ' ', $type));
-    }
+        $at = $completedAt instanceof CarbonInterface ? $completedAt : null;
 
-    protected function humaniseEntityType(string $entity): string
-    {
-        $entity = class_basename($entity);
-
-        return ucwords(preg_replace('/(?<!^)([A-Z])/', ' $1', $entity) ?: $entity);
+        return [
+            'kind' => $kind,
+            'title' => $title,
+            'reference' => $reference ?: null,
+            'completed_at' => $at?->toIso8601String(),
+            'completed_label' => $at?->diffForHumans(),
+            'href' => $href,
+            'owner' => $owner,
+        ];
     }
 
     protected function entityHref(string $entityType, mixed $entityId): ?string
@@ -811,9 +719,7 @@ class GovernancePresenter
             return null;
         }
 
-        $name = class_basename($entityType);
-
-        return match ($name) {
+        return match ($this->timelineEntityBase($entityType)) {
             'GovernanceMeeting' => "/governance/meetings/{$entityId}",
             'Resolution' => "/governance/resolutions/{$entityId}",
             'RiskRegisterEntry' => "/governance/risks/{$entityId}",
@@ -835,15 +741,15 @@ class GovernancePresenter
 
         return [
             'headline' => [
-                $this->metric('Decisions required', $widgets['decisions_required']['count'] ?? 0, ($widgets['decisions_required']['overdue'] ?? 0) > 0 ? 'critical' : 'default'),
+                $this->metric('Resolutions waiting', $widgets['decisions_required']['count'] ?? 0, ($widgets['decisions_required']['overdue'] ?? 0) > 0 ? 'critical' : 'default'),
                 $this->metric('Overdue actions', $workflow['summary']['overdue'] ?? 0, ($workflow['summary']['overdue'] ?? 0) > 0 ? 'critical' : 'default'),
                 $this->metric('Critical risks', $widgets['top_risks']['critical'] ?? 0, ($widgets['top_risks']['critical'] ?? 0) > 0 ? 'critical' : 'default'),
-                $this->metric('Budget variance', $this->formatPercent($widgets['financial']['variance'] ?? null), abs((float) ($widgets['financial']['variance'] ?? 0)) >= 5 ? 'warning' : 'default'),
+                $this->metric('Over or under budget', $this->formatPercent($widgets['financial']['variance'] ?? null), abs((float) ($widgets['financial']['variance'] ?? 0)) >= self::BUDGET_FLAG_PERCENT ? 'warning' : 'default'),
             ],
             'sections' => [
-                ['key' => 'board_focus', 'title' => 'Board Focus', 'cards' => $this->cardsForKeys($cards, ['meeting_readiness', 'follow_through', 'decisions_required', 'roadmap'])],
-                ['key' => 'assurance', 'title' => 'Assurance', 'cards' => $this->cardsForKeys($cards, ['top_risks', 'risk_changes', 'compliance_calendar', 'privacy_data'])],
-                ['key' => 'delivery', 'title' => 'Service Delivery & Controls', 'cards' => $this->cardsForKeys($cards, ['client_safety', 'operational_safety', 'workforce', 'financial', 'control_room', 'it_cyber', 'incidents', 'safeguarding'])],
+                ['key' => 'board_focus', 'title' => 'Board focus', 'cards' => $this->cardsForKeys($cards, ['meeting_readiness', 'follow_through', 'decisions_required', 'roadmap'])],
+                ['key' => 'assurance', 'title' => 'Risk and compliance', 'cards' => $this->cardsForKeys($cards, ['top_risks', 'risk_changes', 'compliance_calendar', 'privacy_data'])],
+                ['key' => 'delivery', 'title' => 'Service delivery and controls', 'cards' => $this->cardsForKeys($cards, ['client_safety', 'operational_safety', 'workforce', 'financial', 'control_room', 'it_cyber', 'incidents', 'safeguarding'])],
             ],
         ];
     }
@@ -861,22 +767,22 @@ class GovernancePresenter
 
         return [
             'committee' => [
-                'name' => $committee?->name ?? $this->titleize($committeeType),
+                'name' => $committee?->name ?? GovernanceLabels::label('meeting_type', $committeeType),
                 'type' => $committeeType,
                 'description' => $committee?->description,
             ],
             'headline' => [
-                $this->metric('Tracked risks', $risks->count()),
-                $this->metric('High / critical', $risks->where('residual_score', '>=', 15)->count(), $risks->where('residual_score', '>=', 20)->count() > 0 ? 'critical' : 'warning'),
+                $this->metric('Open risks', $risks->count()),
+                $this->metric('High or critical risks', $risks->where('residual_score', '>=', 15)->count(), $risks->where('residual_score', '>=', 20)->count() > 0 ? 'critical' : 'warning'),
             ],
             'sections' => [
-                ['key' => 'committee_overview', 'title' => 'Committee Overview', 'cards' => $cards->values()->all()],
+                ['key' => 'committee_overview', 'title' => 'Committee overview', 'cards' => $cards->values()->all()],
             ],
             'risks' => $risks->map(fn (RiskRegisterEntry $risk) => [
                 'id' => $risk->id,
                 'reference' => $risk->risk_reference,
                 'title' => $risk->title,
-                'category' => $this->titleize($risk->category),
+                'category' => GovernanceLabels::label('risk_category', $risk->category),
                 'residual_score' => $risk->residual_score,
                 'owner' => $risk->riskOwner?->name,
                 'within_appetite' => (bool) $risk->within_appetite,
@@ -889,7 +795,7 @@ class GovernancePresenter
         $frameworks = $obligations->map(function (Collection $items, string $framework) {
             return [
                 'key' => $framework,
-                'title' => $items->first()?->getFrameworkLabel() ?? $this->titleize($framework),
+                'title' => $items->first()?->getFrameworkLabel() ?? GovernanceLabels::label('compliance_framework', $framework),
                 'count' => $items->count(),
                 'items' => $items->map(fn (ComplianceObligation $obligation) => [
                     'id' => $obligation->id,
@@ -936,58 +842,60 @@ class GovernancePresenter
         $cards = collect([
             [
                 'key' => 'ceo_report',
-                'title' => 'CEO Report',
+                'title' => 'CEO report',
                 'status' => $ceoSubmitted ? 'done' : ($meeting->ceo_report_deadline && $meeting->ceo_report_deadline->isPast() ? 'warning' : 'todo'),
-                'value' => $ceoSubmitted ? 'Submitted' : 'Pending',
+                'value' => $ceoSubmitted ? 'Submitted' : 'Not submitted',
                 'detail' => $meeting->ceo_report_deadline
-                    ? 'Due '.$meeting->ceo_report_deadline->timezone('Pacific/Auckland')->format('j M Y g:i A')
-                    : 'No deadline set',
+                    ? 'Due '.GovernanceLabels::date($meeting->ceo_report_deadline, true)
+                    : 'No due date set',
                 'href' => $meeting->ceoReport ? "/governance/ceo-reports/{$meeting->ceoReport->id}" : '/governance/ceo-reports',
             ],
             [
                 'key' => 'pack_readiness',
-                'title' => 'Board Pack',
+                'title' => 'Board pack',
                 'status' => $pack?->distributed_at ? 'done' : ($pack ? 'in_progress' : 'todo'),
-                'value' => $pack?->distributed_at ? 'Distributed' : ($pack ? 'Generated' : 'Not started'),
+                'value' => $pack?->distributed_at ? 'Sent to members' : ($pack ? 'Ready' : 'Not prepared'),
                 'detail' => $pack?->distributed_at
-                    ? "{$readCount} read / {$distributedCount} distributed"
-                    : ($pack ? 'Ready to distribute to the board' : 'Generate once agenda and papers are ready'),
+                    ? "{$readCount} of {$distributedCount} have confirmed reading it"
+                    : ($pack ? 'Ready to send to members' : 'Prepare it once the agenda and papers are ready'),
                 'href' => $pack ? "/governance/packs/{$pack->id}" : "/governance/meetings/{$meeting->id}",
             ],
             [
                 'key' => 'quorum',
                 'title' => 'Quorum',
                 'status' => $quorum['met'] ? 'done' : ($quorum['present'] > 0 ? 'in_progress' : 'todo'),
-                'value' => "{$quorum['present']} / {$quorum['required']}",
-                'detail' => $quorum['met'] ? 'Quorum confirmed for decision-making.' : 'Attendance still needs to be confirmed.',
+                'value' => "{$quorum['present']} of {$quorum['required']}",
+                'detail' => $quorum['met']
+                    ? 'Enough members are present for decisions to be valid.'
+                    : 'Attendance still needs to be recorded.',
                 'href' => "/governance/meetings/{$meeting->id}?tab=attendance",
             ],
             [
                 'key' => 'resolutions',
-                'title' => 'Pending Resolutions',
+                'title' => 'Resolutions not yet decided',
                 'status' => $pendingResolutions > 0 ? 'in_progress' : 'done',
                 'value' => $pendingResolutions,
-                'detail' => $pendingResolutions > 0 ? 'Decision papers still open for this meeting.' : 'Decision papers are prepared or complete.',
+                'detail' => $pendingResolutions > 0 ? 'Some resolutions are still in draft or open for voting.' : 'No resolutions are waiting.',
                 'href' => "/governance/meetings/{$meeting->id}?tab=resolutions",
             ],
             [
                 'key' => 'minutes',
                 'title' => 'Minutes',
                 'status' => in_array($minutesStatus, ['signed', 'archived'], true) ? 'done' : ($meeting->minutes ? 'in_progress' : 'todo'),
-                'value' => $meeting->minutes ? $this->titleize($meeting->minutes->status) : 'Not drafted',
+                'value' => $meeting->minutes ? GovernanceLabels::label('minutes_status', $minutesStatus) : 'Not written',
                 'detail' => $meeting->minutes
-                    ? 'Version '.$meeting->minutes->version_number.' is currently '.$this->titleize($meeting->minutes->status).'.'
-                    : 'Minutes will be drafted after the meeting.',
+                    ? 'Version '.$meeting->minutes->version_number.': '.mb_strtolower(GovernanceLabels::label('minutes_status', $minutesStatus)).'.'
+                    : 'Minutes are written after the meeting.',
                 'href' => "/governance/meetings/{$meeting->id}?tab=minutes",
             ],
             [
                 'key' => 'follow_through',
-                'title' => 'Previous Follow-through',
+                'title' => 'Actions from the last meeting',
                 'status' => $previousOpenItems->isEmpty() ? 'done' : 'warning',
                 'value' => $previousOpenItems->count(),
                 'detail' => $previousOpenItems->isEmpty()
-                    ? 'No open follow-through from the previous governance cycle.'
-                    : 'Open action items remain from the last meeting cycle.',
+                    ? 'No actions are still open from the last meeting.'
+                    : 'Some actions from the last meeting are still open.',
                 'href' => '/governance/actions',
             ],
         ]);
@@ -1039,8 +947,7 @@ class GovernancePresenter
             ->orderBy('scheduled_at');
 
         if ($user !== null) {
-            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                ->scopeMeetings($meetingQuery, $user);
+            app(GovernanceRecordAccessService::class)->scopeMeetings($meetingQuery, $user);
         }
 
         $meeting = $meetingQuery->first();
@@ -1048,21 +955,21 @@ class GovernancePresenter
         if (! $meeting) {
             return $this->makeCard(
                 'meeting_readiness',
-                'Meeting readiness',
-                'Preparation status for the next governance cycle.',
+                'Meeting preparation',
+                'How ready the next meeting is.',
                 'good',
-                'Governance meetings',
+                'Meetings',
                 $this->derivedFreshness(),
                 [$this->metric('Next meeting', 'Not scheduled'), $this->metric('Agenda items', 0)],
-                ['No upcoming governance meeting is currently scheduled.'],
+                ['No meeting is scheduled.'],
                 '/governance/meetings'
             );
         }
 
-        $daysUntilMeeting = now()->startOfDay()->diffInDays($meeting->scheduled_at?->copy()->startOfDay(), false);
+        $daysUntilMeeting = GovernanceWording::daysFromToday($meeting->scheduled_at) ?? 0;
         $quorum = $meeting->calculateQuorum();
         // Same audience contract as the meeting workspace and readiness checklist.
-        $agendaCount = app(\App\Domain\Governance\Services\ExecutiveMeetingAccessService::class)
+        $agendaCount = app(ExecutiveMeetingAccessService::class)
             ->visibleAgendaItems($user, $meeting)
             ->count();
         $pack = $user
@@ -1085,24 +992,27 @@ class GovernancePresenter
 
         return $this->makeCard(
             'meeting_readiness',
-            'Meeting readiness',
-            'Preparation status for the next governance cycle.',
+            'Meeting preparation',
+            'How ready the next meeting is.',
             $status,
-            'Governance meetings, board packs, CEO reports',
+            'Meetings, board packs and CEO reports',
             $this->derivedFreshness(),
             array_values(array_filter([
-                $this->metric('Next meeting', $meeting->scheduled_at?->timezone('Pacific/Auckland')->format('j M g:i A') ?? 'TBC'),
+                $this->metric('Next meeting', $meeting->scheduled_at ? GovernanceLabels::date($meeting->scheduled_at, true) : 'To be confirmed'),
                 $this->metric('Agenda items', $agendaCount, $agendaCount === 0 ? 'warning' : 'default'),
+                // Label kept as "Pack": GovernanceBoardPacksTest guards that it is absent for viewers who can't see the pack.
                 $includePackMetric
-                    ? $this->metric('Pack', $packDistributed ? 'Distributed' : ($pack ? 'Generated' : 'Not started'), $packDistributed ? 'default' : 'warning')
+                    ? $this->metric('Pack', $packDistributed ? 'Sent to members' : ($pack ? 'Ready' : 'Not prepared'), $packDistributed ? 'default' : 'warning')
                     : null,
-                $this->metric('CEO report', $ceoSubmitted ? 'Submitted' : 'Pending', $ceoSubmitted ? 'default' : 'warning'),
-                $this->metric('Pending resolutions', $pendingResolutions, $pendingResolutions > 0 ? 'warning' : 'default'),
+                $this->metric('CEO report', $ceoSubmitted ? 'Submitted' : 'Not submitted', $ceoSubmitted ? 'default' : 'warning'),
+                $this->metric('Resolutions not yet decided', $pendingResolutions, $pendingResolutions > 0 ? 'warning' : 'default'),
             ])),
             array_values(array_filter([
                 $meeting->title,
                 $meeting->location ? "Location: {$meeting->location}" : null,
-                $quorum['met'] ? 'Quorum is currently met.' : "Quorum is {$quorum['present']} / {$quorum['required']}.",
+                $quorum['met']
+                    ? 'Enough members are recorded as present for decisions to be valid.'
+                    : "{$quorum['present']} of the {$quorum['required']} members needed are recorded as present.",
             ])),
             "/governance/meetings/{$meeting->id}"
         );
@@ -1114,8 +1024,7 @@ class GovernancePresenter
             ->whereIn('status', ['open', 'in_progress', 'blocked']);
 
         if ($user !== null) {
-            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                ->scopeActionItems($baseQuery, $user);
+            app(GovernanceRecordAccessService::class)->scopeActionItems($baseQuery, $user);
         }
 
         $items = (clone $baseQuery)->with('assignedTo:id,name')->orderBy('due_date')->limit(5)->get();
@@ -1125,10 +1034,10 @@ class GovernancePresenter
 
         return $this->makeCard(
             'follow_through',
-            'Follow-through',
-            'Open board and committee actions that still need closure.',
+            'Actions',
+            'Board and committee actions that are still open.',
             $overdue > 0 ? 'critical' : ($blocked > 0 || $totalOpen > 0 ? 'warning' : 'good'),
-            'Governance action items',
+            'Actions',
             $this->derivedFreshness(),
             [
                 $this->metric('Open actions', $totalOpen, $totalOpen > 0 ? 'warning' : 'default'),
@@ -1136,8 +1045,8 @@ class GovernancePresenter
                 $this->metric('Blocked', $blocked, $blocked > 0 ? 'warning' : 'default'),
             ],
             $items->isEmpty()
-                ? ['No open governance follow-through is currently outstanding.']
-                : $items->take(3)->map(fn (ActionItem $item) => $item->action_reference.' '.$item->description)->values()->all(),
+                ? ['No actions are open.']
+                : $items->take(3)->map(fn (ActionItem $item) => Str::limit(trim((string) ($item->title ?: $item->description)), 90))->values()->all(),
             '/governance/actions'
         );
     }
@@ -1186,24 +1095,27 @@ class GovernancePresenter
 
     protected function presentTopRisksCard(array $widget, array $freshness): array
     {
+        $title = 'Risks';
+        $description = "Open risks, critical risks and risks above the board's limit.";
+
         if (($widget['status'] ?? null) === 'unavailable' || ! array_key_exists('above_appetite', $widget)) {
-            return $this->unavailableCard('top_risks', 'Risk posture', 'Active risks, critical exposure, and items outside appetite.', 'Governance risk register', $freshness, ['Critical', 'High', 'Above appetite', 'Tracked'], '/governance/risks');
+            return $this->unavailableCard('top_risks', $title, $description, 'Risk register', $freshness, ['Critical', 'High', "Above the board's limit", 'Open risks'], '/governance/risks');
         }
 
         return $this->makeCard(
             'top_risks',
-            'Risk posture',
-            'Active risks, critical exposure, and items outside appetite.',
+            $title,
+            $description,
             ($widget['critical'] ?? 0) > 0 || ($widget['above_appetite'] ?? 0) > 0 ? 'critical' : (($widget['high'] ?? 0) > 0 ? 'warning' : 'good'),
-            'Governance risk register',
+            'Risk register',
             $this->freshnessFor('top_risks', $freshness),
             [
                 $this->metric('Critical', $widget['critical'] ?? 0, ($widget['critical'] ?? 0) > 0 ? 'critical' : 'default'),
                 $this->metric('High', $widget['high'] ?? 0, ($widget['high'] ?? 0) > 0 ? 'warning' : 'default'),
-                $this->metric('Above appetite', $widget['above_appetite'] ?? 0, ($widget['above_appetite'] ?? 0) > 0 ? 'warning' : 'default'),
-                $this->metric('Tracked', $widget['count'] ?? count($widget['items'] ?? [])),
+                $this->metric("Above the board's limit", $widget['above_appetite'] ?? 0, ($widget['above_appetite'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('Open risks', $widget['count'] ?? count($widget['items'] ?? [])),
             ],
-            collect($widget['items'] ?? [])->take(3)->map(fn (array $item) => "{$item['reference']} {$item['title']}")->values()->all(),
+            collect($widget['items'] ?? [])->take(3)->map(fn (array $item) => (string) ($item['title'] ?? ''))->filter()->values()->all(),
             '/governance/risks'
         );
     }
@@ -1212,16 +1124,16 @@ class GovernancePresenter
     {
         return $this->makeCard(
             'risk_changes',
-            'Risk movement',
-            'New, escalated, and closed risks during the reporting period.',
+            'Changes to risks',
+            'Risks added, risen or closed this month.',
             ($widget['escalated'] ?? 0) > ($widget['closed'] ?? 0) ? 'warning' : 'good',
-            'Governance risk register',
+            'Risk register',
             $this->freshnessFor('risk_changes', $freshness),
             [
                 $this->metric('New', $widget['new'] ?? 0),
-                $this->metric('Escalated', $widget['escalated'] ?? 0, ($widget['escalated'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('Risen', $widget['escalated'] ?? 0, ($widget['escalated'] ?? 0) > 0 ? 'warning' : 'default'),
                 $this->metric('Closed', $widget['closed'] ?? 0),
-                $this->metric('Net change', $widget['net_change'] ?? 0, ($widget['net_change'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('Overall change', $widget['net_change'] ?? 0, ($widget['net_change'] ?? 0) > 0 ? 'warning' : 'default'),
             ],
             [],
             '/governance/risks/trends'
@@ -1230,18 +1142,20 @@ class GovernancePresenter
 
     protected function presentVoidedRisksCard(array $widget, array $freshness): array
     {
+        $latest = collect($widget['items'] ?? [])->first()['closed_at'] ?? null;
+
         return $this->makeCard(
             'voided_risks',
-            'Recently voided risks',
-            'Items removed or retired from the register this period.',
+            'Risks removed from the register',
+            'Risks taken off the register this month.',
             'good',
-            'Governance risk register',
+            'Risk register',
             $this->freshnessFor('voided_risks', $freshness),
             [
-                $this->metric('Voided', $widget['count'] ?? 0),
-                $this->metric('Latest review', collect($widget['items'] ?? [])->first()['closed_at'] ?? 'None'),
+                $this->metric('Removed', $widget['count'] ?? 0),
+                $this->metric('Most recent', $latest ? GovernanceLabels::date($latest) : 'None'),
             ],
-            collect($widget['items'] ?? [])->take(3)->map(fn (array $item) => "{$item['reference']} {$item['title']}")->values()->all(),
+            collect($widget['items'] ?? [])->take(3)->map(fn (array $item) => (string) ($item['title'] ?? ''))->filter()->values()->all(),
             '/governance/risks'
         );
     }
@@ -1250,15 +1164,15 @@ class GovernancePresenter
     {
         return $this->makeCard(
             'client_safety',
-            'Client safety',
-            'High-risk clients and serious incident posture.',
+            'Safety of the people we support',
+            'People at high risk and serious incidents.',
             $widget['status'] ?? 'unknown',
             'Client risk and incident records',
             $this->freshnessFor('client_safety', $freshness),
             [
-                $this->metric('High-risk clients', $widget['high_risk_clients'] ?? 0, ($widget['high_risk_clients'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('People at high risk', $widget['high_risk_clients'] ?? 0, ($widget['high_risk_clients'] ?? 0) > 0 ? 'warning' : 'default'),
                 $this->metric('Serious incidents', $widget['serious_incidents_period'] ?? 0, ($widget['serious_incidents_period'] ?? 0) > 0 ? 'warning' : 'default'),
-                $this->metric('Open critical', $widget['open_critical_incidents'] ?? 0, ($widget['open_critical_incidents'] ?? 0) > 0 ? 'critical' : 'default'),
+                $this->metric('Critical incidents still open', $widget['open_critical_incidents'] ?? 0, ($widget['open_critical_incidents'] ?? 0) > 0 ? 'critical' : 'default'),
             ],
             [],
             '/incidents'
@@ -1269,8 +1183,8 @@ class GovernancePresenter
     {
         return $this->makeCard(
             'operational_safety',
-            'Operational safety',
-            'Near misses and injury trends affecting service delivery.',
+            'Everyday safety',
+            'Near misses and injuries this month.',
             $widget['status'] ?? 'unknown',
             'Incident register',
             $this->freshnessFor('operational_safety', $freshness),
@@ -1287,16 +1201,16 @@ class GovernancePresenter
     {
         return $this->makeCard(
             'privacy_data',
-            'Privacy & data',
-            'Breaches, PIAs, and privacy request backlog.',
+            'Privacy and personal information',
+            'Privacy breaches, privacy impact assessments and requests for personal information.',
             $widget['status'] ?? 'unknown',
             'Privacy register',
             $this->freshnessFor('privacy_data', $freshness),
             [
-                $this->metric('Breaches (90d)', $widget['breaches_90d'] ?? 0, ($widget['breaches_90d'] ?? 0) > 0 ? 'warning' : 'default'),
-                $this->metric('Open breaches', $widget['open_breaches'] ?? 0, ($widget['open_breaches'] ?? 0) > 0 ? 'critical' : 'default'),
-                $this->metric('Open PIAs', $widget['open_dpias'] ?? 0),
-                $this->metric('DSR backlog', $widget['dsr_backlog'] ?? 0, ($widget['dsr_backlog'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('Breaches (last 90 days)', $widget['breaches_90d'] ?? 0, ($widget['breaches_90d'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('Breaches still open', $widget['open_breaches'] ?? 0, ($widget['open_breaches'] ?? 0) > 0 ? 'critical' : 'default'),
+                $this->metric('Privacy impact assessments open', $widget['open_dpias'] ?? 0),
+                $this->metric('Personal information requests waiting', $widget['dsr_backlog'] ?? 0, ($widget['dsr_backlog'] ?? 0) > 0 ? 'warning' : 'default'),
             ],
             [],
             '/privacy'
@@ -1307,60 +1221,62 @@ class GovernancePresenter
     {
         return $this->makeCard(
             'workforce',
-            'Workforce',
-            'Capacity pressure, unfilled shifts, and compliance training.',
+            'Staff and workforce',
+            'Overtime, unfilled shifts and required training.',
             $widget['status'] ?? 'unknown',
-            'HR scheduling and compliance records',
+            'HR scheduling and training records',
             $this->freshnessFor('workforce', $freshness),
             [
                 $this->metric('Overtime', $this->formatPercent($widget['overtime_percentage'] ?? null), ((float) ($widget['overtime_percentage'] ?? 0)) > 10 ? 'warning' : 'default'),
                 $this->metric('Unfilled shifts', $widget['unfilled_shifts'] ?? 0, ($widget['unfilled_shifts'] ?? 0) > 0 ? 'warning' : 'default'),
-                $this->metric('Training compliance', $this->formatPercent($widget['training_compliance'] ?? null), $widget['training_compliance'] === null ? 'muted' : (((float) $widget['training_compliance']) < 95 ? 'warning' : 'default')),
+                $this->metric('Training compliance', $this->formatPercent($widget['training_compliance'] ?? null), ($widget['training_compliance'] ?? null) === null ? 'muted' : (((float) $widget['training_compliance']) < 95 ? 'warning' : 'default')),
             ],
-            $widget['training_compliance'] === null ? ['Training compliance is not yet integrated for this environment.'] : [],
+            ($widget['training_compliance'] ?? null) === null ? ["Training figures aren't connected yet."] : [],
             '/hr'
         );
     }
 
     protected function presentFinancialCard(array $widget, array $freshness): array
     {
+        $count = fn (string $key) => isset($widget[$key]) ? (int) $widget[$key] : 0;
+
         $highlights = array_values(array_filter([
-            ! empty($widget['fiscal_year']) ? "Budget year {$widget['fiscal_year']}" : null,
-            isset($widget['sites_over_budget_count']) && $widget['sites_over_budget_count'] > 0
-                ? "{$widget['sites_over_budget_count']} site(s) over budget this month"
+            ! empty($widget['fiscal_year']) ? 'Financial year '.$this->financialYear($widget['fiscal_year']) : null,
+            $count('sites_over_budget_count') > 0
+                ? GovernanceWording::count($count('sites_over_budget_count'), 'site').' over budget this month'
                 : null,
-            isset($widget['pending_spend_count']) && $widget['pending_spend_count'] > 0
-                ? "{$widget['pending_spend_count']} spend approval(s) pending"
+            $count('pending_spend_count') > 0
+                ? GovernanceWording::count($count('pending_spend_count'), 'spend request').' waiting for approval'
                 : null,
-            isset($widget['pending_board_approvals']) && $widget['pending_board_approvals'] > 0
-                ? "{$widget['pending_board_approvals']} require board sign-off"
+            $count('pending_board_approvals') > 0
+                ? GovernanceWording::count($count('pending_board_approvals'), 'request').' need board approval'
                 : null,
-            isset($widget['funding_gaps_count']) && $widget['funding_gaps_count'] > 0
-                ? "{$widget['funding_gaps_count']} donor fund(s) over-committed"
+            $count('funding_gaps_count') > 0
+                ? GovernanceWording::count($count('funding_gaps_count'), 'donor fund').' with more promised than is available'
                 : null,
-            isset($widget['roadmap_forecast_total']) ? 'Roadmap forecast '.$this->formatCurrency($widget['roadmap_forecast_total']) : null,
-            isset($widget['governance_envelope_total']) ? 'Governance envelope '.$this->formatCurrency($widget['governance_envelope_total']) : null,
+            isset($widget['roadmap_forecast_total']) ? 'Roadmap cost forecast '.$this->formatCurrency($widget['roadmap_forecast_total']) : null,
+            isset($widget['governance_envelope_total']) ? 'Total set aside by the board '.$this->formatCurrency($widget['governance_envelope_total']) : null,
         ]));
 
         $isUnavailable = in_array($widget['status'] ?? 'unknown', ['unknown', 'unavailable'], true);
 
         return $this->makeCard(
             'financial',
-            'Financial governance',
-            'Approved budget, actuals, variance, sites over budget, and pending spend approvals.',
+            'Spending against budget',
+            'The approved budget, spending so far and how far it is from budget.',
             $widget['status'] ?? 'unknown',
-            'Governance budget and finance posted journals',
+            'Board budgets and Finance',
             $this->freshnessFor('financial', $freshness),
             $isUnavailable ? [
-                $this->metric('Utilisation', '—', 'muted'),
-                $this->metric('Variance', '—', 'muted'),
-                $this->metric('Budget total', '—', 'muted'),
-                $this->metric('Actuals', '—', 'muted'),
+                $this->metric('Budget used', 'Not available', 'muted'),
+                $this->metric('Over or under budget', 'Not available', 'muted'),
+                $this->metric('Budget', 'Not available', 'muted'),
+                $this->metric('Spent so far', 'Not available', 'muted'),
             ] : [
-                $this->metric('Utilisation', $this->formatPercent($widget['budget_utilization'] ?? null)),
-                $this->metric('Variance', $this->formatPercent($widget['variance'] ?? null), abs((float) ($widget['variance'] ?? 0)) >= 5 ? 'warning' : 'default'),
-                $this->metric('Budget total', $this->formatCurrency($widget['budget_total'] ?? null)),
-                $this->metric('Actuals', $this->formatCurrency($widget['actual_total'] ?? null)),
+                $this->metric('Budget used', $this->formatPercent($widget['budget_utilization'] ?? null)),
+                $this->metric('Over or under budget', $this->formatPercent($widget['variance'] ?? null), abs((float) ($widget['variance'] ?? 0)) >= self::BUDGET_FLAG_PERCENT ? 'warning' : 'default'),
+                $this->metric('Budget', $this->formatCurrency($widget['budget_total'] ?? null)),
+                $this->metric('Spent so far', $this->formatCurrency($widget['actual_total'] ?? null)),
             ],
             $highlights,
             '/governance/budgets'
@@ -1368,9 +1284,8 @@ class GovernancePresenter
     }
 
     /**
-     * Build a Pending Spend Approvals card. Built directly from the financial
-     * widget so the dashboard surface can reach this without a separate
-     * snapshot key.
+     * Spend requests waiting for approval. Built directly from the financial
+     * widget (already scoped to the viewer's sites).
      */
     protected function presentSpendApprovalsCard(array $financialWidget, array $freshness): ?array
     {
@@ -1388,26 +1303,23 @@ class GovernancePresenter
 
         return $this->makeCard(
             'spend_approvals',
-            'Spend approvals',
-            'Items above the configured spend threshold awaiting board or finance-committee sign-off.',
+            'Spend requests',
+            'Spending above the set limit that is waiting for approval.',
             $status,
-            'Governance spend approval workflow',
+            'Spend requests',
             $this->freshnessFor('financial', $freshness),
             [
-                $this->metric('Pending approvals', $pending, $pending > 0 ? 'warning' : 'default'),
-                $this->metric('Board threshold', $boardSignoff, $boardSignoff > 0 ? 'warning' : 'default'),
+                $this->metric('Waiting for approval', $pending, $pending > 0 ? 'warning' : 'default'),
+                $this->metric('Need board approval', $boardSignoff, $boardSignoff > 0 ? 'warning' : 'default'),
             ],
             array_values(array_filter([
-                $pending > 0 ? "{$pending} spend approval request(s) awaiting review." : null,
-                $boardSignoff > 0 ? "{$boardSignoff} request(s) exceed the threshold and require board sign-off." : null,
+                $pending > 0 ? GovernanceWording::count($pending, 'spend request').' waiting for approval.' : null,
+                $boardSignoff > 0 ? GovernanceWording::count($boardSignoff, 'request').' over the limit need the board to approve them.' : null,
             ])),
             '/governance/spend-approvals'
         );
     }
 
-    /**
-     * Build a Sites Over Budget card.
-     */
     protected function presentSitesOverBudgetCard(array $financialWidget, array $freshness): ?array
     {
         if (! array_key_exists('sites_over_budget_count', $financialWidget)) {
@@ -1428,16 +1340,16 @@ class GovernancePresenter
         return $this->makeCard(
             'sites_over_budget',
             'Sites over budget',
-            'Operational site/house budgets exceeding allocation this month (sourced from Finance variance).',
+            'Sites and houses spending more than their budget this month (from Finance).',
             $status,
-            'Finance site budget lines',
+            'Finance site budgets',
             $this->freshnessFor('financial', $freshness),
             [
-                $this->metric('Sites', $isUnavailable ? 'Unavailable' : (int) $count, ! $isUnavailable && (int) $count > 0 ? 'warning' : 'default'),
-                $this->metric('Overspend', $isUnavailable ? 'Unavailable' : $this->formatCurrency((float) $amount), ! $isUnavailable && (float) $amount > 0 ? 'warning' : 'default'),
+                $this->metric('Sites', $isUnavailable ? 'Not available' : (int) $count, ! $isUnavailable && (int) $count > 0 ? 'warning' : 'default'),
+                $this->metric('Amount over', $isUnavailable ? 'Not available' : $this->formatCurrency((float) $amount), ! $isUnavailable && (float) $amount > 0 ? 'warning' : 'default'),
             ],
-            $isUnavailable ? ['Site budget variance data is not available for this period.'] : [],
-            '/finance/budget-actuals'
+            $isUnavailable ? ["Site budget figures aren't available for this month."] : [],
+            '/finance/reports/budget-vs-actuals'
         );
     }
 
@@ -1445,17 +1357,17 @@ class GovernancePresenter
     {
         return $this->makeCard(
             'it_cyber',
-            'IT & cyber',
-            'Security incidents, uptime, and critical technical exposure.',
+            'IT and cyber security',
+            'Security incidents, system uptime and critical alerts.',
             $widget['status'] ?? 'unknown',
             'Control room alerts',
             $this->freshnessFor('it_cyber', $freshness),
             [
                 $this->metric('Security incidents', $widget['security_incidents'] ?? 0, ($widget['security_incidents'] ?? 0) > 0 ? 'warning' : 'default'),
-                $this->metric('Uptime', $this->formatPercent($widget['uptime_percentage'] ?? null), $widget['uptime_percentage'] === null ? 'muted' : (((float) $widget['uptime_percentage']) < 99 ? 'warning' : 'default')),
-                $this->metric('Open critical alerts', $widget['critical_open_alerts'] ?? 0, ($widget['critical_open_alerts'] ?? 0) > 0 ? 'critical' : 'default'),
+                $this->metric('Uptime', $this->formatPercent($widget['uptime_percentage'] ?? null), ($widget['uptime_percentage'] ?? null) === null ? 'muted' : (((float) $widget['uptime_percentage']) < 99 ? 'warning' : 'default')),
+                $this->metric('Critical alerts still open', $widget['critical_open_alerts'] ?? 0, ($widget['critical_open_alerts'] ?? 0) > 0 ? 'critical' : 'default'),
             ],
-            $widget['uptime_percentage'] === null ? ['No authoritative uptime signal is available yet.'] : [],
+            ($widget['uptime_percentage'] ?? null) === null ? ["Uptime figures aren't available yet."] : [],
             '/control-room'
         );
     }
@@ -1464,43 +1376,48 @@ class GovernancePresenter
     {
         return $this->makeCard(
             'fleet_assets',
-            'Fleet & assets',
-            'Active assets, overdue inspections, and asset incidents.',
+            'Vehicles and equipment',
+            'Equipment in use, overdue inspections and incidents.',
             $widget['status'] ?? 'unknown',
-            'Asset and vehicle registers',
+            'Vehicle and equipment registers',
             $this->freshnessFor('fleet_assets', $freshness),
             [
-                $this->metric('Active assets', $widget['total_assets'] ?? 0),
-                $this->metric('Fleet vehicles', $widget['fleet_vehicles'] ?? 0),
+                $this->metric('Equipment in use', $widget['total_assets'] ?? 0),
+                $this->metric('Vehicles', $widget['fleet_vehicles'] ?? 0),
                 $this->metric('Overdue inspections', $widget['overdue_inspections'] ?? 0, ($widget['overdue_inspections'] ?? 0) > 0 ? 'warning' : 'default'),
-                $this->metric('Asset incidents', $widget['asset_incidents'] ?? 0, ($widget['asset_incidents'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('Equipment incidents', $widget['asset_incidents'] ?? 0, ($widget['asset_incidents'] ?? 0) > 0 ? 'warning' : 'default'),
             ],
             [],
-            '/fleet'
+            '/fleet-assets'
         );
     }
 
     protected function presentComplianceCalendarCard(array $widget, array $freshness): array
     {
+        $title = 'Requirements due';
+        $description = 'Compliance requirements coming up or overdue.';
+
         if (($widget['status'] ?? null) === 'unavailable') {
-            return $this->unavailableCard('compliance_calendar', 'Compliance calendar', 'Upcoming and overdue governance obligations.', 'Compliance register', $freshness, ['Upcoming obligations', 'Overdue', 'Due this week'], '/governance/compliance/calendar');
+            return $this->unavailableCard('compliance_calendar', $title, $description, 'Compliance register', $freshness, ['Coming up', 'Overdue', 'Due this week'], '/governance/compliance/calendar');
         }
 
         $collection = collect($widget)->filter(fn ($item) => is_array($item));
+        $overdue = $collection->filter(fn (array $item) => ($item['days_remaining'] ?? 1) < 0)->count();
 
         return $this->makeCard(
             'compliance_calendar',
-            'Compliance calendar',
-            'Upcoming and overdue governance obligations.',
-            $collection->contains(fn (array $item) => ($item['days_remaining'] ?? 1) < 0) ? 'critical' : ($collection->isNotEmpty() ? 'warning' : 'good'),
+            $title,
+            $description,
+            $overdue > 0 ? 'critical' : ($collection->isNotEmpty() ? 'warning' : 'good'),
             'Compliance register',
             $this->freshnessFor('compliance_calendar', $freshness),
             [
-                $this->metric('Upcoming obligations', $collection->count()),
-                $this->metric('Overdue', $collection->filter(fn (array $item) => ($item['days_remaining'] ?? 1) < 0)->count(), $collection->contains(fn (array $item) => ($item['days_remaining'] ?? 1) < 0) ? 'critical' : 'default'),
+                $this->metric('Coming up', $collection->count()),
+                $this->metric('Overdue', $overdue, $overdue > 0 ? 'critical' : 'default'),
                 $this->metric('Due this week', $collection->filter(fn (array $item) => ($item['days_remaining'] ?? 999) >= 0 && ($item['days_remaining'] ?? 999) <= 7)->count()),
             ],
-            $collection->take(3)->map(fn (array $item) => "{$item['title']} ({$item['due_date']})")->values()->all(),
+            $collection->take(3)->map(fn (array $item) => trim((string) ($item['title'] ?? ''))
+                .(! empty($item['due_date']) ? ' (due '.GovernanceLabels::date((string) $item['due_date']).')' : ''))->values()->all(),
             '/governance/compliance/calendar'
         );
     }
@@ -1509,16 +1426,16 @@ class GovernancePresenter
     {
         return $this->makeCard(
             'decisions_required',
-            'Decisions required',
-            'Open board resolutions and roadmap decision requests.',
+            'Resolutions waiting',
+            'Resolutions and roadmap requests waiting for the board.',
             ($widget['overdue'] ?? 0) > 0 ? 'critical' : (($widget['count'] ?? 0) > 0 ? 'warning' : 'good'),
-            'Governance resolutions and roadmap requests',
+            'Resolutions and roadmap requests',
             $this->freshnessFor('decisions_required', $freshness),
             [
-                $this->metric('Pending', $widget['count'] ?? 0, ($widget['count'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('Waiting', $widget['count'] ?? 0, ($widget['count'] ?? 0) > 0 ? 'warning' : 'default'),
                 $this->metric('Overdue', $widget['overdue'] ?? 0, ($widget['overdue'] ?? 0) > 0 ? 'critical' : 'default'),
             ],
-            collect($widget['items'] ?? [])->take(3)->map(fn (array $item) => "{$item['reference']} {$item['title']}")->values()->all(),
+            collect($widget['items'] ?? [])->take(3)->map(fn (array $item) => (string) ($item['title'] ?? ''))->filter()->values()->all(),
             '/governance/resolutions'
         );
     }
@@ -1527,18 +1444,18 @@ class GovernancePresenter
     {
         return $this->makeCard(
             'roadmap',
-            'Plans & roadmap',
-            'Initiative delivery, blocked work, and governance budget alignment.',
+            'Plans and roadmap',
+            'Roadmap projects, blocked work and requests for the board.',
             ($widget['status'] ?? null) === 'unavailable' ? 'unknown' : (($widget['initiatives']['blocked'] ?? 0) > 0 || ($widget['decisions_required'] ?? 0) > 0 ? 'warning' : 'good'),
-            'Roadmap governance widget',
+            'Roadmap',
             $this->freshnessFor('roadmap', $freshness),
             [
-                $this->metric('Initiatives', $widget['initiatives']['total'] ?? 0),
+                $this->metric('Projects', $widget['initiatives']['total'] ?? 0),
                 $this->metric('In progress', $widget['initiatives']['in_progress'] ?? 0),
                 $this->metric('Blocked', $widget['initiatives']['blocked'] ?? 0, ($widget['initiatives']['blocked'] ?? 0) > 0 ? 'warning' : 'default'),
-                $this->metric('Decision requests', $widget['decisions_required'] ?? 0, ($widget['decisions_required'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('Requests for the board', $widget['decisions_required'] ?? 0, ($widget['decisions_required'] ?? 0) > 0 ? 'warning' : 'default'),
             ],
-            collect($widget['initiatives']['top'] ?? [])->take(3)->map(fn (array $item) => "{$item['code']} {$item['title']}")->values()->all(),
+            collect($widget['initiatives']['top'] ?? [])->take(3)->map(fn (array $item) => (string) ($item['title'] ?? ''))->filter()->values()->all(),
             '/roadmap'
         );
     }
@@ -1548,16 +1465,16 @@ class GovernancePresenter
         return $this->makeCard(
             'control_room',
             'Control room',
-            'Critical alerts and response performance.',
+            'Critical alerts and how quickly they are handled.',
             ($widget['open_critical'] ?? 0) > 0 ? 'critical' : (($widget['critical_alerts'] ?? 0) > 0 ? 'warning' : 'good'),
-            'Control room operations',
+            'Control room',
             $this->freshnessFor('control_room', $freshness),
             [
                 $this->metric('Critical alerts', $widget['critical_alerts'] ?? 0, ($widget['critical_alerts'] ?? 0) > 0 ? 'warning' : 'default'),
                 $this->metric('High alerts', $widget['high_alerts'] ?? 0),
-                $this->metric('Open critical', $widget['open_critical'] ?? 0, ($widget['open_critical'] ?? 0) > 0 ? 'critical' : 'default'),
-                $this->metric('MTTA', $this->formatMinutes($widget['mtta_minutes'] ?? null)),
-                $this->metric('MTTR', $this->formatMinutes($widget['mttr_minutes'] ?? null)),
+                $this->metric('Critical alerts still open', $widget['open_critical'] ?? 0, ($widget['open_critical'] ?? 0) > 0 ? 'critical' : 'default'),
+                $this->metric('Average time to respond', $this->formatMinutes($widget['mtta_minutes'] ?? null)),
+                $this->metric('Average time to resolve', $this->formatMinutes($widget['mttr_minutes'] ?? null)),
             ],
             [],
             '/control-room'
@@ -1568,16 +1485,16 @@ class GovernancePresenter
     {
         return $this->makeCard(
             'incidents',
-            'Incident closure',
-            'Incident volume, severity mix, and close-out pace.',
+            'Incidents',
+            'Incidents this month, how serious they were and how quickly they were closed.',
             (($widget['by_severity']['critical'] ?? 0) > 0 || ($widget['open_count'] ?? 0) > 0) ? 'warning' : 'good',
             'Incident register',
             $this->freshnessFor('incidents', $freshness),
             [
-                $this->metric('Total this period', $widget['total_period'] ?? 0),
-                $this->metric('Open', $widget['open_count'] ?? 0, ($widget['open_count'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('This month', $widget['total_period'] ?? 0),
+                $this->metric('Still open', $widget['open_count'] ?? 0, ($widget['open_count'] ?? 0) > 0 ? 'warning' : 'default'),
                 $this->metric('Critical', $widget['by_severity']['critical'] ?? 0, ($widget['by_severity']['critical'] ?? 0) > 0 ? 'critical' : 'default'),
-                $this->metric('Avg close', $this->formatHours($widget['avg_close_hours'] ?? null)),
+                $this->metric('Average time to close', $this->formatHours($widget['avg_close_hours'] ?? null)),
             ],
             [],
             '/incidents'
@@ -1596,8 +1513,8 @@ class GovernancePresenter
             [
                 $this->metric('New concerns', $widget['new_concerns'] ?? 0),
                 $this->metric('Critical', $widget['critical_concerns'] ?? 0, ($widget['critical_concerns'] ?? 0) > 0 ? 'critical' : 'default'),
-                $this->metric('Open', $widget['open_concerns'] ?? 0, ($widget['open_concerns'] ?? 0) > 0 ? 'warning' : 'default'),
-                $this->metric('Investigations', $widget['investigations_opened'] ?? 0),
+                $this->metric('Still open', $widget['open_concerns'] ?? 0, ($widget['open_concerns'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('Investigations started', $widget['investigations_opened'] ?? 0),
             ],
             [],
             '/safeguarding'
@@ -1608,15 +1525,15 @@ class GovernancePresenter
     {
         return $this->makeCard(
             'hs_backbone',
-            'Health & safety backbone',
-            'Investigations, corrective actions, extreme risks, and WorkSafe posture.',
+            'Health and safety',
+            'Open events, investigations, corrective actions and extreme risks.',
             $widget['status'] ?? 'unknown',
-            'H&S governance backbone',
+            'Health and safety register',
             $this->freshnessFor('hs_backbone', $freshness),
             [
                 $this->metric('Open events', $widget['open_events'] ?? 0),
                 $this->metric('Overdue investigations', $widget['overdue_investigations'] ?? 0, ($widget['overdue_investigations'] ?? 0) > 0 ? 'warning' : 'default'),
-                $this->metric('Overdue actions', $widget['overdue_corrective_actions'] ?? 0, ($widget['overdue_corrective_actions'] ?? 0) > 0 ? 'warning' : 'default'),
+                $this->metric('Overdue corrective actions', $widget['overdue_corrective_actions'] ?? 0, ($widget['overdue_corrective_actions'] ?? 0) > 0 ? 'warning' : 'default'),
                 $this->metric('Extreme risks', $widget['extreme_risks'] ?? 0, ($widget['extreme_risks'] ?? 0) > 0 ? 'critical' : 'default'),
             ],
             [],
@@ -1635,7 +1552,7 @@ class GovernancePresenter
     }
 
     /**
-     * A card whose source failed: status `unknown`, every metric "Unavailable".
+     * A card whose source failed: status `unknown`, every metric "Not available".
      *
      * @param  array<int, string>  $metricLabels
      */
@@ -1648,8 +1565,8 @@ class GovernancePresenter
             'unknown',
             $source,
             $this->freshnessFor($key, $freshness),
-            array_map(fn (string $label) => $this->metric($label, 'Unavailable', 'muted'), $metricLabels),
-            ['This information could not be loaded. Figures are not shown as zero.'],
+            array_map(fn (string $label) => $this->metric($label, 'Not available', 'muted'), $metricLabels),
+            ["This information couldn't be loaded, so no figures are shown."],
             $href
         );
     }
@@ -1667,22 +1584,22 @@ class GovernancePresenter
 
         $actions = [];
         if ($user->canDo('governance.meetings.view')) {
-            $actions[] = ['label' => 'Meetings', 'href' => '/governance/meetings', 'description' => 'Open the next meeting cockpit.'];
+            $actions[] = ['label' => 'Meetings', 'href' => '/governance/meetings', 'description' => 'Upcoming and past board meetings.'];
         }
         if ($user->canDo('governance.resolutions.view')) {
-            $actions[] = ['label' => 'Decisions', 'href' => '/governance/resolutions', 'description' => 'Review open resolutions and board decisions.'];
+            $actions[] = ['label' => 'Resolutions', 'href' => '/governance/resolutions', 'description' => 'What the board is deciding and has decided.'];
         }
         if ($user->boardMember && $user->canDo('governance.interests.view')) {
-            $actions[] = ['label' => 'My interests', 'href' => '/governance/interests/mine', 'description' => 'Maintain your current interest declarations.'];
+            $actions[] = ['label' => 'My interests', 'href' => '/governance/interests/mine', 'description' => 'Keep the interests you have declared up to date.'];
         }
         if ($user->canDo('governance.evaluations.view')) {
-            $actions[] = ['label' => 'Evaluations', 'href' => '/governance/evaluations', 'description' => 'Review or respond to board evaluations.'];
+            $actions[] = ['label' => 'Evaluations', 'href' => '/governance/evaluations', 'description' => 'Take part in or review board evaluations.'];
         }
         if ($user->canDo('governance.packs.view')) {
-            $actions[] = ['label' => 'Board packs', 'href' => '/governance/meetings', 'description' => 'Open pack generation and distribution workflows.'];
+            $actions[] = ['label' => 'Board packs', 'href' => '/governance/packs', 'description' => 'The reading for your meetings.'];
         }
         if ($user->canDo('governance.budgets.view')) {
-            $actions[] = ['label' => 'Budgets', 'href' => '/governance/budgets', 'description' => 'Review governance budget position and approvals.'];
+            $actions[] = ['label' => 'Budgets', 'href' => '/governance/budgets', 'description' => "The board's budgets and what is waiting for approval."];
         }
 
         return $actions;
@@ -1694,16 +1611,24 @@ class GovernancePresenter
         $timestamp = $freshness[$map[$widgetKey] ?? ''] ?? null;
 
         if (! $timestamp) {
-            return ['status' => 'unknown', 'at' => null, 'label' => 'Freshness unavailable'];
+            return ['status' => 'unknown', 'at' => null, 'label' => 'Update time not available'];
         }
 
         $at = Carbon::parse($timestamp);
-        $minutes = max(0, $at->diffInMinutes(now()));
+        $minutes = (int) max(0, $at->diffInMinutes(now()));
         $status = match (true) {
             $minutes <= 15 => 'fresh', $minutes <= 60 => 'stable', default => 'stale'
         };
 
-        return ['status' => $status, 'at' => $at->toIso8601String(), 'label' => $minutes < 1 ? 'Updated just now' : ($minutes < 60 ? "Updated {$minutes} min ago" : 'Updated '.$at->timezone('Pacific/Auckland')->format('j M g:i A'))];
+        return [
+            'status' => $status,
+            'at' => $at->toIso8601String(),
+            'label' => match (true) {
+                $minutes < 1 => 'Updated just now',
+                $minutes < 60 => 'Updated '.GovernanceWording::count($minutes, 'minute').' ago',
+                default => 'Updated '.GovernanceLabels::date($at, true),
+            },
+        ];
     }
 
     protected function derivedFreshness(): array
@@ -1713,35 +1638,58 @@ class GovernancePresenter
 
     protected function periodLabel(array $period): string
     {
-        $type = $period['type'] ?? 'month';
-        $start = isset($period['start']) ? Carbon::parse($period['start']) : null;
-        $end = isset($period['end']) ? Carbon::parse($period['end']) : null;
+        $label = match ($period['type'] ?? 'month') {
+            'today' => 'Today',
+            'week' => 'This week',
+            'year' => 'This year',
+            default => 'This month',
+        };
 
-        return $start && $end ? $this->titleize($type).' ('.$start->format('j M Y').' to '.$end->format('j M Y').')' : $this->titleize($type);
+        $start = isset($period['start']) ? (string) $period['start'] : null;
+        $end = isset($period['end']) ? (string) $period['end'] : null;
+
+        return $start && $end
+            ? $label.' ('.GovernanceLabels::date($start).' to '.GovernanceLabels::date($end).')'
+            : $label;
     }
 
-    protected function titleize(?string $value): string
+    protected function financialYear(mixed $value): string
     {
-        return $value === null ? '' : str($value)->replace('_', ' ')->title()->toString();
+        try {
+            return GovernanceLabels::financialYear(is_numeric($value) ? (int) $value : (string) $value);
+        } catch (\Throwable) {
+            return 'Not set';
+        }
     }
 
-    protected function formatPercent(?float $value): string
+    protected function formatPercent(mixed $value): string
     {
-        return $value === null ? 'Unavailable' : number_format($value, 1).'%';
+        return $value === null || ! is_numeric($value) ? 'Not available' : number_format((float) $value, 1).'%';
     }
 
     protected function formatCurrency(mixed $value): string
     {
-        return $value === null || $value === '' ? 'Unavailable' : '$'.number_format((float) $value, 2);
+        return $value === null || $value === '' ? 'Not available' : GovernanceLabels::money($value);
     }
 
-    protected function formatMinutes(?float $value): string
+    protected function formatMinutes(mixed $value): string
     {
-        return $value === null ? 'Unavailable' : number_format($value, 1).' min';
+        return $value === null || ! is_numeric($value)
+            ? 'Not available'
+            : GovernanceWording::count((int) round((float) $value), 'minute');
     }
 
-    protected function formatHours(?float $value): string
+    protected function formatHours(mixed $value): string
     {
-        return $value === null ? 'Unavailable' : number_format($value, 1).' h';
+        return $value === null || ! is_numeric($value)
+            ? 'Not available'
+            : number_format((float) $value, 1).' hours';
+    }
+
+    protected function timezone(): string
+    {
+        $timezone = config('app.worker_timezone');
+
+        return is_string($timezone) && $timezone !== '' ? $timezone : GovernanceLabels::TIMEZONE;
     }
 }
