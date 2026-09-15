@@ -70,7 +70,11 @@ import { useMemo, useState } from 'react';
 
 // ── Registries (tile pickers) ───────────────────────────────────────────────
 
-type ResolutionTypeKey = 'ordinary' | 'special' | 'unanimous';
+type ResolutionTypeKey =
+    | 'ordinary'
+    | 'special'
+    | 'three_quarters'
+    | 'unanimous';
 
 interface TileDef<K extends string = string> {
     key: K;
@@ -89,7 +93,8 @@ export const RESOLUTION_TYPES: TileDef<ResolutionTypeKey>[] = [
     {
         key: 'ordinary',
         label: votingThresholdLabel('ordinary'),
-        description: "Passes if more members vote For than Against. Abstentions don't count.",
+        description:
+            "Passes if more members vote For than Against. Abstentions don't count.",
         icon: Vote,
         accent: 'text-status-info',
     },
@@ -100,6 +105,14 @@ export const RESOLUTION_TYPES: TileDef<ResolutionTypeKey>[] = [
             "Passes if at least two-thirds of the For and Against votes are For. Abstentions don't count.",
         icon: ScrollText,
         accent: 'text-status-warning',
+    },
+    {
+        key: 'three_quarters',
+        label: votingThresholdLabel('three_quarters'),
+        description:
+            "Passes if at least three-quarters of the For and Against votes are For — the usual level for changing a trust deed or constitution. Abstentions don't count.",
+        icon: ScrollText,
+        accent: 'text-status-critical',
     },
     {
         key: 'unanimous',
@@ -448,6 +461,8 @@ function thresholdType(threshold: string | null | undefined): string {
         case 'two_thirds':
         case 'special':
             return 'special';
+        case 'three_quarters':
+            return 'three_quarters';
         case 'unanimous':
             return 'unanimous';
         case 'simple_majority':
@@ -657,7 +672,8 @@ export function publicationIssues(
         if (!data.recommendation.trim()) {
             issues.push({
                 step: 'options',
-                message: "Add management's recommendation and the reason for it.",
+                message:
+                    "Add management's recommendation and the reason for it.",
             });
         }
         if (data.meeting_id === NONE && !data.voting_deadline) {
@@ -677,7 +693,8 @@ export function publicationIssues(
     if (!data.service_user_implications.trim()) {
         issues.push({
             step: 'implications',
-            message: 'Describe the effect on the people we support and on safety.',
+            message:
+                'Describe the effect on the people we support and on safety.',
         });
     }
     if (!data.risk_equity_implications.trim()) {
@@ -874,7 +891,10 @@ function ResolutionWizardBody({
     const votingSwitchedOff = votingRules ? !votingRules.switched_on : false;
     const publishBlockedByRules = isDecision && votingSwitchedOff;
     const writtenNotAllowed =
-        isDecision && isWritten && votingRules != null && !votingRules.written_voting_permitted;
+        isDecision &&
+        isWritten &&
+        votingRules != null &&
+        !votingRules.written_voting_permitted;
     const pct = completeness(data);
 
     const goTo = (index: number) => {
@@ -1816,12 +1836,11 @@ function ResolutionWizardBody({
                                             icon={AlertTriangle}
                                             tone="warn"
                                         >
-                                            The board’s voting rules don’t
-                                            allow voting outside a meeting yet.
-                                            Add this resolution to a meeting,
-                                            or ask the chair or board secretary
-                                            to change the voting rules in
-                                            Settings.
+                                            The board’s voting rules don’t allow
+                                            voting outside a meeting yet. Add
+                                            this resolution to a meeting, or ask
+                                            the chair or board secretary to
+                                            change the voting rules in Settings.
                                         </InfoCard>
                                     ) : null}
                                     <Field
@@ -1946,11 +1965,9 @@ function ResolutionWizardBody({
                                                         <Field
                                                             label="Person responsible"
                                                             required
-                                                            error={
-                                                                errorFor(
-                                                                    `follow_up_actions.${index}.assigned_to`,
-                                                                )
-                                                            }
+                                                            error={errorFor(
+                                                                `follow_up_actions.${index}.assigned_to`,
+                                                            )}
                                                         >
                                                             <Select
                                                                 value={
@@ -2208,8 +2225,7 @@ function ResolutionWizardBody({
                                                     value={
                                                         authorityLabel(
                                                             data.authority_binding_key,
-                                                        ) ??
-                                                        'Nothing specific'
+                                                        ) ?? 'Nothing specific'
                                                     }
                                                 />
                                             ) : null}
@@ -2284,9 +2300,7 @@ function ResolutionWizardBody({
                                             <ReviewCard
                                                 icon={ListChecks}
                                                 title="How it passes"
-                                                onEdit={() =>
-                                                    goToKey('voting')
-                                                }
+                                                onEdit={() => goToKey('voting')}
                                                 span
                                             >
                                                 <ReviewRow

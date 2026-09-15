@@ -598,6 +598,35 @@ class VotingServiceTest extends TestCase
         $this->assertSame('two_thirds', $special->fresh()->appliedThreshold());
     }
 
+    public function test_three_quarters_rule_counts_only_for_and_against_votes(): void
+    {
+        $this->seedGovernance();
+        $admin = $this->createAdminUser();
+        $members = collect(range(1, 6))->map(fn (int $i) => $this->createBoardMember(
+            $this->createUserWithRole('board_member', ['email' => "three-quarters-{$i}@example.test"])
+        ))->values();
+        $service = new VotingService;
+
+        // 3 For, 1 Against, 2 abstain: exactly three-quarters of the For and Against votes.
+        $passes = $this->createResolution($admin, ['status' => 'open', 'voting_threshold' => 'three_quarters', 'deadline' => now()->addDay()]);
+        foreach (['for', 'for', 'for', 'against', 'abstain', 'abstain'] as $i => $vote) {
+            $service->castVote($passes, $members[$i], $vote);
+        }
+        $service->closeVoting($passes);
+        $this->assertSame('carried', $passes->fresh()->outcome);
+        $this->assertSame('three_quarters', $passes->fresh()->vote_summary['decision_snapshot']['applied_threshold']);
+
+        // 4 For, 2 Against is two-thirds — enough for "two-thirds", short of three-quarters.
+        $fails = $this->createResolution($admin, ['status' => 'open', 'voting_threshold' => 'three_quarters', 'deadline' => now()->addDay()]);
+        foreach (['for', 'for', 'for', 'for', 'against', 'against'] as $i => $vote) {
+            $service->castVote($fails, $members[$i], $vote);
+        }
+        $service->closeVoting($fails);
+        $this->assertSame('defeated', $fails->fresh()->outcome);
+
+        $this->assertSame('At least three-quarters For', \App\Domain\Governance\Support\GovernanceLabels::label('voting_threshold', 'three_quarters'));
+    }
+
     public function test_written_resolution_follows_the_everyones_agreement_rule_and_results_say_so(): void
     {
         $this->seedGovernance();

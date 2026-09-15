@@ -8,28 +8,16 @@ use App\Models\User;
 
 class PerformanceReviewPolicy
 {
+    /**
+     * Anyone with the view permission can open the list; which reviews it
+     * shows is decided per record by GovernanceRecordAccessService::
+     * scopePerformanceReviews (chair, the remuneration/governance/executive
+     * committees, people who manage reviews, and the person being reviewed).
+     * Other members get an explained empty list, not a 403.
+     */
     public function viewAny(User $user): bool
     {
-        if (! $user->canDo('governance.performance.view')) {
-            return false;
-        }
-
-        if ($user->canDo('governance.performance.manage')
-            || $user->hasRole('admin', 'board_chair')) {
-            return true;
-        }
-
-        $boardMember = $user->boardMember;
-        if ($boardMember && $boardMember->is_active) {
-            if ($boardMember->isCommitteeMember('remuneration')
-                || $boardMember->isCommitteeMember('governance')
-                || $boardMember->isCommitteeMember('executive')) {
-                return true;
-            }
-        }
-
-        // Reviewee can view reviews list if they have any reviews
-        return PerformanceReview::where('reviewee_id', $user->id)->exists();
+        return $user->canDo('governance.performance.view');
     }
 
     public function view(User $user, PerformanceReview $review): bool
@@ -64,13 +52,12 @@ class PerformanceReviewPolicy
             || $user->hasRole('admin', 'board_chair');
     }
 
+    /**
+     * A self-assessment is the reviewee's own account, so only the person
+     * being reviewed can send it — nobody submits it on their behalf.
+     */
     public function submitSelfAssessment(User $user, PerformanceReview $review): bool
     {
-        if ((int) $user->id === (int) $review->reviewee_id) {
-            return true;
-        }
-
-        return $user->canDo('governance.performance.manage')
-            || $user->hasRole('admin');
+        return (int) $user->id === (int) $review->reviewee_id;
     }
 }

@@ -284,6 +284,20 @@ class GovernancePerformanceReviewTest extends TestCase
                 ->where('reviews.data.0.assessment_hidden', false));
     }
 
+    /** A self-assessment is the reviewee's own — managers can't send it for them. */
+    public function test_only_the_person_being_reviewed_can_send_their_self_assessment(): void
+    {
+        $admin = $this->createAdminUser();
+        $ceo = $this->createUserWithRole('ceo');
+        $review = $this->createPerformanceReview($ceo, $admin, ['status' => 'self_review']);
+
+        $this->actingAs($admin)->post("/governance/performance/{$review->id}/self-assessment", [
+            'self_assessment' => 'Written by someone else on the CEO\'s behalf.',
+        ])->assertForbidden();
+
+        $this->assertNull($review->fresh()->self_assessment_submitted_at);
+    }
+
     /** P0-10: the reviewee sends a self-assessment once; the board reads it. */
     public function test_reviewee_sends_their_self_assessment_to_the_board_once(): void
     {

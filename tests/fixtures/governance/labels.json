@@ -27,7 +27,7 @@
             "two_thirds": "At least two-thirds For",
             "unanimous": "Everyone entitled votes For",
             "special_majority": "More For than Against",
-            "three_quarters": "More For than Against"
+            "three_quarters": "At least three-quarters For"
         },
         "resolution_purpose": {
             "decision": "For decision",

@@ -724,6 +724,9 @@ class Resolution extends Model
 
         return match ($rule) {
             'two_thirds' => ($for * 3 >= $totalCast * 2) && ($for > 0) ? 'carried' : 'defeated',
+            // NZ special-resolution level (e.g. Companies Act 1993 s2, common in
+            // trust deeds): at least 75% of the For and Against votes are For.
+            'three_quarters' => ($for * 4 >= $totalCast * 3) && ($for > 0) ? 'carried' : 'defeated',
             default => $for > $against ? 'carried' : 'defeated',
         };
     }

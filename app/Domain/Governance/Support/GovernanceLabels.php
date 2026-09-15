@@ -71,7 +71,7 @@ final class GovernanceLabels
             'two_thirds' => 'At least two-thirds For',
             'unanimous' => 'Everyone entitled votes For',
             'special_majority' => 'More For than Against',
-            'three_quarters' => 'More For than Against',
+            'three_quarters' => 'At least three-quarters For',
         ],
         'resolution_purpose' => [
             'decision' => 'For decision',
@@ -725,6 +725,7 @@ final class GovernanceLabels
     {
         return match ($threshold) {
             'special', 'two_thirds' => "It passes if at least two-thirds of the For and Against votes are For — abstentions don't count either way.",
+            'three_quarters' => "It passes if at least three-quarters of the For and Against votes are For — abstentions don't count either way.",
             'unanimous' => 'It passes only if every voting member votes For — one Against vote, abstention, step-aside or missing vote means it does not pass.',
             // Mirrors Resolution::determineOutcome(): anything else is decided
             // by more For than Against.

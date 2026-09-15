@@ -103,7 +103,7 @@ export const GOVERNANCE_LABELS = {
         // Resolution::determineOutcome() has no rule for these legacy keys
         // and counts them as "more For than Against" — say what really happens.
         special_majority: 'More For than Against',
-        three_quarters: 'More For than Against',
+        three_quarters: 'At least three-quarters For',
     },
     resolution_purpose: {
         decision: 'For decision',
@@ -1321,13 +1321,15 @@ export function financialYearLabel(
 /*  How a resolution passes                                                    */
 /* -------------------------------------------------------------------------- */
 
-type ThresholdRule = 'ordinary' | 'two_thirds' | 'unanimous';
+type ThresholdRule = 'ordinary' | 'two_thirds' | 'three_quarters' | 'unanimous';
 
 function thresholdRule(threshold: Maybe<string>): ThresholdRule {
     switch (threshold) {
         case 'special':
         case 'two_thirds':
             return 'two_thirds';
+        case 'three_quarters':
+            return 'three_quarters';
         case 'unanimous':
             return 'unanimous';
         default:
@@ -1342,6 +1344,8 @@ export function thresholdExplanation(threshold: Maybe<string>): string {
     switch (thresholdRule(threshold)) {
         case 'two_thirds':
             return "It passes if at least two-thirds of the For and Against votes are For — abstentions don't count either way.";
+        case 'three_quarters':
+            return "It passes if at least three-quarters of the For and Against votes are For — abstentions don't count either way.";
         case 'unanimous':
             return 'It passes only if every voting member votes For — one Against vote, abstention, step-aside or missing vote means it does not pass.';
         default:
@@ -1352,6 +1356,8 @@ export function thresholdExplanation(threshold: Maybe<string>): string {
 const THRESHOLD_NEED: Record<ThresholdRule, string> = {
     ordinary: 'more For than Against',
     two_thirds: 'at least two-thirds of the For and Against votes to be For',
+    three_quarters:
+        'at least three-quarters of the For and Against votes to be For',
     unanimous: 'every voting member to vote For',
 };
 

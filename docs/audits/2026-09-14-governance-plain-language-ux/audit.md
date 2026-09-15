@@ -116,7 +116,7 @@ Verification (second half): Pest Governance + Unit Governance + Sites calendar +
 
 **Still open (owner decisions and follow-ups):**
 - **Decided 15 September 2026:** budget approval limited to finance approvers (chair, treasurer, admin; migration `2026_09_15_720000`); evaluation results open only after the evaluation closes.
-- **Decisions still open:** `performance.view` holders get 403 on the performance list; managers can send a CEO self-assessment on the CEO's behalf; a 75% voting rule.
+- **Decided 15 September 2026 (following NZ board practice):** the CEO performance list opens for anyone with view permission and shows only the reviews they may see (explained empty list for ordinary members, no 403); only the person being reviewed can send their self-assessment; a new "At least three-quarters For" voting rule (75% of For and Against votes, abstentions not counted — the NZ special-resolution level used for trust deed and constitution changes).
 - **Content:** Te Tiriti principle descriptions (Māori advisor) and the compliance framework list (quality lead); then GOV-A28 testing with real board members.
 - **Small follow-ups:** committee meetings linking to their committee risk view and report; `DashboardAggregatorService::getTopRisks()` critical count vs the register and fake `getDataFreshness()` times; re-confirmation-due policies in My work; `GovernancePresenter::complianceStatus()` possibly unused; Dusk chair journey spec needs the Workflow tab; signed-in browser walkthrough of both halves.
 

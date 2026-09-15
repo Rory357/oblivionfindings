@@ -94,7 +94,10 @@ const STATUS_OPTIONS = [
     { value: 'completed', label: 'Done' },
 ];
 
-const RATING_VARIANT: Record<string, 'success' | 'info' | 'warning' | 'critical'> = {
+const RATING_VARIANT: Record<
+    string,
+    'success' | 'info' | 'warning' | 'critical'
+> = {
     exceeds: 'success',
     meets: 'info',
     needs_improvement: 'warning',
@@ -219,7 +222,9 @@ export default function PerformanceIndex({
                         href="/governance/performance?status=completed"
                         tone={counts.completed > 0 ? 'success' : 'brand'}
                     >
-                        <PageHeaderMeterBig>{counts.completed}</PageHeaderMeterBig>
+                        <PageHeaderMeterBig>
+                            {counts.completed}
+                        </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
                             Completed reviews
                         </PageHeaderMeterCaption>
@@ -307,7 +312,9 @@ export default function PerformanceIndex({
                             description={
                                 hasFilters
                                     ? 'Try clearing a filter or search term.'
-                                    : 'Reviews you can see appear here once the board sets one up.'
+                                    : can_create
+                                      ? 'Reviews you can see appear here once the board sets one up.'
+                                      : "CEO performance reviews are confidential. They're shared with the board chair, the committee that runs the review and the person being reviewed."
                             }
                             action={
                                 hasFilters ? (

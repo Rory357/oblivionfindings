@@ -300,6 +300,9 @@ describe('thresholdExplanation', () => {
             "It passes if more voting members vote For than Against — abstentions don't count either way.",
         );
         expect(thresholdExplanation('two_thirds')).toContain('two-thirds');
+        expect(thresholdExplanation('three_quarters')).toContain(
+            'three-quarters of the For and Against votes',
+        );
         expect(thresholdExplanation('unanimous')).toContain(
             'every voting member votes For',
         );

@@ -841,6 +841,7 @@ class ResolutionController extends Controller
         if (! empty($validated['type'])) {
             return match ($validated['type']) {
                 'special' => 'two_thirds',
+                'three_quarters' => 'three_quarters',
                 'unanimous' => 'unanimous',
                 default => 'simple_majority',
             };

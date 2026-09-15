@@ -12,7 +12,7 @@ use App\Support\WorkerClock;
 trait ResolutionAuthoringRules
 {
     /** Voting rules Resolution::determineOutcome() actually implements. */
-    public const VOTING_THRESHOLDS = ['simple_majority', 'two_thirds', 'unanimous'];
+    public const VOTING_THRESHOLDS = ['simple_majority', 'two_thirds', 'three_quarters', 'unanimous'];
 
     /**
      * The wizard's `<input type="datetime-local">` sends NZ wall time
@@ -48,7 +48,7 @@ trait ResolutionAuthoringRules
             'title.required' => 'Give the resolution a title.',
             'title.max' => 'Keep the title under 255 characters.',
             'purpose.in' => 'Choose whether this paper is for decision, for discussion or for information.',
-            'type.in' => 'Choose how the resolution passes: more For than Against, at least two-thirds For, or everyone entitled votes For.',
+            'type.in' => 'Choose how the resolution passes: more For than Against, at least two-thirds For, at least three-quarters For, or everyone entitled votes For.',
             'voting_threshold.in' => 'Choose how the resolution passes: more For than Against, at least two-thirds For, or everyone entitled votes For.',
             'meeting_id.exists' => "The meeting you chose doesn't exist any more.",
             'governance_meeting_id.exists' => "The meeting you chose doesn't exist any more.",
@@ -101,7 +101,7 @@ trait ResolutionAuthoringRules
             'exact_motion' => 'nullable|string',
             'purpose' => 'nullable|string|in:decision,discussion,information',
             'decision_type' => 'nullable|string|max:100',
-            'type' => 'nullable|string|in:ordinary,special,unanimous',
+            'type' => 'nullable|string|in:ordinary,special,three_quarters,unanimous',
             'context' => 'nullable|string',
             'description' => 'nullable|string',
             'options' => 'nullable|array',

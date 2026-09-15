@@ -189,8 +189,13 @@ class GovernanceDerivedAudienceTest extends TestCase
 
         $nonExec = $this->createNonExecutiveViewer();
 
-        // Ordinary member denied on index, show, edit
-        $this->actingAs($nonExec)->get('/governance/performance')->assertForbidden();
+        // Ordinary member: the list opens (no dead-end 403) but shows no
+        // reviews and leaks nothing; the review itself stays denied.
+        $memberIndex = $this->actingAs($nonExec)->get('/governance/performance');
+        $memberIndex->assertOk()->assertInertia(fn ($page) => $page
+            ->has('reviews.data', 0)
+            ->where('summary.total', 0));
+        $this->assertStringNotContainsString($ceoUser->name, json_encode($memberIndex->viewData('page')['props']['reviews']));
         $this->actingAs($nonExec)->get("/governance/performance/{$review->id}")->assertForbidden();
         $this->actingAs($nonExec)->get("/governance/performance/{$review->id}/edit")->assertForbidden();
 
