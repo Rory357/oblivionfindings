@@ -610,7 +610,7 @@ class GovernanceMeetingsTest extends TestCase
         $response->assertInertia(function ($page) use ($meeting1) {
             $page->component('Governance/Meetings/Show')
                 ->where('workflowChecklist.items.9.key', 'follow_through')
-                ->where('workflowChecklist.items.9.detail', "No open action items remain from {$meeting1->title}.");
+                ->where('workflowChecklist.items.9.detail', "No actions are still open from {$meeting1->title}.");
         });
     }
 }

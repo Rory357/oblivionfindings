@@ -88,6 +88,27 @@ Hand-rolled status pills (PriorityBadge, Reports, Packs dialog, Budgets Show) ·
 | **5 — Design-rule debt** | Budgets/CEO report/Packs/Performance record bodies, the four Reports pages, calendar source tokens/labels, dialogs, tables, typography | Full DESIGN.md conformance on retained pages |
 | **6 — Content & people** | Te Tiriti principles and compliance framework list checked by a quality lead and Māori advisor; test with 2–3 real board members (GOV-A28) | Accurate NZ content; real comprehension evidence |
 
+## 6. Implementation status — 15 September 2026
+
+**Shipped to main (first half).** Foundation (labels/status chips with a TS↔PHP fixture, glossary + `GovernanceTermHint`, EmptyState icons, hub/tab renames, vocabulary guide, DESIGN.md anti-pattern) and wave 1:
+
+| Area | Result |
+|---|---|
+| Voting, conflicts, resolutions, Settings | **P0-1, P0-2, P0-3, P0-4 fixed.** One shared ballot + conflict dialog (meeting workspace and resolution page); `vote_note` column with guarded data repair; vote confirmation, receipts, plain outcome sentences; real "at least two-thirds For" rule; NZ-time deadlines; follow-up actions created on pass; information/discussion papers can't go to a vote; chair records the board's existing approval of voting rules (first activation only); "Voting is switched off" banner; Settings rebuilt as "How the board votes"; plain server/validation messages. |
+| Home, My work, priorities, calendar | **P0-6, P0-7 fixed.** Upcoming meetings are "Coming up", not pending; every priority source permission-filtered, voting admin only for people who can do it; plain server wording layer (`GovernanceWording`); one assurance summary, no duplicated metrics, manager-only timeline/signals; Recently completed, timeline, calendar and dashboard widgets audience-filtered; calendar source tokens, labels, "Minutes due". Also fixed: completed votes never shown (wrong table), member checklist crash, pack read tracking, packs shown as unavailable. |
+| Finance, strategy, CEO reviews, navigation | **P0-10, P0-11, P0-12 fixed.** CEO's board scores masked on the server until completion; self-assessment → board assessment → complete review; budget changes on approved budgets with approver-only confirmed decisions and server thresholds; record actual spend; approval status from the linked resolution; spend approvals needing the board require a covering resolution; strategic plans read-only once approved, no "TBD"; plain authority messages; hub navigation for treasurer/CEO/reviewee. `SpendApprovalAuthorityTest` held two classes so 13 tests never ran — split and fixed. |
+| Coordinator | Meeting page no longer sends attachment storage paths or vote hashes and carries ballot state; plain fallback action verbs; unused calendar component removed. |
+
+Verification (merged with origin/main): Pest `tests/Feature/Governance tests/Unit/Governance tests/Feature/Sites/Calendar` **548/549**, the one failure a stale wording assertion, corrected and re-run **1/1**; Vitest (changed + sidebar + Sites calendar) **179/179**; ESLint 96 changed files clean; `tsc --noEmit` clean; production build succeeded.
+
+**Decisions taken during implementation (owner to confirm):** "Move money between lines" removed from budget changes (one resolution can only approve one record — request a decrease and an increase instead); `special_majority`/`three_quarters` legacy values keep "More For than Against" and new ones are rejected (a 75% option needs an owner decision).
+
+**Still to do (second half, not started):**
+- **Actions, board packs, CEO reports, board members, interests, evaluations, audit log** — incl. **P0-5** (upload evidence to complete an action), escalation that notifies nobody, pack page as a reader, superseded-pack 404 notice, non-staff board appointments, interest update/end, evaluation drafts/comments/validation, audit log in sentences, confirmations for distribute/submit/archive.
+- **Risk, compliance, care quality, Te Tiriti, policies, documents, records, reports** — incl. **P0-8** (policy sign-off list), **P0-9** (compliance status never refreshes), accept/close risk and treatments, trends snapshot job, evidence download, new policy version, Records/Documents/Policies overlap, the four Reports pages; Te Tiriti and compliance framework content needs a Māori advisor / quality lead.
+- **Meeting pages** — readiness grid for managers only, tab order and names, minutes/RSVP dialogs, meeting wizard committee/status issues, Meetings index back link.
+- **Follow-ups:** "My performance review" item in My work; Budgets and Strategic plan in Records for members who can view them; budget-change links to `?tab=changes`; permissions review (ordinary members seeded with `governance.budgets.approve`; `performance.view` holders get 403 on the list; managers can send a CEO self-assessment on their behalf); sweep other Pest files for multiple classes that silently skip tests.
+
 **Owner decisions (14 September 2026):** implement phases 1–5; board decisions are called **Resolutions**; policy sign-off is **Read and confirm**; voting rules are first switched on by the **chair or secretary recording the board's existing approval** (governing document, date approved, minutes reference). The approved wording lives in `vocabulary.md`.
 
 Full per-area findings with file:line references and suggested wording are in `findings-member-journey.md`, `findings-decisions-board-settings.md`, `findings-risk-policies-records.md` and `findings-finance-strategy-navigation.md` in this folder.
