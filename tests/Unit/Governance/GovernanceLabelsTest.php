@@ -49,7 +49,7 @@ class GovernanceLabelsTest extends TestCase
         $this->assertSame('Reduce it', GovernanceLabels::label('risk_strategy', 'treat'));
         $this->assertSame('Live with it and monitor', GovernanceLabels::label('risk_strategy', 'tolerate'));
         $this->assertSame('Almost certain', GovernanceLabels::label('risk_likelihood', 5));
-        $this->assertSame('Ngā Paerewa Health and Disability Services Standard', GovernanceLabels::label('compliance_framework', 'nga_paerewa'));
+        $this->assertSame('Ngā Paerewa Health and Disability Services Standard (NZS 8134:2021)', GovernanceLabels::label('compliance_framework', 'nga_paerewa'));
         $this->assertSame('Not due yet', GovernanceLabels::label('compliance_status', 'not_due'));
         $this->assertSame('Replaced by a newer version', GovernanceLabels::label('policy_status', 'superseded'));
         $this->assertSame('Waiting for the board', GovernanceLabels::label('budget_status', 'proposed'));
