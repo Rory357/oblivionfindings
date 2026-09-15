@@ -819,6 +819,12 @@ class GovernancePresenter
         ];
     }
 
+    /**
+     * The manager-only readiness summary shown at the top of the meeting
+     * workspace's Workflow tab. Values and details use the same words as the
+     * meeting checklist (GovernanceWorkflowService::meetingChecklist), and a
+     * step that doesn't apply says so instead of looking unfinished.
+     */
     public function meetingCockpit(
         GovernanceMeeting $meeting,
         array $quorum,
@@ -827,47 +833,72 @@ class GovernancePresenter
     ): array {
         $ceoStatus = $meeting->ceoReport?->status;
         $ceoSubmitted = in_array($ceoStatus, ['submitted', 'included_in_pack'], true);
+        // Same rule as the checklist: committee meetings don't need a CEO report.
+        $ceoNotNeeded = ! $meeting->isFullBoard() && ! $meeting->ceoReport && ! $meeting->ceo_report_deadline;
         $pack = $user
             ? $this->boardPackAccess->visiblePack($user, $meeting->boardPack)
             : null;
         $includePackCard = $user !== null
             && ($this->boardPackAccess->canManage($user) || $pack !== null);
 
-        $previousOpenItems = $this->openFollowThroughForMeeting($this->previousMeeting($meeting));
+        $previousMeeting = $this->previousMeeting($meeting);
+        $previousOpenItems = $this->openFollowThroughForMeeting($previousMeeting);
         $pendingResolutions = $meeting->resolutions->whereIn('status', ['draft', 'open'])->count();
         $readCount = $pack?->readCount() ?? 0;
         $distributedCount = count(array_unique($pack?->distributed_to ?? []));
         $minutesStatus = $meeting->minutes?->status;
+        // Attendance is recorded at the meeting, so before the day there is nothing to count yet.
+        $meetingDayReached = (GovernanceWording::daysFromToday($meeting->scheduled_at) ?? 1) <= 0;
+        $stillNeeded = max(0, (int) $quorum['required'] - (int) $quorum['present']);
 
         $cards = collect([
             [
                 'key' => 'ceo_report',
                 'title' => 'CEO report',
-                'status' => $ceoSubmitted ? 'done' : ($meeting->ceo_report_deadline && $meeting->ceo_report_deadline->isPast() ? 'warning' : 'todo'),
-                'value' => $ceoSubmitted ? 'Submitted' : 'Not submitted',
-                'detail' => $meeting->ceo_report_deadline
-                    ? 'Due '.GovernanceLabels::date($meeting->ceo_report_deadline, true)
-                    : 'No due date set',
+                'status' => match (true) {
+                    $ceoNotNeeded => 'not_applicable',
+                    $ceoSubmitted => 'done',
+                    $meeting->ceo_report_deadline && $meeting->ceo_report_deadline->isPast() => 'warning',
+                    default => 'todo',
+                },
+                'value' => match (true) {
+                    $ceoNotNeeded => 'Not needed',
+                    $ceoSubmitted => 'Submitted',
+                    default => 'Not submitted yet',
+                },
+                'detail' => match (true) {
+                    $ceoNotNeeded => "Committee meetings don't need a CEO report.",
+                    $ceoSubmitted => 'The CEO report has been submitted.',
+                    $meeting->ceo_report_deadline !== null => 'Due '.GovernanceLabels::date($meeting->ceo_report_deadline, true).'.',
+                    default => 'No due date has been set.',
+                },
                 'href' => $meeting->ceoReport ? "/governance/ceo-reports/{$meeting->ceoReport->id}" : '/governance/ceo-reports',
             ],
             [
                 'key' => 'pack_readiness',
                 'title' => 'Board pack',
                 'status' => $pack?->distributed_at ? 'done' : ($pack ? 'in_progress' : 'todo'),
-                'value' => $pack?->distributed_at ? 'Sent to members' : ($pack ? 'Ready' : 'Not prepared'),
+                'value' => $pack?->distributed_at ? 'Sent to members' : ($pack ? 'Ready to send' : 'Not prepared'),
                 'detail' => $pack?->distributed_at
-                    ? "{$readCount} of {$distributedCount} have confirmed reading it"
-                    : ($pack ? 'Ready to send to members' : 'Prepare it once the agenda and papers are ready'),
-                'href' => $pack ? "/governance/packs/{$pack->id}" : "/governance/meetings/{$meeting->id}",
+                    ? "{$readCount} of {$distributedCount} have confirmed reading it."
+                    : ($pack ? 'Send it so members can read it before the meeting.' : 'Generate a draft pack once the agenda and resolutions are ready.'),
+                'href' => $pack ? "/governance/packs/{$pack->id}" : "/governance/meetings/{$meeting->id}?tab=agenda",
             ],
             [
                 'key' => 'quorum',
                 'title' => 'Quorum',
-                'status' => $quorum['met'] ? 'done' : ($quorum['present'] > 0 ? 'in_progress' : 'todo'),
-                'value' => "{$quorum['present']} of {$quorum['required']}",
-                'detail' => $quorum['met']
-                    ? 'Enough members are present for decisions to be valid.'
-                    : 'Attendance still needs to be recorded.',
+                'status' => match (true) {
+                    ! $meetingDayReached => 'todo',
+                    (bool) $quorum['met'] => 'done',
+                    $quorum['present'] > 0 => 'in_progress',
+                    default => 'todo',
+                },
+                'value' => $meetingDayReached ? "{$quorum['present']} of {$quorum['required']}" : 'On the day',
+                'detail' => match (true) {
+                    ! $meetingDayReached => "Attendance is recorded at the meeting. {$quorum['required']} of the {$quorum['total']} members must be present for decisions to be valid.",
+                    (bool) $quorum['met'] => 'Enough members are present for decisions to be valid.',
+                    default => GovernanceWording::count($stillNeeded, 'more member').' needed for decisions to be valid. Record who attended.',
+                },
                 'href' => "/governance/meetings/{$meeting->id}?tab=attendance",
             ],
             [
@@ -875,16 +906,22 @@ class GovernancePresenter
                 'title' => 'Resolutions not yet decided',
                 'status' => $pendingResolutions > 0 ? 'in_progress' : 'done',
                 'value' => $pendingResolutions,
-                'detail' => $pendingResolutions > 0 ? 'Some resolutions are still in draft or open for voting.' : 'No resolutions are waiting.',
+                'detail' => $pendingResolutions > 0
+                    ? GovernanceWording::count($pendingResolutions, 'resolution').' still in draft or open for voting.'
+                    : 'No resolutions are waiting.',
                 'href' => "/governance/meetings/{$meeting->id}?tab=resolutions",
             ],
             [
                 'key' => 'minutes',
                 'title' => 'Minutes',
                 'status' => in_array($minutesStatus, ['signed', 'archived'], true) ? 'done' : ($meeting->minutes ? 'in_progress' : 'todo'),
-                'value' => $meeting->minutes ? GovernanceLabels::label('minutes_status', $minutesStatus) : 'Not written',
+                'value' => match ($minutesStatus) {
+                    null => 'Not written yet',
+                    'reviewed' => 'Sent for approval',
+                    default => GovernanceLabels::label('minutes_status', $minutesStatus),
+                },
                 'detail' => $meeting->minutes
-                    ? 'Version '.$meeting->minutes->version_number.': '.mb_strtolower(GovernanceLabels::label('minutes_status', $minutesStatus)).'.'
+                    ? 'Version '.$meeting->minutes->version_number.'.'
                     : 'Minutes are written after the meeting.',
                 'href' => "/governance/meetings/{$meeting->id}?tab=minutes",
             ],
@@ -893,9 +930,12 @@ class GovernancePresenter
                 'title' => 'Actions from the last meeting',
                 'status' => $previousOpenItems->isEmpty() ? 'done' : 'warning',
                 'value' => $previousOpenItems->count(),
-                'detail' => $previousOpenItems->isEmpty()
-                    ? 'No actions are still open from the last meeting.'
-                    : 'Some actions from the last meeting are still open.',
+                'detail' => match (true) {
+                    $previousMeeting === null => 'There is no earlier meeting to check.',
+                    $previousOpenItems->isEmpty() => "No actions are still open from {$previousMeeting->title}.",
+                    default => GovernanceWording::count($previousOpenItems->count(), 'action')
+                        .' still open from '.$previousMeeting->title.'.',
+                },
                 'href' => '/governance/actions',
             ],
         ]);

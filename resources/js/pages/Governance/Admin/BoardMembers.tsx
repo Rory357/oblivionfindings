@@ -32,12 +32,12 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly } from '@/lib/datetime';
+import { boardRoleLabel, governanceStatus } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
 
 import {
     BOARD_ROLES,
     BoardMemberWizardDialog,
-    boardRoleLabel,
     dateOnly,
     type BoardMemberRecord,
     type BoardMemberUser,
@@ -46,20 +46,33 @@ import {
 interface Props extends PageProps {
     boardMembers: BoardMemberRecord[];
     availableUsers: BoardMemberUser[];
+    canInvitePeople?: boolean;
+    endingSoonDays?: number;
 }
 
-type StandingFilter = 'all' | 'active' | 'inactive' | 'ending';
+type StatusFilter = 'all' | 'active' | 'inactive' | 'ending';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+/** One chip per appointment, from the shared Governance labels. */
+export function appointmentChip(member: BoardMemberRecord) {
+    if (member.ending_soon) {
+        return { label: 'Term ending soon', variant: 'warning' as const };
+    }
+    return governanceStatus(
+        'board_member_standing',
+        member.standing ?? (member.is_active ? 'active' : 'inactive'),
+    );
+}
 
 export default function ManageBoardMembers({
     auth,
     boardMembers,
     availableUsers,
+    canInvitePeople = false,
+    endingSoonDays = 90,
 }: Props) {
     const [search, setSearch] = useState('');
     const [role, setRole] = useState('all');
-    const [standing, setStanding] = useState<StandingFilter>('all');
+    const [status, setStatus] = useState<StatusFilter>('all');
     const [wizard, setWizard] = useState<{
         open: boolean;
         member: BoardMemberRecord | null;
@@ -67,28 +80,19 @@ export default function ManageBoardMembers({
     const [removing, setRemoving] = useState<BoardMemberRecord | null>(null);
     const ctxMenu = useEntityContextMenu<BoardMemberRecord>();
 
-    const today = new Date().toISOString().split('T')[0];
-    const in90Days = new Date(Date.now() + 90 * DAY_MS)
-        .toISOString()
-        .split('T')[0];
-    const endingSoon = (m: BoardMemberRecord) => {
-        const end = dateOnly(m.term_end);
-        return m.is_active && end !== '' && end >= today && end <= in90Days;
-    };
-
-    const activeCount = boardMembers.filter((m) => m.is_active).length;
-    const endingCount = boardMembers.filter(endingSoon).length;
-    const votingSeats = boardMembers.filter(
-        (m) => m.is_active && m.board_role !== 'observer',
-    ).length;
+    const isActive = (m: BoardMemberRecord) =>
+        (m.standing ?? (m.is_active ? 'active' : 'inactive')) === 'active';
+    const activeCount = boardMembers.filter(isActive).length;
+    const endingCount = boardMembers.filter((m) => m.ending_soon).length;
+    const votingCount = boardMembers.filter((m) => m.can_vote).length;
 
     const visible = useMemo(() => {
         const q = search.trim().toLowerCase();
         return boardMembers.filter((m) => {
             if (role !== 'all' && m.board_role !== role) return false;
-            if (standing === 'active' && !m.is_active) return false;
-            if (standing === 'inactive' && m.is_active) return false;
-            if (standing === 'ending' && !endingSoon(m)) return false;
+            if (status === 'active' && !isActive(m)) return false;
+            if (status === 'inactive' && isActive(m)) return false;
+            if (status === 'ending' && !m.ending_soon) return false;
             if (q === '') return true;
             return (
                 (m.user?.name ?? '').toLowerCase().includes(q) ||
@@ -96,13 +100,13 @@ export default function ManageBoardMembers({
             );
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [boardMembers, search, role, standing]);
+    }, [boardMembers, search, role, status]);
 
-    const hasFilters = search.trim() !== '' || role !== 'all' || standing !== 'all';
+    const hasFilters = search.trim() !== '' || role !== 'all' || status !== 'all';
     const clearFilters = () => {
         setSearch('');
         setRole('all');
-        setStanding('all');
+        setStatus('all');
     };
 
     const actionsFor = (m: BoardMemberRecord): MenuItem[] =>
@@ -125,7 +129,7 @@ export default function ManageBoardMembers({
         {
             key: 'role',
             label: 'Role',
-            width: '0.8fr',
+            width: '0.9fr',
             cell: (m) => <EntityChip>{boardRoleLabel(m.board_role)}</EntityChip>,
         },
         {
@@ -135,10 +139,10 @@ export default function ManageBoardMembers({
             cell: (m) =>
                 m.term_start ? (
                     <span>
-                        {formatDateOnly(dateOnly(m.term_start))} →{' '}
+                        {formatDateOnly(dateOnly(m.term_start))} –{' '}
                         {m.term_end
                             ? formatDateOnly(dateOnly(m.term_end))
-                            : 'Ongoing'}
+                            : 'ongoing'}
                     </span>
                 ) : (
                     <EmptyValue />
@@ -147,15 +151,21 @@ export default function ManageBoardMembers({
         {
             key: 'status',
             label: 'Status',
-            width: '0.8fr',
-            cell: (m) =>
-                endingSoon(m) ? (
-                    <EntityStatusChip variant="warning">Term ending</EntityStatusChip>
-                ) : (
-                    <EntityStatusChip variant={m.is_active ? 'success' : 'neutral'}>
-                        {m.is_active ? 'Active' : 'Inactive'}
+            width: '0.9fr',
+            cell: (m) => {
+                const chip = appointmentChip(m);
+                return (
+                    <EntityStatusChip variant={chip.variant}>
+                        {chip.label}
                     </EntityStatusChip>
-                ),
+                );
+            },
+        },
+        {
+            key: 'vote',
+            label: 'Can vote',
+            width: '0.6fr',
+            cell: (m) => (m.can_vote ? 'Yes' : 'No'),
         },
     ];
 
@@ -163,13 +173,13 @@ export default function ManageBoardMembers({
         <PageHeader
             icon={Users}
             title="Board members"
-            subline="Appointments, roles and terms for the governing board"
+            subline={`Who is on the board, their roles and their terms · ${votingCount} can vote`}
             actions={
                 <>
                     <PageHeaderSearch
                         value={search}
                         onChange={setSearch}
-                        placeholder="Search members by name or email…"
+                        placeholder="Search by name or email…"
                     />
                     <PageHeaderPrimaryButton
                         icon={Plus}
@@ -184,21 +194,18 @@ export default function ManageBoardMembers({
                     <PageHeaderMeterBlock
                         label="Appointments"
                         ariaLabel="View all board appointments"
-                        onClick={() => {
-                            setStanding('all');
-                            setRole('all');
-                        }}
+                        onClick={clearFilters}
                     >
                         <PageHeaderMeterBig>{boardMembers.length}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {boardMembers.length - activeCount} inactive
+                            {boardMembers.length - activeCount} not current
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Active"
-                        value={`${activeCount}/${boardMembers.length}`}
-                        ariaLabel="View active board members"
-                        onClick={() => setStanding('active')}
+                        label="Current members"
+                        value={`${activeCount} of ${boardMembers.length}`}
+                        ariaLabel="View current board members"
+                        onClick={() => setStatus('active')}
                     >
                         <PageHeaderMeterBar
                             percent={
@@ -208,28 +215,18 @@ export default function ManageBoardMembers({
                             }
                         />
                         <PageHeaderMeterCaption>
-                            {votingSeats} voting seats filled
+                            {votingCount} can vote
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Terms ending"
-                        tone={endingCount > 0 ? 'warning' : 'success'}
-                        ariaLabel="View terms ending within 90 days"
-                        onClick={() => setStanding('ending')}
+                        label="Terms ending soon"
+                        tone={endingCount > 0 ? 'warning' : 'brand'}
+                        ariaLabel={`View terms ending in the next ${endingSoonDays} days`}
+                        onClick={() => setStatus('ending')}
                     >
                         <PageHeaderMeterBig>{endingCount}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            within the next 90 days
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Eligible staff"
-                        ariaLabel="Appoint a board member"
-                        onClick={() => setWizard({ open: true, member: null })}
-                    >
-                        <PageHeaderMeterBig>{availableUsers.length}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            not yet on the board
+                            In the next {endingSoonDays} days
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
@@ -237,27 +234,29 @@ export default function ManageBoardMembers({
             filters={
                 <>
                     <PageHeaderFilterSelect
-                        label="All roles"
+                        label="Role"
                         value={role}
+                        allValue="all"
                         options={[
-                            { value: 'all', label: 'All roles' },
+                            { value: 'all', label: 'Any role' },
                             ...BOARD_ROLES.map((r) => ({
                                 value: r.key,
-                                label: r.label,
+                                label: boardRoleLabel(r.key),
                             })),
                         ]}
                         onChange={setRole}
                     />
                     <PageHeaderFilterSelect
-                        label="Any standing"
-                        value={standing}
+                        label="Status"
+                        value={status}
+                        allValue="all"
                         options={[
-                            { value: 'all', label: 'Any standing' },
+                            { value: 'all', label: 'Any status' },
                             { value: 'active', label: 'Active' },
                             { value: 'inactive', label: 'Inactive' },
-                            { value: 'ending', label: 'Term ending ≤ 90 days' },
+                            { value: 'ending', label: 'Term ending soon' },
                         ]}
-                        onChange={(v) => setStanding(v as StandingFilter)}
+                        onChange={(v) => setStatus(v as StatusFilter)}
                     />
                 </>
             }
@@ -282,7 +281,7 @@ export default function ManageBoardMembers({
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
                     <ListCaption
-                        title="Current appointments"
+                        title="Appointments"
                         caption={`${visible.length} of ${boardMembers.length} shown`}
                         right={
                             hasFilters ? (
@@ -290,7 +289,6 @@ export default function ManageBoardMembers({
                                     variant="outline"
                                     size="sm"
                                     onClick={clearFilters}
-                                    className="text-xs text-muted-foreground"
                                 >
                                     <X className="h-3.5 w-3.5" />
                                     Clear filters
@@ -305,7 +303,7 @@ export default function ManageBoardMembers({
                             title={
                                 hasFilters
                                     ? 'No board members match your filters'
-                                    : 'No board members appointed yet'
+                                    : 'No one has been appointed yet'
                             }
                             description={
                                 hasFilters
@@ -338,15 +336,15 @@ export default function ManageBoardMembers({
                             identityLabel="Member"
                             identity={(m) => ({
                                 mark: <PersonDisc name={m.user?.name} size={30} />,
-                                name: m.user?.name ?? 'Unknown user',
+                                name: m.user?.name ?? 'Person without a login',
                                 subline: m.user?.email ?? 'No email recorded',
                             })}
                             columns={columns}
                             actionsFor={actionsFor}
                             onOpen={(m) => setWizard({ open: true, member: m })}
                             onRowContextMenu={(e, m) => ctxMenu.open(e, m)}
-                            mutedFor={(m) => !m.is_active}
-                            minWidth={720}
+                            mutedFor={(m) => !isActive(m)}
+                            minWidth={760}
                         />
                     )}
                 </div>
@@ -367,6 +365,7 @@ export default function ManageBoardMembers({
                 open={wizard.open}
                 member={wizard.member}
                 availableUsers={availableUsers}
+                canInvitePeople={canInvitePeople}
                 onClose={() => setWizard({ open: false, member: null })}
             />
 
@@ -380,9 +379,10 @@ export default function ManageBoardMembers({
                         { preserveScroll: true },
                     );
                 }}
-                title="Remove this board member?"
-                description={`${removing?.user?.name ?? 'This member'} will be marked inactive and removed from the board. They can be re-appointed later.`}
+                title="Remove this person from the board?"
+                description={`${removing?.user?.name ?? 'This person'} stops being a board member straight away. They lose board access that comes from this appointment, including voting and board packs. You can appoint them again later.`}
                 confirmText="Remove from board"
+                variant="destructive"
             />
         </AppLayout>
     );

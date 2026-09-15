@@ -534,25 +534,25 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                                 <PageHeaderMeterBlock
                                     label="To do"
                                     href="/governance/my-work?kind=act"
-                                    ariaLabel="Show actions assigned to you"
+                                    ariaLabel="Show things for you to do"
                                 >
                                     <PageHeaderMeterBig>{feed.totals.act}</PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
                                         {feed.totals.act > 0
-                                            ? `${plural(feed.totals.act, 'action', 'actions')} assigned to you`
-                                            : 'No actions assigned'}
+                                            ? `${plural(feed.totals.act, 'thing', 'things')} for you to do`
+                                            : 'Nothing for you to do'}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
                                     label="Coming up"
                                     href="/governance/my-work?kind=know"
-                                    ariaLabel="Show meetings coming up"
+                                    ariaLabel="Show what's coming up"
                                 >
                                     <PageHeaderMeterBig>{feed.totals.know}</PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
                                         {feed.totals.know > 0
-                                            ? `${plural(feed.totals.know, 'meeting', 'meetings')} — for your information`
-                                            : 'No meetings coming up'}
+                                            ? `${plural(feed.totals.know, 'item', 'items')} — for your information`
+                                            : 'Nothing coming up'}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
@@ -710,8 +710,8 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                                     Coming up
                                 </CardTitle>
                                 <CardDescription>
-                                    For your information — meetings you can
-                                    open. There's nothing to do for these yet.
+                                    For your information — upcoming meetings and
+                                    finished reviews. There's nothing to do for these yet.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>

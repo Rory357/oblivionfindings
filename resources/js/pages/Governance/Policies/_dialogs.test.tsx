@@ -88,6 +88,45 @@ describe('PolicyWizardDialog', () => {
             requires_attestation: true,
         });
     });
+
+    it('starts a new version prefilled and requires "What changed"', () => {
+        render(
+            <PolicyWizardDialog
+                open
+                onClose={vi.fn()}
+                policy={{ ...approvedPolicy, version: 2 }}
+                mode="version"
+            />,
+        );
+        expect(screen.getAllByText('Start version 3').length).toBeGreaterThan(0);
+        expect(
+            (screen.getByLabelText(/policy title/i) as HTMLInputElement).value,
+        ).toBe('Delegations of Authority');
+
+        clickContinue();
+        const content = screen.getByLabelText(/policy content/i) as HTMLTextAreaElement;
+        expect(content.disabled).toBe(false);
+        clickContinue();
+        expect(screen.getByText('Say what changed in this version.')).toBeTruthy();
+
+        fireEvent.change(screen.getByLabelText(/what changed/i), {
+            target: { value: 'New spending limits in section 4' },
+        });
+        clickContinue();
+        clickContinue();
+        fireEvent.click(
+            screen.getByRole('button', { name: /save version 3 as a draft/i }),
+        );
+
+        expect(inertia.post).toHaveBeenCalledTimes(1);
+        const [url, payload] = inertia.post.mock.calls[0];
+        expect(url).toBe('/governance/policies/7/version');
+        expect(payload).toMatchObject({
+            content: 'Approved wording',
+            change_summary: 'New spending limits in section 4',
+            effective_date: null,
+        });
+    });
 });
 
 describe('EvaluationWizardDialog', () => {

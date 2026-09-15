@@ -1,39 +1,49 @@
+import { Head, Link } from '@inertiajs/react';
+import { AlertTriangle, ArrowUpRight, ShieldAlert } from 'lucide-react';
+
 import {
     PageHeader,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
+import { formatDateOnly } from '@/lib/datetime';
+import { refSuffix } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
-import { Head } from '@inertiajs/react';
-import { AlertCircle, AlertTriangle, Shield, TrendingUp } from 'lucide-react';
+
+import {
+    controlText,
+    riskBandLabel,
+    riskLevelVariant,
+    riskStatusChip,
+    strategyLabel,
+} from '../Risks/_shared';
+import { GeneratedAt } from './_shared';
 
 interface Risk {
     id: number;
-    reference: string;
+    reference: string | null;
     title: string;
     category: string;
-    description: string;
+    category_label: string;
+    description: string | null;
     inherent_score: number;
     residual_score: number;
-    control_effectiveness: string;
+    appetite_threshold: number;
+    control_effectiveness: string | null;
     within_appetite: boolean;
-    severity: string;
-    owner: any;
-    mitigation_strategy: string;
+    status: string;
+    owner: string | null;
+    mitigation_strategy: string | null;
     treatments_count: number;
-    active_treatments: number;
+    open_treatments: number;
+    overdue_treatments: number;
     next_review: string | null;
 }
 
@@ -42,34 +52,34 @@ interface Props extends PageProps {
     summary: {
         critical: number;
         high: number;
-        above_appetite: number;
-        total_active: number;
+        above_limit: number;
+        current: number;
     };
+    generatedAt: string;
 }
 
-const severityBorder: Record<string, string> = {
-    critical: 'border-l-red-500',
-    high: 'border-l-orange-500',
-    medium: 'border-l-yellow-500',
-    low: 'border-l-green-500',
-};
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div>
+            <dt className="text-caption">{label}</dt>
+            <dd className="mt-0.5 text-sm text-foreground">{children}</dd>
+        </div>
+    );
+}
 
-const severityBadge: Record<string, string> = {
-    critical: 'bg-status-critical text-white',
-    high: 'bg-status-warning text-white',
-    medium: 'bg-status-warning text-black',
-    low: 'bg-status-success text-white',
-};
-
-export default function RiskNarrative({ auth, risks, summary }: Props) {
-    const formatDate = (d: string | null) =>
-        d
-            ? new Date(d).toLocaleDateString('en-NZ', {
-                  day: '2-digit',
-                  month: 'short',
-                  year: 'numeric',
-              })
-            : 'Not set';
+export default function RiskNarrative({ auth, risks, summary, generatedAt }: Props) {
+    const titleChip =
+        summary.above_limit > 0 ? (
+            <PageHeaderStatusChip variant="critical">
+                {summary.above_limit} above the board&apos;s limit
+            </PageHeaderStatusChip>
+        ) : summary.current === 0 ? (
+            <PageHeaderStatusChip variant="neutral">No open risks</PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                None above the board&apos;s limit
+            </PageHeaderStatusChip>
+        );
 
     return (
         <AppLayout
@@ -77,252 +87,147 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Reports', href: '/governance/reports/board-monthly' },
-                { title: 'Risk Narrative', href: '/governance/reports/risk-narrative' },
+                { title: 'Risk register', href: '/governance/risks' },
+                { title: 'Top risks report', href: '/governance/reports/risk-narrative' },
             ]}
         >
-            <Head title="Risk Narrative Report" />
+            <Head title="Top risks report" />
 
             <PageLayout
                 hero={
                     <PageHeader
                         icon={AlertTriangle}
-                        title="Risk Narrative Report"
-                        subline="Detailed narrative view of all active risks."
+                        title="Top risks report"
+                        titleChip={titleChip}
+                        subline="The 10 highest risks after controls"
                         backHref="/governance/risks"
                         meters={
                             <>
                                 <PageHeaderMeterBlock
                                     label="Critical"
                                     href="/governance/risks?severity=critical"
-                                    tone={summary.critical > 0 ? 'critical' : undefined}
+                                    tone={summary.critical > 0 ? 'critical' : 'brand'}
+                                    ariaLabel="Open critical risks"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {summary.critical}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Immediate escalation</PageHeaderMeterCaption>
+                                    <PageHeaderMeterBig>{summary.critical}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>score 20 to 25 after controls</PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
                                     label="High"
                                     href="/governance/risks?severity=high"
-                                    tone={summary.high > 0 ? 'warning' : undefined}
+                                    tone={summary.high > 0 ? 'warning' : 'brand'}
+                                    ariaLabel="Open high risks"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {summary.high}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Elevated exposure</PageHeaderMeterCaption>
+                                    <PageHeaderMeterBig>{summary.high}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>score 15 to 19 after controls</PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Above appetite"
-                                    href="/governance/risks?appetite=above"
-                                    tone={summary.above_appetite > 0 ? 'critical' : undefined}
+                                    label="Above the board's limit"
+                                    href="/governance/risks?above_appetite=1"
+                                    tone={summary.above_limit > 0 ? 'critical' : 'brand'}
+                                    ariaLabel="Open risks above the board's limit"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {summary.above_appetite}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Tolerance breached</PageHeaderMeterCaption>
+                                    <PageHeaderMeterBig>{summary.above_limit}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>not accepted by the board</PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Active risks"
+                                    label="On the register"
                                     href="/governance/risks"
+                                    ariaLabel="Open the risk register"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {summary.total_active}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Register total</PageHeaderMeterCaption>
+                                    <PageHeaderMeterBig>{summary.current}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>open or accepted by the board</PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                             </>
                         }
                     />
                 }
             >
-                {/* Summary Stats */}
-                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-                    <Card className="border-status-critical/30">
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-status-critical">
-                                        Critical
-                                    </p>
-                                    <p className="text-3xl font-bold text-status-critical">
-                                        {summary.critical}
-                                    </p>
-                                </div>
-                                <AlertTriangle className="h-8 w-8 text-status-critical" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-status-warning/30">
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-status-warning">
-                                        High
-                                    </p>
-                                    <p className="text-3xl font-bold text-status-warning">
-                                        {summary.high}
-                                    </p>
-                                </div>
-                                <AlertCircle className="h-8 w-8 text-status-warning" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-primary">
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-primary">
-                                        Above Appetite
-                                    </p>
-                                    <p className="text-3xl font-bold text-primary">
-                                        {summary.above_appetite}
-                                    </p>
-                                </div>
-                                <TrendingUp className="h-8 w-8 text-primary" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Total Active
-                                    </p>
-                                    <p className="text-3xl font-bold">
-                                        {summary.total_active}
-                                    </p>
-                                </div>
-                                <Shield className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Risk Detail Cards */}
-                <div className="space-y-4">
-                    {risks.map((risk) => (
-                        <Card
-                            key={risk.id}
-                            className={cn(
-                                'border-l-4',
-                                severityBorder[risk.severity] ??
-                                    'border-l-gray-300',
-                            )}
-                        >
-                            <CardHeader>
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <CardTitle className="flex flex-wrap items-center gap-2">
-                                            {risk.title}
-                                            <Badge variant="outline">
-                                                {risk.reference}
-                                            </Badge>
-                                            <Badge
-                                                className={
-                                                    severityBadge[
-                                                        risk.severity
-                                                    ] ??
-                                                    'bg-muted-foreground/80 text-white'
-                                                }
-                                            >
-                                                {risk.severity}
-                                            </Badge>
-                                            {!risk.within_appetite && (
-                                                <Badge className="bg-primary/10 text-primary">
-                                                    Above Appetite
-                                                </Badge>
-                                            )}
-                                        </CardTitle>
-                                        <CardDescription className="mt-1 capitalize">
-                                            {risk.category?.replace(/_/g, ' ')}
-                                        </CardDescription>
-                                    </div>
-                                    <div className="shrink-0 text-right">
-                                        <div className="text-sm text-muted-foreground">
-                                            Residual Score
+                {risks.length === 0 ? (
+                    <EmptyState
+                        icon={ShieldAlert}
+                        title="No open risks"
+                        description="Risks appear here once they are added to the register."
+                    />
+                ) : (
+                    risks.map((risk, index) => {
+                        const status = riskStatusChip(risk);
+                        return (
+                            <Card key={risk.id}>
+                                <CardHeader>
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                        <div className="flex flex-col gap-1">
+                                            <CardTitle>
+                                                <Link
+                                                    href={`/governance/risks/${risk.id}`}
+                                                    className="underline-offset-2 hover:underline"
+                                                >
+                                                    {index + 1}. {risk.title}
+                                                </Link>
+                                            </CardTitle>
+                                            <CardDescription>
+                                                {[risk.category_label, refSuffix(risk.reference)]
+                                                    .filter(Boolean)
+                                                    .join(' · ')}
+                                            </CardDescription>
                                         </div>
-                                        <div className="text-2xl font-bold">
-                                            {risk.residual_score}
+                                        <div className="flex flex-wrap gap-2">
+                                            <StatusBadge variant={riskLevelVariant(risk.residual_score)}>
+                                                {risk.residual_score} · {riskBandLabel(risk.residual_score)}
+                                            </StatusBadge>
+                                            <StatusBadge variant={status.variant}>{status.label}</StatusBadge>
                                         </div>
                                     </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {risk.description && (
-                                        <div>
-                                            <p className="mb-1 text-sm font-medium text-foreground">
-                                                Description
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {risk.description}
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {risk.mitigation_strategy && (
-                                        <div>
-                                            <p className="mb-1 text-sm font-medium text-foreground">
-                                                Mitigation Strategy
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {risk.mitigation_strategy}
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                                        <span>
-                                            Inherent:{' '}
-                                            <strong>
-                                                {risk.inherent_score}
-                                            </strong>
-                                        </span>
-                                        <span>
-                                            Residual:{' '}
-                                            <strong>
-                                                {risk.residual_score}
-                                            </strong>
-                                        </span>
-                                        <span>
-                                            Control Effectiveness:{' '}
-                                            <strong className="capitalize">
-                                                {risk.control_effectiveness}
-                                            </strong>
-                                        </span>
-                                        <span>
-                                            Owner:{' '}
-                                            <strong>
-                                                {risk.owner?.name ??
-                                                    'Unassigned'}
-                                            </strong>
-                                        </span>
-                                        <span>
-                                            Treatments:{' '}
-                                            <Badge variant="outline">
-                                                {risk.active_treatments} /{' '}
-                                                {risk.treatments_count}
-                                            </Badge>
-                                        </span>
-                                        <span>
-                                            Next Review:{' '}
-                                            <strong>
-                                                {formatDate(risk.next_review)}
-                                            </strong>
-                                        </span>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                    {risks.length === 0 && (
-                        <div className="py-12 text-center text-sm text-muted-foreground">
-                            No active risks found.
-                        </div>
-                    )}
-                </div>
+                                </CardHeader>
+                                <CardContent className="flex flex-col gap-4">
+                                    {risk.description ? (
+                                        <p className="text-subtle whitespace-pre-wrap">
+                                            {risk.description}
+                                        </p>
+                                    ) : null}
+                                    <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                        <Fact label="Risk before controls">
+                                            {risk.inherent_score} · {riskBandLabel(risk.inherent_score)}
+                                        </Fact>
+                                        <Fact label="Risk after controls">
+                                            {risk.residual_score} · {riskBandLabel(risk.residual_score)}
+                                        </Fact>
+                                        <Fact label={`The board's limit for ${risk.category_label.toLowerCase()} risks`}>
+                                            {risk.appetite_threshold}
+                                        </Fact>
+                                        <Fact label="How well controls work">
+                                            {controlText(risk.control_effectiveness)}
+                                        </Fact>
+                                        <Fact label="Response">
+                                            {strategyLabel(risk.mitigation_strategy)}
+                                        </Fact>
+                                        <Fact label="Owner">{risk.owner ?? 'No owner named'}</Fact>
+                                        <Fact label="Actions">
+                                            {risk.treatments_count === 0
+                                                ? 'None yet'
+                                                : `${risk.open_treatments} of ${risk.treatments_count} still open${
+                                                      risk.overdue_treatments > 0
+                                                          ? ` · ${risk.overdue_treatments} overdue`
+                                                          : ''
+                                                  }`}
+                                        </Fact>
+                                        <Fact label="Next review">
+                                            {risk.next_review ? formatDateOnly(risk.next_review) : 'Not set'}
+                                        </Fact>
+                                    </dl>
+                                    <Link
+                                        href={`/governance/risks/${risk.id}`}
+                                        className="inline-flex w-fit items-center gap-1 text-sm font-medium text-primary underline-offset-2 hover:underline"
+                                    >
+                                        Open this risk
+                                        <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                                    </Link>
+                                </CardContent>
+                            </Card>
+                        );
+                    })
+                )}
+                <GeneratedAt at={generatedAt} />
             </PageLayout>
         </AppLayout>
     );

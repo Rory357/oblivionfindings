@@ -365,6 +365,70 @@ class GovernanceWorkflowServiceTest extends TestCase
         $this->assertNotSame('vote_resolutions', $after['next_step']['key'] ?? null);
     }
 
+    /** Checklist steps say their status and the minutes' stage in plain words. */
+    public function test_meeting_checklist_steps_carry_plain_status_labels_and_minutes_wording(): void
+    {
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin, ['title' => 'August board meeting', 'scheduled_at' => now()->subDays(2)]);
+
+        $service = app(GovernanceWorkflowService::class);
+        $before = collect($service->meetingChecklist($meeting->fresh(), $admin)['items'])->keyBy('key');
+        $this->assertSame('To do', $before['minutes_drafted']['status_label']);
+        $this->assertSame('Write the minutes after the meeting.', $before['minutes_drafted']['detail']);
+        $this->assertSame('Waiting on an earlier step', $before['minutes_approved']['status_label']);
+
+        app(\App\Domain\Governance\Services\MeetingMinuteService::class)->storeMinutes(
+            $meeting,
+            [['heading' => 'General business', 'content' => 'Agreed the plan.']],
+            $admin,
+        );
+        app(\App\Domain\Governance\Services\MeetingMinuteService::class)->submitForReview($meeting->fresh(), $admin);
+
+        $checklist = $service->meetingChecklist($meeting->fresh(), $admin);
+        $after = collect($checklist['items'])->keyBy('key');
+        $this->assertSame('Done', $after['minutes_drafted']['status_label']);
+        $this->assertSame('The draft minutes have been sent to the chair for approval.', $after['minutes_drafted']['detail']);
+        $this->assertSame('Waiting for the chair to approve the minutes.', $after['minutes_approved']['detail']);
+        $this->assertIsString($checklist['next_step']['status_label']);
+        foreach ($after as $step) {
+            $this->assertStringNotContainsString('_', $step['status_label']);
+        }
+    }
+
+    /** A budget change waiting for approval opens straight on the budget's changes tab. */
+    public function test_budget_change_priorities_open_the_budgets_changes_tab(): void
+    {
+        $admin = $this->createAdminUser();
+        $budget = $this->createBudget($admin, ['title' => 'Operating budget', 'status' => 'approved', 'total_budget' => 100000]);
+        $line = \App\Domain\Governance\Models\BudgetLineItem::create([
+            'budget_id' => $budget->id,
+            'category' => 'operations',
+            'description' => 'Respite',
+            'budget_amount' => 100000,
+            'forecast_amount' => 100000,
+            'actual_amount' => 0,
+        ]);
+        $change = \App\Domain\Governance\Models\BudgetAdjustment::create([
+            'budget_id' => $budget->id,
+            'budget_line_item_id' => $line->id,
+            'adjustment_type' => 'increase',
+            'amount' => 2500,
+            'reason' => 'Extra respite hours',
+            'proposed_by' => $admin->id,
+            'proposed_at' => now(),
+            'status' => 'submitted',
+            'threshold_applies' => false,
+        ]);
+
+        $action = collect(app(GovernanceWorkflowService::class)->dashboardWorkflow($admin)['actions'])
+            ->firstWhere('id', "budget-adjustment:{$change->id}");
+
+        $this->assertNotNull($action);
+        $this->assertSame("/governance/budgets/{$budget->id}?tab=changes", $action['action_url']);
+        $this->assertSame('Review budget change', $action['action_label']);
+        $this->assertStringContainsString('$2,500', $action['detail']);
+    }
+
     private function denyPermission(User $user, string $key): void
     {
         $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key]);

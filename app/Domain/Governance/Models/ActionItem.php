@@ -7,11 +7,34 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ActionItem extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
+
+    /**
+     * Plain messages members see (vocabulary.md). The stale-version message is
+     * also how controllers recognise a concurrent edit, so compare against the
+     * constant — never a fragment of the wording.
+     */
+    public const STALE_VERSION_MESSAGE = 'Someone else changed this action while you were working on it. Reload the page to see their changes, then try again.';
+
+    public const ALREADY_DONE_MESSAGE = "This action is already done, so it can't be changed.";
+
+    public const EVIDENCE_NEEDED_MESSAGE = "This action needs evidence before it can be marked as done. Upload a file that shows it's done, such as the signed document or a confirmation email.";
+
+    /** Reason recorded when the overdue sweep raises an action on its own. */
+    public const AUTOMATIC_ESCALATION_REASON = 'Escalated automatically because it was overdue';
+
+    /** Reason written by the sweep before automatic escalations had no escalator. */
+    public const LEGACY_AUTOMATIC_ESCALATION_REASON = 'Automatically escalated due to overdue status';
+
+    protected $hidden = [
+        // Legacy evidence stored as storage paths: never serialised to a page.
+        'evidence_attachments',
+    ];
 
     protected $fillable = [
         'action_reference',
@@ -93,6 +116,28 @@ class ActionItem extends Model
         return $this->morphTo('source', 'source_type', 'source_id');
     }
 
+    /** Files uploaded as proof the action is done. */
+    public function evidence(): HasMany
+    {
+        return $this->hasMany(ActionItemEvidence::class, 'action_item_id')->orderBy('created_at')->orderBy('id');
+    }
+
+    /** True when the overdue sweep (not a person) raised the action with the board. */
+    public function wasEscalatedAutomatically(): bool
+    {
+        if ($this->escalated_at === null) {
+            return false;
+        }
+
+        // Older sweeps recorded the owner as the escalator with this reason.
+        if ($this->escalation_reason === self::LEGACY_AUTOMATIC_ESCALATION_REASON) {
+            return true;
+        }
+
+        return $this->escalated_by === null
+            && $this->escalation_reason === self::AUTOMATIC_ESCALATION_REASON;
+    }
+
     public function scopeOpen($query)
     {
         return $query->whereIn('status', ['open', 'in_progress', 'blocked']);
@@ -145,12 +190,12 @@ class ActionItem extends Model
             $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status === 'complete') {
-                throw new \DomainException('A completed action item is in a terminal state and cannot be modified.');
+                throw new \DomainException(self::ALREADY_DONE_MESSAGE);
             }
 
             $currentVersion = (int) ($locked->version_number ?? 1);
             if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
-                throw new \DomainException('Action item was modified by another user. Please reload and review the latest changes.');
+                throw new \DomainException(self::STALE_VERSION_MESSAGE);
             }
 
             $clamped = min(100, max(0, $pct));
@@ -173,16 +218,16 @@ class ActionItem extends Model
             $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status === 'complete') {
-                throw new \DomainException('A completed action item is in a terminal state and cannot be marked as blocked.');
+                throw new \DomainException(self::ALREADY_DONE_MESSAGE);
             }
 
             $currentVersion = (int) ($locked->version_number ?? 1);
             if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
-                throw new \DomainException('Action item was modified by another user. Please reload and review the latest changes.');
+                throw new \DomainException(self::STALE_VERSION_MESSAGE);
             }
 
             if (empty(trim($reason))) {
-                throw new \DomainException('A reason is required to mark an action item as blocked.');
+                throw new \DomainException("Say what's stopping the work.");
             }
 
             $locked->update([
@@ -202,12 +247,12 @@ class ActionItem extends Model
             $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status === 'complete') {
-                throw new \DomainException('A completed action item is in a terminal state and cannot be unblocked.');
+                throw new \DomainException(self::ALREADY_DONE_MESSAGE);
             }
 
             $currentVersion = (int) ($locked->version_number ?? 1);
             if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
-                throw new \DomainException('Action item was modified by another user. Please reload and review the latest changes.');
+                throw new \DomainException(self::STALE_VERSION_MESSAGE);
             }
 
             $locked->update([
@@ -221,14 +266,26 @@ class ActionItem extends Model
         });
     }
 
-    public function markComplete(int $userId, ?string $notes = null, ?array $evidenceFiles = null, ?int $expectedVersion = null): string
+    /**
+     * Mark the action as done.
+     *
+     * Evidence can be files uploaded to this action (`$evidenceIds`, the ids
+     * of its ActionItemEvidence rows) or, for older API callers, managed
+     * storage paths (`$evidenceFiles`). Both are validated: uploaded ids must
+     * belong to THIS action, and paths must be real managed files that no
+     * other action already uses.
+     *
+     * @param  array<int, mixed>|null  $evidenceFiles
+     * @param  array<int, mixed>|null  $evidenceIds
+     */
+    public function markComplete(int $userId, ?string $notes = null, ?array $evidenceFiles = null, ?int $expectedVersion = null, ?array $evidenceIds = null): string
     {
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($userId, $notes, $evidenceFiles, $expectedVersion) {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($userId, $notes, $evidenceFiles, $expectedVersion, $evidenceIds) {
             $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
 
             $currentVersion = (int) ($locked->version_number ?? 1);
             if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
-                throw new \DomainException('Action item was modified by another user. Please reload and review the latest changes.');
+                throw new \DomainException(self::STALE_VERSION_MESSAGE);
             }
 
             if ($locked->status === 'complete') {
@@ -237,7 +294,29 @@ class ActionItem extends Model
             }
 
             if (empty($notes) || empty(trim($notes))) {
-                throw new \DomainException('Completion notes are required to complete this action item.');
+                throw new \DomainException('Add a short note about what was done.');
+            }
+
+            $uploadedIds = [];
+            if (is_array($evidenceIds)) {
+                foreach ($evidenceIds as $id) {
+                    if (! is_numeric($id) || (int) $id < 1) {
+                        throw new \DomainException("One of the evidence files couldn't be found. Reload the page and try again.");
+                    }
+                    $uploadedIds[] = (int) $id;
+                }
+                $uploadedIds = array_values(array_unique($uploadedIds));
+            }
+
+            if ($uploadedIds !== []) {
+                $belongingCount = ActionItemEvidence::query()
+                    ->where('action_item_id', $locked->id)
+                    ->whereIn('id', $uploadedIds)
+                    ->count();
+
+                if ($belongingCount !== count($uploadedIds)) {
+                    throw new \DomainException("One of the evidence files belongs to a different action. Upload the file to this action instead.");
+                }
             }
 
             $normalizedFiles = [];
@@ -250,13 +329,18 @@ class ActionItem extends Model
                 }
             }
 
-            if ($locked->evidence_required && empty($normalizedFiles) && empty($locked->evidence_attachments)) {
-                throw new \DomainException('Evidence documentation is required to complete this action item.');
+            $hasUploadedEvidence = ActionItemEvidence::query()->where('action_item_id', $locked->id)->exists();
+
+            if ($locked->evidence_required
+                && empty($normalizedFiles)
+                && empty($locked->evidence_attachments)
+                && ! $hasUploadedEvidence) {
+                throw new \DomainException(self::EVIDENCE_NEEDED_MESSAGE);
             }
 
             foreach ($normalizedFiles as $filePath) {
                 if (file_exists(public_path($filePath)) && ! \Illuminate\Support\Facades\Storage::disk('local')->exists($filePath)) {
-                    throw new \DomainException("Public website assets cannot be used as action completion evidence.");
+                    throw new \DomainException("That file can't be used as evidence. Upload the file instead.");
                 }
 
                 $diskLocal = \Illuminate\Support\Facades\Storage::disk('local');
@@ -269,7 +353,7 @@ class ActionItem extends Model
                 }
 
                 if (! $exists) {
-                    throw new \DomainException("Evidence file '{$filePath}' does not exist or has not been uploaded to managed storage.");
+                    throw new \DomainException("We couldn't find that evidence file. Upload the file instead.");
                 }
 
                 $otherAction = static::where('id', '!=', $locked->id)
@@ -278,9 +362,9 @@ class ActionItem extends Model
                 if ($otherAction) {
                     $completingUser = \App\Models\User::find($userId);
                     if (! $completingUser || ! app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)->canViewActionItem($completingUser, $otherAction)) {
-                        throw new \DomainException("Evidence file '{$filePath}' belongs to an inaccessible or restricted record.");
+                        throw new \DomainException("That evidence file belongs to a record you can't open. Upload your own copy instead.");
                     }
-                    throw new \DomainException("Evidence file '{$filePath}' is already associated with another action item.");
+                    throw new \DomainException('That evidence file is already attached to another action. Upload your own copy instead.');
                 }
             }
 
@@ -310,25 +394,39 @@ class ActionItem extends Model
         });
     }
 
-    public function escalate(int $userId, string $reason, ?int $expectedVersion = null): void
+    /**
+     * Raise the action with the board. `$userId` is the person who raised it,
+     * or null when the overdue sweep does it automatically — an automatic
+     * escalation never records the owner as the escalator.
+     */
+    public function escalate(?int $userId, string $reason, ?int $expectedVersion = null): void
     {
         \Illuminate\Support\Facades\DB::transaction(function () use ($userId, $reason, $expectedVersion) {
             $locked = static::where('id', $this->id)->lockForUpdate()->firstOrFail();
 
             $currentVersion = (int) ($locked->version_number ?? 1);
             if ($expectedVersion !== null && $currentVersion !== (int) $expectedVersion) {
-                throw new \DomainException('Action item was modified by another user. Please reload and review the latest changes.');
+                throw new \DomainException(self::STALE_VERSION_MESSAGE);
+            }
+
+            if ($locked->status === 'complete') {
+                throw new \DomainException(self::ALREADY_DONE_MESSAGE);
             }
 
             if (empty(trim($reason))) {
-                throw new \DomainException('An escalation reason is required.');
+                throw new \DomainException('Say why the board needs to look at this action.');
             }
 
             $locked->update([
                 'escalated_at' => now(),
                 'escalated_by' => $userId,
                 'escalation_reason' => trim($reason),
-                'priority' => $locked->priority === 'low' ? 'medium' : 'high',
+                // Raise the priority one step; never lower a critical action.
+                'priority' => match ($locked->priority) {
+                    'low' => 'medium',
+                    'critical' => 'critical',
+                    default => 'high',
+                },
                 'version_number' => $currentVersion + 1,
             ]);
 

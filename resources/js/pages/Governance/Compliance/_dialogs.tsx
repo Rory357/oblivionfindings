@@ -1,11 +1,12 @@
 /**
  * Governance compliance dialogs (design_styles/POPUP_STYLE_GUIDE.md):
  *
- *   - ObligationWizardDialog — the entity add/edit wizard (WizardShell). Add
- *     opens from the register header, Edit from the obligation record; both
- *     use the SAME steps, prefilled on edit.
+ *   - ObligationWizardDialog — the requirement add/edit wizard (WizardShell).
+ *     Add opens from the register header, Edit from the requirement record;
+ *     both use the SAME steps, prefilled on edit, and every field can be
+ *     corrected after it was added (changes are kept in the audit log).
  *   - UploadEvidenceDialog / CompleteObligationDialog — simple dialogs opened
- *     from the obligation record.
+ *     from the requirement record.
  *
  * Fields and rules mirror StoreComplianceObligationRequest and
  * ComplianceController::update / uploadEvidence / complete.
@@ -43,9 +44,12 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { formatDateOnly, toDateInput } from '@/lib/datetime';
+import {
+    complianceEvidenceTypeLabel,
+    frequencyLabel,
+    priorityLabel,
+} from '@/lib/governance-labels';
 import { cn } from '@/lib/utils';
-import { complete as completeObligation, store as storeObligation } from '@/routes/governance/compliance';
-import { upload as uploadEvidence } from '@/routes/governance/compliance/evidence';
 import { router, useForm } from '@inertiajs/react';
 import axios from 'axios';
 import {
@@ -64,6 +68,7 @@ import {
     FileText,
     Gavel,
     HeartPulse,
+    History,
     Loader2,
     Plus,
     Scale,
@@ -95,19 +100,16 @@ export interface ObligationFormOptions {
 }
 
 export const FREQUENCY_OPTIONS = [
-    { value: 'monthly', label: 'Monthly' },
-    { value: 'quarterly', label: 'Quarterly' },
-    { value: 'annual', label: 'Annual' },
-    { value: 'ad_hoc', label: 'Ad hoc' },
-    { value: 'event_driven', label: 'Event driven' },
-];
+    'monthly',
+    'quarterly',
+    'annual',
+    'ad_hoc',
+    'event_driven',
+].map((value) => ({ value, label: frequencyLabel(value) }));
 
-export const PRIORITY_OPTIONS = [
-    { value: 'low', label: 'Low' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'high', label: 'High' },
-    { value: 'critical', label: 'Critical' },
-];
+export const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'critical'].map(
+    (value) => ({ value, label: priorityLabel(value) }),
+);
 
 /** Framework → icon for tile pickers and list marks (cosmetic grouping). */
 export function frameworkIcon(value: string): LucideIcon {
@@ -115,7 +117,7 @@ export function frameworkIcon(value: string): LucideIcon {
     if (value === 'hswa' || value === 'hdsa_safety') return HeartPulse;
     if (value === 'privacy_act' || value === 'hip_code') return ShieldCheck;
     if (value === 'employment') return Users;
-    if (value === 'charities') return Scale;
+    if (value === 'charities' || value === 'code_of_rights') return Scale;
     return Gavel;
 }
 
@@ -138,12 +140,13 @@ function FieldError({ message }: { message?: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Obligation wizard (add + edit)                                     */
+/*  Requirement wizard (add + edit)                                    */
 /* ------------------------------------------------------------------ */
 
 export interface ObligationRecord {
     id: number;
     framework: string;
+    framework_label?: string;
     obligation_code: string | null;
     obligation_title: string;
     description: string | null;
@@ -154,6 +157,7 @@ export interface ObligationRecord {
     owner_id?: number | null;
     owner?: { id: number; name: string } | null;
     notes?: string | null;
+    evidence_required?: boolean;
 }
 
 type ObligationWizardForm = {
@@ -167,31 +171,32 @@ type ObligationWizardForm = {
     due_date: string;
     priority: string;
     owner_id: string;
+    evidence_required: boolean;
 };
 
 const OBLIGATION_STEPS: readonly WizardStep[] = [
     {
         key: 'obligation',
-        label: 'Obligation',
-        blurb: 'Framework, title & reference',
+        label: 'Requirement',
+        blurb: 'Where it comes from and its name',
         icon: ShieldCheck,
     },
     {
         key: 'details',
         label: 'Details',
-        blurb: 'What it requires',
+        blurb: 'What has to be done',
         icon: ClipboardList,
     },
     {
         key: 'schedule',
         label: 'Schedule',
-        blurb: 'Due date, owner & priority',
+        blurb: 'When, who and how important',
         icon: CalendarClock,
     },
     {
         key: 'review',
         label: 'Review',
-        blurb: 'Confirm before saving',
+        blurb: 'Check before saving',
         icon: CheckCircle2,
     },
 ];
@@ -207,6 +212,7 @@ const OBLIGATION_STEP_FOR_FIELD: Record<string, number> = {
     due_date: 2,
     priority: 2,
     owner_id: 2,
+    evidence_required: 2,
 };
 
 function initialObligationForm(
@@ -228,6 +234,7 @@ function initialObligationForm(
                 : obligation?.owner?.id != null
                   ? String(obligation.owner.id)
                   : '',
+        evidence_required: obligation?.evidence_required ?? true,
     };
 }
 
@@ -238,16 +245,21 @@ function validateObligationStep(
 ): Record<string, string> {
     const e: Record<string, string> = {};
     if (index === 0) {
-        if (!isEdit && !data.framework) e.framework = 'Choose a framework';
-        if (!data.title.trim()) e.title = 'A title is required';
+        if (!data.framework)
+            e.framework =
+                'Choose the law, standard or funding contract this requirement comes from.';
+        if (!data.title.trim()) e.title = 'Give the requirement a name.';
         else if (data.title.length > 255)
-            e.title = 'Keep the title to 255 characters or fewer';
+            e.title = 'Keep the name to 255 characters or fewer.';
         if (data.obligation_reference.length > 50)
-            e.obligation_reference = 'Reference must be 50 characters or fewer';
+            e.obligation_reference = 'Keep the reference to 50 characters or fewer.';
     }
     if (index === 1) {
         if (!data.description.trim())
-            e.description = 'Describe the obligation';
+            e.description = 'Describe what this requirement covers.';
+    }
+    if (index === 2 && isEdit && !data.due_date) {
+        e.due_date = 'Choose the due date.';
     }
     return e;
 }
@@ -256,7 +268,7 @@ export interface ObligationWizardDialogProps {
     open: boolean;
     onClose: () => void;
     options: ObligationFormOptions;
-    /** When set the wizard edits this obligation; otherwise it creates one. */
+    /** When set the wizard edits this requirement; otherwise it adds one. */
     obligation?: ObligationRecord | null;
 }
 
@@ -285,8 +297,10 @@ function ObligationWizardBody({
     const [done, setDone] = useState(false);
     const [confirmClose, setConfirmClose] = useState(false);
 
-    const set = (key: keyof ObligationWizardForm, value: string) =>
-        setData((prev) => ({ ...prev, [key]: value }));
+    const set = <K extends keyof ObligationWizardForm>(
+        key: K,
+        value: ObligationWizardForm[K],
+    ) => setData((prev) => ({ ...prev, [key]: value }));
     const err = (name: string): string | undefined =>
         errors[name] ??
         (form.errors as Record<string, string>)[name] ??
@@ -297,8 +311,25 @@ function ObligationWizardBody({
     const cur = OBLIGATION_STEPS[stepIndex];
     const isReview = cur.key === 'review';
 
+    // A requirement filed under an older framework keeps it as a choice.
+    const frameworkOptions = useMemo(() => {
+        if (
+            obligation?.framework &&
+            !options.frameworks.some((f) => f.value === obligation.framework)
+        ) {
+            return [
+                ...options.frameworks,
+                {
+                    value: obligation.framework,
+                    label: obligation.framework_label ?? obligation.framework,
+                },
+            ];
+        }
+        return options.frameworks;
+    }, [obligation, options.frameworks]);
+
     const frameworkLabel =
-        optionLabel(options.frameworks, data.framework) ?? data.framework;
+        optionLabel(frameworkOptions, data.framework) ?? data.framework;
     const ownerName =
         options.owners.find((o) => String(o.id) === data.owner_id)?.name ??
         (isEdit ? obligation?.owner?.name : undefined);
@@ -352,6 +383,7 @@ function ObligationWizardBody({
         const all = {
             ...validateObligationStep(0, data, isEdit),
             ...validateObligationStep(1, data, isEdit),
+            ...validateObligationStep(2, data, isEdit),
         };
         if (Object.keys(all).length) {
             setErrors(all);
@@ -385,20 +417,23 @@ function ObligationWizardBody({
         };
 
         if (isEdit && obligation) {
-            // ComplianceController::update accepts title, description,
-            // due_date, owner_id and notes — framework, reference,
-            // requirements, frequency and priority are fixed at creation.
             form.transform((current) => {
                 const payload: Record<string, unknown> = {
+                    framework: current.framework,
+                    obligation_reference: current.obligation_reference || null,
                     title: current.title,
                     description: current.description,
+                    requirements: current.requirements || null,
+                    frequency: current.frequency,
+                    priority: current.priority,
+                    evidence_required: current.evidence_required,
                     notes: current.notes,
                 };
                 if (current.due_date) payload.due_date = current.due_date;
                 if (current.owner_id && current.owner_id !== initial.owner_id) {
                     payload.owner_id = Number(current.owner_id);
                 }
-                return payload as ObligationWizardForm;
+                return payload as unknown as ObligationWizardForm;
             });
             form.put(`/governance/compliance/${obligation.id}`, visit);
             return;
@@ -414,31 +449,31 @@ function ObligationWizardBody({
                     description: current.description,
                     requirements: current.requirements,
                     frequency: current.frequency,
-                    due_date: current.due_date,
+                    due_date: current.due_date || null,
                     priority: current.priority,
+                    evidence_required: current.evidence_required,
                     owner_id: current.owner_id
                         ? Number(current.owner_id)
                         : null,
                 }) as unknown as ObligationWizardForm,
         );
-        form.post(storeObligation.url(), visit);
+        form.post('/governance/compliance', visit);
     };
-
-    const lockedHint = isEdit ? 'set at creation' : undefined;
 
     const success = done ? (
         <WizardSuccessPane
-            title={isEdit ? 'Obligation updated' : 'Obligation added'}
+            title={isEdit ? 'Requirement saved' : 'Requirement added'}
             blurb={
                 isEdit ? (
                     <>
-                        <strong>{data.title}</strong> has been updated.
+                        <strong>{data.title}</strong> has been saved. The change
+                        is kept in the audit log.
                     </>
                 ) : (
                     <>
-                        <strong>{data.title}</strong> ({frameworkLabel}) is now
-                        tracked on the compliance register. Reminders have been
-                        scheduled for its owner.
+                        <strong>{data.title}</strong> ({frameworkLabel}) is now on
+                        the compliance register. Its owner will be reminded
+                        before it is due.
                     </>
                 )
             }
@@ -470,18 +505,14 @@ function ObligationWizardBody({
             <WizardShell
                 open={open}
                 onClose={requestClose}
-                title={
-                    isEdit
-                        ? 'Edit compliance obligation'
-                        : 'Add compliance obligation'
-                }
+                title={isEdit ? 'Edit requirement' : 'Add requirement'}
                 description={
                     isEdit
-                        ? 'Update the obligation title, description, due date, owner and notes.'
-                        : 'A guided wizard to register a regulatory or framework obligation.'
+                        ? 'Correct any detail of this requirement. Each change is kept in the audit log.'
+                        : 'Add a legal or funding requirement the organisation must meet.'
                 }
                 railIcon={ShieldCheck}
-                railTitle={isEdit ? 'Edit obligation' : 'New obligation'}
+                railTitle={isEdit ? 'Edit requirement' : 'New requirement'}
                 railSub="Compliance register"
                 steps={OBLIGATION_STEPS}
                 stepIndex={stepIndex}
@@ -527,7 +558,7 @@ function ObligationWizardBody({
                                 ) : (
                                     <Check className="h-4 w-4" />
                                 )}
-                                {isEdit ? 'Save changes' : 'Create obligation'}
+                                {isEdit ? 'Save changes' : 'Add requirement'}
                             </Button>
                         ) : (
                             <Button type="button" onClick={next}>
@@ -541,42 +572,35 @@ function ObligationWizardBody({
                     <WizardStepPane>
                         <StepHead
                             icon={ShieldCheck}
-                            title="Which obligation?"
-                            blurb="Pick the regulatory framework and name the obligation you're tracking."
+                            title="Which requirement?"
+                            blurb="Choose the law, standard or funding contract it comes from and give it a name."
                         />
                         <div className="grid gap-4">
+                            {isEdit ? (
+                                <InfoCard icon={History}>
+                                    Every detail can be corrected here. The
+                                    audit log keeps what it was before.
+                                </InfoCard>
+                            ) : null}
                             <Field
-                                label="Framework"
-                                required={!isEdit}
-                                hint={lockedHint}
+                                label="Comes from"
+                                required
                                 error={err('framework')}
                             >
-                                {isEdit ? (
-                                    <InfoCard
-                                        icon={frameworkIcon(data.framework)}
-                                    >
-                                        <strong>{frameworkLabel}</strong> — the
-                                        framework is fixed once an obligation
-                                        is registered.
-                                    </InfoCard>
-                                ) : (
-                                    <TilePicker
-                                        value={data.framework}
-                                        onChange={(v) => set('framework', v)}
-                                        cols={2}
-                                        options={options.frameworks.map(
-                                            (f) => ({
-                                                key: f.value,
-                                                label: f.label,
-                                                icon: frameworkIcon(f.value),
-                                            }),
-                                        )}
-                                    />
-                                )}
+                                <TilePicker
+                                    value={data.framework}
+                                    onChange={(v) => set('framework', v)}
+                                    cols={2}
+                                    options={frameworkOptions.map((f) => ({
+                                        key: f.value,
+                                        label: f.label,
+                                        icon: frameworkIcon(f.value),
+                                    }))}
+                                />
                             </Field>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <Field
-                                    label="Title"
+                                    label="Name"
                                     required
                                     error={err('title')}
                                     span
@@ -593,25 +617,19 @@ function ObligationWizardBody({
                                 </Field>
                                 <Field
                                     label="Reference"
-                                    hint={lockedHint ?? 'clause / code (optional)'}
+                                    hint="clause or code (optional)"
                                     error={err('obligation_reference')}
                                 >
-                                    {isEdit ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            {data.obligation_reference || '—'}
-                                        </p>
-                                    ) : (
-                                        <Input
-                                            value={data.obligation_reference}
-                                            onChange={(e) =>
-                                                set(
-                                                    'obligation_reference',
-                                                    e.target.value.slice(0, 50),
-                                                )
-                                            }
-                                            placeholder="e.g. HSWA-2015-SEC-36"
-                                        />
-                                    )}
+                                    <Input
+                                        value={data.obligation_reference}
+                                        onChange={(e) =>
+                                            set(
+                                                'obligation_reference',
+                                                e.target.value.slice(0, 50),
+                                            )
+                                        }
+                                        placeholder="e.g. HSWA s36"
+                                    />
                                 </Field>
                             </div>
                         </div>
@@ -622,8 +640,8 @@ function ObligationWizardBody({
                     <WizardStepPane>
                         <StepHead
                             icon={ClipboardList}
-                            title="What does it require?"
-                            blurb="Describe the obligation and what must be done to comply."
+                            title="What has to be done?"
+                            blurb="Describe the requirement and what must be done or sent to meet it."
                         />
                         <div className="grid gap-4">
                             <Field
@@ -637,32 +655,23 @@ function ObligationWizardBody({
                                     onChange={(e) =>
                                         set('description', e.target.value)
                                     }
-                                    placeholder="What this obligation covers and why it matters."
+                                    placeholder="What this requirement covers and why it matters."
                                     aria-invalid={!!err('description')}
                                 />
                             </Field>
                             <Field
-                                label="Requirements"
-                                hint={
-                                    lockedHint ??
-                                    'what must be done / submitted (optional)'
-                                }
+                                label="What must be done"
+                                hint="optional"
                                 error={err('requirements')}
                             >
-                                {isEdit ? (
-                                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">
-                                        {data.requirements || '—'}
-                                    </p>
-                                ) : (
-                                    <Textarea
-                                        rows={3}
-                                        value={data.requirements}
-                                        onChange={(e) =>
-                                            set('requirements', e.target.value)
-                                        }
-                                        placeholder="e.g. Board-approved self-assessment uploaded as evidence each year."
-                                    />
-                                )}
+                                <Textarea
+                                    rows={3}
+                                    value={data.requirements}
+                                    onChange={(e) =>
+                                        set('requirements', e.target.value)
+                                    }
+                                    placeholder="e.g. Board-approved self-assessment uploaded as evidence each year."
+                                />
                             </Field>
                             {isEdit ? (
                                 <Field
@@ -676,15 +685,14 @@ function ObligationWizardBody({
                                         onChange={(e) =>
                                             set('notes', e.target.value)
                                         }
-                                        placeholder="Context for the board or the obligation owner."
+                                        placeholder="Anything the board or the owner should know."
                                     />
                                 </Field>
                             ) : (
                                 <InfoCard icon={FileText}>
                                     Evidence (documents, audit reports,
-                                    attestations) is attached after creation
-                                    from the obligation record — each
-                                    obligation keeps its own evidence trail.
+                                    certificates) is added from the requirement
+                                    once it is saved.
                                 </InfoCard>
                             )}
                         </div>
@@ -695,37 +703,31 @@ function ObligationWizardBody({
                     <WizardStepPane>
                         <StepHead
                             icon={CalendarClock}
-                            title="Due date, owner & priority"
-                            blurb="When it's due, who is accountable, and how much it matters."
+                            title="When, who and how important"
+                            blurb="When it's due, who is responsible and how much it matters."
                         />
                         <div className="grid gap-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <SubHead icon={CalendarClock}>Schedule</SubHead>
                                 <Field
-                                    label="Frequency"
-                                    hint={lockedHint}
+                                    label="How often"
                                     span
                                     error={err('frequency')}
                                 >
-                                    {isEdit ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            {optionLabel(
-                                                FREQUENCY_OPTIONS,
-                                                data.frequency,
-                                            ) ?? '—'}
-                                        </p>
-                                    ) : (
-                                        <Segmented
-                                            value={data.frequency}
-                                            onChange={(v) =>
-                                                set('frequency', v)
-                                            }
-                                            options={FREQUENCY_OPTIONS}
-                                        />
-                                    )}
+                                    <Segmented
+                                        value={data.frequency}
+                                        onChange={(v) => set('frequency', v)}
+                                        options={FREQUENCY_OPTIONS}
+                                    />
                                 </Field>
                                 <Field
                                     label={isEdit ? 'Due date' : 'Next due date'}
+                                    required={isEdit}
+                                    hint={
+                                        isEdit
+                                            ? undefined
+                                            : 'Leave blank to set it from how often it is due'
+                                    }
                                     error={err('due_date')}
                                 >
                                     <Input
@@ -736,43 +738,30 @@ function ObligationWizardBody({
                                         }
                                     />
                                 </Field>
-                                <Field
-                                    label="Priority"
-                                    hint={lockedHint}
-                                    error={err('priority')}
-                                >
-                                    {isEdit ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            {optionLabel(
-                                                PRIORITY_OPTIONS,
-                                                data.priority,
-                                            ) ?? '—'}
-                                        </p>
-                                    ) : (
-                                        <Segmented
-                                            value={data.priority}
-                                            onChange={(v) => set('priority', v)}
-                                            options={PRIORITY_OPTIONS}
-                                        />
-                                    )}
+                                <Field label="Priority" error={err('priority')}>
+                                    <Segmented
+                                        value={data.priority}
+                                        onChange={(v) => set('priority', v)}
+                                        options={PRIORITY_OPTIONS}
+                                    />
                                 </Field>
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2">
-                                <SubHead icon={Users}>Ownership</SubHead>
+                                <SubHead icon={Users}>Responsibility</SubHead>
                                 <Field
                                     label="Owner"
                                     span
                                     hint={
                                         isEdit
-                                            ? 'accountable person'
-                                            : 'accountable person — defaults to you'
+                                            ? 'the person responsible'
+                                            : 'the person responsible — you, if left blank'
                                     }
                                     error={err('owner_id')}
                                 >
                                     <SelectInput
                                         value={data.owner_id}
                                         onChange={(v) => set('owner_id', v)}
-                                        placeholder="Assign an owner"
+                                        placeholder="Choose an owner"
                                         ariaLabel="Owner"
                                         options={options.owners.map((o) => ({
                                             value: String(o.id),
@@ -780,6 +769,28 @@ function ObligationWizardBody({
                                         }))}
                                     />
                                 </Field>
+                                <div className="flex items-start gap-2.5 rounded-lg border border-border p-3 sm:col-span-2">
+                                    <Checkbox
+                                        id="obligation-evidence-required"
+                                        checked={data.evidence_required}
+                                        onCheckedChange={(v) =>
+                                            set('evidence_required', v === true)
+                                        }
+                                    />
+                                    <label
+                                        htmlFor="obligation-evidence-required"
+                                        className="text-sm"
+                                    >
+                                        <span className="block font-medium">
+                                            Evidence needed to mark it done
+                                        </span>
+                                        <span className="text-caption">
+                                            It can only be marked done once a
+                                            file that hasn&apos;t expired is
+                                            attached.
+                                        </span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </WizardStepPane>
@@ -789,22 +800,20 @@ function ObligationWizardBody({
                     <WizardStepPane>
                         <StepHead
                             icon={CheckCircle2}
-                            title={
-                                isEdit ? 'Review changes' : 'Review & create'
-                            }
-                            blurb="Confirm the obligation before saving it to the register."
+                            title={isEdit ? 'Review changes' : 'Review and add'}
+                            blurb="Check the requirement before saving it to the register."
                         />
                         <div className="grid gap-3 sm:grid-cols-2">
                             <ReviewCard
                                 icon={ShieldCheck}
-                                title="Obligation"
+                                title="Requirement"
                                 onEdit={() => goTo(0)}
                             >
                                 <ReviewRow
-                                    label="Framework"
+                                    label="Comes from"
                                     value={frameworkLabel}
                                 />
-                                <ReviewRow label="Title" value={data.title} />
+                                <ReviewRow label="Name" value={data.title} />
                                 <ReviewRow
                                     label="Reference"
                                     value={data.obligation_reference}
@@ -816,7 +825,7 @@ function ObligationWizardBody({
                                 onEdit={() => goTo(2)}
                             >
                                 <ReviewRow
-                                    label="Frequency"
+                                    label="How often"
                                     value={optionLabel(
                                         FREQUENCY_OPTIONS,
                                         data.frequency,
@@ -827,7 +836,7 @@ function ObligationWizardBody({
                                     value={
                                         data.due_date
                                             ? formatDateOnly(data.due_date)
-                                            : undefined
+                                            : 'Set from how often it is due'
                                     }
                                 />
                                 <ReviewRow
@@ -844,6 +853,10 @@ function ObligationWizardBody({
                                         (isEdit ? undefined : 'You')
                                     }
                                 />
+                                <ReviewRow
+                                    label="Evidence needed"
+                                    value={data.evidence_required ? 'Yes' : 'No'}
+                                />
                             </ReviewCard>
                             <ReviewCard
                                 icon={ClipboardList}
@@ -856,7 +869,7 @@ function ObligationWizardBody({
                                     value={data.description}
                                 />
                                 <ReviewRow
-                                    label="Requirements"
+                                    label="What must be done"
                                     value={data.requirements}
                                 />
                                 {isEdit ? (
@@ -874,8 +887,8 @@ function ObligationWizardBody({
                         <DialogTitle>Discard this draft?</DialogTitle>
                         <DialogDescription>
                             {isEdit
-                                ? 'Your unsaved changes to this obligation will be lost.'
-                                : 'The details entered for this obligation will be lost.'}
+                                ? 'Your unsaved changes to this requirement will be lost.'
+                                : 'The details entered for this requirement will be lost.'}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -908,35 +921,30 @@ function ObligationWizardBody({
 const EVIDENCE_TYPES = [
     {
         key: 'document',
-        label: 'Document',
-        description: 'Policy, filing or record.',
+        description: 'A policy, filing or record.',
         icon: FileText,
     },
     {
         key: 'audit_report',
-        label: 'Audit report',
-        description: 'Internal or external audit findings.',
+        description: 'Findings from an internal or external audit.',
         icon: ClipboardList,
     },
     {
         key: 'certification',
-        label: 'Certification',
-        description: 'Certificate or accreditation.',
+        description: 'A certificate or accreditation.',
         icon: Award,
     },
     {
         key: 'system_export',
-        label: 'System export',
-        description: 'Report exported from a system.',
+        description: 'A report downloaded from a system.',
         icon: Database,
     },
     {
         key: 'attestation',
-        label: 'Attestation',
-        description: 'Signed statement of compliance.',
+        description: 'A signed statement that the requirement is met.',
         icon: Signature,
     },
-];
+].map((type) => ({ ...type, label: complianceEvidenceTypeLabel(type.key) }));
 
 export function UploadEvidenceDialog({
     open,
@@ -989,7 +997,7 @@ function UploadEvidenceBody({
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
         setSubmitError(null);
-        form.post(uploadEvidence.url({ obligation: obligationId }), {
+        form.post(`/governance/compliance/${obligationId}/evidence`, {
             forceFormData: true,
             preserveScroll: true,
             preserveState: true,
@@ -1012,14 +1020,14 @@ function UploadEvidenceBody({
                     Upload evidence
                 </DialogTitle>
                 <DialogDescription>
-                    Attach proof that this obligation has been met. Files up to
-                    10 MB.
+                    Add a file showing this requirement is met — for example the
+                    filing receipt or audit report. Files can be up to 10 MB.
                 </DialogDescription>
             </DialogHeader>
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                    <Label className="mb-1.5 block">Evidence type</Label>
+                    <Label className="mb-1.5 block">What kind of evidence</Label>
                     <TilePicker
                         value={form.data.evidence_type}
                         onChange={(v) => form.setData('evidence_type', v)}
@@ -1030,7 +1038,7 @@ function UploadEvidenceBody({
                 </div>
                 <div>
                     <Label htmlFor="evidence-title">
-                        Title <span className="text-status-critical">*</span>
+                        Name <span className="text-status-critical">*</span>
                     </Label>
                     <Input
                         id="evidence-title"
@@ -1051,6 +1059,7 @@ function UploadEvidenceBody({
                     <Input
                         id="evidence-valid-until"
                         type="date"
+                        min={toDateInput(Date.now() + 86_400_000)}
                         value={form.data.valid_until}
                         onChange={(e) =>
                             form.setData('valid_until', e.target.value)
@@ -1088,8 +1097,8 @@ function UploadEvidenceBody({
                     ) : (
                         <FileDropzone
                             multiple={false}
-                            title="Drag & drop the evidence file"
-                            hint="PDF, Word, spreadsheets, images · max 10 MB"
+                            title="Drag and drop the evidence file"
+                            hint="PDF, Word, Excel, PowerPoint, images, CSV or text · up to 10 MB"
                             onFiles={(files) =>
                                 form.setData('file', files[0] ?? null)
                             }
@@ -1128,7 +1137,7 @@ function UploadEvidenceBody({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Complete obligation (simple dialog)                                */
+/*  Mark as done (simple dialog)                                       */
 /* ------------------------------------------------------------------ */
 
 export interface EvidenceItem {
@@ -1136,10 +1145,12 @@ export interface EvidenceItem {
     evidence_type: string;
     title: string;
     valid_until: string | null;
+    expired?: boolean;
     uploaded_by: { name: string } | null;
 }
 
 export function isEvidenceExpired(evidence: EvidenceItem): boolean {
+    if (typeof evidence.expired === 'boolean') return evidence.expired;
     if (!evidence.valid_until) return false;
     return evidence.valid_until.slice(0, 10) < toDateInput(new Date());
 }
@@ -1214,14 +1225,11 @@ function CompleteObligationBody({
         try {
             // axios (not an Inertia visit) so a 409 version conflict or a
             // validation message renders inline instead of an error page.
-            await axios.post(
-                completeObligation.url({ obligation: obligation.id }),
-                {
-                    evidence_ids: selectedIds.length > 0 ? selectedIds : undefined,
-                    completion_notes: notes || undefined,
-                    expected_version: obligation.version_number ?? 1,
-                },
-            );
+            await axios.post(`/governance/compliance/${obligation.id}/complete`, {
+                evidence_ids: selectedIds.length > 0 ? selectedIds : undefined,
+                completion_notes: notes || undefined,
+                expected_version: obligation.version_number ?? 1,
+            });
             onClose();
             router.reload();
         } catch (e: unknown) {
@@ -1241,7 +1249,7 @@ function CompleteObligationBody({
             setError(
                 firstError ??
                     response?.data?.message ??
-                    'Failed to mark obligation complete.',
+                    "The requirement wasn't marked as done. Try again.",
             );
         } finally {
             setSubmitting(false);
@@ -1253,11 +1261,11 @@ function CompleteObligationBody({
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-primary" />
-                    Complete compliance obligation
+                    Mark this requirement as done?
                 </DialogTitle>
                 <DialogDescription>
-                    Record how this obligation was fulfilled and the evidence
-                    that supports it.
+                    Record how it was met and the evidence that shows it. Once
+                    done, the next one is scheduled if it repeats.
                 </DialogDescription>
             </DialogHeader>
 
@@ -1278,7 +1286,7 @@ function CompleteObligationBody({
                     </p>
                     {obligation.requirements ? (
                         <p className="text-caption mt-1 border-t border-border pt-1">
-                            <span className="font-medium">Requirements:</span>{' '}
+                            <span className="font-medium">What must be done:</span>{' '}
                             {obligation.requirements}
                         </p>
                     ) : null}
@@ -1286,10 +1294,10 @@ function CompleteObligationBody({
 
                 {obligation.evidence_required && !hasValidEvidence ? (
                     <InfoCard icon={AlertTriangle} tone="crit">
-                        <p className="font-medium">Valid evidence required</p>
+                        <p className="font-medium">Current evidence needed</p>
                         <p className="text-caption mt-0.5">
-                            Evidence is mandatory for this obligation, but no
-                            active, unexpired evidence is attached.
+                            This requirement needs evidence that hasn&apos;t
+                            expired before it can be marked done.
                         </p>
                         {onUploadFirst ? (
                             <Button
@@ -1307,8 +1315,8 @@ function CompleteObligationBody({
                 ) : null}
 
                 <div>
-                    <p className="text-caption font-semibold uppercase">
-                        Attached evidence ({evidenceItems.length})
+                    <p className="text-caption font-semibold">
+                        Evidence ({evidenceItems.length})
                     </p>
                     {evidenceItems.length > 0 ? (
                         <div className="scrollbar-pretty mt-2 flex max-h-48 flex-col gap-2 overflow-y-auto pr-1">
@@ -1379,18 +1387,17 @@ function CompleteObligationBody({
                                                         variant="neutral"
                                                         size="sm"
                                                     >
-                                                        Active
+                                                        No expiry date
                                                     </StatusBadge>
                                                 )}
                                             </span>
-                                            <span className="mt-0.5 block text-muted-foreground capitalize">
-                                                {ev.evidence_type.replace(
-                                                    /_/g,
-                                                    ' ',
+                                            <span className="mt-0.5 block text-muted-foreground">
+                                                {complianceEvidenceTypeLabel(
+                                                    ev.evidence_type,
                                                 )}{' '}
                                                 · Uploaded by{' '}
                                                 {ev.uploaded_by?.name ||
-                                                    'Unknown'}
+                                                    'someone no longer listed'}
                                             </span>
                                         </span>
                                     </label>
@@ -1399,18 +1406,18 @@ function CompleteObligationBody({
                         </div>
                     ) : (
                         <p className="text-caption mt-2">
-                            No evidence files uploaded yet.
+                            No evidence uploaded yet.
                         </p>
                     )}
                 </div>
 
                 <div>
-                    <Label htmlFor="completion-notes">Completion notes</Label>
+                    <Label htmlFor="completion-notes">How it was met</Label>
                     <Textarea
                         id="completion-notes"
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder="How this obligation was fulfilled, relevant findings, or actions taken…"
+                        placeholder="How the requirement was met, any findings, or actions taken…"
                         className="mt-1"
                         rows={3}
                         maxLength={2000}
@@ -1433,7 +1440,7 @@ function CompleteObligationBody({
                     ) : (
                         <FileCheck className="mr-2 h-4 w-4" />
                     )}
-                    Complete obligation
+                    Mark as done
                 </Button>
             </DialogFooter>
         </>

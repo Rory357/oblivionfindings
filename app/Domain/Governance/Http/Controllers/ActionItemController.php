@@ -6,11 +6,15 @@ use App\Domain\Governance\Http\Requests\StoreActionItemRequest;
 use App\Domain\Governance\Models\ActionItem;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\Resolution;
+use App\Domain\Governance\Services\ActionItemEscalationNotifier;
+use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Domain\Governance\Services\GovernanceRecordAccessService;
+use App\Domain\Governance\Support\GovernanceLabels;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class ActionItemController extends Controller
@@ -24,7 +28,9 @@ class ActionItemController extends Controller
         $baseQuery = ActionItem::query();
         $accessService->scopeActionItems($baseQuery, $user);
 
-        $query = (clone $baseQuery)->with(['assignedTo:id,name', 'completedBy:id,name', 'createdBy:id,name']);
+        $query = (clone $baseQuery)
+            ->with(['assignedTo:id,name', 'completedBy:id,name', 'createdBy:id,name'])
+            ->withCount('evidence');
 
         // Filter by assignment
         $mine = ($request->has('assigned_to_me') && ! in_array((string) $request->input('assigned_to_me'), ['0', 'false'], true))
@@ -74,7 +80,10 @@ class ActionItemController extends Controller
             });
         }
 
-        $items = $query->orderBy('due_date')->paginate(20)->withQueryString();
+        $items = $query->orderBy('due_date')
+            ->paginate(20)
+            ->withQueryString()
+            ->through(fn (ActionItem $item) => $this->presentIndexRow($item));
 
         $summary = [
             'total_open' => (clone $baseQuery)->open()->count(),
@@ -92,8 +101,9 @@ class ActionItemController extends Controller
             ->pluck('source_type')
             ->map(fn ($type) => [
                 'value' => (string) $type,
-                'label' => Str::headline(class_basename((string) $type)),
+                'label' => GovernanceLabels::label('action_source', (string) $type),
             ])
+            ->unique('label')
             ->values();
 
         $assignees = User::query()
@@ -121,7 +131,7 @@ class ActionItemController extends Controller
     {
         $this->authorize('view', $action);
 
-        $action->load(['assignedTo', 'completedBy', 'createdBy', 'escalatedBy:id,name']);
+        $action->load(['assignedTo:id,name', 'completedBy:id,name', 'createdBy:id,name', 'escalatedBy:id,name', 'evidence.uploadedBy:id,name']);
 
         $user = $request->user();
         $accessService = app(GovernanceRecordAccessService::class);
@@ -171,11 +181,12 @@ class ActionItemController extends Controller
         $canUpdate = $user->can('update', $action);
 
         return Inertia::render('Governance/Actions/Show', [
-            'action' => $action,
+            'action' => $this->presentAction($action, $user),
             'source_details' => $sourceDetails,
-            // Reassignment options are only needed by people who can reassign.
+            // Reassignment options are only needed by people who can reassign —
+            // names only, never contact details.
             'assignees' => $canUpdate
-                ? User::query()->whereNotNull('approved_at')->orderBy('name')->get(['id', 'name', 'email'])
+                ? User::query()->whereNotNull('approved_at')->orderBy('name')->get(['id', 'name'])
                 : [],
             'can_update' => $canUpdate,
             // Contextual opening (e.g. from a meeting paper): a same-origin
@@ -191,12 +202,24 @@ class ActionItemController extends Controller
         $validated = $request->validate([
             'completion_notes' => 'required|string|min:3|max:2000',
             'evidence_files' => 'nullable|array',
+            'evidence_ids' => 'nullable|array',
+            'evidence_ids.*' => 'integer',
             'expected_version' => 'required|integer',
             'return_to' => 'nullable|string|max:2048',
+        ], [
+            'completion_notes.required' => 'Add a short note about what was done.',
+            'completion_notes.min' => 'Add a little more detail about what was done.',
+            'completion_notes.max' => 'Keep the note under 2,000 characters.',
+            'evidence_ids.*.integer' => "One of the evidence files couldn't be found. Reload the page and try again.",
+            'expected_version.required' => 'Reload the page and try again.',
         ]);
 
-        if ($action->evidence_required && empty($validated['evidence_files']) && empty($action->evidence_attachments)) {
-            return redirect()->back()->with('error', 'Evidence documentation is required to complete this action item.');
+        if ($action->evidence_required
+            && empty($validated['evidence_files'])
+            && empty($validated['evidence_ids'])
+            && empty($action->evidence_attachments)
+            && ! $action->evidence()->exists()) {
+            return redirect()->back()->with('error', ActionItem::EVIDENCE_NEEDED_MESSAGE);
         }
 
         try {
@@ -205,11 +228,12 @@ class ActionItemController extends Controller
                 $validated['completion_notes'],
                 $validated['evidence_files'] ?? null,
                 $validated['expected_version'],
+                $validated['evidence_ids'] ?? null,
             );
 
-            return $this->redirectAfterMutation($request, "Action item completed. Receipt: {$receipt}");
+            return $this->redirectAfterMutation($request, "Action marked as done. Receipt {$receipt}.");
         } catch (\DomainException $e) {
-            if (str_contains($e->getMessage(), 'modified by another user')) {
+            if ($e->getMessage() === ActionItem::STALE_VERSION_MESSAGE) {
                 return $this->conflictResponse($request, $e->getMessage());
             }
             if ($request->wantsJson()) {
@@ -232,7 +256,7 @@ class ActionItemController extends Controller
             'version_number' => 1,
         ]);
 
-        return redirect()->back()->with('success', 'Action item created.');
+        return redirect()->back()->with('success', 'Action added.');
     }
 
     public function updateProgress(Request $request, ActionItem $action)
@@ -244,6 +268,12 @@ class ActionItemController extends Controller
             'progress_notes' => 'nullable|string|max:1000',
             'expected_version' => 'required|integer',
             'return_to' => 'nullable|string|max:2048',
+        ], [
+            'progress_pct.required' => 'Choose how far along the work is.',
+            'progress_pct.min' => 'Progress must be between 0% and 100%.',
+            'progress_pct.max' => 'Progress must be between 0% and 100%.',
+            'progress_notes.max' => 'Keep the update under 1,000 characters.',
+            'expected_version.required' => 'Reload the page and try again.',
         ]);
 
         try {
@@ -253,9 +283,9 @@ class ActionItemController extends Controller
                 $validated['expected_version'],
             );
 
-            return $this->redirectAfterMutation($request, 'Progress updated.');
+            return $this->redirectAfterMutation($request, 'Progress saved.');
         } catch (\DomainException $e) {
-            if (str_contains($e->getMessage(), 'modified by another user')) {
+            if ($e->getMessage() === ActionItem::STALE_VERSION_MESSAGE) {
                 return $this->conflictResponse($request, $e->getMessage());
             }
             if ($request->wantsJson()) {
@@ -273,14 +303,18 @@ class ActionItemController extends Controller
         $validated = $request->validate([
             'blocked_reason' => 'required|string|max:500',
             'expected_version' => 'required|integer',
+        ], [
+            'blocked_reason.required' => "Say what's stopping the work.",
+            'blocked_reason.max' => 'Keep the reason under 500 characters.',
+            'expected_version.required' => 'Reload the page and try again.',
         ]);
 
         try {
             $action->block($validated['blocked_reason'], $validated['expected_version']);
 
-            return redirect()->back()->with('success', 'Action item marked as blocked.');
+            return redirect()->back()->with('success', 'Action marked as blocked.');
         } catch (\DomainException $e) {
-            if (str_contains($e->getMessage(), 'modified by another user')) {
+            if ($e->getMessage() === ActionItem::STALE_VERSION_MESSAGE) {
                 return $this->conflictResponse($request, $e->getMessage());
             }
 
@@ -294,14 +328,16 @@ class ActionItemController extends Controller
 
         $validated = $request->validate([
             'expected_version' => 'required|integer',
+        ], [
+            'expected_version.required' => 'Reload the page and try again.',
         ]);
 
         try {
             $action->unblock($validated['expected_version']);
 
-            return redirect()->back()->with('success', 'Action item unblocked.');
+            return redirect()->back()->with('success', 'Blocker removed. The action is back in progress.');
         } catch (\DomainException $e) {
-            if (str_contains($e->getMessage(), 'modified by another user')) {
+            if ($e->getMessage() === ActionItem::STALE_VERSION_MESSAGE) {
                 return $this->conflictResponse($request, $e->getMessage());
             }
 
@@ -309,26 +345,47 @@ class ActionItemController extends Controller
         }
     }
 
-    public function escalate(Request $request, ActionItem $action)
+    /**
+     * "Raise with the board": record why, raise the priority and tell the
+     * board chair and secretary (the dialog promises exactly this).
+     */
+    public function escalate(Request $request, ActionItem $action, ActionItemEscalationNotifier $notifier)
     {
         $this->authorize('update', $action);
 
         $validated = $request->validate([
             'escalation_reason' => 'required|string|max:500',
             'expected_version' => 'required|integer',
+        ], [
+            'escalation_reason.required' => 'Say why the board needs to look at this action.',
+            'escalation_reason.max' => 'Keep the reason under 500 characters.',
+            'expected_version.required' => 'Reload the page and try again.',
         ]);
 
         try {
             $action->escalate(auth()->id(), $validated['escalation_reason'], $validated['expected_version']);
-
-            return redirect()->back()->with('success', 'Action item escalated.');
         } catch (\DomainException $e) {
-            if (str_contains($e->getMessage(), 'modified by another user')) {
+            if ($e->getMessage() === ActionItem::STALE_VERSION_MESSAGE) {
                 return $this->conflictResponse($request, $e->getMessage());
             }
 
             return redirect()->back()->with('error', $e->getMessage());
         }
+
+        $action->refresh()->loadMissing('assignedTo:id,name');
+        $notified = $notifier->notifyBoardLeaders($action, $request->user());
+
+        GovernanceAuditService::log('action.escalated', 'ActionItem', (int) $action->id, [
+            'chair_notified' => $notified['chair'],
+            'secretary_notified' => $notified['secretary'],
+        ]);
+
+        $message = ActionItemEscalationNotifier::summary($notified);
+
+        return redirect()->back()->with(
+            $notified['chair'] || $notified['secretary'] ? 'success' : 'warning',
+            $message,
+        );
     }
 
     public function reassign(Request $request, ActionItem $action)
@@ -336,12 +393,20 @@ class ActionItemController extends Controller
         $this->authorize('update', $action);
 
         $validated = $request->validate([
-            'assigned_to' => 'required|exists:users,id',
+            'assigned_to' => ['required', Rule::exists('users', 'id')->whereNotNull('approved_at')],
             'expected_version' => 'required|integer',
+        ], [
+            'assigned_to.required' => 'Choose who should own this action.',
+            'assigned_to.exists' => "That person can't own actions. Choose someone with an approved login.",
+            'expected_version.required' => 'Reload the page and try again.',
         ]);
 
+        if ($action->status === 'complete') {
+            return redirect()->back()->with('error', ActionItem::ALREADY_DONE_MESSAGE);
+        }
+
         if ((int) ($action->version_number ?? 1) !== (int) $validated['expected_version']) {
-            return $this->conflictResponse($request, 'Action item was modified by another user. Please reload and review the latest changes.');
+            return $this->conflictResponse($request, ActionItem::STALE_VERSION_MESSAGE);
         }
 
         $action->update([
@@ -349,7 +414,92 @@ class ActionItemController extends Controller
             'version_number' => ($action->version_number ?? 1) + 1,
         ]);
 
-        return redirect()->back()->with('success', 'Action item reassigned.');
+        $ownerName = User::query()->whereKey($validated['assigned_to'])->value('name');
+
+        return redirect()->back()->with('success', $ownerName ? "{$ownerName} now owns this action." : 'Owner changed.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentIndexRow(ActionItem $item): array
+    {
+        $uploaded = (int) ($item->evidence_count ?? 0);
+        $legacy = is_array($item->evidence_attachments) ? count($item->evidence_attachments) : 0;
+        $evidenceCount = $uploaded + $legacy;
+
+        return [
+            'id' => (int) $item->id,
+            'action_reference' => $item->action_reference,
+            'title' => $item->title,
+            'description' => $item->description,
+            'due_date' => $item->due_date?->toDateString(),
+            'status' => $item->status,
+            'priority' => $item->priority,
+            'assigned_to' => $item->assignedTo ? ['id' => (int) $item->assignedTo->id, 'name' => $item->assignedTo->name] : null,
+            'source_type' => $item->source_type,
+            'source_id' => $item->source_id,
+            'progress_pct' => (int) ($item->progress_pct ?? 0),
+            'evidence_required' => (bool) $item->evidence_required,
+            'evidence_count' => $evidenceCount,
+        ];
+    }
+
+    /**
+     * The action as the page needs it. Evidence is listed by file name with an
+     * authorised download link; storage paths never leave the server.
+     *
+     * @return array<string, mixed>
+     */
+    private function presentAction(ActionItem $action, User $viewer): array
+    {
+        $person = fn (?User $user) => $user ? ['id' => (int) $user->id, 'name' => $user->name] : null;
+        $legacyPaths = is_array($action->evidence_attachments) ? array_values($action->evidence_attachments) : [];
+        $canManageEvidence = $viewer->canDo('governance.actions.manage');
+
+        return [
+            'id' => (int) $action->id,
+            'action_reference' => $action->action_reference,
+            'title' => $action->title,
+            'description' => $action->description,
+            'due_date' => $action->due_date?->toDateString(),
+            'status' => $action->status,
+            'priority' => $action->priority,
+            'source_type' => $action->source_type,
+            'source_id' => $action->source_id,
+            'evidence_required' => (bool) $action->evidence_required,
+            'completion_notes' => $action->completion_notes,
+            'completion_receipt' => $action->completion_receipt,
+            'completed_at' => $action->completed_at?->toIso8601String(),
+            'progress_pct' => (int) ($action->progress_pct ?? 0),
+            'progress_notes' => $action->progress_notes,
+            'version_number' => (int) ($action->version_number ?? 1),
+            'blocked_at' => $action->blocked_at?->toIso8601String(),
+            'blocked_reason' => $action->blocked_reason,
+            'escalated_at' => $action->escalated_at?->toIso8601String(),
+            'escalation_reason' => $action->wasEscalatedAutomatically() ? null : $action->escalation_reason,
+            'escalated_automatically' => $action->wasEscalatedAutomatically(),
+            'assigned_to' => $person($action->assignedTo),
+            'completed_by' => $person($action->completedBy),
+            'created_by' => $person($action->createdBy),
+            'escalated_by' => $action->wasEscalatedAutomatically() ? null : $person($action->escalatedBy),
+            'evidence' => $action->evidence
+                ->map(fn ($evidence) => [
+                    ...$evidence->present(),
+                    'can_remove' => $action->status !== 'complete'
+                        && ($canManageEvidence || (int) $evidence->uploaded_by === (int) $viewer->id),
+                ])
+                ->values()
+                ->all(),
+            'legacy_evidence' => collect($legacyPaths)
+                ->map(fn ($path, int $index) => [
+                    'index' => $index,
+                    'original_name' => basename((string) (is_array($path) ? ($path['path'] ?? $path['file_path'] ?? '') : $path)),
+                    'download_url' => "/governance/actions/{$action->id}/evidence/earlier/{$index}/download",
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 
     /**

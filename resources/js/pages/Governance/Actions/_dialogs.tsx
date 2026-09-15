@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { pageHasFlashError } from '@/components/governance/governance-dialog-deep-link';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,7 +9,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
@@ -28,36 +28,43 @@ import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle,
-    FileText,
     Flag,
     Gauge,
     Loader2,
     PauseCircle,
-    Plus,
-    Trash2,
     UserRound,
 } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
+import {
+    ActionEvidencePanel,
+    type ActionEvidenceFile,
+    type EarlierEvidenceFile,
+} from './_evidence';
 
 export interface ActionDialogRecord {
     id: number;
+    title?: string | null;
     action_reference: string;
     version_number?: number | null;
     progress_pct?: number | null;
     progress_notes?: string | null;
     evidence_required: boolean;
-    evidence_attachments?: string[] | null;
+    evidence?: ActionEvidenceFile[];
+    legacy_evidence?: EarlierEvidenceFile[];
     assigned_to?: { id: number; name: string } | null;
 }
 
 export interface AssigneeOption {
     id: number;
     name: string;
-    email?: string | null;
 }
 
 const NONE = '__none';
+
+/** The action's name as members know it — its title, never its code. */
+const nameOf = (action: ActionDialogRecord) =>
+    action.title?.trim() || 'this action';
 
 /** Standard simple-dialog shell (POPUP_STYLE_GUIDE.md): body mounts only while open. */
 function ActionDialogShell({
@@ -72,6 +79,7 @@ function ActionDialogShell({
     return (
         <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
             <DialogContent
+                className="max-h-[90vh] overflow-y-auto"
                 style={{
                     maxWidth: 'min(92vw, 720px)',
                     width: 'min(92vw, 720px)',
@@ -86,23 +94,30 @@ function ActionDialogShell({
 function SubmitButton({
     processing,
     disabled,
-    variant,
     children,
+    onClick,
+    type = 'submit',
 }: {
     processing: boolean;
     disabled?: boolean;
-    variant?: 'default' | 'destructive';
     children: ReactNode;
+    onClick?: () => void;
+    type?: 'submit' | 'button';
 }) {
     return (
-        <Button
-            type="submit"
-            variant={variant}
-            disabled={processing || disabled}
-        >
+        <Button type={type} onClick={onClick} disabled={processing || disabled}>
             {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {children}
         </Button>
+    );
+}
+
+/** A visible reason beside a disabled button — never only a tooltip. */
+function BlockedReason({ children }: { children: ReactNode }) {
+    return (
+        <p className="text-caption mr-auto self-center" role="status">
+            {children}
+        </p>
     );
 }
 
@@ -171,15 +186,15 @@ function UpdateProgressBody({
                     Update progress
                 </DialogTitle>
                 <DialogDescription>
-                    Record how far the deliverable has come. Reaching 100% does
-                    not close the action — completion needs sign-off notes
-                    {action.evidence_required ? ' and evidence' : ''}.
+                    Say how far along “{nameOf(action)}” is. Progress on its own
+                    doesn&apos;t finish the action — use Mark as done when the
+                    work is complete.
                 </DialogDescription>
             </DialogHeader>
 
             <div className="mt-3 grid gap-4">
                 <Field
-                    label={`Completion — ${form.data.progress_pct}%`}
+                    label={`How far along — ${form.data.progress_pct}%`}
                     error={form.errors.progress_pct}
                 >
                     <input
@@ -196,7 +211,7 @@ function UpdateProgressBody({
                     />
                 </Field>
                 <Field
-                    label="Progress notes"
+                    label="What's happened so far"
                     error={form.errors.progress_notes}
                 >
                     <Textarea
@@ -207,7 +222,7 @@ function UpdateProgressBody({
                         onChange={(e) =>
                             form.setData('progress_notes', e.target.value)
                         }
-                        placeholder="What was achieved, and what happens next…"
+                        placeholder="e.g. Quotes received from two suppliers; choosing one next week"
                     />
                 </Field>
                 {form.errors.expected_version ? (
@@ -258,9 +273,11 @@ function BlockActionBody({
         blocked_reason: '',
         expected_version: action.version_number ?? 1,
     });
+    const missingReason = !form.data.blocked_reason.trim();
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        if (missingReason) return;
         form.post(blockAction.url({ action: action.id }), {
             preserveScroll: true,
             onSuccess: closeOnSuccess(onClose),
@@ -272,16 +289,16 @@ function BlockActionBody({
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                     <PauseCircle className="h-4 w-4 text-status-warning" />
-                    Mark action as blocked
+                    Mark as blocked
                 </DialogTitle>
                 <DialogDescription>
-                    Explain the dependency, missing information or roadblock
-                    stopping progress.
+                    Say what&apos;s stopping “{nameOf(action)}”, so the owner and
+                    the board can sort it out. You can remove the blocker later.
                 </DialogDescription>
             </DialogHeader>
             <div className="mt-3">
                 <Field
-                    label="Blocker"
+                    label="What's stopping the work?"
                     required
                     error={form.errors.blocked_reason}
                 >
@@ -293,18 +310,20 @@ function BlockActionBody({
                         onChange={(e) =>
                             form.setData('blocked_reason', e.target.value)
                         }
-                        placeholder="What specifically is preventing completion…"
+                        placeholder="e.g. Waiting for the lawyer to send the final contract"
                     />
                 </Field>
             </div>
             <DialogFooter className="mt-4">
+                {missingReason ? (
+                    <BlockedReason>Add a reason to continue.</BlockedReason>
+                ) : null}
                 <Button type="button" variant="outline" onClick={onClose}>
                     Cancel
                 </Button>
                 <SubmitButton
                     processing={form.processing}
-                    disabled={!form.data.blocked_reason.trim()}
-                    variant="destructive"
+                    disabled={missingReason}
                 >
                     Mark as blocked
                 </SubmitButton>
@@ -313,7 +332,7 @@ function BlockActionBody({
     );
 }
 
-// ── Escalate ─────────────────────────────────────────────────────────────
+// ── Raise with the board (escalate) ──────────────────────────────────────
 
 export function EscalateActionDialog({
     open,
@@ -342,9 +361,11 @@ function EscalateActionBody({
         escalation_reason: '',
         expected_version: action.version_number ?? 1,
     });
+    const missingReason = !form.data.escalation_reason.trim();
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        if (missingReason) return;
         form.post(escalateAction.url({ action: action.id }), {
             preserveScroll: true,
             onSuccess: closeOnSuccess(onClose),
@@ -355,17 +376,18 @@ function EscalateActionBody({
         <form onSubmit={submit}>
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                    <Flag className="h-4 w-4 text-status-critical" />
-                    Escalate action
+                    <Flag className="h-4 w-4 text-primary" />
+                    Raise with the board
                 </DialogTitle>
                 <DialogDescription>
-                    Alert the board chair and secretariat that this action needs
-                    governance intervention.
+                    The board chair and secretary get an email and a
+                    notification asking them to look at “{nameOf(action)}”. Its
+                    priority goes up too.
                 </DialogDescription>
             </DialogHeader>
             <div className="mt-3">
                 <Field
-                    label="Escalation reason"
+                    label="Why does the board need to look at this?"
                     required
                     error={form.errors.escalation_reason}
                 >
@@ -377,27 +399,29 @@ function EscalateActionBody({
                         onChange={(e) =>
                             form.setData('escalation_reason', e.target.value)
                         }
-                        placeholder="Why governance intervention is required…"
+                        placeholder="e.g. We need a board decision on the extra cost before we can go ahead"
                     />
                 </Field>
             </div>
             <DialogFooter className="mt-4">
+                {missingReason ? (
+                    <BlockedReason>Add a reason to continue.</BlockedReason>
+                ) : null}
                 <Button type="button" variant="outline" onClick={onClose}>
                     Cancel
                 </Button>
                 <SubmitButton
                     processing={form.processing}
-                    disabled={!form.data.escalation_reason.trim()}
-                    variant="destructive"
+                    disabled={missingReason}
                 >
-                    Escalate action
+                    Raise with the board
                 </SubmitButton>
             </DialogFooter>
         </form>
     );
 }
 
-// ── Reassign ─────────────────────────────────────────────────────────────
+// ── Change owner (reassign) ──────────────────────────────────────────────
 
 export function ReassignActionDialog({
     open,
@@ -436,10 +460,13 @@ function ReassignActionBody({
             : NONE,
         expected_version: action.version_number ?? 1,
     });
+    const unchanged =
+        form.data.assigned_to === NONE ||
+        form.data.assigned_to === String(action.assigned_to?.id ?? '');
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        if (form.data.assigned_to === NONE) return;
+        if (unchanged) return;
         form.post(`/governance/actions/${action.id}/reassign`, {
             preserveScroll: true,
             onSuccess: closeOnSuccess(onClose),
@@ -451,11 +478,11 @@ function ReassignActionBody({
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                     <UserRound className="h-4 w-4 text-primary" />
-                    Reassign action
+                    Change owner
                 </DialogTitle>
                 <DialogDescription>
-                    Transfer accountability for {action.action_reference} to
-                    another approved person.
+                    Choose who is responsible for “{nameOf(action)}”. The new
+                    owner can update its progress and mark it as done.
                 </DialogDescription>
             </DialogHeader>
             <div className="mt-3">
@@ -485,9 +512,7 @@ function ReassignActionBody({
                                     key={user.id}
                                     value={String(user.id)}
                                 >
-                                    {user.email
-                                        ? `${user.name} (${user.email})`
-                                        : user.name}
+                                    {user.name}
                                 </SelectItem>
                             ))}
                         </SelectContent>
@@ -495,25 +520,23 @@ function ReassignActionBody({
                 </Field>
             </div>
             <DialogFooter className="mt-4">
+                {unchanged ? (
+                    <BlockedReason>
+                        Choose a different person to continue.
+                    </BlockedReason>
+                ) : null}
                 <Button type="button" variant="outline" onClick={onClose}>
                     Cancel
                 </Button>
-                <SubmitButton
-                    processing={form.processing}
-                    disabled={
-                        form.data.assigned_to === NONE ||
-                        form.data.assigned_to ===
-                            String(action.assigned_to?.id ?? '')
-                    }
-                >
-                    Reassign action
+                <SubmitButton processing={form.processing} disabled={unchanged}>
+                    Change owner
                 </SubmitButton>
             </DialogFooter>
         </form>
     );
 }
 
-// ── Complete ─────────────────────────────────────────────────────────────
+// ── Mark as done ─────────────────────────────────────────────────────────
 
 export function CompleteActionDialog({
     open,
@@ -537,6 +560,21 @@ export function CompleteActionDialog({
     );
 }
 
+/** Why "Mark as done" can't be used yet, or null when it can. */
+export function completionBlockedReason(
+    notes: string,
+    evidenceRequired: boolean,
+    evidenceCount: number,
+): string | null {
+    if (notes.trim().length < 3) {
+        return 'Add a note about what was done to continue.';
+    }
+    if (evidenceRequired && evidenceCount === 0) {
+        return 'Upload evidence to continue.';
+    }
+    return null;
+}
+
 function CompleteActionBody({
     onClose,
     action,
@@ -546,33 +584,25 @@ function CompleteActionBody({
     action: ActionDialogRecord;
     returnTo?: string | null;
 }) {
+    const evidence = action.evidence ?? [];
+    const earlier = action.legacy_evidence ?? [];
     const form = useForm({
         completion_notes: '',
-        evidence_files: [] as string[],
         expected_version: action.version_number ?? 1,
         return_to: returnTo ?? '',
     });
-    const [evidenceDraft, setEvidenceDraft] = useState('');
-    const errors = form.errors as Record<string, string | undefined>;
-    const existingEvidence = action.evidence_attachments ?? [];
-    const evidenceMissing =
-        action.evidence_required &&
-        form.data.evidence_files.length === 0 &&
-        existingEvidence.length === 0;
-    const notesTooShort = form.data.completion_notes.trim().length < 3;
+    const [confirming, setConfirming] = useState(false);
+    const blocked = completionBlockedReason(
+        form.data.completion_notes,
+        action.evidence_required,
+        evidence.length + earlier.length,
+    );
 
-    const addEvidence = () => {
-        const value = evidenceDraft.trim();
-        if (!value || form.data.evidence_files.includes(value)) return;
-        form.setData('evidence_files', [...form.data.evidence_files, value]);
-        setEvidenceDraft('');
-    };
-
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        if (notesTooShort || evidenceMissing) return;
+    const send = () => {
         form.transform((data) => ({
             ...data,
+            // Only files uploaded to THIS action; the server checks that too.
+            evidence_ids: evidence.map((file) => file.id),
             return_to: data.return_to || undefined,
         }));
         form.post(completeAction.url({ action: action.id }), {
@@ -581,31 +611,31 @@ function CompleteActionBody({
         });
     };
 
-    const evidenceError =
-        errors.evidence_files ??
-        Object.entries(errors).find(([key]) =>
-            key.startsWith('evidence_files.'),
-        )?.[1];
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        if (blocked) return;
+        setConfirming(true);
+    };
 
     return (
         <form onSubmit={submit}>
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-status-success" />
-                    Complete action
+                    Mark as done
                 </DialogTitle>
                 <DialogDescription>
-                    Sign off {action.action_reference} with completion notes
+                    Say what was done for “{nameOf(action)}”
                     {action.evidence_required
-                        ? ' and the required verification evidence'
+                        ? ' and add the evidence the board asked for'
                         : ''}
-                    . A completion receipt is issued.
+                    . A receipt is saved with the action.
                 </DialogDescription>
             </DialogHeader>
 
             <div className="mt-3 grid gap-4">
                 <Field
-                    label="Completion notes"
+                    label="What was done?"
                     required
                     error={form.errors.completion_notes}
                 >
@@ -617,94 +647,25 @@ function CompleteActionBody({
                         onChange={(e) =>
                             form.setData('completion_notes', e.target.value)
                         }
-                        placeholder="The work completed, approvals obtained and outcomes realised…"
+                        placeholder="e.g. The revised contract was signed by both parties on 12 September and filed"
                     />
                 </Field>
 
-                <Field
-                    label="Evidence documents"
-                    required={
-                        action.evidence_required &&
-                        existingEvidence.length === 0
-                    }
-                    hint="Managed storage paths"
-                    error={evidenceError}
-                >
-                    <div className="grid gap-2">
-                        <div className="flex gap-2">
-                            <Input
-                                id="action-evidence"
-                                value={evidenceDraft}
-                                onChange={(e) =>
-                                    setEvidenceDraft(e.target.value)
-                                }
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        addEvidence();
-                                    }
-                                }}
-                                placeholder="e.g. governance/evidence/signed-policy-v2.pdf"
-                            />
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={addEvidence}
-                                disabled={!evidenceDraft.trim()}
-                            >
-                                <Plus className="h-4 w-4" /> Add
-                            </Button>
-                        </div>
-                        {form.data.evidence_files.map((file, index) => (
-                            <div
-                                key={file}
-                                className="flex items-center justify-between gap-2 rounded-md bg-muted px-2.5 py-1.5 text-xs"
-                            >
-                                <span className="flex min-w-0 items-center gap-1.5">
-                                    <FileText className="size-3.5 shrink-0 text-muted-foreground" />
-                                    <span className="truncate font-mono">
-                                        {file}
-                                    </span>
-                                </span>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-7"
-                                    aria-label={`Remove evidence ${file}`}
-                                    onClick={() =>
-                                        form.setData(
-                                            'evidence_files',
-                                            form.data.evidence_files.filter(
-                                                (_, i) => i !== index,
-                                            ),
-                                        )
-                                    }
-                                >
-                                    <Trash2 className="size-3.5 text-status-critical" />
-                                </Button>
-                            </div>
-                        ))}
-                        {existingEvidence.length > 0 ? (
-                            <p className="text-caption">
-                                {existingEvidence.length} evidence file
-                                {existingEvidence.length === 1
-                                    ? ' is'
-                                    : 's are'}{' '}
-                                already attached.
-                            </p>
-                        ) : null}
-                    </div>
-                </Field>
+                <div className="grid gap-2">
+                    <p className="text-sm font-medium">
+                        {action.evidence_required
+                            ? 'Evidence (needed)'
+                            : 'Evidence (optional)'}
+                    </p>
+                    <ActionEvidencePanel
+                        actionId={action.id}
+                        evidence={evidence}
+                        earlierEvidence={earlier}
+                        canUpload
+                        required={action.evidence_required}
+                    />
+                </div>
 
-                {action.evidence_required ? (
-                    <InfoCard icon={AlertTriangle} tone="warn">
-                        This action requires verification evidence. Reference
-                        documents already held in managed Governance storage;
-                        public website files, missing files and evidence
-                        belonging to another action are rejected.
-                    </InfoCard>
-                ) : null}
                 {form.errors.expected_version ? (
                     <InfoCard icon={AlertTriangle} tone="crit">
                         {form.errors.expected_version}
@@ -713,16 +674,27 @@ function CompleteActionBody({
             </div>
 
             <DialogFooter className="mt-4">
+                {blocked ? <BlockedReason>{blocked}</BlockedReason> : null}
                 <Button type="button" variant="outline" onClick={onClose}>
                     Cancel
                 </Button>
                 <SubmitButton
                     processing={form.processing}
-                    disabled={notesTooShort || evidenceMissing}
+                    disabled={Boolean(blocked)}
                 >
-                    Complete action
+                    Mark as done
                 </SubmitButton>
             </DialogFooter>
+
+            <ConfirmDialog
+                open={confirming}
+                onClose={() => setConfirming(false)}
+                onConfirm={send}
+                title="Mark this action as done?"
+                description={`“${nameOf(action)}” will be marked as done and can't be reopened or changed afterwards. Your note${evidence.length > 0 ? ' and evidence are' : ' is'} saved with a receipt.`}
+                confirmText="Mark as done"
+                variant="default"
+            />
         </form>
     );
 }

@@ -1,40 +1,56 @@
 import type { StatusVariant } from '@/components/ui/status-badge';
 import { toDateInput } from '@/lib/datetime';
+import {
+    governanceStatus,
+    type GovernanceStatusChip,
+} from '@/lib/governance-labels';
+
+/** One status chip for an action: "Overdue" wins while the work is still open. */
+export function actionChip(
+    status: string,
+    dueDate: string | null | undefined,
+): GovernanceStatusChip {
+    if (isActionOverdue(status, dueDate)) {
+        return governanceStatus('action_status', 'overdue');
+    }
+    return governanceStatus('action_status', status);
+}
 
 export function actionStatusVariant(status: string): StatusVariant {
-    switch (status) {
-        case 'complete':
-            return 'success';
-        case 'blocked':
-            return 'critical';
-        case 'in_progress':
-            return 'info';
-        default:
-            return 'neutral';
-    }
+    return governanceStatus('action_status', status).variant;
 }
 
 export function actionStatusLabel(status: string): string {
-    if (status === 'complete') return 'Completed';
-    if (status === 'in_progress') return 'In progress';
-    return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
+    return governanceStatus('action_status', status).label;
 }
 
 export function actionPriorityVariant(priority: string): StatusVariant {
-    switch (priority) {
-        case 'critical':
-            return 'critical';
-        case 'high':
-            return 'warning';
-        case 'medium':
-            return 'info';
-        default:
-            return 'neutral';
-    }
+    return governanceStatus('priority', priority).variant;
 }
 
 export function actionPriorityLabel(priority: string): string {
-    return priority.charAt(0).toUpperCase() + priority.slice(1);
+    return governanceStatus('priority', priority).label;
+}
+
+/**
+ * "Needed — not yet added" / "Added" / "Not needed" — whether proof has been
+ * provided, not just whether it is required.
+ */
+export function evidenceState(
+    required: boolean | undefined,
+    count: number | undefined,
+): GovernanceStatusChip {
+    const files = count ?? 0;
+    if (files > 0) {
+        return {
+            label: files === 1 ? 'Added' : `Added (${files})`,
+            variant: 'success',
+        };
+    }
+    if (required) {
+        return { label: 'Needed — not yet added', variant: 'warning' };
+    }
+    return { label: 'Not needed', variant: 'neutral' };
 }
 
 /** Due dates are calendar dates (YYYY-MM-DD, sometimes with a time part). */
@@ -62,4 +78,53 @@ export function daysUntilDue(
     const ms =
         Date.parse(`${due}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`);
     return Number.isNaN(ms) ? null : Math.round(ms / 86_400_000);
+}
+
+/** "3 days overdue" / "Due today" / "5 days left". */
+export function dueWording(dueDate: string | null | undefined): string | null {
+    const days = daysUntilDue(dueDate);
+    if (days === null) return null;
+    if (days < 0) {
+        const n = Math.abs(days);
+        return `${n} day${n === 1 ? '' : 's'} overdue`;
+    }
+    if (days === 0) return 'Due today';
+    return `${days} day${days === 1 ? '' : 's'} left`;
+}
+
+/** Evidence the server accepts (ActionItemEvidenceController::ALLOWED_EXTENSIONS). */
+export const EVIDENCE_EXTENSIONS = [
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'webp',
+    'csv',
+    'txt',
+] as const;
+
+export const EVIDENCE_MAX_BYTES = 20 * 1024 * 1024;
+
+/** A plain reason a file can't be uploaded, or null when it's fine. */
+export function evidenceFileProblem(file: {
+    name: string;
+    size: number;
+}): string | null {
+    const extension = file.name.includes('.')
+        ? (file.name.split('.').pop() ?? '').toLowerCase()
+        : '';
+    if (!(EVIDENCE_EXTENSIONS as readonly string[]).includes(extension)) {
+        return `"${file.name}" can't be used. Evidence must be a PDF, a Word, Excel or PowerPoint file, an image (JPG, PNG, GIF or WebP), or a CSV or text file.`;
+    }
+    if (file.size > EVIDENCE_MAX_BYTES) {
+        return `"${file.name}" is bigger than 20 MB. Choose a smaller file.`;
+    }
+    return null;
 }

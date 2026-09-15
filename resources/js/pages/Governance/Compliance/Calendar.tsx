@@ -36,16 +36,16 @@ export default function ComplianceCalendar({ auth }: Props) {
             ...createGovernanceCalendarAdapter({
                 title: 'Compliance calendar',
                 subline:
-                    'Statutory obligations, reviews, and renewals across frameworks',
+                    'When legal, standards and funding requirements are due',
                 initialSources: ['obligations'],
                 sourceFilters: GOVERNANCE_CALENDAR_SOURCES,
             }),
-            searchPlaceholder: 'Search obligations, reviews…',
-            // The obligation wizard lives on the register; this deep link opens it.
+            searchPlaceholder: 'Search requirements…',
+            // The requirement wizard lives on the register; this deep link opens it.
             primaryAction: canManage
                 ? {
                       href: '/governance/compliance?create=1',
-                      label: 'Add obligation',
+                      label: 'Add requirement',
                   }
                 : undefined,
         }),
@@ -61,7 +61,7 @@ export default function ComplianceCalendar({ auth }: Props) {
                 { title: 'Calendar', href: '/governance/compliance/calendar' },
             ]}
         >
-            <Head title="Compliance Calendar" />
+            <Head title="Compliance calendar" />
             <SiteCalendar
                 context="page"
                 scope="global"

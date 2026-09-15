@@ -213,8 +213,13 @@ test('board member can work through the executive governance journey', function 
             ->waitForText($evaluation->title, 30)
             ->visit("/governance/packs/{$pack->id}")
             ->waitFor('@pack-heading', 30)
-            ->assertSee('Pack distributed')
+            ->assertSee('Read the pack')
             ->assertPresent('@download-pack')
+            // Reading is confirmed on purpose, never recorded just by opening the page.
+            ->click('@mark-read-button')
+            ->whenAvailable('[role="alertdialog"]', function (Browser $dialog) {
+                $dialog->press("I've read this pack");
+            })
             ->waitUsing(15, 500, function () use ($pack) {
                 $pack->refresh();
 
@@ -315,7 +320,11 @@ test('board secretary can prepare a meeting and clear workflow items', function 
             ->click('@view-pack')
             ->waitFor('@distribute-pack', 120)
             ->click('@distribute-pack')
-            ->waitForText('Pack distributed', 60)
+            // Sending is confirmed first ("Send the pack to N board members?").
+            ->whenAvailable('[role="alertdialog"]', function (Browser $dialog) {
+                $dialog->press('Send the pack');
+            })
+            ->waitForText('Sent to members', 60)
             ->visit("/governance/meetings/{$meeting->id}")
             ->waitFor('@workflow-status-pack_generated', 30)
             ->assertSeeIn('@workflow-status-pack_generated', 'done')

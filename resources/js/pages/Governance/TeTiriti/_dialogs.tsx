@@ -1,12 +1,13 @@
 /**
- * Te Tiriti o Waitangi framework dialogs (design_styles/POPUP_STYLE_GUIDE.md):
+ * Te Tiriti o Waitangi commitment dialogs (design_styles/POPUP_STYLE_GUIDE.md):
  *
- *   - TeTiritiObligationWizardDialog — the entity add/edit wizard
- *     (WizardShell); Add and Edit share the same steps, prefilled on edit.
+ *   - TeTiritiObligationWizardDialog — add/edit wizard (WizardShell); Add and
+ *     Edit share the same steps, prefilled on edit.
  *   - TeTiritiObligationDetailDialog — read-only detail viewer with an Edit
  *     hand-off for managers.
  *
- * Fields mirror TeTiritiController::store / update.
+ * Fields mirror TeTiritiController::store / update. Principles are the five
+ * Hauora (Wai 2575) principles sent by the server.
  */
 import { Button } from '@/components/ui/button';
 import {
@@ -22,7 +23,7 @@ import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
-    InfoCard,
+    SelectInput,
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
@@ -35,7 +36,7 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { formatDateOnly } from '@/lib/datetime';
-import { useForm } from '@inertiajs/react';
+import { useForm, usePage } from '@inertiajs/react';
 import {
     Check,
     CheckCircle2,
@@ -43,6 +44,7 @@ import {
     ChevronRight,
     CircleDashed,
     ClipboardList,
+    Crown,
     Handshake,
     Landmark,
     Loader2,
@@ -52,7 +54,6 @@ import {
     Shield,
     Sparkles,
     Timer,
-    Users,
     Waypoints,
     type LucideIcon,
 } from 'lucide-react';
@@ -61,6 +62,12 @@ import { useMemo, useState } from 'react';
 export interface Principle {
     value: string;
     label: string;
+    description: string;
+}
+
+export interface CommitmentOwner {
+    id: number;
+    name: string;
 }
 
 export interface TeTiritiObligation {
@@ -71,14 +78,15 @@ export interface TeTiritiObligation {
     implementation_status: string;
     evidence_notes: string | null;
     target_date: string | null;
+    owner: CommitmentOwner | null;
 }
 
 const PRINCIPLE_ICONS: Record<string, LucideIcon> = {
-    partnership: Handshake,
-    participation: Users,
-    protection: Shield,
+    tino_rangatiratanga: Crown,
     equity: Scale,
+    active_protection: Shield,
     options: Waypoints,
+    partnership: Handshake,
 };
 
 export function principleIcon(value: string): LucideIcon {
@@ -87,44 +95,48 @@ export function principleIcon(value: string): LucideIcon {
 
 function PrincipleGlyph({ principle }: { principle: string }) {
     switch (principle) {
-        case 'partnership':
-            return <Handshake className="size-4" />;
-        case 'participation':
-            return <Users className="size-4" />;
-        case 'protection':
-            return <Shield className="size-4" />;
+        case 'tino_rangatiratanga':
+            return <Crown className="size-4" />;
         case 'equity':
             return <Scale className="size-4" />;
+        case 'active_protection':
+            return <Shield className="size-4" />;
         case 'options':
             return <Waypoints className="size-4" />;
+        case 'partnership':
+            return <Handshake className="size-4" />;
         default:
             return <Landmark className="size-4" />;
     }
 }
 
+/**
+ * "Done" and "Part of everyday practice" are both finished states, so both
+ * use the success tone.
+ */
 export const IMPLEMENTATION_STATUSES = [
     {
         key: 'not_started',
         label: 'Not started',
-        description: 'Commitment recorded; no action yet.',
+        description: 'Agreed, but no work has started.',
         icon: CircleDashed,
     },
     {
         key: 'in_progress',
         label: 'In progress',
-        description: 'Actions under way.',
+        description: 'Work is under way.',
         icon: Timer,
     },
     {
         key: 'implemented',
-        label: 'Implemented',
-        description: 'Delivered and evidenced.',
+        label: 'Done',
+        description: 'Delivered, with evidence.',
         icon: CheckCircle2,
     },
     {
         key: 'embedded',
-        label: 'Embedded',
-        description: 'Part of everyday practice.',
+        label: 'Part of everyday practice',
+        description: 'Done and now simply how we work.',
         icon: Sparkles,
     },
 ];
@@ -139,14 +151,17 @@ export function implementationStatusLabel(status: string): string {
 export function implementationStatusVariant(status: string): StatusVariant {
     switch (status) {
         case 'embedded':
-            return 'success';
         case 'implemented':
-            return 'info';
+            return 'success';
         case 'in_progress':
-            return 'warning';
+            return 'info';
         default:
             return 'neutral';
     }
+}
+
+export function isDelivered(status: string): boolean {
+    return status === 'implemented' || status === 'embedded';
 }
 
 type FlashPage = { props: { flash?: { error?: string | null } } };
@@ -164,6 +179,7 @@ type ObligationForm = {
     title: string;
     description: string;
     implementation_status: string;
+    owner_id: string;
     evidence_notes: string;
     target_date: string;
 };
@@ -172,25 +188,25 @@ const STEPS: readonly WizardStep[] = [
     {
         key: 'principle',
         label: 'Principle',
-        blurb: 'Te Tiriti principle & title',
+        blurb: 'Which principle it meets',
         icon: Landmark,
     },
     {
         key: 'commitment',
         label: 'Commitment',
-        blurb: 'What it means & progress',
+        blurb: 'What we commit to and who leads it',
         icon: ClipboardList,
     },
     {
         key: 'evidence',
         label: 'Evidence',
-        blurb: 'Evidence notes & target date',
+        blurb: 'Evidence and target date',
         icon: CheckCircle2,
     },
     {
         key: 'review',
         label: 'Review',
-        blurb: 'Confirm before saving',
+        blurb: 'Check before saving',
         icon: Check,
     },
 ];
@@ -201,18 +217,30 @@ const STEP_FOR_FIELD: Record<string, number> = {
     description: 1,
     implementation_status: 1,
     status: 1,
+    owner_id: 1,
     evidence_notes: 2,
     evidence: 2,
     target_date: 2,
 };
 
-function initialForm(obligation: TeTiritiObligation | null): ObligationForm {
+function initialForm(
+    obligation: TeTiritiObligation | null,
+    defaultOwnerId: number | null,
+    defaultPrinciple: string,
+): ObligationForm {
     return {
-        principle: obligation?.principle ?? 'partnership',
+        principle: obligation?.principle ?? defaultPrinciple,
         title: obligation?.title ?? '',
         description: obligation?.description ?? '',
         implementation_status:
             obligation?.implementation_status ?? 'not_started',
+        owner_id: obligation
+            ? obligation.owner
+                ? String(obligation.owner.id)
+                : ''
+            : defaultOwnerId
+              ? String(defaultOwnerId)
+              : '',
         evidence_notes: obligation?.evidence_notes ?? '',
         target_date: obligation?.target_date
             ? obligation.target_date.slice(0, 10)
@@ -223,13 +251,16 @@ function initialForm(obligation: TeTiritiObligation | null): ObligationForm {
 function validateStep(index: number, data: ObligationForm) {
     const e: Record<string, string> = {};
     if (index === 0) {
-        if (!data.principle) e.principle = 'Choose a principle';
-        if (!data.title.trim()) e.title = 'A title is required';
+        if (!data.principle) e.principle = 'Choose a principle.';
+        if (!data.title.trim()) e.title = 'Give the commitment a name.';
         else if (data.title.length > 255)
-            e.title = 'Keep the title to 255 characters or fewer';
+            e.title = 'Keep the name to 255 characters or fewer.';
     }
-    if (index === 1 && !data.description.trim()) {
-        e.description = 'Describe the obligation';
+    if (index === 1) {
+        if (!data.description.trim()) {
+            e.description = 'Describe what the organisation commits to.';
+        }
+        if (!data.owner_id) e.owner_id = 'Choose who is responsible.';
     }
     return e;
 }
@@ -238,6 +269,7 @@ export interface TeTiritiObligationWizardDialogProps {
     open: boolean;
     onClose: () => void;
     principles: Principle[];
+    owners: CommitmentOwner[];
     obligation?: TeTiritiObligation | null;
 }
 
@@ -247,14 +279,27 @@ export function TeTiritiObligationWizardDialog(
     return props.open ? <WizardBody {...props} /> : null;
 }
 
+type AuthPage = { auth?: { user?: { id?: number } | null } };
+
 function WizardBody({
     open,
     onClose,
     principles,
+    owners,
     obligation = null,
 }: TeTiritiObligationWizardDialogProps) {
     const isEdit = obligation != null;
-    const initial = useMemo(() => initialForm(obligation), [obligation]);
+    const page = usePage();
+    const currentUserId =
+        (page.props as AuthPage).auth?.user?.id ?? null;
+    const defaultOwnerId = owners.some((o) => o.id === currentUserId)
+        ? currentUserId
+        : null;
+    const defaultPrinciple = principles[0]?.value ?? '';
+    const initial = useMemo(
+        () => initialForm(obligation, defaultOwnerId, defaultPrinciple),
+        [obligation, defaultOwnerId, defaultPrinciple],
+    );
     const form = useForm<ObligationForm>(initial);
     const { data, setData, processing } = form;
 
@@ -281,13 +326,16 @@ function WizardBody({
     const principleLabel =
         principles.find((p) => p.value === data.principle)?.label ??
         data.principle;
+    const ownerName =
+        owners.find((o) => String(o.id) === data.owner_id)?.name ??
+        obligation?.owner?.name;
 
     const pct = useMemo(() => {
         const checks = [
             !!data.principle,
             !!data.title.trim(),
             !!data.description.trim(),
-            !!data.implementation_status,
+            !!data.owner_id,
             !!data.evidence_notes.trim(),
             !!data.target_date,
         ];
@@ -315,7 +363,7 @@ function WizardBody({
 
     const resetAll = () => {
         form.clearErrors();
-        setData(initialForm(null));
+        setData(initialForm(null, defaultOwnerId, defaultPrinciple));
         setErrors({});
         setSubmitError(null);
         setStepIndex(0);
@@ -335,8 +383,8 @@ function WizardBody({
         const visit = {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: (page: unknown) => {
-                const error = flashError(page);
+            onSuccess: (successPage: unknown) => {
+                const error = flashError(successPage);
                 if (error) {
                     setSubmitError(error);
                     return;
@@ -349,39 +397,30 @@ function WizardBody({
             },
         };
 
-        if (isEdit && obligation) {
-            // TeTiritiController::update does not change the principle.
-            form.transform(
-                (current) =>
-                    ({
-                        title: current.title,
-                        description: current.description,
-                        implementation_status: current.implementation_status,
-                        evidence_notes: current.evidence_notes,
-                        target_date: current.target_date || null,
-                    }) as unknown as ObligationForm,
-            );
-            form.put(`/governance/te-tiriti/${obligation.id}`, visit);
-            return;
-        }
-
         form.transform(
             (current) =>
                 ({
                     ...current,
+                    owner_id: current.owner_id ? Number(current.owner_id) : null,
                     target_date: current.target_date || null,
                 }) as unknown as ObligationForm,
         );
+
+        if (isEdit && obligation) {
+            form.put(`/governance/te-tiriti/${obligation.id}`, visit);
+            return;
+        }
+
         form.post('/governance/te-tiriti', visit);
     };
 
     const success = done ? (
         <WizardSuccessPane
-            title={isEdit ? 'Obligation updated' : 'Obligation added'}
+            title={isEdit ? 'Commitment saved' : 'Commitment added'}
             blurb={
                 <>
                     <strong>{data.title}</strong> ({principleLabel}) is{' '}
-                    {isEdit ? 'updated' : 'now tracked'} as{' '}
+                    {isEdit ? 'saved' : 'now on the list'} as{' '}
                     {implementationStatusLabel(
                         data.implementation_status,
                     ).toLowerCase()}
@@ -416,15 +455,11 @@ function WizardBody({
             <WizardShell
                 open={open}
                 onClose={requestClose}
-                title={
-                    isEdit
-                        ? 'Edit Te Tiriti obligation'
-                        : 'Add Te Tiriti obligation'
-                }
-                description="Record an obligation under a Te Tiriti o Waitangi principle and track its implementation."
+                title={isEdit ? 'Edit commitment' : 'Add commitment'}
+                description="Record how the organisation meets a Te Tiriti o Waitangi principle, and who leads it."
                 railIcon={Landmark}
-                railTitle={isEdit ? 'Edit obligation' : 'New obligation'}
-                railSub="Te Tiriti framework"
+                railTitle={isEdit ? 'Edit commitment' : 'New commitment'}
+                railSub="Te Tiriti o Waitangi"
                 steps={STEPS}
                 stepIndex={stepIndex}
                 onStepClick={goTo}
@@ -469,7 +504,7 @@ function WizardBody({
                                 ) : (
                                     <Check className="h-4 w-4" />
                                 )}
-                                {isEdit ? 'Save changes' : 'Add obligation'}
+                                {isEdit ? 'Save changes' : 'Add commitment'}
                             </Button>
                         ) : (
                             <Button type="button" onClick={next}>
@@ -483,45 +518,35 @@ function WizardBody({
                     <WizardStepPane>
                         <StepHead
                             icon={Landmark}
-                            title="Which principle?"
-                            blurb="Choose the Te Tiriti principle this obligation gives effect to."
+                            title="Which principle does it meet?"
+                            blurb="The five principles come from the Waitangi Tribunal's Hauora report (Wai 2575)."
                         />
                         <div className="grid gap-4">
                             <Field
                                 label="Principle"
-                                required={!isEdit}
-                                hint={isEdit ? 'set at creation' : undefined}
+                                required
                                 error={err('principle')}
                             >
-                                {isEdit ? (
-                                    <InfoCard
-                                        icon={principleIcon(data.principle)}
-                                    >
-                                        <strong>{principleLabel}</strong> — the
-                                        principle is fixed once an obligation
-                                        is recorded.
-                                    </InfoCard>
-                                ) : (
-                                    <TilePicker
-                                        value={data.principle}
-                                        onChange={(v) => set('principle', v)}
-                                        cols={2}
-                                        options={principles.map((p) => ({
-                                            key: p.value,
-                                            label: p.label,
-                                            icon: principleIcon(p.value),
-                                        }))}
-                                    />
-                                )}
+                                <TilePicker
+                                    value={data.principle}
+                                    onChange={(v) => set('principle', v)}
+                                    cols={2}
+                                    options={principles.map((p) => ({
+                                        key: p.value,
+                                        label: p.label,
+                                        description: p.description,
+                                        icon: principleIcon(p.value),
+                                    }))}
+                                />
                             </Field>
-                            <Field label="Title" required error={err('title')}>
+                            <Field label="Name" required error={err('title')}>
                                 <Input
                                     value={data.title}
                                     maxLength={255}
                                     onChange={(e) =>
                                         set('title', e.target.value)
                                     }
-                                    placeholder="e.g. Māori representation on the clinical governance committee"
+                                    placeholder="e.g. Māori representation on the board"
                                     aria-invalid={!!err('title')}
                                 />
                             </Field>
@@ -533,8 +558,8 @@ function WizardBody({
                     <WizardStepPane>
                         <StepHead
                             icon={ClipboardList}
-                            title="What is the commitment?"
-                            blurb="Describe the obligation and where implementation stands."
+                            title="What do we commit to?"
+                            blurb="Describe the commitment, who leads it and how far it has got."
                         />
                         <div className="grid gap-4">
                             <Field
@@ -553,7 +578,23 @@ function WizardBody({
                                 />
                             </Field>
                             <Field
-                                label="Implementation status"
+                                label="Who is responsible"
+                                required
+                                error={err('owner_id')}
+                            >
+                                <SelectInput
+                                    value={data.owner_id}
+                                    onChange={(v) => set('owner_id', v)}
+                                    placeholder="Choose a person"
+                                    ariaLabel="Who is responsible"
+                                    options={owners.map((owner) => ({
+                                        value: String(owner.id),
+                                        label: owner.name,
+                                    }))}
+                                />
+                            </Field>
+                            <Field
+                                label="How far it has got"
                                 error={err('implementation_status')}
                             >
                                 <TilePicker
@@ -573,12 +614,12 @@ function WizardBody({
                     <WizardStepPane>
                         <StepHead
                             icon={CheckCircle2}
-                            title="Evidence & timing"
-                            blurb="Note the evidence of progress and when it should be delivered."
+                            title="Evidence and timing"
+                            blurb="Note what shows progress, and when it should be done."
                         />
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Field
-                                label="Evidence notes"
+                                label="Evidence"
                                 hint="optional"
                                 span
                                 error={err('evidence_notes')}
@@ -589,7 +630,7 @@ function WizardBody({
                                     onChange={(e) =>
                                         set('evidence_notes', e.target.value)
                                     }
-                                    placeholder="e.g. Hui minutes, iwi partnership agreement, kaupapa Māori service review."
+                                    placeholder="e.g. Hui notes, iwi partnership agreement, kaupapa Māori service review."
                                 />
                             </Field>
                             <Field
@@ -613,20 +654,20 @@ function WizardBody({
                     <WizardStepPane>
                         <StepHead
                             icon={Check}
-                            title={isEdit ? 'Review changes' : 'Review & add'}
-                            blurb="Confirm the obligation before saving it to the framework."
+                            title={isEdit ? 'Check your changes' : 'Check and add'}
+                            blurb="Make sure the commitment is right before saving it."
                         />
                         <div className="grid gap-3 sm:grid-cols-2">
                             <ReviewCard
                                 icon={Landmark}
-                                title="Obligation"
+                                title="Commitment"
                                 onEdit={() => goTo(0)}
                             >
                                 <ReviewRow
                                     label="Principle"
                                     value={principleLabel}
                                 />
-                                <ReviewRow label="Title" value={data.title} />
+                                <ReviewRow label="Name" value={data.title} />
                             </ReviewCard>
                             <ReviewCard
                                 icon={ClipboardList}
@@ -638,6 +679,10 @@ function WizardBody({
                                     value={implementationStatusLabel(
                                         data.implementation_status,
                                     )}
+                                />
+                                <ReviewRow
+                                    label="Who is responsible"
+                                    value={ownerName}
                                 />
                                 <ReviewRow
                                     label="Target date"
@@ -674,8 +719,8 @@ function WizardBody({
                         <DialogTitle>Discard this draft?</DialogTitle>
                         <DialogDescription>
                             {isEdit
-                                ? 'Your unsaved changes to this obligation will be lost.'
-                                : 'The details entered for this obligation will be lost.'}
+                                ? 'Your unsaved changes to this commitment will be lost.'
+                                : 'The details entered for this commitment will be lost.'}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -707,12 +752,12 @@ function WizardBody({
 
 export function TeTiritiObligationDetailDialog({
     obligation,
-    principleLabel,
+    principle,
     onClose,
     onEdit,
 }: {
     obligation: TeTiritiObligation | null;
-    principleLabel: string;
+    principle: Principle | null;
     onClose: () => void;
     onEdit?: () => void;
 }) {
@@ -727,13 +772,15 @@ export function TeTiritiObligationDetailDialog({
                         <DialogHeader>
                             <DialogTitle className="flex items-center gap-2">
                                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-primary/15 text-primary">
-                                    <PrincipleGlyph
-                                        principle={obligation.principle}
-                                    />
+                                    <PrincipleGlyph principle={obligation.principle} />
                                 </span>
                                 {obligation.title}
                             </DialogTitle>
-                            <DialogDescription>{principleLabel}</DialogDescription>
+                            <DialogDescription>
+                                {principle
+                                    ? `${principle.label} — ${principle.description}`
+                                    : obligation.principle}
+                            </DialogDescription>
                         </DialogHeader>
                         <div className="mt-2 flex flex-col gap-3 text-sm">
                             <StatusBadge
@@ -751,6 +798,10 @@ export function TeTiritiObligationDetailDialog({
                                 <p className="whitespace-pre-wrap">
                                     {obligation.description}
                                 </p>
+                            </div>
+                            <div>
+                                <p className="text-caption">Who is responsible</p>
+                                <p>{obligation.owner?.name ?? 'No one yet'}</p>
                             </div>
                             <div>
                                 <p className="text-caption">Evidence</p>
@@ -774,7 +825,7 @@ export function TeTiritiObligationDetailDialog({
                             {onEdit ? (
                                 <Button onClick={onEdit}>
                                     <Pencil className="h-4 w-4" /> Edit
-                                    obligation
+                                    commitment
                                 </Button>
                             ) : null}
                         </DialogFooter>

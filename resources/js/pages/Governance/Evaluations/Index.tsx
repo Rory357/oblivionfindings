@@ -22,7 +22,6 @@ import {
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
-    PageHeaderMeterDonut,
     PageHeaderPrimaryButton,
     PageHeaderSearch,
     PageLayout,
@@ -30,26 +29,30 @@ import {
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import type { StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly } from '@/lib/datetime';
+import { formatDateOnly, toDateInput } from '@/lib/datetime';
+import { governanceStatus } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
 
 import {
     EVALUATION_TYPES,
     EvaluationWizardDialog,
-    evaluationTypeLabel,
+    evaluationSubject,
+    type CommitteeOption,
 } from './_dialogs';
 
 interface Evaluation {
     id: number;
     title: string;
     evaluation_type: string;
+    committee_name?: string | null;
     status: string;
     period_start: string;
     period_end: string;
     due_date: string;
     responses_count: number;
+    /** Only for people who answer evaluations; null for drafts. */
+    my_response: 'responded' | 'not_yet' | null;
 }
 
 interface Filters {
@@ -73,19 +76,11 @@ interface Props extends PageProps {
         closed: number;
         active_board_members: number;
     };
+    is_board_member?: boolean;
+    /** NZ calendar date from the server. */
+    today?: string;
+    committees?: CommitteeOption[];
 }
-
-const STATUS_VARIANT: Record<string, StatusVariant> = {
-    active: 'info',
-    draft: 'neutral',
-    closed: 'success',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-    active: 'Open',
-    draft: 'Draft',
-    closed: 'Closed',
-};
 
 function cleanParams(values: Partial<Filters>): Record<string, string> {
     return Object.fromEntries(
@@ -100,12 +95,15 @@ export default function EvaluationsIndex({
     evaluations,
     filters,
     summary,
+    is_board_member: isBoardMember = false,
+    today: serverToday,
+    committees = [],
 }: Props) {
     const canManage = Boolean(auth.can?.governance?.evaluations?.manage);
     const [wizardOpen, setWizardOpen] = useDialogDeepLink('create', canManage);
     const [search, setSearch] = useState(filters.search ?? '');
     const ctxMenu = useEntityContextMenu<Evaluation>();
-    const today = new Date().toISOString().split('T')[0];
+    const today = serverToday ?? toDateInput(new Date());
 
     useEffect(() => {
         setSearch(filters.search ?? '');
@@ -134,68 +132,68 @@ export default function EvaluationsIndex({
 
     const closeWizard = () => setWizardOpen(false);
 
+    const isOpenEvaluation = (e: Evaluation) =>
+        e.status === 'active' || e.status === 'open';
+    const isPastDue = (e: Evaluation) => isOpenEvaluation(e) && e.due_date < today;
+
     const actionsFor = (e: Evaluation): MenuItem[] =>
         compactMenu([
             {
-                label: e.status === 'active' ? 'Open & respond' : 'Open evaluation',
+                label:
+                    isOpenEvaluation(e) && e.my_response === 'not_yet' && !isPastDue(e)
+                        ? 'Open and respond'
+                        : 'Open evaluation',
                 icon: Eye,
                 onClick: () => router.visit(`/governance/evaluations/${e.id}`),
             },
-            {
-                label: 'View results',
-                icon: BarChart3,
-                onClick: () =>
-                    router.visit(`/governance/evaluations/${e.id}/results`),
-            },
+            e.status !== 'draft'
+                ? {
+                      label: 'View results',
+                      icon: BarChart3,
+                      onClick: () =>
+                          router.visit(`/governance/evaluations/${e.id}/results`),
+                  }
+                : null,
         ]);
-
-    const closedShare =
-        summary.total > 0 ? (summary.closed / summary.total) * 100 : 0;
 
     const columns: EntityTableColumn<Evaluation>[] = [
         {
             key: 'type',
-            label: 'Type',
-            width: '0.8fr',
-            cell: (e) => <EntityChip>{evaluationTypeLabel(e.evaluation_type)}</EntityChip>,
+            label: 'Who is evaluated',
+            width: '0.9fr',
+            cell: (e) => (
+                <EntityChip>{evaluationSubject(e.evaluation_type, e.committee_name)}</EntityChip>
+            ),
         },
         {
             key: 'status',
             label: 'Status',
-            width: '0.6fr',
-            cell: (e) => (
-                <EntityStatusChip variant={STATUS_VARIANT[e.status] ?? 'neutral'}>
-                    {STATUS_LABEL[e.status] ?? e.status}
-                </EntityStatusChip>
-            ),
-        },
-        {
-            key: 'period',
-            label: 'Period',
-            width: '1.2fr',
-            cell: (e) =>
-                `${formatDateOnly(e.period_start)} – ${formatDateOnly(e.period_end)}`,
+            width: '0.9fr',
+            cell: (e) => {
+                const chip = governanceStatus('evaluation_status', e.status);
+                return (
+                    <EntityStatusChip variant={chip.variant}>{chip.label}</EntityStatusChip>
+                );
+            },
         },
         {
             key: 'due',
-            label: 'Due',
-            width: '0.7fr',
-            cell: (e) => (
-                <span
-                    className={
-                        e.status === 'active' && e.due_date < today
-                            ? 'font-semibold text-status-critical'
-                            : undefined
-                    }
-                >
-                    {formatDateOnly(e.due_date)}
-                </span>
-            ),
+            label: 'Responses due',
+            width: '0.9fr',
+            cell: (e) =>
+                isPastDue(e) ? (
+                    <span className="flex flex-wrap items-center gap-1.5">
+                        <span>{formatDateOnly(e.due_date)}</span>
+                        <EntityStatusChip variant="critical">Overdue</EntityStatusChip>
+                    </span>
+                ) : (
+                    formatDateOnly(e.due_date)
+                ),
         },
         {
             key: 'responses',
             label: 'Responses',
-            width: '0.6fr',
+            width: '0.7fr',
             align: 'center',
             cell: (e) => (
                 <CounterPill tone={e.responses_count > 0 ? 'success' : 'neutral'}>
@@ -203,13 +201,32 @@ export default function EvaluationsIndex({
                 </CounterPill>
             ),
         },
+        ...(isBoardMember
+            ? [
+                  {
+                      key: 'you',
+                      label: 'You',
+                      width: '0.7fr',
+                      cell: (e: Evaluation) =>
+                          e.my_response === 'responded' ? (
+                              <EntityStatusChip variant="success">Responded</EntityStatusChip>
+                          ) : e.my_response === 'not_yet' ? (
+                              <EntityStatusChip variant={isOpenEvaluation(e) && !isPastDue(e) ? 'warning' : 'neutral'}>
+                                  Not yet
+                              </EntityStatusChip>
+                          ) : (
+                              <span className="text-caption">Not open yet</span>
+                          ),
+                  } satisfies EntityTableColumn<Evaluation>,
+              ]
+            : []),
     ];
 
     const header = (
         <PageHeader
             icon={Star}
-            title="Board evaluations"
-            subline={`Board, committee and chair performance evaluations · ${summary.active_board_members} active board members`}
+            title="Evaluations"
+            subline={`How the board, its committees and the chair are doing, in members' own words · ${summary.active_board_members} current board ${summary.active_board_members === 1 ? 'member' : 'members'}`}
             actions={
                 <>
                     <PageHeaderSearch
@@ -230,24 +247,14 @@ export default function EvaluationsIndex({
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Evaluations"
-                        ariaLabel="View all evaluations"
-                        href="/governance/evaluations"
-                    >
-                        <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            conducted or planned
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Open"
+                        label="Open for responses"
                         tone={summary.active > 0 ? 'warning' : 'brand'}
                         ariaLabel="View evaluations open for responses"
                         href="/governance/evaluations?status=active"
                     >
                         <PageHeaderMeterBig>{summary.active}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            accepting member responses
+                            members can answer now
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
@@ -256,26 +263,23 @@ export default function EvaluationsIndex({
                         href="/governance/evaluations?status=draft"
                     >
                         <PageHeaderMeterBig>{summary.draft}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            not yet launched
-                        </PageHeaderMeterCaption>
+                        <PageHeaderMeterCaption>not open yet</PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Closed"
-                        value={summary.closed}
                         ariaLabel="View closed evaluations"
                         href="/governance/evaluations?status=closed"
                     >
-                        <PageHeaderMeterDonut
-                            percent={closedShare}
-                            caption={
-                                <>
-                                    {summary.closed} of {summary.total}
-                                    <br />
-                                    finalised
-                                </>
-                            }
-                        />
+                        <PageHeaderMeterBig>{summary.closed}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>results ready to read</PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="All evaluations"
+                        ariaLabel="View all evaluations"
+                        href="/governance/evaluations"
+                    >
+                        <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>in the register</PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
             }
@@ -286,17 +290,20 @@ export default function EvaluationsIndex({
                         value={filters.status ?? 'all'}
                         options={[
                             { value: 'all', label: 'Any status' },
-                            { value: 'active', label: 'Open' },
+                            {
+                                value: 'active',
+                                label: governanceStatus('evaluation_status', 'active').label,
+                            },
                             { value: 'draft', label: 'Draft' },
                             { value: 'closed', label: 'Closed' },
                         ]}
                         onChange={(v) => go({ status: v })}
                     />
                     <PageHeaderFilterSelect
-                        label="All types"
+                        label="Anyone evaluated"
                         value={filters.type ?? 'all'}
                         options={[
-                            { value: 'all', label: 'All types' },
+                            { value: 'all', label: 'Anyone evaluated' },
                             ...EVALUATION_TYPES.map((t) => ({
                                 value: t.key,
                                 label: t.label,
@@ -319,7 +326,7 @@ export default function EvaluationsIndex({
                 { title: 'Evaluations', href: '/governance/evaluations' },
             ]}
         >
-            <Head title="Board evaluations" />
+            <Head title="Evaluations" />
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
                     <ListCaption
@@ -352,8 +359,8 @@ export default function EvaluationsIndex({
                                 hasFilters
                                     ? 'Try clearing a filter or search term.'
                                     : canManage
-                                      ? 'Start a board effectiveness evaluation for members to complete.'
-                                      : 'Evaluations the board runs will appear here.'
+                                      ? 'Set up an evaluation for board members to answer, such as a yearly board effectiveness review.'
+                                      : 'Evaluations appear here when the board secretary sets one up.'
                             }
                             action={
                                 hasFilters ? (
@@ -377,7 +384,7 @@ export default function EvaluationsIndex({
                             identity={(e) => ({
                                 icon: Star,
                                 name: e.title,
-                                subline: `${evaluationTypeLabel(e.evaluation_type)} evaluation`,
+                                subline: `Covers ${formatDateOnly(e.period_start)} – ${formatDateOnly(e.period_end)}`,
                             })}
                             columns={columns}
                             actionsFor={actionsFor}
@@ -409,7 +416,11 @@ export default function EvaluationsIndex({
             ) : null}
 
             {canManage ? (
-                <EvaluationWizardDialog open={wizardOpen} onClose={closeWizard} />
+                <EvaluationWizardDialog
+                    open={wizardOpen}
+                    onClose={closeWizard}
+                    committees={committees}
+                />
             ) : null}
         </AppLayout>
     );

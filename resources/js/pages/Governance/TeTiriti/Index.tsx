@@ -34,9 +34,11 @@ import {
     IMPLEMENTATION_STATUSES,
     implementationStatusLabel,
     implementationStatusVariant,
+    isDelivered,
     principleIcon,
     TeTiritiObligationDetailDialog,
     TeTiritiObligationWizardDialog,
+    type CommitmentOwner,
     type Principle,
     type TeTiritiObligation,
 } from './_dialogs';
@@ -44,21 +46,26 @@ import {
 interface Props extends PageProps {
     obligationsByPrinciple: Record<string, TeTiritiObligation[]>;
     principles: Principle[];
+    owners: CommitmentOwner[];
 }
+
+const DELIVERED = 'delivered';
 
 const STATUS_FILTERS = [
     { value: 'all', label: 'All statuses' },
     ...IMPLEMENTATION_STATUSES.map((s) => ({ value: s.key, label: s.label })),
+    { value: DELIVERED, label: 'Done or part of everyday practice' },
 ];
 
-function isDelivered(status: string): boolean {
-    return status === 'implemented' || status === 'embedded';
+function plural(count: number, one: string, many: string): string {
+    return `${count} ${count === 1 ? one : many}`;
 }
 
 export default function TeTiritiIndex({
     auth,
     obligationsByPrinciple,
     principles,
+    owners = [],
 }: Props) {
     const canManage = Boolean(auth?.can?.governance?.['te-tiriti']?.manage);
     const [search, setSearch] = useState('');
@@ -76,15 +83,21 @@ export default function TeTiritiIndex({
         .length;
     const deliveredPct = all.length > 0 ? (delivered / all.length) * 100 : 0;
 
-    const principleLabel = (value: string) =>
-        principles.find((p) => p.value === value)?.label ?? value;
+    const principleFor = (value: string) =>
+        principles.find((p) => p.value === value) ?? null;
 
     const term = search.trim().toLowerCase();
+    const matchesStatus = (o: TeTiritiObligation) =>
+        statusFilter === 'all' ||
+        (statusFilter === DELIVERED
+            ? isDelivered(o.implementation_status)
+            : o.implementation_status === statusFilter);
     const matches = (o: TeTiritiObligation) =>
-        (statusFilter === 'all' || o.implementation_status === statusFilter) &&
+        matchesStatus(o) &&
         (term === '' ||
             o.title.toLowerCase().includes(term) ||
             o.description.toLowerCase().includes(term) ||
+            (o.owner?.name ?? '').toLowerCase().includes(term) ||
             (o.evidence_notes ?? '').toLowerCase().includes(term));
     const hasFilters =
         principleFilter !== 'all' || statusFilter !== 'all' || term !== '';
@@ -92,7 +105,8 @@ export default function TeTiritiIndex({
         (p) => principleFilter === 'all' || p.value === principleFilter,
     );
     const visibleCount = visiblePrinciples.reduce(
-        (sum, p) => sum + (obligationsByPrinciple[p.value] ?? []).filter(matches).length,
+        (sum, p) =>
+            sum + (obligationsByPrinciple[p.value] ?? []).filter(matches).length,
         0,
     );
 
@@ -115,7 +129,7 @@ export default function TeTiritiIndex({
                 onClick: () => setViewing(obligation),
             },
             canManage && {
-                label: 'Edit obligation',
+                label: 'Edit commitment',
                 icon: Pencil,
                 onClick: () => openEdit(obligation),
             },
@@ -126,32 +140,32 @@ export default function TeTiritiIndex({
             icon={Landmark}
             title="Te Tiriti o Waitangi"
             titleChip={
-                <PageHeaderStatusChip
-                    variant={
-                        all.length === 0
-                            ? 'neutral'
-                            : deliveredPct >= 75
-                              ? 'success'
-                              : 'warning'
-                    }
-                >
-                    {Math.round(deliveredPct)}% implemented
-                </PageHeaderStatusChip>
+                all.length === 0 ? (
+                    <PageHeaderStatusChip variant="neutral">
+                        No commitments yet
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip
+                        variant={deliveredPct >= 75 ? 'success' : 'warning'}
+                    >
+                        {delivered} of {all.length} done
+                    </PageHeaderStatusChip>
+                )
             }
-            subline={`Obligations and implementation tracking · ${principles.length} principles · ${all.length} obligations`}
+            subline={`How we meet our Te Tiriti o Waitangi commitments under Ngā Paerewa section 1 · ${plural(all.length, 'commitment', 'commitments')}`}
             actions={
                 <>
                     <PageHeaderSearch
                         value={search}
                         onChange={setSearch}
-                        placeholder="Search obligations, evidence…"
+                        placeholder="Search commitments…"
                     />
                     {canManage ? (
                         <PageHeaderPrimaryButton
                             icon={Plus}
                             onClick={() => setWizardOpen(true)}
                         >
-                            Add obligation
+                            Add commitment
                         </PageHeaderPrimaryButton>
                     ) : null}
                 </>
@@ -159,60 +173,55 @@ export default function TeTiritiIndex({
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Obligations"
-                        ariaLabel="View all obligations"
+                        label="Commitments"
+                        ariaLabel="Show all commitments"
                         onClick={clearFilters}
                     >
                         <PageHeaderMeterBig>{all.length}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            across {principles.length} principles
+                            across {plural(principles.length, 'principle', 'principles')}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Not started"
-                        ariaLabel="View obligations not started"
+                        ariaLabel="Show commitments not started"
                         onClick={() => setStatusFilter('not_started')}
                         tone={count('not_started') > 0 ? 'warning' : 'brand'}
                     >
                         <PageHeaderMeterBig>
                             {count('not_started')}
                         </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            awaiting action
-                        </PageHeaderMeterCaption>
+                        <PageHeaderMeterCaption>no work yet</PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="In progress"
-                        ariaLabel="View obligations in progress"
+                        ariaLabel="Show commitments in progress"
                         onClick={() => setStatusFilter('in_progress')}
                     >
                         <PageHeaderMeterBig>
                             {count('in_progress')}
                         </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            actions under way
-                        </PageHeaderMeterCaption>
+                        <PageHeaderMeterCaption>work under way</PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Embedded"
-                        ariaLabel="View embedded obligations"
+                        label="Part of everyday practice"
+                        ariaLabel="Show commitments that are part of everyday practice"
                         onClick={() => setStatusFilter('embedded')}
                         tone={count('embedded') > 0 ? 'success' : 'brand'}
                     >
                         <PageHeaderMeterBig>{count('embedded')}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            in everyday practice
-                        </PageHeaderMeterCaption>
+                        <PageHeaderMeterCaption>how we now work</PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Implemented"
+                        label="Done"
                         value={`${delivered}/${all.length}`}
-                        ariaLabel="View implemented obligations"
-                        onClick={() => setStatusFilter('implemented')}
+                        ariaLabel="Show commitments that are done or part of everyday practice"
+                        onClick={() => setStatusFilter(DELIVERED)}
+                        tone="success"
                     >
                         <PageHeaderMeterDonut
                             percent={deliveredPct}
-                            caption="implemented or embedded"
+                            caption="done or part of everyday practice"
                         />
                     </PageHeaderMeterBlock>
                 </>
@@ -224,7 +233,10 @@ export default function TeTiritiIndex({
                         value={principleFilter}
                         options={[
                             { value: 'all', label: 'All principles' },
-                            ...principles,
+                            ...principles.map((p) => ({
+                                value: p.value,
+                                label: p.label,
+                            })),
                         ]}
                         onChange={setPrincipleFilter}
                     />
@@ -245,7 +257,7 @@ export default function TeTiritiIndex({
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Te Tiriti o Waitangi', href: '/governance/te-tiriti' },
+                { title: 'Te Tiriti', href: '/governance/te-tiriti' },
             ]}
         >
             <Head title="Te Tiriti o Waitangi" />
@@ -254,7 +266,7 @@ export default function TeTiritiIndex({
                     {hasFilters && visibleCount === 0 ? (
                         <EmptyState
                             icon={Landmark}
-                            title="No obligations match your filters"
+                            title="No commitments match your filters"
                             description="Try clearing a filter or search term."
                             action={
                                 <Button
@@ -276,12 +288,6 @@ export default function TeTiritiIndex({
                             const done = obligations.filter((o) =>
                                 isDelivered(o.implementation_status),
                             ).length;
-                            const progress =
-                                obligations.length > 0
-                                    ? Math.round(
-                                          (done / obligations.length) * 100,
-                                      )
-                                    : 0;
                             return (
                                 <section
                                     key={principle.value}
@@ -290,32 +296,32 @@ export default function TeTiritiIndex({
                                 >
                                     <ListCaption
                                         title={principle.label}
-                                        caption={`${rows.length} of ${obligations.length} shown · ${progress}% implemented`}
+                                        caption={`${principle.description} · ${done} of ${obligations.length} done`}
                                     />
                                     {rows.length === 0 ? (
                                         <EmptyState
                                             variant="compact"
                                             icon={principleIcon(principle.value)}
-                                            title="No obligations recorded for this principle"
+                                            title="No commitments recorded for this principle yet"
                                         />
                                     ) : (
                                         <EntityTable<TeTiritiObligation>
                                             rows={rows}
                                             rowKey={(o) => o.id}
-                                            identityLabel="Obligation"
+                                            identityLabel="Commitment"
                                             identity={(o) => ({
                                                 icon: principleIcon(o.principle),
                                                 name: o.title,
                                                 subline: o.description,
                                             })}
                                             onOpen={(o) => setViewing(o)}
-                                            minWidth={760}
+                                            minWidth={860}
                                             identityWidth="2.4fr"
                                             columns={[
                                                 {
                                                     key: 'status',
                                                     label: 'Status',
-                                                    width: '1fr',
+                                                    width: '1.1fr',
                                                     cell: (o) => (
                                                         <EntityStatusChip
                                                             variant={implementationStatusVariant(
@@ -329,9 +335,22 @@ export default function TeTiritiIndex({
                                                     ),
                                                 },
                                                 {
+                                                    key: 'owner',
+                                                    label: 'Owner',
+                                                    width: '1fr',
+                                                    cell: (o) =>
+                                                        o.owner ? (
+                                                            <span className="truncate">
+                                                                {o.owner.name}
+                                                            </span>
+                                                        ) : (
+                                                            <EmptyValue />
+                                                        ),
+                                                },
+                                                {
                                                     key: 'evidence',
                                                     label: 'Evidence',
-                                                    width: '1.6fr',
+                                                    width: '1.4fr',
                                                     cell: (o) =>
                                                         o.evidence_notes ? (
                                                             <span className="truncate">
@@ -343,7 +362,7 @@ export default function TeTiritiIndex({
                                                 },
                                                 {
                                                     key: 'target',
-                                                    label: 'Target',
+                                                    label: 'Target date',
                                                     width: '0.9fr',
                                                     cell: (o) =>
                                                         o.target_date ? (
@@ -384,7 +403,7 @@ export default function TeTiritiIndex({
 
             <TeTiritiObligationDetailDialog
                 obligation={viewing}
-                principleLabel={viewing ? principleLabel(viewing.principle) : ''}
+                principle={viewing ? principleFor(viewing.principle) : null}
                 onClose={() => setViewing(null)}
                 onEdit={canManage && viewing ? () => openEdit(viewing) : undefined}
             />
@@ -395,11 +414,13 @@ export default function TeTiritiIndex({
                         open={wizardOpen}
                         onClose={() => setWizardOpen(false)}
                         principles={principles}
+                        owners={owners}
                     />
                     <TeTiritiObligationWizardDialog
                         open={editing != null}
                         onClose={() => setEditing(null)}
                         principles={principles}
+                        owners={owners}
                         obligation={editing}
                     />
                 </>

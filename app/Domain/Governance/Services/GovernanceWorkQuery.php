@@ -8,6 +8,7 @@ use App\Domain\Governance\Enums\GovernanceWorkKind;
 use App\Domain\Governance\Models\ActionItem;
 use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Models\PerformanceReview;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\Vote;
 use App\Domain\Governance\Support\GovernanceLabels;
@@ -34,6 +35,9 @@ class GovernanceWorkQuery
     /** Upcoming meetings are "for your information" — never pending work. */
     public const UPCOMING_STATUS = 'upcoming';
 
+    /** How long a completed performance review stays in "for your information". */
+    public const REVIEW_OUTCOME_DAYS = 30;
+
     public function __construct(
         protected GovernanceRecordAccessService $recordAccess,
         protected BoardPackAccessService $boardPackAccess,
@@ -44,7 +48,8 @@ class GovernanceWorkQuery
      * Query full personal obligations for the given viewer.
      *
      * `items` is the filtered, paginated list. "For your information" items
-     * (upcoming meetings) are kept apart: they never count towards `all`,
+     * (upcoming meetings, a performance review that has just been completed)
+     * are kept apart: they never count towards `all`,
      * `pending` or `overdue`, appear in `items` only for the `know` kind
      * filter, and are always listed separately as `coming_up`.
      *
@@ -71,6 +76,7 @@ class GovernanceWorkQuery
             'action_items' => 'available',
             'policies' => 'available',
             'meetings' => 'available',
+            'performance_reviews' => 'available',
         ];
 
         /** @var Collection<int, GovernanceWorkItem> $actionable */
@@ -78,10 +84,12 @@ class GovernanceWorkQuery
             ->merge($this->queryVoteItems($viewer, $availability))
             ->merge($this->queryReadItems($viewer, $availability))
             ->merge($this->queryActItems($viewer, $availability))
+            ->merge($this->queryPerformanceReviewItems($viewer, $availability))
             ->sort(fn (GovernanceWorkItem $a, GovernanceWorkItem $b) => $this->compareWorkItems($a, $b))
             ->values();
 
         $comingUp = $this->queryKnowItems($viewer, $availability)
+            ->merge($this->queryPerformanceReviewOutcomes($viewer, $availability))
             ->sort(fn (GovernanceWorkItem $a, GovernanceWorkItem $b) => $this->compareWorkItems($a, $b))
             ->values();
 
@@ -380,6 +388,8 @@ class GovernanceWorkQuery
                     ->where('policy_attestations.user_id', $viewer->id)
                     ->whereNull('policy_attestations.acknowledged_at')
                     ->whereNull('governance_policies.deleted_at')
+                    // Only policies that ask members to read and confirm them.
+                    ->where('governance_policies.requires_attestation', true)
                     ->whereIn('governance_policies.status', ['approved', 'published', 'active'])
                     ->where(function ($query) {
                         $query->whereNull('governance_policies.effective_from')
@@ -601,6 +611,152 @@ class GovernanceWorkQuery
         } catch (\Throwable $e) {
             report($e);
             $availability['meetings'] = 'unavailable';
+
+            return collect();
+        }
+    }
+
+    /**
+     * "My performance review": while the board is waiting for the viewer's
+     * self-assessment, a "Do" item to write it. Only the person being
+     * reviewed gets it — the same condition the review page uses to offer
+     * the self-assessment — and it never carries the board's ratings, scores
+     * or decision, which stay masked until the review is complete.
+     *
+     * @param  array<string, string>  $availability
+     * @return Collection<int, GovernanceWorkItem>
+     */
+    public function queryPerformanceReviewItems(User $viewer, array &$availability): Collection
+    {
+        if (! Schema::hasTable('performance_reviews')) {
+            return collect();
+        }
+
+        try {
+            return PerformanceReview::query()
+                ->where('reviewee_id', $viewer->id)
+                ->whereNotIn('status', ['completed', 'closed'])
+                ->whereNull('self_assessment_submitted_at')
+                ->orderBy('id')
+                ->get()
+                ->map(function (PerformanceReview $review) use ($viewer): GovernanceWorkItem {
+                    $cycle = PerformanceReview::cycleLabel($review->review_cycle);
+                    // The review page (and its self-assessment route) sit behind
+                    // governance.performance.view: without it the work is still
+                    // listed, and the button says why it can't be opened.
+                    $canWrite = $viewer->can('view', $review) && $viewer->can('submitSelfAssessment', $review);
+                    $period = $review->period_start && $review->period_end
+                        ? ' for '.GovernanceLabels::date($review->period_start->toDateString())
+                            .' to '.GovernanceLabels::date($review->period_end->toDateString())
+                        : '';
+
+                    return new GovernanceWorkItem(
+                        id: "performance_review:{$review->id}:self_assessment",
+                        kind: GovernanceWorkKind::Act,
+                        source: [
+                            'type' => 'performance_review',
+                            'id' => $review->id,
+                            'reference' => '',
+                            'href' => "/governance/performance/{$review->id}",
+                        ],
+                        title: "Write your self-assessment for {$cycle}",
+                        reason: "The board is waiting for your self-assessment{$period}. You send it once, then the board completes your review.",
+                        priority: 'high',
+                        status: 'pending',
+                        dueAt: null,
+                        dueDate: null,
+                        assigneeUserId: $viewer->id,
+                        boardMemberId: $viewer->boardMember?->id,
+                        requiredAction: [
+                            'key' => 'act',
+                            'label' => 'Write self-assessment',
+                            'href' => "/governance/performance/{$review->id}#self-assessment",
+                            'allowed' => $canWrite,
+                            'blocked_reason' => $canWrite
+                                ? null
+                                : "You don't have access to open performance reviews yet. Ask the board chair.",
+                        ],
+                        sourceVersion: 1,
+                        area: 'Performance',
+                        ownerName: $viewer->name,
+                    );
+                })
+                ->values();
+        } catch (\Throwable $e) {
+            report($e);
+            $availability['performance_reviews'] = 'unavailable';
+
+            return collect();
+        }
+    }
+
+    /**
+     * Once the board has completed the viewer's performance review, a "for
+     * your information" note that the outcome is ready to read, for
+     * REVIEW_OUTCOME_DAYS after completion. It names the review — never the
+     * rating or decision — and only reaches a reviewee who can open it.
+     *
+     * @param  array<string, string>  $availability
+     * @return Collection<int, GovernanceWorkItem>
+     */
+    public function queryPerformanceReviewOutcomes(User $viewer, array &$availability): Collection
+    {
+        if (! Schema::hasTable('performance_reviews')) {
+            return collect();
+        }
+
+        try {
+            $since = now()->subDays(self::REVIEW_OUTCOME_DAYS);
+
+            return PerformanceReview::query()
+                ->where('reviewee_id', $viewer->id)
+                ->where('status', 'completed')
+                ->where(function ($query) use ($since) {
+                    $query->where('approved_by_board_at', '>=', $since)
+                        ->orWhere(fn ($legacy) => $legacy->whereNull('approved_by_board_at')->where('updated_at', '>=', $since));
+                })
+                ->orderByDesc('id')
+                ->get()
+                ->filter(fn (PerformanceReview $review) => $viewer->can('view', $review))
+                ->map(function (PerformanceReview $review) use ($viewer): GovernanceWorkItem {
+                    $cycle = PerformanceReview::cycleLabel($review->review_cycle);
+                    $completedAt = $review->approved_by_board_at ?? $review->updated_at;
+
+                    return new GovernanceWorkItem(
+                        id: "performance_review:{$review->id}:outcome",
+                        kind: GovernanceWorkKind::Know,
+                        source: [
+                            'type' => 'performance_review',
+                            'id' => $review->id,
+                            'reference' => '',
+                            'href' => "/governance/performance/{$review->id}",
+                        ],
+                        title: 'Your performance review is complete — read the outcome',
+                        reason: $completedAt
+                            ? "{$cycle}: the board completed it on ".GovernanceLabels::date($completedAt).'.'
+                            : "{$cycle}: the board has completed it.",
+                        priority: 'low',
+                        status: 'completed',
+                        dueAt: null,
+                        dueDate: null,
+                        assigneeUserId: $viewer->id,
+                        boardMemberId: $viewer->boardMember?->id,
+                        requiredAction: [
+                            'key' => 'know',
+                            'label' => 'Read the outcome',
+                            'href' => "/governance/performance/{$review->id}",
+                            'allowed' => true,
+                            'blocked_reason' => null,
+                        ],
+                        sourceVersion: 1,
+                        area: 'Performance',
+                        ownerName: $viewer->name,
+                    );
+                })
+                ->values();
+        } catch (\Throwable $e) {
+            report($e);
+            $availability['performance_reviews'] = 'unavailable';
 
             return collect();
         }

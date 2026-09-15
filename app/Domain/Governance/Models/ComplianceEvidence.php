@@ -21,6 +21,9 @@ class ComplianceEvidence extends Model
         'title',
         'description',
         'file_path',
+        'original_name',
+        'mime_type',
+        'file_size',
         'external_reference',
         'url',
         'valid_from',
@@ -112,5 +115,42 @@ class ComplianceEvidence extends Model
             return null;
         }
         return \Illuminate\Support\Facades\Storage::url($this->file_path);
+    }
+
+    /** Past its "valid until" date (NZ calendar date). */
+    public function isExpired(?string $today = null): bool
+    {
+        return $this->valid_until !== null
+            && $this->valid_until->toDateString() < ($today ?? ComplianceObligation::nzToday());
+    }
+
+    /** The disk holding the stored file, or null when it is missing. */
+    public function storedDisk(): ?string
+    {
+        if (! $this->file_path) {
+            return null;
+        }
+
+        foreach ([config('filesystems.default', 'local'), 'local', 'public'] as $disk) {
+            if (is_string($disk) && \Illuminate\Support\Facades\Storage::disk($disk)->exists($this->file_path)) {
+                return $disk;
+            }
+        }
+
+        return null;
+    }
+
+    /** "Annual return receipt.pdf" — the uploaded name, never the storage code. */
+    public function downloadName(): string
+    {
+        $original = trim((string) $this->original_name);
+        if ($original !== '') {
+            return $original;
+        }
+
+        $extension = pathinfo((string) $this->file_path, PATHINFO_EXTENSION);
+        $base = \Illuminate\Support\Str::slug((string) $this->title) ?: 'evidence';
+
+        return $extension !== '' ? "{$base}.{$extension}" : $base;
     }
 }

@@ -1,4 +1,6 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
 import {
     PageHeader,
     PageHeaderGlassButton,
@@ -9,39 +11,37 @@ import {
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
-import { Badge } from '@/components/ui/badge';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { TabsContent } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
+import {
+    formatDateLong,
+    formatDateTimeLong,
+    toDatetimeLocal,
+} from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { PageProps } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
-    AlertOctagon,
-    BookOpen,
-    Briefcase,
     CheckCircle2,
-    ClipboardList,
-    DollarSign,
     FileText,
     Gauge,
     Gavel,
     MessageCircleQuestion,
+    Paperclip,
     Pencil,
     Printer,
     Send,
-    ShieldCheck,
-    Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AttachmentsPanel, type Attachment } from './_attachments';
 import {
+    CEO_REPORT_SECTIONS,
     CeoReportWizardDialog,
-    ceoReportStatusLabel,
-    ceoReportStatusVariant,
+    ceoReportChip,
+    matterStatus,
     type MeetingOption,
 } from './_dialogs';
 
@@ -83,7 +83,7 @@ interface Report {
     recommendations: string | null;
     decisions_sought: DecisionSought[];
     matters_arising: MatterArising[];
-    kpi_snapshot: Record<string, any> | null;
+    kpi_snapshot: Record<string, unknown> | null;
     attachments: Attachment[];
     sections_complete: number;
 }
@@ -93,15 +93,18 @@ interface Props extends PageProps {
     meetings: MeetingOption[];
 }
 
-const SECTION_LIST = [
-    { key: 'executive_summary', label: 'Executive summary' },
-    { key: 'operational_summary', label: 'Operational summary' },
-    { key: 'key_achievements', label: 'Key achievements' },
-    { key: 'financial_summary', label: 'Financial summary' },
-    { key: 'challenges_and_risks', label: 'Challenges & risks' },
-    { key: 'compliance_status', label: 'Compliance status' },
-    { key: 'staffing_update', label: 'Workforce update' },
-    { key: 'recommendations', label: 'Strategic progress' },
+type TabKey = 'report' | 'decisions' | 'matters' | 'figures' | 'attachments';
+
+/** The order a board member reads the report in. */
+const READING_ORDER = [
+    'executive_summary',
+    'operational_summary',
+    'key_achievements',
+    'staffing_update',
+    'financial_summary',
+    'challenges_and_risks',
+    'compliance_status',
+    'recommendations',
 ] as const;
 
 function paragraphs(value: string | null): string[] {
@@ -112,283 +115,241 @@ function paragraphs(value: string | null): string[] {
         .filter(Boolean);
 }
 
-function SectionView({
-    title,
-    value,
-    fallback,
-}: {
-    title: string;
-    value: string | null;
-    fallback: string;
-}) {
-    const paras = paragraphs(value);
+/* ── Key figures ───────────────────────────────────────────────────────── */
+
+export interface KeyFigure {
+    label: string;
+    /** "Not available" when the source failed or had no data — never a 0. */
+    value: string;
+    tone: 'critical' | 'warning' | 'success' | 'neutral';
+    hint?: ReactNode;
+}
+
+type Snapshot = Record<string, unknown> | null;
+
+function objectAt(snapshot: Snapshot, key: string): Record<string, unknown> | null {
+    const value = snapshot?.[key];
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null;
+}
+
+function numberAt(source: Record<string, unknown> | null, key: string): number | null {
+    const value = source?.[key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+const NOT_AVAILABLE = 'Not available';
+
+/** Figures saved when the report was submitted. Missing sources read "Not available". */
+export function keyFigures(snapshot: Snapshot): KeyFigure[] {
+    const risks = objectAt(snapshot, 'top_risks');
+    const critical = numberAt(risks, 'critical');
+    const aboveLimit = numberAt(risks, 'above_appetite');
+
+    const calendar = snapshot?.compliance_calendar;
+    const overdueRequirements = Array.isArray(calendar)
+        ? calendar.filter(
+              (item) =>
+                  typeof (item as { days_remaining?: unknown })?.days_remaining ===
+                      'number' &&
+                  ((item as { days_remaining: number }).days_remaining < 0),
+          ).length
+        : null;
+
+    const incidents = objectAt(snapshot, 'incidents');
+    const bySeverity =
+        incidents && typeof incidents.by_severity === 'object'
+            ? (incidents.by_severity as Record<string, unknown>)
+            : null;
+    const criticalIncidents = bySeverity
+        ? (numberAt(bySeverity, 'critical') ?? 0)
+        : null;
+
+    const finance = objectAt(snapshot, 'financial');
+    const variance = numberAt(finance, 'variance');
+
+    const workforce = objectAt(snapshot, 'workforce');
+    const training = numberAt(workforce, 'training_compliance');
+
+    const safeguarding = objectAt(snapshot, 'safeguarding');
+    const openSafeguarding = numberAt(safeguarding, 'open_concerns');
+
+    const decisions = objectAt(snapshot, 'decisions_required');
+    const decisionsPending = numberAt(decisions, 'count');
+
+    const count = (
+        label: string,
+        value: number | null,
+        badTone: 'critical' | 'warning',
+        hint?: ReactNode,
+    ): KeyFigure =>
+        value === null
+            ? { label, value: NOT_AVAILABLE, tone: 'neutral', hint }
+            : {
+                  label,
+                  value: String(value),
+                  tone: value > 0 ? badTone : 'success',
+                  hint,
+              };
+
+    return [
+        count('Critical risks', critical, 'critical'),
+        count(
+            "Risks above the board's limit",
+            aboveLimit,
+            'warning',
+            <GovernanceTermHint term="board_limit" />,
+        ),
+        count('Overdue requirements', overdueRequirements, 'critical'),
+        count('Critical incidents', criticalIncidents, 'critical'),
+        variance === null
+            ? { label: 'Budget position', value: NOT_AVAILABLE, tone: 'neutral' }
+            : {
+                  label: 'Budget position',
+                  value:
+                      variance === 0
+                          ? 'On budget'
+                          : `${variance > 0 ? 'Over' : 'Under'} budget by ${Math.abs(variance).toFixed(1)}%`,
+                  tone: Math.abs(variance) >= 5 ? 'warning' : 'success',
+              },
+        training === null
+            ? { label: 'Staff up to date with training', value: NOT_AVAILABLE, tone: 'neutral' }
+            : {
+                  label: 'Staff up to date with training',
+                  value: `${training.toFixed(0)}%`,
+                  tone: training >= 95 ? 'success' : 'warning',
+              },
+        count('Open safeguarding concerns', openSafeguarding, 'warning'),
+        count('Decisions waiting for the board', decisionsPending, 'warning'),
+    ];
+}
+
+const FIGURE_TONE: Record<KeyFigure['tone'], string> = {
+    critical: 'text-status-critical',
+    warning: 'text-status-warning',
+    success: 'text-status-success',
+    neutral: 'text-muted-foreground',
+};
+
+function KeyFiguresView({ snapshot }: { snapshot: Snapshot }) {
+    if (!snapshot) {
+        return (
+            <EmptyState
+                icon={Gauge}
+                title="No key figures yet"
+                description="The figures are saved automatically when the report is submitted to the board."
+            />
+        );
+    }
+
+    const capturedAt =
+        typeof snapshot.captured_at === 'string' ? snapshot.captured_at : null;
+
     return (
         <Card>
-            <CardContent className="space-y-2 p-5 print:p-3">
-                <h3 className="text-section-title print:text-sm">{title}</h3>
-                {paras.length === 0 ? (
-                    <p className="text-sm text-muted-foreground italic">
-                        {fallback}
+            <CardContent className="flex flex-col gap-4 p-5 print:p-3">
+                <div>
+                    <h2 className="text-section-title">
+                        Key figures when the report was submitted
+                    </h2>
+                    <p className="text-subtle">
+                        {capturedAt
+                            ? `As they stood on ${formatDateTimeLong(capturedAt)}. "Not available" means the figure couldn't be worked out at the time.`
+                            : `"Not available" means the figure couldn't be worked out at the time.`}
                     </p>
-                ) : (
-                    <div className="space-y-2 text-sm leading-relaxed text-foreground">
-                        {paras.map((p, i) => (
-                            <p key={i}>{p}</p>
-                        ))}
-                    </div>
-                )}
+                </div>
+                <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 print:grid-cols-2">
+                    {keyFigures(snapshot).map((figure) => (
+                        <div
+                            key={figure.label}
+                            className="rounded-lg border border-border p-3"
+                        >
+                            <dt className="text-caption flex items-center gap-1">
+                                {figure.label}
+                                {figure.hint}
+                            </dt>
+                            <dd
+                                className={cn(
+                                    'mt-1 text-sm font-semibold tabular-nums',
+                                    FIGURE_TONE[figure.tone],
+                                )}
+                            >
+                                {figure.value}
+                            </dd>
+                        </div>
+                    ))}
+                </dl>
             </CardContent>
         </Card>
     );
 }
 
-function StatusStrip({ report }: { report: Report }) {
-    type Tile = {
-        label: string;
-        value: string;
-        tone: 'success' | 'info' | 'warning' | 'critical' | 'muted';
-    };
+/* ── Sections ──────────────────────────────────────────────────────────── */
 
-    const periodValue = report.period_label ?? 'Not set';
-    const deadlineValue = report.deadline
-        ? new Date(report.deadline).toLocaleDateString('en-NZ')
-        : 'No deadline';
-    const meetingValue = report.meeting?.title ?? 'No meeting';
-    const statusLabel =
-        report.status === 'draft'
-            ? 'Draft'
-            : report.status === 'submitted'
-              ? 'Submitted'
-              : report.status === 'presented'
-                ? 'Presented'
-                : report.status;
-    const submittedValue = report.submitted_at
-        ? new Date(report.submitted_at).toLocaleDateString('en-NZ')
-        : '—';
-    const presentedValue = report.presented_at
-        ? new Date(report.presented_at).toLocaleDateString('en-NZ')
-        : '—';
+const FALLBACKS: Record<string, string> = {
+    executive_summary: 'No executive summary was included.',
+    operational_summary: 'No operational summary was included.',
+    key_achievements: 'No key achievements were highlighted.',
+    staffing_update: 'No workforce update was included.',
+    financial_summary: 'No financial summary was included.',
+    challenges_and_risks: 'No challenges or risks were raised.',
+    compliance_status: 'No compliance update was included.',
+    recommendations: 'No strategic progress was reported.',
+};
 
-    const tiles: Tile[] = [
-        {
-            label: 'Period',
-            value: periodValue,
-            tone: report.period_label ? 'info' : 'warning',
-        },
-        {
-            label: 'Deadline',
-            value: deadlineValue,
-            tone: report.is_overdue
-                ? 'critical'
-                : report.deadline
-                  ? 'info'
-                  : 'muted',
-        },
-        {
-            label: 'Author',
-            value: report.author?.name ?? 'Unknown',
-            tone: 'info',
-        },
-        {
-            label: 'Status',
-            value: statusLabel,
-            tone:
-                report.status === 'presented'
-                    ? 'success'
-                    : report.status === 'submitted'
-                      ? 'info'
-                      : 'warning',
-        },
-        {
-            label: 'For meeting',
-            value: meetingValue,
-            tone: report.meeting ? 'info' : 'warning',
-        },
-        {
-            label: report.status === 'presented' ? 'Presented' : 'Submitted',
-            value:
-                report.status === 'presented' ? presentedValue : submittedValue,
-            tone:
-                report.status === 'presented' || report.status === 'submitted'
-                    ? 'success'
-                    : 'muted',
-        },
-    ];
-
-    const TONE_VALUE: Record<Tile['tone'], string> = {
-        success: 'text-status-success',
-        info: 'text-foreground',
-        warning: 'text-status-warning',
-        critical: 'text-status-critical',
-        muted: 'text-muted-foreground',
-    };
-
-    return (
-        <div
-            className="grid gap-5 md:grid-cols-3 xl:grid-cols-6 print:grid-cols-3"
-            data-dusk="ceo-status-strip"
-        >
-            {tiles.map((t) => (
-                <Card key={t.label}>
-                    <CardContent className="p-4">
-                        <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-                            {t.label}
-                        </p>
-                        <p
-                            className={cn(
-                                'mt-1 truncate text-sm leading-snug font-semibold',
-                                TONE_VALUE[t.tone],
-                            )}
-                            title={t.value}
-                        >
-                            {t.value}
-                        </p>
-                    </CardContent>
-                </Card>
-            ))}
-        </div>
-    );
-}
-
-function KpiSnapshotView({
-    snapshot,
-}: {
-    snapshot: Record<string, any> | null;
-}) {
-    if (!snapshot) {
-        return (
-            <EmptyState
-                icon={Gauge}
-                title="No KPI snapshot yet"
-                description="Snapshots are captured automatically when the report is submitted to the board."
-            />
-        );
-    }
-
-    const tiles: Array<{
-        label: string;
-        value: string;
-        tone: 'success' | 'warning' | 'critical' | 'info' | 'muted';
-    }> = [];
-
-    const tr = snapshot.top_risks ?? {};
-    tiles.push({
-        label: 'Critical risks',
-        value: String(tr.critical ?? 0),
-        tone: (tr.critical ?? 0) > 0 ? 'critical' : 'success',
-    });
-    tiles.push({
-        label: 'Risks above appetite',
-        value: String(tr.above_appetite ?? 0),
-        tone: (tr.above_appetite ?? 0) > 0 ? 'warning' : 'success',
-    });
-
-    const cc = Array.isArray(snapshot.compliance_calendar)
-        ? snapshot.compliance_calendar
-        : [];
-    const overdueCompliance = cc.filter(
-        (c: any) => (c?.days_remaining ?? 1) < 0,
-    ).length;
-    tiles.push({
-        label: 'Overdue obligations',
-        value: String(overdueCompliance),
-        tone: overdueCompliance > 0 ? 'critical' : 'success',
-    });
-
-    const inc = snapshot.incidents ?? {};
-    tiles.push({
-        label: 'Critical incidents',
-        value: String(inc?.by_severity?.critical ?? 0),
-        tone: (inc?.by_severity?.critical ?? 0) > 0 ? 'critical' : 'success',
-    });
-
-    const fin = snapshot.financial ?? {};
-    const variance = Number(fin?.variance ?? 0);
-    tiles.push({
-        label: 'Budget variance',
-        value: `${variance.toFixed(1)}%`,
-        tone: Math.abs(variance) >= 5 ? 'warning' : 'success',
-    });
-
-    const wf = snapshot.workforce ?? {};
-    const training = wf?.training_compliance;
-    tiles.push({
-        label: 'Training compliance',
-        value: training == null ? '—' : `${Number(training).toFixed(0)}%`,
-        tone:
-            training == null
-                ? 'muted'
-                : Number(training) >= 95
-                  ? 'success'
-                  : 'warning',
-    });
-
-    const sg = snapshot.safeguarding ?? {};
-    tiles.push({
-        label: 'Open safeguarding',
-        value: String(sg.open_concerns ?? 0),
-        tone: (sg.open_concerns ?? 0) > 0 ? 'warning' : 'success',
-    });
-
-    const dr = snapshot.decisions_required ?? {};
-    tiles.push({
-        label: 'Decisions pending',
-        value: String(dr.count ?? 0),
-        tone: (dr.count ?? 0) > 0 ? 'warning' : 'success',
-    });
-
-    const TONE_VALUE: Record<string, string> = {
-        success: 'text-status-success',
-        info: 'text-foreground',
-        warning: 'text-status-warning',
-        critical: 'text-status-critical',
-        muted: 'text-muted-foreground',
-    };
-
-    const capturedAt = snapshot.captured_at
-        ? new Date(snapshot.captured_at).toLocaleString('en-NZ')
-        : null;
+function ReportDocument({ report }: { report: Report }) {
+    const sections = READING_ORDER.map((key) => ({
+        key,
+        label:
+            CEO_REPORT_SECTIONS.find((section) => section.key === key)?.label ??
+            key,
+        value: report[key],
+    }));
 
     return (
         <Card>
-            <CardContent className="space-y-4 p-5 print:p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                        <h3 className="text-section-title">
-                            KPI snapshot at submission
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                            The numbers as they stood when this report was
-                            submitted to the board.
-                        </p>
-                    </div>
-                    {capturedAt && (
-                        <Badge variant="outline" className="text-[10px]">
-                            Captured {capturedAt}
-                        </Badge>
-                    )}
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 print:grid-cols-2">
-                    {tiles.map((t) => (
-                        <div
-                            key={t.label}
-                            className="rounded-lg border border-border bg-muted/30 p-3"
+            <CardContent className="flex flex-col gap-6 p-5 print:p-3">
+                <nav aria-label="Contents" className="print:hidden">
+                    <h2 className="text-section-title">Contents</h2>
+                    <ol className="mt-2 grid gap-1 sm:grid-cols-2">
+                        {sections.map((section, index) => (
+                            <li key={section.key}>
+                                <a
+                                    href={`#ceo-section-${section.key}`}
+                                    className="text-sm text-primary underline-offset-4 hover:underline"
+                                >
+                                    {index + 1}. {section.label}
+                                </a>
+                            </li>
+                        ))}
+                    </ol>
+                </nav>
+                {sections.map((section) => {
+                    const paras = paragraphs(section.value);
+                    return (
+                        <section
+                            key={section.key}
+                            id={`ceo-section-${section.key}`}
+                            className="scroll-mt-5 border-t border-border pt-4"
                         >
-                            <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-                                {t.label}
-                            </p>
-                            <p
-                                className={cn(
-                                    'mt-1 text-lg font-semibold tabular-nums',
-                                    TONE_VALUE[t.tone],
-                                )}
-                            >
-                                {t.value}
-                            </p>
-                        </div>
-                    ))}
-                </div>
+                            <h3 className="text-section-title">
+                                {section.label}
+                            </h3>
+                            {paras.length === 0 ? (
+                                <p className="text-subtle mt-1">
+                                    {FALLBACKS[section.key]}
+                                </p>
+                            ) : (
+                                <div className="mt-2 flex flex-col gap-2 text-sm leading-relaxed">
+                                    {paras.map((p, i) => (
+                                        <p key={i}>{p}</p>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+                    );
+                })}
             </CardContent>
         </Card>
     );
@@ -400,7 +361,7 @@ function DecisionsView({ items }: { items: DecisionSought[] }) {
             <EmptyState
                 icon={Gavel}
                 title="No decisions sought"
-                description="No board decisions were requested in this report."
+                description="The CEO didn't ask the board to decide anything in this report."
             />
         );
     }
@@ -408,28 +369,24 @@ function DecisionsView({ items }: { items: DecisionSought[] }) {
         <div className="grid gap-5 md:grid-cols-2 print:grid-cols-1">
             {items.map((d, i) => (
                 <Card key={i}>
-                    <CardContent className="space-y-2 p-4">
-                        <div className="flex items-start gap-2">
-                            <Gavel className="mt-0.5 h-4 w-4 text-primary" />
-                            <p className="text-sm font-semibold text-foreground">
-                                {d.title || `Decision ${i + 1}`}
-                            </p>
-                        </div>
-                        {d.detail && (
-                            <p className="text-sm text-muted-foreground">
-                                {d.detail}
-                            </p>
-                        )}
-                        {d.recommendation && (
-                            <div className="rounded-lg border border-primary/20 bg-primary/5 p-2">
-                                <p className="text-[10px] font-medium tracking-wide text-primary uppercase">
-                                    CEO recommendation
+                    <CardContent className="flex flex-col gap-2 p-4">
+                        <p className="flex items-start gap-2 text-sm font-semibold">
+                            <Gavel className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                            {d.title || `Decision ${i + 1}`}
+                        </p>
+                        {d.detail ? (
+                            <p className="text-subtle">{d.detail}</p>
+                        ) : null}
+                        {d.recommendation ? (
+                            <div className="rounded-lg border border-border p-2">
+                                <p className="text-caption">
+                                    The CEO recommends
                                 </p>
-                                <p className="mt-0.5 text-sm text-foreground">
+                                <p className="mt-0.5 text-sm">
                                     {d.recommendation}
                                 </p>
                             </div>
-                        )}
+                        ) : null}
                     </CardContent>
                 </Card>
             ))}
@@ -443,39 +400,32 @@ function MattersView({ items }: { items: MatterArising[] }) {
             <EmptyState
                 icon={MessageCircleQuestion}
                 title="No matters arising"
-                description="Nothing was carried forward from the previous report."
+                description="Nothing was carried forward from the last meeting."
             />
         );
     }
-    const TONE: Record<string, 'warning' | 'info' | 'success'> = {
-        open: 'warning',
-        in_progress: 'info',
-        done: 'success',
-    };
     return (
         <div className="flex flex-col gap-5">
-            {items.map((m, i) => (
-                <Card key={i}>
-                    <CardContent className="space-y-2 p-4">
-                        <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-semibold text-foreground">
-                                {m.title || `Matter ${i + 1}`}
-                            </p>
-                            <StatusBadge
-                                size="sm"
-                                variant={TONE[m.status] ?? 'warning'}
-                            >
-                                {ceoReportStatusLabel(m.status ?? 'open')}
-                            </StatusBadge>
-                        </div>
-                        {m.update && (
-                            <p className="text-sm text-muted-foreground">
-                                {m.update}
-                            </p>
-                        )}
-                    </CardContent>
-                </Card>
-            ))}
+            {items.map((m, i) => {
+                const status = matterStatus(m.status);
+                return (
+                    <Card key={i}>
+                        <CardContent className="flex flex-col gap-2 p-4">
+                            <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-semibold">
+                                    {m.title || `Matter ${i + 1}`}
+                                </p>
+                                <StatusBadge size="sm" variant={status.variant}>
+                                    {status.label}
+                                </StatusBadge>
+                            </div>
+                            {m.update ? (
+                                <p className="text-subtle">{m.update}</p>
+                            ) : null}
+                        </CardContent>
+                    </Card>
+                );
+            })}
         </div>
     );
 }
@@ -488,54 +438,67 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
             }
         )?.can?.governance?.['ceo-reports']?.manage ?? false;
 
-    const canEdit = can && report.status === 'draft';
+    const isDraft = report.status === 'draft';
+    const canEdit = can && isDraft;
     const [editOpen, setEditOpen] = useDialogDeepLink('edit', canEdit);
-    const [activeTab, setActiveTab] = useState<string>('executive');
+    const [tab, setTab] = useState<TabKey>('report');
+    const [confirm, setConfirm] = useState<'submit' | 'present' | null>(null);
 
-    const handleSubmit = () =>
+    const chip = ceoReportChip(report.status, report.is_overdue);
+
+    const submit = () =>
         router.post(
             `/governance/ceo-reports/${report.id}/submit`,
             {},
             { preserveScroll: true },
         );
-    const handlePresent = () =>
+    const present = () =>
         router.post(
             `/governance/ceo-reports/${report.id}/present`,
             {},
             { preserveScroll: true },
         );
-    const handlePrint = () => window.print();
 
-    const tabs: PageTabItem[] = [
-        { value: 'executive', label: 'Executive summary', icon: FileText },
-        { value: 'operations', label: 'Operations', icon: Briefcase },
-        { value: 'financials', label: 'Financials', icon: DollarSign },
-        { value: 'risks', label: 'Risk & Compliance', icon: ShieldCheck },
-        { value: 'workforce', label: 'Workforce', icon: Users },
-        { value: 'strategy', label: 'Strategy', icon: BookOpen },
+    const tabs: { key: TabKey; label: string; icon: typeof FileText; count?: number }[] = [
+        { key: 'report', label: 'Report', icon: FileText },
         {
-            value: 'decisions',
-            label: `Decisions (${report.decisions_sought.length})`,
+            key: 'decisions',
+            label: 'Decisions sought',
             icon: Gavel,
+            count: report.decisions_sought.length,
         },
         {
-            value: 'matters',
-            label: `Matters arising (${report.matters_arising.length})`,
+            key: 'matters',
+            label: 'Matters arising',
             icon: MessageCircleQuestion,
+            count: report.matters_arising.length,
         },
+        { key: 'figures', label: 'Key figures', icon: Gauge },
         {
-            value: 'kpi',
-            label: 'KPI snapshot',
-            icon: Gauge,
-            overflowable: true,
-        },
-        {
-            value: 'attachments',
-            label: `Attachments (${report.attachments.length})`,
-            icon: ClipboardList,
-            overflowable: true,
+            key: 'attachments',
+            label: 'Attachments',
+            icon: Paperclip,
+            count: report.attachments.length,
         },
     ];
+
+    // Every section renders so "Print or save as PDF" includes the whole
+    // report; only the chosen tab shows on screen.
+    const panel = (key: TabKey, children: ReactNode) => (
+        <div key={key} className={tab === key ? 'block' : 'hidden print:block'}>
+            {children}
+        </div>
+    );
+
+    const deadlineCaption = report.deadline
+        ? report.is_overdue
+            ? 'Past the deadline'
+            : isDraft && report.days_until_deadline !== null
+              ? report.days_until_deadline <= 0
+                  ? 'Due today'
+                  : `Due in ${report.days_until_deadline} day${report.days_until_deadline === 1 ? '' : 's'}`
+              : 'Deadline'
+        : 'No deadline set';
 
     return (
         <AppLayout
@@ -558,125 +521,142 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
                         icon={FileText}
                         title={report.title}
                         titleDusk="ceo-report-title"
+                        wrapTitle
                         titleChip={
-                            <>
-                                <PageHeaderStatusChip
-                                    variant={ceoReportStatusVariant(
-                                        report.status,
-                                    )}
-                                >
-                                    {ceoReportStatusLabel(report.status)}
-                                </PageHeaderStatusChip>
-                                {report.is_overdue && (
-                                    <PageHeaderStatusChip
-                                        variant="critical"
-                                        icon={AlertOctagon}
-                                    >
-                                        Overdue
-                                    </PageHeaderStatusChip>
-                                )}
-                            </>
+                            <PageHeaderStatusChip variant={chip.variant}>
+                                {chip.label}
+                            </PageHeaderStatusChip>
                         }
                         subline={[
-                            report.period_label,
-                            report.author ? `By ${report.author.name}` : null,
-                            report.meeting
-                                ? `For ${report.meeting.title}`
+                            report.period_label
+                                ? `Covers ${report.period_label}`
                                 : null,
+                            report.author ? `By ${report.author.name}` : null,
+                            report.presented_at
+                                ? `Presented ${formatDateLong(report.presented_at)}`
+                                : report.submitted_at
+                                  ? `Submitted ${formatDateLong(report.submitted_at)}`
+                                  : null,
                         ]
                             .filter(Boolean)
                             .join(' · ')}
                         meters={
                             <>
                                 <PageHeaderMeterBlock
-                                    label="Sections"
-                                    onClick={() => setActiveTab('executive')}
-                                    ariaLabel="View report sections"
+                                    label="Sections written"
+                                    onClick={() => setTab('report')}
+                                    ariaLabel="Read the report"
                                 >
                                     <PageHeaderMeterBig>
-                                        {report.sections_complete}/
-                                        {SECTION_LIST.length}
+                                        {report.sections_complete} of{' '}
+                                        {CEO_REPORT_SECTIONS.length}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        Narrative sections completed
+                                        Report sections
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Decisions"
-                                    onClick={() => setActiveTab('decisions')}
-                                    ariaLabel="View decisions sought"
+                                    label="Decisions sought"
+                                    onClick={() => setTab('decisions')}
+                                    ariaLabel="View the decisions the CEO is asking for"
                                 >
                                     <PageHeaderMeterBig>
                                         {report.decisions_sought.length}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        Decisions sought
+                                        For the board to decide
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Matters"
-                                    onClick={() => setActiveTab('matters')}
-                                    ariaLabel="View matters arising"
+                                    label="Deadline"
+                                    tone={report.is_overdue ? 'critical' : 'brand'}
+                                    href={
+                                        report.is_overdue
+                                            ? '/governance/ceo-reports?status=overdue'
+                                            : '/governance/ceo-reports'
+                                    }
+                                    ariaLabel="View CEO reports by deadline"
                                 >
                                     <PageHeaderMeterBig>
-                                        {report.matters_arising.length}
+                                        {report.deadline
+                                            ? formatDateLong(report.deadline)
+                                            : 'Not set'}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        Matters arising
+                                        {deadlineCaption}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Attachments"
-                                    onClick={() => setActiveTab('attachments')}
-                                    ariaLabel="View attachments"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {report.attachments.length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Supporting documents
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
+                                {report.meeting ? (
+                                    <PageHeaderMeterBlock
+                                        label="Meeting"
+                                        href={`/governance/meetings/${report.meeting.id}`}
+                                        ariaLabel="Go to the meeting"
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {report.meeting.scheduled_at
+                                                ? formatDateLong(
+                                                      report.meeting.scheduled_at,
+                                                  )
+                                                : 'Date not set'}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {report.meeting.title}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
                             </>
                         }
                         actions={
                             <>
                                 <PageHeaderGlassButton
                                     icon={Printer}
-                                    onClick={handlePrint}
+                                    onClick={() => window.print()}
                                 >
-                                    Print / PDF
+                                    Print or save as PDF
                                 </PageHeaderGlassButton>
-                                {canEdit && (
+                                {canEdit ? (
                                     <PageHeaderGlassButton
                                         icon={Pencil}
                                         onClick={() => setEditOpen(true)}
                                     >
                                         Edit report
                                     </PageHeaderGlassButton>
-                                )}
-                                {can && report.status === 'draft' && (
+                                ) : null}
+                                {can && isDraft ? (
                                     <PageHeaderPrimaryButton
                                         icon={Send}
-                                        onClick={handleSubmit}
+                                        onClick={() => setConfirm('submit')}
                                     >
                                         Submit to board
                                     </PageHeaderPrimaryButton>
-                                )}
-                                {can && report.status === 'submitted' && (
+                                ) : null}
+                                {can && report.status === 'submitted' ? (
                                     <PageHeaderPrimaryButton
                                         icon={CheckCircle2}
-                                        onClick={handlePresent}
+                                        onClick={() => setConfirm('present')}
                                     >
                                         Mark as presented
                                     </PageHeaderPrimaryButton>
-                                )}
+                                ) : null}
                             </>
                         }
                     />
                 }
+                tabs={
+                    <div data-dusk="ceo-report-tabs" className="print:hidden">
+                        <TierTwoTabs
+                            tabs={tabs}
+                            activeTab={tab}
+                            onTab={(key) => setTab(key as TabKey)}
+                            testIdPrefix="ceo-report"
+                            ariaLabel="Report sections"
+                            panelId="ceo-report-panel"
+                            renderLink={() => null}
+                        />
+                    </div>
+                }
             >
-                {canEdit && (
+                {canEdit ? (
                     <CeoReportWizardDialog
                         isOpen={editOpen}
                         onClose={() => setEditOpen(false)}
@@ -688,11 +668,8 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
                                 : '',
                             period_start: report.period_start ?? '',
                             period_end: report.period_end ?? '',
-                            deadline: report.deadline
-                                ? new Date(report.deadline)
-                                      .toISOString()
-                                      .slice(0, 16)
-                                : '',
+                            // NZ wall time — slicing the ISO string would show UTC.
+                            deadline: toDatetimeLocal(report.deadline),
                             executive_summary: report.executive_summary ?? '',
                             operational_summary:
                                 report.operational_summary ?? '',
@@ -708,109 +685,78 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
                             attachments: report.attachments,
                         }}
                     />
-                )}
+                ) : null}
 
-                <div className="flex flex-col gap-5">
-                    <StatusStrip report={report} />
+                <div
+                    id="ceo-report-panel"
+                    role="tabpanel"
+                    aria-labelledby={`ceo-report-tab-${tab}`}
+                    className="flex flex-col gap-5"
+                >
+                    {!isDraft && can ? (
+                        <p className="text-subtle print:hidden">
+                            This report has been submitted, so it can&apos;t be
+                            edited.
+                            {report.meeting ? (
+                                <>
+                                    {' '}
+                                    <Link
+                                        href={`/governance/meetings/${report.meeting.id}`}
+                                        className="text-primary underline-offset-4 hover:underline"
+                                    >
+                                        Go to the meeting
+                                    </Link>
+                                </>
+                            ) : null}
+                        </p>
+                    ) : null}
 
-                    <div data-dusk="ceo-report-tabs">
-                        <PageTabs
-                            value={activeTab}
-                            onValueChange={setActiveTab}
-                            items={tabs}
-                        >
-                            <TabsContent value="executive">
-                                <SectionView
-                                    title="Executive summary"
-                                    value={report.executive_summary}
-                                    fallback="The CEO did not include an executive summary for this period."
+                    {panel('report', <ReportDocument report={report} />)}
+                    {panel(
+                        'decisions',
+                        <DecisionsView items={report.decisions_sought} />,
+                    )}
+                    {panel(
+                        'matters',
+                        <MattersView items={report.matters_arising} />,
+                    )}
+                    {panel(
+                        'figures',
+                        <KeyFiguresView snapshot={report.kpi_snapshot} />,
+                    )}
+                    {panel(
+                        'attachments',
+                        <Card>
+                            <CardContent className="p-5">
+                                <AttachmentsPanel
+                                    reportId={report.id}
+                                    attachments={report.attachments}
+                                    canManage={canEdit}
                                 />
-                            </TabsContent>
-
-                            <TabsContent
-                                value="operations"
-                                className="flex flex-col gap-5"
-                            >
-                                <SectionView
-                                    title="Operational summary"
-                                    value={report.operational_summary}
-                                    fallback="No operational summary was included."
-                                />
-                                <SectionView
-                                    title="Key achievements"
-                                    value={report.key_achievements}
-                                    fallback="No key achievements were highlighted."
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="financials">
-                                <SectionView
-                                    title="Financial summary"
-                                    value={report.financial_summary}
-                                    fallback="No financial commentary was included."
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="risks" className="flex flex-col gap-5">
-                                <SectionView
-                                    title="Challenges & risks"
-                                    value={report.challenges_and_risks}
-                                    fallback="No challenges or risks were flagged."
-                                />
-                                <SectionView
-                                    title="Compliance status"
-                                    value={report.compliance_status}
-                                    fallback="No compliance update was included."
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="workforce">
-                                <SectionView
-                                    title="Workforce update"
-                                    value={report.staffing_update}
-                                    fallback="No workforce update was included."
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="strategy">
-                                <SectionView
-                                    title="Strategic progress"
-                                    value={report.recommendations}
-                                    fallback="No strategic progress was reported."
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="decisions">
-                                <DecisionsView
-                                    items={report.decisions_sought}
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="matters">
-                                <MattersView items={report.matters_arising} />
-                            </TabsContent>
-
-                            <TabsContent value="kpi">
-                                <KpiSnapshotView
-                                    snapshot={report.kpi_snapshot}
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="attachments">
-                                <Card>
-                                    <CardContent className="p-5">
-                                        <AttachmentsPanel
-                                            reportId={report.id}
-                                            attachments={report.attachments}
-                                            canManage={can}
-                                        />
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        </PageTabs>
-                    </div>
+                            </CardContent>
+                        </Card>,
+                    )}
                 </div>
             </PageLayout>
+
+            <ConfirmDialog
+                open={confirm === 'submit'}
+                onClose={() => setConfirm(null)}
+                onConfirm={submit}
+                title="Submit your report to the board?"
+                description="Board members will be able to read it. You won't be able to edit it afterwards, and the key figures are saved as they stand right now."
+                confirmText="Submit to board"
+                variant="default"
+            />
+            <ConfirmDialog
+                open={confirm === 'present'}
+                onClose={() => setConfirm(null)}
+                onConfirm={present}
+                title="Mark this report as presented?"
+                description={`This records that the report was presented to the board${report.meeting ? ` at ${report.meeting.title}` : ''}. It can't be undone.`}
+                confirmText="Mark as presented"
+                variant="default"
+            />
         </AppLayout>
     );
 }

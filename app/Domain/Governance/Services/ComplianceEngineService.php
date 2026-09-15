@@ -138,7 +138,7 @@ class ComplianceEngineService
 
             // Optimistic concurrency check
             if ($expectedVersion !== null && (int) $locked->version_number !== (int) $expectedVersion) {
-                abort(409, 'The compliance obligation has been updated by another user. Please refresh and try again.');
+                abort(409, 'Someone else changed this requirement while you had it open. Refresh the page and try again.');
             }
 
             // Validate provided evidence IDs
@@ -147,7 +147,7 @@ class ComplianceEngineService
 
                 if ($evidences->count() !== count($evidenceIds)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
-                        'evidence_ids' => 'One or more selected evidence records do not exist.',
+                        'evidence_ids' => 'Some of the chosen evidence no longer exists. Refresh the page and choose again.',
                     ]);
                 }
 
@@ -155,20 +155,20 @@ class ComplianceEngineService
                     // Check for foreign evidence (borrowed / reparenting attempt forbidden)
                     if ((int) $ev->compliance_obligation_id !== (int) $locked->id) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
-                            'evidence_ids' => "Evidence '{$ev->title}' belongs to another obligation and cannot be reassigned.",
+                            'evidence_ids' => "“{$ev->title}” is evidence for a different requirement, so it can't be used here.",
                         ]);
                     }
 
                     // Check for future-dated or expired evidence
                     if ($ev->valid_from && $ev->valid_from->gt(today())) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
-                            'evidence_ids' => "Evidence '{$ev->title}' is not valid until {$ev->valid_from->toDateString()} and cannot satisfy compliance.",
+                            'evidence_ids' => '“'.$ev->title.'” only becomes valid on '.\App\Domain\Governance\Support\GovernanceLabels::date($ev->valid_from->toDateString()).", so it can't be used yet.",
                         ]);
                     }
 
                     if ($ev->valid_until && $ev->valid_until->lt(today())) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
-                            'evidence_ids' => "Evidence '{$ev->title}' expired on {$ev->valid_until->toDateString()} and cannot satisfy compliance.",
+                            'evidence_ids' => '“'.$ev->title.'” expired on '.\App\Domain\Governance\Support\GovernanceLabels::date($ev->valid_until->toDateString()).". It can't be used — upload current evidence.",
                         ]);
                     }
 
@@ -184,7 +184,7 @@ class ComplianceEngineService
 
                         if (! $hasBytes) {
                             throw \Illuminate\Validation\ValidationException::withMessages([
-                                'evidence_ids' => "Evidence file '{$ev->title}' does not exist on disk or is empty and cannot satisfy compliance.",
+                                'evidence_ids' => "The file for “{$ev->title}” is missing or empty. Upload it again.",
                             ]);
                         }
                     }
@@ -223,7 +223,7 @@ class ComplianceEngineService
 
             if ($locked->evidence_required && ! $hasValidEvidence) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'evidence' => 'Valid, unexpired evidence with verified files is required to complete this compliance obligation.',
+                    'evidence' => "This requirement needs current evidence before it can be marked done. Upload a file that hasn't expired first.",
                 ]);
             }
 
@@ -305,7 +305,8 @@ class ComplianceEngineService
         string $title,
         $file,
         User $uploadedBy,
-        ?Carbon $validUntil = null
+        ?Carbon $validUntil = null,
+        ?string $description = null
     ): ComplianceEvidence {
         $path = $file->store('compliance-evidence/'.$obligation->framework);
 
@@ -313,7 +314,12 @@ class ComplianceEngineService
             'compliance_obligation_id' => $obligation->id,
             'evidence_type' => $type,
             'title' => $title,
+            'description' => $description,
             'file_path' => $path,
+            // Shown and downloaded under the name the file had when it was uploaded.
+            'original_name' => method_exists($file, 'getClientOriginalName') ? $file->getClientOriginalName() : null,
+            'mime_type' => method_exists($file, 'getMimeType') ? $file->getMimeType() : null,
+            'file_size' => method_exists($file, 'getSize') ? $file->getSize() : null,
             'valid_until' => $validUntil,
             'uploaded_by' => $uploadedBy->id,
             'uploaded_at' => now(),
@@ -468,56 +474,118 @@ class ComplianceEngineService
     }
 
     /**
-     * Get compliance status summary
+     * Requirement counts for the Compliance header and the Compliance status
+     * report. Worked out from each due date (NZ calendar date), so they are
+     * right even before the daily status refresh runs, and built from every
+     * framework in ComplianceObligation::frameworkOptions() (plus any legacy
+     * framework key still in use) so the totals match the list.
+     *
+     * Due soon = due in the next 30 days, not overdue, not cancelled.
+     * On time = done, or still open and not overdue — out of every
+     * requirement except cancelled ones.
      */
-    public function getComplianceStatus(): array
+    public function getComplianceStatus(?string $today = null): array
     {
-        $frameworks = [
-            'charities', 'nga_paerewa', 'hdsa_safety', 'privacy_act',
-            'hip_code', 'hswa', 'employment', 'funding_moh',
-        ];
+        $today ??= ComplianceObligation::nzToday();
+
+        $frameworks = array_keys(ComplianceObligation::frameworkOptions());
+        $inUse = ComplianceObligation::query()->distinct()->pluck('framework')->filter()->all();
+        $frameworks = array_values(array_unique([...$frameworks, ...$inUse]));
 
         $summary = [];
         foreach ($frameworks as $framework) {
-            $obligations = ComplianceObligation::byFramework($framework);
-
-            $summary[$framework] = [
-                'total' => $obligations->count(),
-                'complete' => (clone $obligations)->where('status', 'complete')->count(),
-                'overdue' => (clone $obligations)->overdue()->count(),
-                'due_soon' => (clone $obligations)->dueSoon(30)->count(),
-                'not_due' => (clone $obligations)->where('status', 'not_due')->count(),
-            ];
+            $summary[$framework] = $this->counts(
+                fn () => ComplianceObligation::query()->byFramework($framework),
+                $today,
+            );
         }
+
+        $totals = $this->counts(fn () => ComplianceObligation::query(), $today);
 
         return [
             'by_framework' => $summary,
-            'total_overdue' => ComplianceObligation::overdue()->count(),
-            'total_due_soon' => ComplianceObligation::dueSoon(30)->count(),
-            'next_30_days' => $this->getUpcomingObligations(30),
+            'totals' => $totals,
+            'total_overdue' => $totals['overdue'],
+            'total_due_soon' => $totals['due_soon'],
+            'due_soon_days' => ComplianceObligation::DUE_SOON_DAYS,
+            'next_30_days' => $this->getUpcomingObligations(ComplianceObligation::DUE_SOON_DAYS, $today),
         ];
     }
 
     /**
-     * Get upcoming obligations
+     * @param  callable(): \Illuminate\Database\Eloquent\Builder  $base
+     * @return array{total: int, counted: int, complete: int, overdue: int, due_soon: int, not_due: int, cancelled: int, on_time: int}
      */
-    public function getUpcomingObligations(int $days = 30): array
+    protected function counts(callable $base, string $today): array
     {
-        return ComplianceObligation::where('due_date', '<=', now()->addDays($days))
-            ->where('status', '!=', 'complete')
+        $counted = $base()->counted()->count();
+        $overdue = $base()->overdue($today)->count();
+
+        return [
+            'total' => $base()->count(),
+            'counted' => $counted,
+            'complete' => $base()->where('status', 'complete')->count(),
+            'overdue' => $overdue,
+            'due_soon' => $base()->dueSoon(ComplianceObligation::DUE_SOON_DAYS, $today)->count(),
+            'not_due' => $base()->notYetDue($today)->count(),
+            'cancelled' => $base()->whereIn('status', ComplianceObligation::NOT_COUNTED_STATUSES)->count(),
+            'on_time' => $counted - $overdue,
+        ];
+    }
+
+    /**
+     * Open requirements that are overdue or due in the next $days days.
+     */
+    public function getUpcomingObligations(int $days = ComplianceObligation::DUE_SOON_DAYS, ?string $today = null): array
+    {
+        $today ??= ComplianceObligation::nzToday();
+        $until = Carbon::createFromFormat('!Y-m-d', $today)->addDays($days)->toDateString();
+
+        return ComplianceObligation::query()
+            ->open()
+            ->whereDate('due_date', '<=', $until)
+            ->with('owner:id,name')
             ->orderBy('due_date')
             ->get()
-            ->map(fn ($o) => [
+            ->map(fn (ComplianceObligation $o) => [
                 'id' => $o->id,
                 'framework' => $o->getFrameworkLabel(),
                 'title' => $o->obligation_title,
                 'due_date' => $o->due_date->toDateString(),
-                'days_remaining' => now()->diffInDays($o->due_date, false),
-                'status' => $o->status,
+                'days_remaining' => $o->daysUntilDue($today),
+                'status' => $o->currentStatus($today),
                 'owner' => $o->owner?->name,
                 'evidence_provided' => $o->evidence_provided,
             ])
             ->toArray();
+    }
+
+    /**
+     * Daily refresh: store the status worked out from each open
+     * requirement's due date, so everything reading `status` (reminders,
+     * exports, other modules) agrees with the calendar. Bulk updates skip
+     * model events — nothing but the date-driven status changes.
+     *
+     * @return array{overdue: int, due_soon: int, not_due: int}
+     */
+    public function refreshStatuses(?string $today = null): array
+    {
+        $today ??= ComplianceObligation::nzToday();
+
+        return [
+            'overdue' => ComplianceObligation::query()
+                ->overdue($today)
+                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'overdue'))
+                ->update(['status' => 'overdue']),
+            'due_soon' => ComplianceObligation::query()
+                ->dueSoon(ComplianceObligation::DUE_SOON_DAYS, $today)
+                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'due_soon'))
+                ->update(['status' => 'due_soon']),
+            'not_due' => ComplianceObligation::query()
+                ->notYetDue($today)
+                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'not_due'))
+                ->update(['status' => 'not_due']),
+        ];
     }
 
     /**

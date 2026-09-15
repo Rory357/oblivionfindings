@@ -13,6 +13,8 @@ import {
     PageHeader,
     PageHeaderFilterCheck,
     PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterAvatars,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -24,82 +26,79 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, toDateInput } from '@/lib/datetime';
-import { riskScoreLevel } from '@/lib/governance-status';
+import { refSuffix } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { ExternalLink, Users, X } from 'lucide-react';
+import { BarChart3, ExternalLink, Users, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { riskCategoryIcon, STRATEGY_OPTIONS } from './_dialogs';
-import { RiskViewToggle, riskLevelVariant } from './_shared';
+import { riskCategoryIcon } from './_dialogs';
+import {
+    RISK_SEVERITY_FILTERS,
+    RiskViewToggle,
+    riskBand,
+    riskBandLabel,
+    riskLevelVariant,
+    riskStatusChip,
+    strategyLabel,
+} from './_shared';
 
 interface CommitteeRisk {
     id: number;
     risk_reference: string;
     title: string;
-    category: string | null;
-    residual_score: number | null;
+    category: string;
+    category_label: string;
+    inherent_score: number;
+    residual_score: number;
     within_appetite: boolean;
+    status: string;
+    accepted_until: string | null;
     mitigation_strategy: string | null;
     next_review_date: string | null;
 }
 
+interface CommitteeInfo {
+    id: number;
+    name: string;
+    type: string;
+    description: string | null;
+    members: Array<{ name: string; role: string; is_chair: boolean }>;
+    categories: Array<{ value: string; label: string }>;
+}
+
 interface Props extends PageProps {
-    committee: string;
+    committee: CommitteeInfo;
+    committees: Array<{ id: number; name: string; type: string }>;
     risks: CommitteeRisk[];
 }
 
-/** Committees served by RiskRegisterController::committeeView. */
-const COMMITTEES = [
-    { value: 'audit_risk', label: 'Audit & Risk' },
-    { value: 'people', label: 'People' },
-    { value: 'finance', label: 'Finance' },
-];
-
-const SEVERITY_OPTIONS = [
-    { value: 'all', label: 'All severities' },
-    { value: 'critical', label: 'Critical (20+)' },
-    { value: 'high', label: 'High (15–19)' },
-];
-
-function dateOnly(value: string | null): string | null {
-    return value ? value.slice(0, 10) : null;
+function reviewDue(risk: CommitteeRisk, soon: string): boolean {
+    return Boolean(risk.next_review_date && risk.next_review_date <= soon);
 }
 
-function reviewDue(risk: CommitteeRisk): boolean {
-    const date = dateOnly(risk.next_review_date);
-    if (!date) return false;
-    const soon = new Date(Date.now() + 7 * 86_400_000);
-    return date <= toDateInput(soon);
-}
-
-export default function CommitteeRisks({ committee, risks }: Props) {
+export default function CommitteeRisks({ committee, committees, risks }: Props) {
     const [severity, setSeverity] = useState('all');
     const [aboveOnly, setAboveOnly] = useState(false);
     const [dueOnly, setDueOnly] = useState(false);
     const ctxMenu = useEntityContextMenu<CommitteeRisk>();
-
-    const title =
-        COMMITTEES.find((c) => c.value === committee)?.label ??
-        committee.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    // Overdue or due within 7 days, by the NZ calendar date.
+    const soon = toDateInput(Date.now() + 7 * 86_400_000);
 
     const sorted = useMemo(
-        () =>
-            [...risks].sort(
-                (a, b) => (b.residual_score ?? 0) - (a.residual_score ?? 0),
-            ),
+        () => [...risks].sort((a, b) => b.residual_score - a.residual_score),
         [risks],
     );
-    const above = sorted.filter((r) => r.within_appetite === false).length;
-    const critical = sorted.filter((r) => (r.residual_score ?? 0) >= 20).length;
-    const due = sorted.filter(reviewDue).length;
+    const aboveLimit = sorted.filter(
+        (r) => !r.within_appetite && r.status === 'open',
+    ).length;
+    const critical = sorted.filter((r) => riskBand(r.residual_score) === 'critical').length;
+    const due = sorted.filter((r) => reviewDue(r, soon)).length;
 
     const visible = sorted.filter((risk) => {
-        const score = risk.residual_score ?? 0;
-        if (severity === 'critical' && score < 20) return false;
-        if (severity === 'high' && (score < 15 || score > 19)) return false;
-        if (aboveOnly && risk.within_appetite !== false) return false;
-        if (dueOnly && !reviewDue(risk)) return false;
+        if (severity !== 'all' && riskBand(risk.residual_score) !== severity) return false;
+        if (aboveOnly && (risk.within_appetite || risk.status !== 'open')) return false;
+        if (dueOnly && !reviewDue(risk, soon)) return false;
         return true;
     });
     const hasFilters = severity !== 'all' || aboveOnly || dueOnly;
@@ -118,99 +117,127 @@ export default function CommitteeRisks({ committee, risks }: Props) {
             },
         ]);
 
+    const categoryList = committee.categories.map((c) => c.label.toLowerCase()).join(', ');
+
     const header = (
         <PageHeader
             icon={Users}
-            title={`${title} committee risks`}
+            title={`${committee.name} risks`}
             titleChip={
-                above > 0 ? (
+                aboveLimit > 0 ? (
                     <PageHeaderStatusChip variant="critical">
-                        {above} above appetite
+                        {aboveLimit} above the board&apos;s limit
+                    </PageHeaderStatusChip>
+                ) : sorted.length === 0 ? (
+                    <PageHeaderStatusChip variant="neutral">
+                        No open risks
                     </PageHeaderStatusChip>
                 ) : (
                     <PageHeaderStatusChip variant="success">
-                        Within appetite
+                        None above the board&apos;s limit
                     </PageHeaderStatusChip>
                 )
             }
-            subline={`Active risks in this committee's categories · highest residual score first`}
+            subline={`Open and accepted risks this committee oversees: ${categoryList || 'none set'}`}
+            actions={
+                <PageHeaderGlassButton
+                    icon={BarChart3}
+                    onClick={() =>
+                        router.visit(`/governance/reports/committee/${committee.id}`)
+                    }
+                >
+                    Committee report
+                </PageHeaderGlassButton>
+            }
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Committee risks"
-                        ariaLabel="View all committee risks"
+                        label="Risks overseen"
+                        ariaLabel="Show all of this committee's risks"
                         onClick={clearFilters}
                     >
                         <PageHeaderMeterBig>{sorted.length}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            active in scope
-                        </PageHeaderMeterCaption>
+                        <PageHeaderMeterCaption>open or accepted</PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Critical"
-                        ariaLabel="View critical committee risks"
+                        ariaLabel="Show this committee's critical risks"
                         onClick={() => setSeverity('critical')}
                         tone={critical > 0 ? 'critical' : 'brand'}
                     >
                         <PageHeaderMeterBig>{critical}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            Residual score 20+
-                        </PageHeaderMeterCaption>
+                        <PageHeaderMeterCaption>after controls, 20–25</PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Above appetite"
-                        value={above}
-                        ariaLabel="View committee risks above appetite"
+                        label="Above the board's limit"
+                        value={aboveLimit}
+                        ariaLabel="Show this committee's risks above the board's limit"
                         onClick={() => setAboveOnly(true)}
-                        tone={above > 0 ? 'critical' : 'brand'}
+                        tone={aboveLimit > 0 ? 'critical' : 'brand'}
                     >
                         <PageHeaderMeterDonut
-                            percent={
-                                sorted.length > 0
-                                    ? (above / sorted.length) * 100
-                                    : 0
-                            }
-                            caption={`${above} of ${sorted.length} risks`}
+                            percent={sorted.length > 0 ? (aboveLimit / sorted.length) * 100 : 0}
+                            caption={`${aboveLimit} of ${sorted.length} risks`}
                         />
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Reviews due"
-                        ariaLabel="View committee risks due for review"
+                        ariaLabel="Show this committee's risks due for review"
                         onClick={() => setDueOnly(true)}
                         tone={due > 0 ? 'warning' : 'brand'}
                     >
                         <PageHeaderMeterBig>{due}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            overdue or within 7 days
-                        </PageHeaderMeterCaption>
+                        <PageHeaderMeterCaption>overdue or within 7 days</PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Members"
+                        value={committee.members.length}
+                        ariaLabel="View this committee's members on its report"
+                        href={`/governance/reports/committee/${committee.id}#committee-members`}
+                    >
+                        {committee.members.length > 0 ? (
+                            <PageHeaderMeterAvatars
+                                people={committee.members.slice(0, 6).map((member, index) => ({
+                                    id: `${member.name}-${index}`,
+                                    name: member.name,
+                                    detail: member.role,
+                                }))}
+                                overflow={Math.max(0, committee.members.length - 6)}
+                            />
+                        ) : (
+                            <PageHeaderMeterCaption>No current members</PageHeaderMeterCaption>
+                        )}
                     </PageHeaderMeterBlock>
                 </>
             }
             filters={
                 <>
                     <RiskViewToggle value={null} />
+                    {committees.length > 1 ? (
+                        <PageHeaderFilterSelect
+                            label={committee.name}
+                            value={String(committee.id)}
+                            // A committee is always selected: no clear control.
+                            allValue={String(committee.id)}
+                            options={committees.map((c) => ({
+                                value: String(c.id),
+                                label: c.name,
+                            }))}
+                            onChange={(value) => {
+                                if (value !== String(committee.id)) {
+                                    router.visit(`/governance/risks/committee/${value}`);
+                                }
+                            }}
+                        />
+                    ) : null}
                     <PageHeaderFilterSelect
-                        label="Committee"
-                        value={committee}
-                        // A committee is always selected: no clear control.
-                        allValue={committee}
-                        options={COMMITTEES}
-                        onChange={(value) => {
-                            if (value !== committee) {
-                                router.visit(
-                                    `/governance/risks/committee/${value}`,
-                                );
-                            }
-                        }}
-                    />
-                    <PageHeaderFilterSelect
-                        label="Severity"
+                        label="Any level"
                         value={severity}
-                        options={SEVERITY_OPTIONS}
+                        options={RISK_SEVERITY_FILTERS}
                         onChange={setSeverity}
                     />
                     <PageHeaderFilterCheck
-                        label="Above appetite"
+                        label="Above the board's limit"
                         checked={aboveOnly}
                         onChange={setAboveOnly}
                     />
@@ -232,39 +259,35 @@ export default function CommitteeRisks({ committee, risks }: Props) {
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Risk register', href: '/governance/risks' },
                 {
-                    title: `${title} committee`,
-                    href: `/governance/risks/committee/${committee}`,
+                    title: `${committee.name} risks`,
+                    href: `/governance/risks/committee/${committee.id}`,
                 },
             ]}
         >
-            <Head title={`${title} committee risks`} />
+            <Head title={`${committee.name} risks`} />
 
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
                     <ListCaption
-                        title={hasFilters ? 'Matching risks' : 'Committee risks'}
-                        caption={`${visible.length} of ${sorted.length} shown`}
+                        title={hasFilters ? 'Matching risks' : 'Risks this committee oversees'}
+                        caption={`${visible.length} of ${sorted.length} shown · highest risk after controls first`}
                     />
                     {visible.length === 0 ? (
                         <EmptyState
                             icon={Users}
                             title={
                                 hasFilters
-                                    ? 'No committee risks match your filters'
-                                    : 'No active risks for this committee'
+                                    ? 'No risks match your filters'
+                                    : 'No open risks for this committee'
                             }
                             description={
                                 hasFilters
                                     ? 'Try clearing a filter.'
-                                    : 'Active risks in this committee’s categories will appear here.'
+                                    : `Open or accepted ${categoryList || ''} risks appear here.`
                             }
                             action={
                                 hasFilters ? (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={clearFilters}
-                                    >
+                                    <Button variant="outline" size="sm" onClick={clearFilters}>
                                         <X className="h-3.5 w-3.5" />
                                         Clear filters
                                     </Button>
@@ -277,97 +300,62 @@ export default function CommitteeRisks({ committee, risks }: Props) {
                             rowKey={(risk) => risk.id}
                             identityLabel="Risk"
                             identity={(risk) => ({
-                                icon: riskCategoryIcon(risk.category ?? ''),
+                                icon: riskCategoryIcon(risk.category),
                                 name: risk.title,
                                 linkLabel: `Open ${risk.title}`,
-                                subline: [
-                                    risk.risk_reference,
-                                    risk.category
-                                        ? risk.category
-                                              .replace(/_/g, ' ')
-                                              .replace(/\b\w/g, (c) =>
-                                                  c.toUpperCase(),
-                                              )
-                                        : null,
-                                ]
-                                    .filter(Boolean)
-                                    .join(' · '),
+                                subline: `${risk.category_label} · ${refSuffix(risk.risk_reference)}`,
                             })}
                             hrefFor={(risk) => `/governance/risks/${risk.id}`}
-                            onOpen={(risk) =>
-                                router.visit(`/governance/risks/${risk.id}`)
-                            }
-                            minWidth={820}
+                            onOpen={(risk) => router.visit(`/governance/risks/${risk.id}`)}
+                            minWidth={860}
                             columns={[
                                 {
-                                    key: 'residual',
-                                    label: 'Residual',
-                                    width: '1fr',
-                                    cell: (risk) =>
-                                        risk.residual_score != null ? (
-                                            <EntityStatusChip
-                                                variant={riskLevelVariant(
-                                                    risk.residual_score,
-                                                )}
-                                            >
-                                                {risk.residual_score} ·{' '}
-                                                {riskScoreLevel(
-                                                    risk.residual_score,
-                                                )}
-                                            </EntityStatusChip>
-                                        ) : (
-                                            <EmptyValue />
-                                        ),
+                                    key: 'scores',
+                                    label: 'Before → after controls',
+                                    width: '1.1fr',
+                                    cell: (risk) => (
+                                        <EntityStatusChip variant={riskLevelVariant(risk.residual_score)}>
+                                            {risk.inherent_score} → {risk.residual_score} ·{' '}
+                                            {riskBandLabel(risk.residual_score)}
+                                        </EntityStatusChip>
+                                    ),
                                 },
                                 {
-                                    key: 'appetite',
-                                    label: 'Appetite',
-                                    width: '0.9fr',
-                                    cell: (risk) =>
-                                        risk.within_appetite ? (
-                                            <EntityStatusChip variant="success">
-                                                Within
+                                    key: 'status',
+                                    label: 'Status',
+                                    width: '1.3fr',
+                                    cell: (risk) => {
+                                        const chip = riskStatusChip(risk);
+                                        return (
+                                            <EntityStatusChip variant={chip.variant}>
+                                                {chip.label}
                                             </EntityStatusChip>
-                                        ) : (
-                                            <EntityStatusChip variant="critical">
-                                                Above
-                                            </EntityStatusChip>
-                                        ),
+                                        );
+                                    },
                                 },
                                 {
                                     key: 'strategy',
-                                    label: 'Strategy',
-                                    width: '0.9fr',
+                                    label: 'Response',
+                                    width: '1fr',
                                     cell: (risk) =>
-                                        STRATEGY_OPTIONS.find(
-                                            (s) =>
-                                                s.key ===
-                                                risk.mitigation_strategy,
-                                        )?.label ??
-                                        (risk.mitigation_strategy || (
+                                        risk.mitigation_strategy ? (
+                                            strategyLabel(risk.mitigation_strategy)
+                                        ) : (
                                             <EmptyValue />
-                                        )),
+                                        ),
                                 },
                                 {
                                     key: 'review',
                                     label: 'Next review',
-                                    width: '1fr',
+                                    width: '0.9fr',
                                     cell: (risk) =>
                                         risk.next_review_date ? (
-                                            reviewDue(risk) ? (
+                                            reviewDue(risk, soon) ? (
                                                 <EntityStatusChip variant="warning">
-                                                    {formatDateOnly(
-                                                        dateOnly(
-                                                            risk.next_review_date,
-                                                        ),
-                                                    )}
+                                                    {formatDateOnly(risk.next_review_date)}
                                                 </EntityStatusChip>
                                             ) : (
-                                                formatDateOnly(
-                                                    dateOnly(
-                                                        risk.next_review_date,
-                                                    ),
-                                                )
+                                                formatDateOnly(risk.next_review_date)
                                             )
                                         ) : (
                                             <EmptyValue />
@@ -375,9 +363,7 @@ export default function CommitteeRisks({ committee, risks }: Props) {
                                 },
                             ]}
                             actionsFor={actionsFor}
-                            onRowContextMenu={(e, risk) =>
-                                ctxMenu.open(e, risk)
-                            }
+                            onRowContextMenu={(e, risk) => ctxMenu.open(e, risk)}
                         />
                     )}
                 </div>
@@ -387,7 +373,7 @@ export default function CommitteeRisks({ committee, risks }: Props) {
                 <EntityContextMenu
                     x={ctxMenu.ctx.x}
                     y={ctxMenu.ctx.y}
-                    icon={riskCategoryIcon(ctxMenu.ctx.record.category ?? '')}
+                    icon={riskCategoryIcon(ctxMenu.ctx.record.category)}
                     title={ctxMenu.ctx.record.title}
                     items={actionsFor(ctxMenu.ctx.record)}
                     onClose={ctxMenu.close}

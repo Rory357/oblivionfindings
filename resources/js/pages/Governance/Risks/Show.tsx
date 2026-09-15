@@ -2,6 +2,7 @@ import {
     GovernanceAttachmentsPanel,
     type GovernanceAttachment,
 } from '@/components/governance/GovernanceAttachmentsPanel';
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
 import {
     PageHeader,
     PageHeaderGlassButton,
@@ -13,6 +14,7 @@ import {
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
+import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
@@ -21,21 +23,28 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly } from '@/lib/datetime';
-import { riskScoreLevel } from '@/lib/governance-status';
+import { formatDateLong, formatDateOnly } from '@/lib/datetime';
+import {
+    frequencyLabel,
+    governanceStatus,
+    refSuffix,
+} from '@/lib/governance-labels';
 import { PageProps } from '@/types';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
+    CalendarClock,
     CheckCircle,
+    CheckCircle2,
     Link2,
     Paperclip,
     Pencil,
     Plus,
     ShieldCheck,
+    ShieldOff,
     User,
     Wrench,
 } from 'lucide-react';
@@ -45,12 +54,27 @@ import { useState } from 'react';
 import {
     AcceptRiskDialog,
     AddTreatmentDialog,
+    ChangeTreatmentDueDateDialog,
+    CloseRiskDialog,
+    CompleteTreatmentDialog,
     riskCategoryIcon,
     RiskWizardDialog,
-    STRATEGY_OPTIONS,
+    type PassedResolutionOption,
     type RiskFormOptions,
+    type TreatmentSummary,
 } from './_dialogs';
-import { riskLevelVariant, riskStatusLabel, riskStatusVariant } from './_shared';
+import {
+    CONTROL_EFFECT,
+    CONTROL_HELP,
+    RiskScoreExplainer,
+    controlText,
+    impactText,
+    likelihoodText,
+    riskBandLabel,
+    riskLevelVariant,
+    riskStatusChip,
+    strategyLabel,
+} from './_shared';
 
 interface Treatment {
     id: number;
@@ -61,24 +85,36 @@ interface Treatment {
     expected_score_reduction: number | null;
     evidence_required?: boolean;
     evidence_attachments?: GovernanceAttachment[];
+    completed_at: string | null;
+    completed_by: { name: string } | null;
+    completion_notes: string | null;
+    can_complete: boolean;
+    complete_blocked_reason: string | null;
+    can_change_due_date: boolean;
 }
 
 interface Acceptance {
     id: number;
     acceptance_type: string;
     justification: string;
+    conditions: string[];
     accepted_by: { name: string } | null;
-    accepted_at: string;
+    accepted_at: string | null;
     expires_at: string | null;
+    expired: boolean;
+    resolution: { id: number; title: string; reference: string | null } | null;
+    has_resolution: boolean;
 }
 
 interface EventLink {
     id: number;
     event_type: string;
+    event_type_label: string;
     event_reference: string | null;
     event_severity: string;
     link_rationale: string | null;
-    linked_at: string;
+    linked_at: string | null;
+    href: string | null;
 }
 
 interface Risk {
@@ -87,6 +123,7 @@ interface Risk {
     title: string;
     description: string;
     category: string;
+    category_label: string;
     likelihood_score: number;
     impact_score: number;
     inherent_score: number;
@@ -100,6 +137,11 @@ interface Risk {
     next_review_date: string | null;
     risk_owner_id?: number | null;
     risk_owner: { id: number; name: string } | null;
+    closure_rationale: string | null;
+    closed_at: string | null;
+    closed_by: { name: string } | null;
+    accepted_until: string | null;
+    acceptance_ended: boolean;
     treatments: Treatment[];
     acceptances: Acceptance[];
     events: EventLink[];
@@ -107,34 +149,22 @@ interface Risk {
 
 interface Props extends PageProps {
     risk: Risk;
-    assignees: Array<{ id: number; name: string; email: string }>;
+    assignees: Array<{ id: number; name: string }>;
     canEdit: boolean;
     canAccept: boolean;
+    canClose: boolean;
+    resolutionOptions: PassedResolutionOption[];
+    canViewResolutions: boolean;
+    overseenBy: Array<{ id: number; name: string; type: string }>;
     formOptions?: RiskFormOptions | null;
 }
 
-const TREATMENT_VARIANTS: Record<string, StatusVariant> = {
-    complete: 'success',
-    in_progress: 'info',
-    overdue: 'critical',
-    planned: 'neutral',
-};
-
-const SEVERITY_VARIANTS: Record<string, StatusVariant> = {
+const SEVERITY_VARIANTS: Record<string, 'critical' | 'warning' | 'success' | 'neutral'> = {
     critical: 'critical',
     high: 'warning',
     medium: 'warning',
     low: 'success',
 };
-
-function dateOnly(value: string | null | undefined): string {
-    return formatDateOnly(value ? value.slice(0, 10) : null);
-}
-
-function humanise(value: string | null | undefined): string {
-    if (!value) return '—';
-    return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 function scrollTo(id: string) {
     document
@@ -142,51 +172,63 @@ function scrollTo(id: string) {
         ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function ScoreTile({
+    label,
+    hint,
+    children,
+}: {
+    label: React.ReactNode;
+    hint?: React.ReactNode;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="rounded-lg border border-border p-4">
+            <p className="text-subtle flex items-center gap-1">{label}</p>
+            <div className="mt-1 font-medium">{children}</div>
+            {hint ? <p className="text-caption mt-1">{hint}</p> : null}
+        </div>
+    );
+}
+
 export default function RiskShow({
     risk,
     assignees,
     canEdit,
     canAccept,
+    canClose,
+    resolutionOptions,
+    canViewResolutions,
+    overseenBy = [],
     formOptions = null,
 }: Props) {
-    const { labels: pageLabels } = usePage().props as {
-        labels?: Record<string, string>;
-    };
-    const clientSingular = pageLabels?.['client.singular'] ?? 'Client';
     const [treatmentOpen, setTreatmentOpen] = useState(false);
     const [acceptOpen, setAcceptOpen] = useState(false);
-    const canOpenEdit = canEdit && formOptions != null;
+    const [closeOpen, setCloseOpen] = useState(false);
+    const [completing, setCompleting] = useState<TreatmentSummary | null>(null);
+    const [rescheduling, setRescheduling] = useState<TreatmentSummary | null>(null);
+    const canOpenEdit = canEdit && formOptions != null && risk.status !== 'closed';
     // Retired /risks/{id}/edit deep links arrive as ?edit=1.
     const [editOpen, setEditOpen] = useDialogDeepLink('edit', canOpenEdit);
 
-    const categoryLabel = (category: string) => {
-        const labels: Record<string, string> = {
-            client_safety: `${clientSingular} Safety`,
-            reputational: 'Reputational',
-            financial: 'Financial',
-            it_cyber: 'IT/Cyber',
-            workforce: 'Workforce',
-            legal_compliance: 'Legal/Compliance',
-            operational: 'Operational',
-            clinical: 'Clinical',
-        };
-        return labels[category] || humanise(category);
-    };
-
-    const canAcceptNow =
-        canEdit &&
-        canAccept &&
-        !risk.within_appetite &&
-        risk.status === 'active';
+    const isOpen = risk.status === 'open';
+    const isClosed = risk.status === 'closed';
+    const canAcceptNow = canAccept && isOpen;
+    const chip = riskStatusChip(risk);
     const completeTreatments = risk.treatments.filter(
         (t) => t.status === 'complete',
     ).length;
     const overdueTreatments = risk.treatments.filter(
         (t) => t.status === 'overdue',
     ).length;
-    const strategyLabel =
-        STRATEGY_OPTIONS.find((s) => s.key === risk.mitigation_strategy)
-            ?.label ?? humanise(risk.mitigation_strategy);
+    const currentAcceptance =
+        risk.status === 'accepted' ? (risk.acceptances[0] ?? null) : null;
+
+    const limitCaption =
+        risk.status === 'accepted'
+            ? chip.label
+            : risk.within_appetite
+              ? 'Within the limit'
+              : 'Above the limit — needs action or board acceptance';
 
     const header = (
         <PageHeader
@@ -197,35 +239,41 @@ export default function RiskShow({
             titleDusk="risk-heading"
             wrapTitle
             titleChip={
-                !risk.within_appetite ? (
-                    <PageHeaderStatusChip variant="critical">
-                        Above appetite
-                    </PageHeaderStatusChip>
-                ) : (
-                    <PageHeaderStatusChip
-                        variant={riskStatusVariant(risk.status)}
-                    >
-                        {riskStatusLabel(risk.status)}
-                    </PageHeaderStatusChip>
-                )
+                <PageHeaderStatusChip variant={chip.variant}>
+                    {chip.label}
+                </PageHeaderStatusChip>
             }
-            subline={`${risk.risk_reference} · ${categoryLabel(risk.category)} · ${riskStatusLabel(risk.status)} · ${riskScoreLevel(risk.residual_score)} residual risk (${risk.residual_score})`}
+            subline={[
+                risk.category_label,
+                `${riskBandLabel(risk.residual_score)} after controls (${risk.residual_score})`,
+                refSuffix(risk.risk_reference),
+            ]
+                .filter(Boolean)
+                .join(' · ')}
             actions={
                 <>
-                    {canEdit ? (
+                    {canEdit && !isClosed ? (
                         <PageHeaderGlassButton
                             icon={Plus}
                             onClick={() => setTreatmentOpen(true)}
                         >
-                            Add treatment
+                            Add action
                         </PageHeaderGlassButton>
                     ) : null}
-                    {canAcceptNow ? (
+                    {canAcceptNow && !risk.within_appetite ? (
                         <PageHeaderGlassButton
                             icon={ShieldCheck}
                             onClick={() => setAcceptOpen(true)}
                         >
                             Accept risk
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {canClose ? (
+                        <PageHeaderGlassButton
+                            icon={ShieldOff}
+                            onClick={() => setCloseOpen(true)}
+                        >
+                            Close risk
                         </PageHeaderGlassButton>
                     ) : null}
                     {canOpenEdit ? (
@@ -241,9 +289,9 @@ export default function RiskShow({
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Residual score"
-                        value={`${risk.residual_score}/25`}
-                        ariaLabel="View the risk assessment"
+                        label="Risk after controls"
+                        value={`${risk.residual_score} of 25`}
+                        ariaLabel="View how serious this risk is"
                         onClick={() => scrollTo('risk-assessment')}
                         tone={
                             risk.residual_score >= 20
@@ -257,13 +305,13 @@ export default function RiskShow({
                             percent={(risk.residual_score / 25) * 100}
                         />
                         <PageHeaderMeterCaption>
-                            {riskScoreLevel(risk.residual_score)} · appetite{' '}
-                            {risk.appetite_threshold}
+                            {riskBandLabel(risk.residual_score)} · the board&apos;s
+                            limit is {risk.appetite_threshold}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Inherent score"
-                        ariaLabel="View the risk assessment"
+                        label="Risk before controls"
+                        ariaLabel="View how serious this risk is"
                         onClick={() => scrollTo('risk-assessment')}
                     >
                         <PageHeaderMeterBig>{risk.inherent_score}</PageHeaderMeterBig>
@@ -273,24 +321,32 @@ export default function RiskShow({
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Appetite"
-                        ariaLabel="View appetite details"
-                        onClick={() => scrollTo('risk-assessment')}
-                        tone={risk.within_appetite ? 'success' : 'critical'}
+                        label="The board's limit"
+                        ariaLabel="View the board's limit and any acceptance"
+                        onClick={() =>
+                            scrollTo(
+                                risk.acceptances.length > 0
+                                    ? 'risk-acceptance'
+                                    : 'risk-assessment',
+                            )
+                        }
+                        tone={
+                            risk.status === 'accepted'
+                                ? risk.acceptance_ended
+                                    ? 'warning'
+                                    : 'success'
+                                : risk.within_appetite
+                                  ? 'success'
+                                  : 'critical'
+                        }
                     >
-                        <PageHeaderMeterBig>
-                            {risk.appetite_threshold}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            {risk.within_appetite
-                                ? 'Within appetite'
-                                : 'Above appetite · acceptance needed'}
-                        </PageHeaderMeterCaption>
+                        <PageHeaderMeterBig>{risk.appetite_threshold}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>{limitCaption}</PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Treatments"
+                        label="Actions"
                         value={risk.treatments.length}
-                        ariaLabel="View treatment actions"
+                        ariaLabel="View actions to reduce this risk"
                         onClick={() => scrollTo('risk-treatments')}
                         tone={overdueTreatments > 0 ? 'critical' : 'brand'}
                     >
@@ -305,8 +361,8 @@ export default function RiskShow({
                         />
                         <PageHeaderMeterCaption>
                             {overdueTreatments > 0
-                                ? `${overdueTreatments} overdue · ${completeTreatments} complete`
-                                : `${completeTreatments} of ${risk.treatments.length} complete`}
+                                ? `${overdueTreatments} overdue · ${completeTreatments} done`
+                                : `${completeTreatments} of ${risk.treatments.length} done`}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
@@ -316,11 +372,12 @@ export default function RiskShow({
                     >
                         <PageHeaderMeterBig>
                             <span className="text-base">
-                                {dateOnly(risk.next_review_date)}
+                                {formatDateOnly(risk.next_review_date, 'Not set')}
                             </span>
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {humanise(risk.review_frequency)} review
+                            Reviewed{' '}
+                            {frequencyLabel(risk.review_frequency).toLowerCase()}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
@@ -335,7 +392,7 @@ export default function RiskShow({
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Risk register', href: '/governance/risks' },
                 {
-                    title: risk.risk_reference,
+                    title: risk.title,
                     href: `/governance/risks/${risk.id}`,
                 },
             ]}
@@ -345,9 +402,33 @@ export default function RiskShow({
             <PageLayout hero={header}>
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
                     <div className="flex flex-col gap-5 lg:col-span-2">
+                        {isClosed ? (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <ShieldOff className="h-4 w-4 text-muted-foreground" />
+                                        Closed
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Closed on {formatDateLong(risk.closed_at)}
+                                        {risk.closed_by
+                                            ? ` by ${risk.closed_by.name}`
+                                            : ''}
+                                    </CardDescription>
+                                </CardHeader>
+                                {risk.closure_rationale ? (
+                                    <CardContent>
+                                        <p className="text-sm whitespace-pre-wrap">
+                                            {risk.closure_rationale}
+                                        </p>
+                                    </CardContent>
+                                ) : null}
+                            </Card>
+                        ) : null}
+
                         <Card>
                             <CardHeader>
-                                <CardTitle>Description</CardTitle>
+                                <CardTitle>What the risk is</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <p className="whitespace-pre-wrap text-foreground">
@@ -356,71 +437,95 @@ export default function RiskShow({
                             </CardContent>
                         </Card>
 
-                        <Card id="risk-assessment">
+                        <Card id="risk-assessment" className="scroll-mt-5">
                             <CardHeader>
-                                <CardTitle>Risk assessment</CardTitle>
-                                <CardDescription>
-                                    5×5 likelihood × impact, adjusted for
-                                    control effectiveness
-                                </CardDescription>
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div>
+                                        <CardTitle>How serious it is</CardTitle>
+                                        <CardDescription>
+                                            Likelihood × impact, then lowered by the
+                                            controls already in place
+                                        </CardDescription>
+                                    </div>
+                                    <RiskScoreExplainer />
+                                </div>
                             </CardHeader>
                             <CardContent className="flex flex-col gap-4">
-                                <div className="grid grid-cols-3 gap-4">
-                                    {[
-                                        {
-                                            label: 'Likelihood',
-                                            value: risk.likelihood_score,
-                                        },
-                                        {
-                                            label: 'Impact',
-                                            value: risk.impact_score,
-                                        },
-                                        {
-                                            label: 'Inherent score',
-                                            value: risk.inherent_score,
-                                        },
-                                    ].map((tile) => (
-                                        <div
-                                            key={tile.label}
-                                            className="rounded-lg bg-muted p-4 text-center"
+                                <div className="grid gap-4 sm:grid-cols-3">
+                                    <ScoreTile
+                                        label={
+                                            <>
+                                                Likelihood
+                                                <GovernanceTermHint term="likelihood" />
+                                            </>
+                                        }
+                                    >
+                                        {likelihoodText(risk.likelihood_score)}
+                                    </ScoreTile>
+                                    <ScoreTile
+                                        label={
+                                            <>
+                                                Impact
+                                                <GovernanceTermHint term="impact" />
+                                            </>
+                                        }
+                                    >
+                                        {impactText(risk.impact_score)}
+                                    </ScoreTile>
+                                    <ScoreTile
+                                        label={
+                                            <>
+                                                Risk before controls
+                                                <GovernanceTermHint term="risk_before_controls" />
+                                            </>
+                                        }
+                                    >
+                                        <StatusBadge
+                                            variant={riskLevelVariant(
+                                                risk.inherent_score,
+                                            )}
                                         >
-                                            <p className="text-page-title tabular-nums">
-                                                {tile.value}
-                                            </p>
-                                            <p className="text-subtle">
-                                                {tile.label}
-                                            </p>
-                                        </div>
-                                    ))}
+                                            {risk.inherent_score} ·{' '}
+                                            {riskBandLabel(risk.inherent_score)}
+                                        </StatusBadge>
+                                    </ScoreTile>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="rounded-lg border border-border p-4">
-                                        <p className="text-subtle">
-                                            Control effectiveness
-                                        </p>
-                                        <p className="font-medium capitalize">
-                                            {risk.control_effectiveness}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-lg border border-border p-4">
-                                        <p className="text-subtle">
-                                            Residual score
-                                        </p>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <ScoreTile
+                                        label={
+                                            <>
+                                                How well current controls work
+                                                <GovernanceTermHint term="control_effectiveness" />
+                                            </>
+                                        }
+                                        hint={`${CONTROL_HELP} This rating ${CONTROL_EFFECT[risk.control_effectiveness] ?? 'changes the score'}.`}
+                                    >
+                                        {controlText(risk.control_effectiveness)}
+                                    </ScoreTile>
+                                    <ScoreTile
+                                        label={
+                                            <>
+                                                Risk after controls
+                                                <GovernanceTermHint term="risk_after_controls" />
+                                            </>
+                                        }
+                                    >
                                         <StatusBadge
                                             variant={riskLevelVariant(
                                                 risk.residual_score,
                                             )}
-                                            className="mt-1"
                                         >
                                             {risk.residual_score} ·{' '}
-                                            {riskScoreLevel(risk.residual_score)}
+                                            {riskBandLabel(risk.residual_score)}
                                         </StatusBadge>
-                                    </div>
+                                    </ScoreTile>
                                 </div>
                                 <div className="rounded-lg border border-border p-4">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-subtle">
-                                            Appetite threshold
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <span className="text-subtle flex items-center gap-1">
+                                            The board&apos;s limit for{' '}
+                                            {risk.category_label.toLowerCase()} risks
+                                            <GovernanceTermHint term="board_limit" />
                                         </span>
                                         <span className="font-medium tabular-nums">
                                             {risk.appetite_threshold}
@@ -430,12 +535,18 @@ export default function RiskShow({
                                         {risk.within_appetite ? (
                                             <StatusBadge variant="success">
                                                 <CheckCircle className="h-3.5 w-3.5" />
-                                                Within appetite
+                                                Within the board&apos;s limit
+                                            </StatusBadge>
+                                        ) : risk.status === 'accepted' ? (
+                                            <StatusBadge variant={chip.variant}>
+                                                <ShieldCheck className="h-3.5 w-3.5" />
+                                                Above the limit · {chip.label.toLowerCase()}
                                             </StatusBadge>
                                         ) : (
                                             <StatusBadge variant="critical">
                                                 <AlertTriangle className="h-3.5 w-3.5" />
-                                                Above appetite — requires
+                                                Above the board&apos;s limit — needs
+                                                more action or the board&apos;s
                                                 acceptance
                                             </StatusBadge>
                                         )}
@@ -444,122 +555,175 @@ export default function RiskShow({
                             </CardContent>
                         </Card>
 
-                        <Card id="risk-treatments">
+                        <Card id="risk-treatments" className="scroll-mt-5">
                             <CardHeader>
-                                <CardTitle>Treatment actions</CardTitle>
+                                <CardTitle>Actions to reduce this risk</CardTitle>
                                 <CardDescription>
-                                    Active mitigation measures
+                                    Work under way to make it less likely or less
+                                    harmful
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 {risk.treatments.length > 0 ? (
                                     <div className="flex flex-col gap-3">
-                                        {risk.treatments.map((treatment) => (
-                                            <div
-                                                key={treatment.id}
-                                                className="rounded-lg border border-border p-4"
-                                            >
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div>
-                                                        <p className="font-medium">
-                                                            {
-                                                                treatment.action_description
-                                                            }
-                                                        </p>
-                                                        <div className="text-subtle mt-2 flex flex-wrap items-center gap-4">
-                                                            <span className="flex items-center gap-1">
-                                                                <User className="h-4 w-4" />
-                                                                {treatment
-                                                                    .assigned_to
-                                                                    ?.name ||
-                                                                    'Unassigned'}
-                                                            </span>
-                                                            <span className="flex items-center gap-1">
-                                                                <Calendar className="h-4 w-4" />
-                                                                {dateOnly(
-                                                                    treatment.due_date,
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <StatusBadge
-                                                        variant={
-                                                            TREATMENT_VARIANTS[
-                                                                treatment.status
-                                                            ] ?? 'neutral'
-                                                        }
-                                                    >
-                                                        {humanise(
-                                                            treatment.status,
-                                                        )}
-                                                    </StatusBadge>
-                                                </div>
-                                                {treatment.expected_score_reduction ? (
-                                                    <p className="mt-2 text-sm text-status-success">
-                                                        Expected score
-                                                        reduction: −
-                                                        {
-                                                            treatment.expected_score_reduction
-                                                        }
-                                                    </p>
-                                                ) : null}
-
-                                                <details
-                                                    className="group mt-3"
-                                                    data-dusk={`treatment-evidence-${treatment.id}`}
+                                        {risk.treatments.map((treatment) => {
+                                            const status = governanceStatus(
+                                                'risk_treatment_status',
+                                                treatment.status,
+                                            );
+                                            const summary: TreatmentSummary = {
+                                                id: treatment.id,
+                                                action_description:
+                                                    treatment.action_description,
+                                                due_date: treatment.due_date,
+                                                expected_score_reduction:
+                                                    treatment.expected_score_reduction,
+                                            };
+                                            return (
+                                                <div
+                                                    key={treatment.id}
+                                                    className="rounded-lg border border-border p-4"
                                                 >
-                                                    <summary className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground">
-                                                        <Paperclip className="h-3.5 w-3.5" />
-                                                        Evidence (
-                                                        {treatment
-                                                            .evidence_attachments
-                                                            ?.length ?? 0}
-                                                        )
-                                                        {treatment.evidence_required ? (
-                                                            <StatusBadge
-                                                                variant="warning"
-                                                                size="sm"
-                                                                className="ml-1"
-                                                            >
-                                                                Required
-                                                            </StatusBadge>
-                                                        ) : null}
-                                                    </summary>
-                                                    <div className="mt-3 border-t border-border pt-3">
-                                                        <GovernanceAttachmentsPanel
-                                                            canManage={!!canEdit}
-                                                            attachments={
-                                                                treatment.evidence_attachments ??
-                                                                []
-                                                            }
-                                                            urls={{
-                                                                upload: `/governance/risks/${risk.id}/treatments/${treatment.id}/attachments`,
-                                                                delete: (id) =>
-                                                                    `/governance/risks/${risk.id}/treatments/${treatment.id}/attachments/${id}`,
-                                                            }}
-                                                            reloadProp="risk"
-                                                            helperText="Control test results, vendor reports, sign-off letters — anything proving the treatment was actioned."
-                                                            emptyText={{
-                                                                managed:
-                                                                    'No evidence yet. Drop files above to record proof of action.',
-                                                                readOnly:
-                                                                    'No evidence has been attached to this treatment.',
-                                                            }}
-                                                        />
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <p className="font-medium">
+                                                                {treatment.action_description}
+                                                            </p>
+                                                            <div className="text-subtle mt-2 flex flex-wrap items-center gap-4">
+                                                                <span className="flex items-center gap-1">
+                                                                    <User className="h-4 w-4" />
+                                                                    {treatment.assigned_to?.name ||
+                                                                        'No one assigned'}
+                                                                </span>
+                                                                <span className="flex items-center gap-1">
+                                                                    <Calendar className="h-4 w-4" />
+                                                                    Due{' '}
+                                                                    {formatDateOnly(
+                                                                        treatment.due_date,
+                                                                        'date not set',
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <StatusBadge variant={status.variant}>
+                                                            {status.label}
+                                                        </StatusBadge>
                                                     </div>
-                                                </details>
-                                            </div>
-                                        ))}
+                                                    {treatment.expected_score_reduction ? (
+                                                        <p className="text-caption mt-2">
+                                                            Should lower the risk after
+                                                            controls by{' '}
+                                                            {treatment.expected_score_reduction}
+                                                        </p>
+                                                    ) : null}
+                                                    {treatment.status === 'complete' ? (
+                                                        <p className="mt-2 flex items-center gap-1.5 text-sm">
+                                                            <CheckCircle2 className="h-4 w-4 text-status-success" />
+                                                            Done on{' '}
+                                                            {formatDateLong(treatment.completed_at)}
+                                                            {treatment.completed_by
+                                                                ? ` by ${treatment.completed_by.name}`
+                                                                : ''}
+                                                            {treatment.completion_notes
+                                                                ? ` — ${treatment.completion_notes}`
+                                                                : ''}
+                                                        </p>
+                                                    ) : null}
+
+                                                    {canEdit &&
+                                                    (treatment.can_complete ||
+                                                        treatment.complete_blocked_reason ||
+                                                        treatment.can_change_due_date) ? (
+                                                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                            {treatment.can_complete ? (
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        setCompleting(summary)
+                                                                    }
+                                                                >
+                                                                    <CheckCircle2 className="h-4 w-4" />
+                                                                    Mark as done
+                                                                </Button>
+                                                            ) : null}
+                                                            {treatment.can_change_due_date ? (
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={() =>
+                                                                        setRescheduling(summary)
+                                                                    }
+                                                                >
+                                                                    <CalendarClock className="h-4 w-4" />
+                                                                    Change due date
+                                                                </Button>
+                                                            ) : null}
+                                                            {treatment.complete_blocked_reason ? (
+                                                                <p className="text-caption w-full">
+                                                                    {treatment.complete_blocked_reason}
+                                                                </p>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : null}
+
+                                                    <details
+                                                        className="group mt-3"
+                                                        data-dusk={`treatment-evidence-${treatment.id}`}
+                                                    >
+                                                        <summary className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground">
+                                                            <Paperclip className="h-3.5 w-3.5" />
+                                                            Evidence (
+                                                            {treatment.evidence_attachments
+                                                                ?.length ?? 0}
+                                                            )
+                                                            {treatment.evidence_required ? (
+                                                                <StatusBadge
+                                                                    variant="warning"
+                                                                    size="sm"
+                                                                    className="ml-1"
+                                                                >
+                                                                    Needed to mark done
+                                                                </StatusBadge>
+                                                            ) : null}
+                                                        </summary>
+                                                        <div className="mt-3 border-t border-border pt-3">
+                                                            <GovernanceAttachmentsPanel
+                                                                canManage={!!canEdit && treatment.status !== 'complete'}
+                                                                attachments={
+                                                                    treatment.evidence_attachments ??
+                                                                    []
+                                                                }
+                                                                urls={{
+                                                                    upload: `/governance/risks/${risk.id}/treatments/${treatment.id}/attachments`,
+                                                                    delete: (id) =>
+                                                                        `/governance/risks/${risk.id}/treatments/${treatment.id}/attachments/${id}`,
+                                                                }}
+                                                                reloadProp="risk"
+                                                                helperText="Test results, supplier reports, signed letters — anything showing the action was done."
+                                                                emptyText={{
+                                                                    managed:
+                                                                        'No evidence yet. Drop files above to show the action was done.',
+                                                                    readOnly:
+                                                                        'No evidence has been attached to this action.',
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </details>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <EmptyState
                                         variant="compact"
                                         icon={Wrench}
-                                        title="No treatment actions yet"
+                                        title="No actions yet"
                                         description={
-                                            canEdit
-                                                ? 'Add a treatment to record how this risk will be reduced.'
-                                                : 'Treatment actions added by the risk owner will appear here.'
+                                            canEdit && !isClosed
+                                                ? 'Add an action to record how this risk will be reduced.'
+                                                : 'Actions added by the risk owner appear here.'
                                         }
                                     />
                                 )}
@@ -571,7 +735,8 @@ export default function RiskShow({
                                 <CardHeader>
                                     <CardTitle>Linked events</CardTitle>
                                     <CardDescription>
-                                        Related incidents, alerts, and concerns
+                                        Incidents, alerts and concerns connected
+                                        to this risk
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="flex flex-col gap-2">
@@ -583,12 +748,23 @@ export default function RiskShow({
                                             <div className="flex min-w-0 items-center gap-2">
                                                 <Link2 className="h-4 w-4 shrink-0 text-muted-foreground" />
                                                 <StatusBadge variant="neutral">
-                                                    {humanise(event.event_type)}
+                                                    {event.event_type_label}
                                                 </StatusBadge>
-                                                <span className="truncate text-sm">
-                                                    {event.event_reference ??
-                                                        '—'}
-                                                </span>
+                                                {event.href ? (
+                                                    <Link
+                                                        href={event.href}
+                                                        className="truncate text-sm font-medium text-primary underline-offset-4 hover:underline"
+                                                    >
+                                                        {event.event_reference
+                                                            ? `Open ${event.event_reference}`
+                                                            : `Open this ${event.event_type_label.toLowerCase()}`}
+                                                    </Link>
+                                                ) : (
+                                                    <span className="truncate text-sm">
+                                                        {event.event_reference ??
+                                                            'No reference recorded'}
+                                                    </span>
+                                                )}
                                             </div>
                                             <StatusBadge
                                                 variant={
@@ -597,7 +773,7 @@ export default function RiskShow({
                                                     ] ?? 'neutral'
                                                 }
                                             >
-                                                {humanise(event.event_severity)}
+                                                {governanceStatus('priority', event.event_severity).label}
                                             </StatusBadge>
                                         </div>
                                     ))}
@@ -607,7 +783,7 @@ export default function RiskShow({
                     </div>
 
                     <div className="flex flex-col gap-5">
-                        <Card id="risk-details">
+                        <Card id="risk-details" className="scroll-mt-5">
                             <CardHeader>
                                 <CardTitle>Details</CardTitle>
                             </CardHeader>
@@ -615,59 +791,122 @@ export default function RiskShow({
                                 <div>
                                     <p className="text-subtle">Risk owner</p>
                                     <p className="font-medium">
-                                        {risk.risk_owner?.name ||
-                                            'Not assigned'}
+                                        {risk.risk_owner?.name || 'No owner'}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-subtle">
-                                        Mitigation strategy
-                                    </p>
+                                    <p className="text-subtle">How we will respond</p>
                                     <p className="font-medium">
-                                        {strategyLabel}
+                                        {strategyLabel(risk.mitigation_strategy)}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-subtle">
-                                        Review frequency
-                                    </p>
+                                    <p className="text-subtle">Reviewed</p>
                                     <p className="font-medium">
-                                        {humanise(risk.review_frequency)}
+                                        {frequencyLabel(risk.review_frequency)}
                                     </p>
                                 </div>
                                 <div>
                                     <p className="text-subtle">Next review</p>
                                     <p className="font-medium">
-                                        {dateOnly(risk.next_review_date)}
+                                        {formatDateLong(risk.next_review_date, 'Not set')}
                                     </p>
+                                </div>
+                                <div>
+                                    <p className="text-subtle">Overseen by</p>
+                                    {overseenBy.length > 0 ? (
+                                        <ul className="flex flex-col gap-1">
+                                            {overseenBy.map((committee) => (
+                                                <li key={committee.id}>
+                                                    <Link
+                                                        href={`/governance/risks/committee/${committee.id}`}
+                                                        className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                                                    >
+                                                        {committee.name}
+                                                    </Link>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="font-medium text-muted-foreground">
+                                            The full board (no committee set up for
+                                            this kind of risk)
+                                        </p>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
 
                         {risk.acceptances.length > 0 ? (
-                            <Card>
+                            <Card id="risk-acceptance" className="scroll-mt-5">
                                 <CardHeader>
-                                    <CardTitle>Risk acceptances</CardTitle>
+                                    <CardTitle>The board&apos;s acceptance</CardTitle>
+                                    {currentAcceptance ? (
+                                        <CardDescription>{chip.label}</CardDescription>
+                                    ) : null}
                                 </CardHeader>
-                                <CardContent className="flex flex-col gap-3">
+                                <CardContent className="flex flex-col gap-4">
                                     {risk.acceptances.map((acceptance) => (
                                         <div
                                             key={acceptance.id}
-                                            className="rounded-lg border border-primary/40 bg-primary/10 p-3"
+                                            className="flex flex-col gap-2 rounded-lg border border-border p-3"
                                         >
-                                            <p className="text-sm font-medium text-primary">
-                                                {humanise(
-                                                    acceptance.acceptance_type,
+                                            <StatusBadge
+                                                variant={acceptance.expired ? 'warning' : 'success'}
+                                                className="w-fit"
+                                            >
+                                                {acceptance.expired
+                                                    ? `Ended ${formatDateOnly(acceptance.expires_at)}`
+                                                    : `Accepted until ${formatDateOnly(acceptance.expires_at)}`}
+                                            </StatusBadge>
+                                            <div>
+                                                <p className="text-caption">
+                                                    Why the board accepted it
+                                                </p>
+                                                <p className="text-sm whitespace-pre-wrap">
+                                                    {acceptance.justification}
+                                                </p>
+                                            </div>
+                                            {acceptance.conditions.length > 0 ? (
+                                                <div>
+                                                    <p className="text-caption">Conditions</p>
+                                                    <ul className="list-disc pl-5 text-sm">
+                                                        {acceptance.conditions.map(
+                                                            (condition, index) => (
+                                                                <li key={index}>{condition}</li>
+                                                            ),
+                                                        )}
+                                                    </ul>
+                                                </div>
+                                            ) : null}
+                                            <div>
+                                                <p className="text-caption">Resolution</p>
+                                                {acceptance.resolution ? (
+                                                    <Link
+                                                        href={`/governance/resolutions/${acceptance.resolution.id}`}
+                                                        className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                                                    >
+                                                        {acceptance.resolution.title}
+                                                    </Link>
+                                                ) : (
+                                                    <p className="text-sm text-muted-foreground">
+                                                        {acceptance.has_resolution
+                                                            ? 'Linked to a resolution you can’t open'
+                                                            : 'Accepted without a board resolution (the risk was within the limit)'}
+                                                    </p>
                                                 )}
-                                            </p>
-                                            <p className="text-caption mt-1">
-                                                Accepted by{' '}
-                                                {acceptance.accepted_by?.name ??
-                                                    '—'}
-                                            </p>
+                                                {acceptance.resolution?.reference ? (
+                                                    <span className="text-caption ml-1">
+                                                        {refSuffix(acceptance.resolution.reference)}
+                                                    </span>
+                                                ) : null}
+                                            </div>
                                             <p className="text-caption">
-                                                Expires{' '}
-                                                {dateOnly(acceptance.expires_at)}
+                                                Recorded
+                                                {acceptance.accepted_by
+                                                    ? ` by ${acceptance.accepted_by.name}`
+                                                    : ''}{' '}
+                                                on {formatDateLong(acceptance.accepted_at)}
                                             </p>
                                         </div>
                                     ))}
@@ -678,7 +917,7 @@ export default function RiskShow({
                 </div>
             </PageLayout>
 
-            {canEdit ? (
+            {canEdit && !isClosed ? (
                 <AddTreatmentDialog
                     open={treatmentOpen}
                     onClose={() => setTreatmentOpen(false)}
@@ -691,8 +930,34 @@ export default function RiskShow({
                     open={acceptOpen}
                     onClose={() => setAcceptOpen(false)}
                     riskId={risk.id}
+                    categoryLabel={risk.category_label}
                     appetiteThreshold={risk.appetite_threshold}
+                    aboveLimit={!risk.within_appetite}
+                    resolutionOptions={resolutionOptions}
+                    canViewResolutions={canViewResolutions}
                 />
+            ) : null}
+            {canClose ? (
+                <CloseRiskDialog
+                    open={closeOpen}
+                    onClose={() => setCloseOpen(false)}
+                    riskId={risk.id}
+                    riskTitle={risk.title}
+                />
+            ) : null}
+            {canEdit ? (
+                <>
+                    <CompleteTreatmentDialog
+                        riskId={risk.id}
+                        treatment={completing}
+                        onClose={() => setCompleting(null)}
+                    />
+                    <ChangeTreatmentDueDateDialog
+                        riskId={risk.id}
+                        treatment={rescheduling}
+                        onClose={() => setRescheduling(null)}
+                    />
+                </>
             ) : null}
             {canOpenEdit && formOptions ? (
                 <RiskWizardDialog

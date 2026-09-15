@@ -124,9 +124,60 @@ class RiskRegisterEntry extends Model
         return $this->hasMany(RiskAcceptance::class, 'risk_register_entry_id');
     }
 
+    /** Open on the register (legacy "mitigating"/"transferred" rows are open too). */
+    public const OPEN_STATUSES = ['active', 'open', 'mitigating', 'transferred'];
+
+    public const ACCEPTED_STATUS = 'accepted';
+
+    /** Taken off the register. */
+    public const CLOSED_STATUSES = ['voided', 'closed', 'avoided'];
+
+    /** Score bands (RiskScoringService::getRiskLevel): [min, max] inclusive. */
+    public const SEVERITY_BANDS = [
+        'critical' => [20, 25],
+        'high' => [15, 19],
+        'medium' => [10, 14],
+        'low' => [1, 9],
+    ];
+
     public function scopeActive($query)
     {
         return $query->whereIn('status', ['active', 'open']);
+    }
+
+    /** Open, not accepted, not closed. */
+    public function scopeOpenStatus($query)
+    {
+        return $query->whereIn('status', self::OPEN_STATUSES);
+    }
+
+    /** Still on the register: open or accepted by the board. */
+    public function scopeCurrent($query)
+    {
+        return $query->whereIn('status', [...self::OPEN_STATUSES, self::ACCEPTED_STATUS]);
+    }
+
+    public function scopeClosedStatus($query)
+    {
+        return $query->whereIn('status', self::CLOSED_STATUSES);
+    }
+
+    /**
+     * Severity band on the score before controls ("before") or after
+     * controls ("after", the default and the score compared with the limit).
+     */
+    public function scopeSeverity($query, string $level, string $basis = 'after')
+    {
+        $band = self::SEVERITY_BANDS[$level] ?? null;
+        if ($band === null) {
+            return $query;
+        }
+
+        $column = $basis === 'before' ? 'inherent_score' : 'residual_score';
+
+        return $level === 'low'
+            ? $query->where($column, '<=', $band[1])
+            : $query->whereBetween($column, $band);
     }
 
     public function scopeCritical($query)
@@ -137,6 +188,26 @@ class RiskRegisterEntry extends Model
     public function scopeHigh($query)
     {
         return $query->whereBetween('residual_score', [15, 19]);
+    }
+
+    public function isOpenStatus(): bool
+    {
+        return in_array($this->status, self::OPEN_STATUSES, true);
+    }
+
+    public function isClosedStatus(): bool
+    {
+        return in_array($this->status, self::CLOSED_STATUSES, true);
+    }
+
+    /** The register status in plain terms: open · accepted · closed. */
+    public function presentedStatus(): string
+    {
+        return match (true) {
+            $this->status === self::ACCEPTED_STATUS => 'accepted',
+            $this->isClosedStatus() => 'closed',
+            default => 'open',
+        };
     }
 
     public function scopeByCategory($query, string $category)
@@ -176,7 +247,7 @@ class RiskRegisterEntry extends Model
 
     public function requiresBoardAcceptance(): bool
     {
-        return !$this->within_appetite && $this->status === 'active';
+        return ! $this->within_appetite && $this->isOpenStatus();
     }
 
     public function close(string $reason, int $userId): void

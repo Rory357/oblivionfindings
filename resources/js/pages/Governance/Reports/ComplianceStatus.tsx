@@ -1,254 +1,252 @@
+import { Head, router } from '@inertiajs/react';
+import { ClipboardCheck, Eye, ShieldCheck } from 'lucide-react';
+
+import {
+    EmptyValue,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+} from '@/components/lists';
 import {
     PageHeader,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
+import { refSuffix } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
-import { Head } from '@inertiajs/react';
-import { ShieldCheck } from 'lucide-react';
+
+import {
+    dueLabel,
+    obligationStatusLabel,
+    obligationStatusVariant,
+    onTimeSentence,
+    plural,
+} from '../Compliance/_shared';
+import { GeneratedAt } from './_shared';
+
+interface RequirementRow {
+    id: number;
+    title: string;
+    code: string | null;
+    owner: string | null;
+    due_date: string | null;
+    status: string;
+    days_until_due: number | null;
+}
 
 interface Props extends PageProps {
     report: {
         summary: {
             total: number;
+            counted: number;
             complete: number;
             overdue: number;
             due_soon: number;
-            completion_rate: number;
+            not_due: number;
+            cancelled: number;
+            on_time: number;
         };
+        due_soon_days: number;
         frameworks: Array<{
             key: string;
             title: string;
             count: number;
-            items: Array<{
-                id: number;
-                title: string;
-                code?: string;
-                owner?: string | null;
-                due_date?: string | null;
-                status: string;
-                days_remaining?: number | null;
-            }>;
+            counted: number;
+            on_time: number;
+            overdue: number;
+            items: RequirementRow[];
         }>;
     };
+    today: string;
+    generatedAt: string;
 }
 
-const statusStyles: Record<string, string> = {
-    complete:
-        'bg-status-success-bg text-status-success border-status-success/30',
-    overdue:
-        'bg-status-critical-bg text-status-critical border-status-critical/30',
-    due_soon:
-        'bg-status-warning-bg text-status-warning border-status-warning/30',
-    not_due: 'bg-status-info-bg text-status-info border-status-info/30',
-};
+export default function ComplianceStatus({ auth, report, today, generatedAt }: Props) {
+    const { summary } = report;
+    const onTimePct = summary.counted > 0 ? (summary.on_time / summary.counted) * 100 : 0;
 
-export default function ComplianceStatus({ auth, report }: Props) {
+    const titleChip =
+        summary.total === 0 ? (
+            <PageHeaderStatusChip variant="neutral">No requirements yet</PageHeaderStatusChip>
+        ) : summary.overdue > 0 ? (
+            <PageHeaderStatusChip variant="critical">{summary.overdue} overdue</PageHeaderStatusChip>
+        ) : summary.due_soon > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {summary.due_soon} due in {report.due_soon_days} days
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">Nothing overdue</PageHeaderStatusChip>
+        );
+
     return (
         <AppLayout
             user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Reports', href: '/governance/reports/board-monthly' },
-                { title: 'Compliance Status', href: '/governance/reports/compliance-status' },
+                { title: 'Compliance', href: '/governance/compliance' },
+                {
+                    title: 'Compliance status report',
+                    href: '/governance/reports/compliance-status',
+                },
             ]}
         >
-            <Head title="Compliance Status Report" />
+            <Head title="Compliance status report" />
 
             <PageLayout
                 hero={
                     <PageHeader
                         icon={ShieldCheck}
-                        title="Compliance Status Report"
-                        subline="A framework-by-framework view of obligations due, overdue, and complete."
+                        title="Compliance status report"
+                        titleChip={titleChip}
+                        subline={`Legal, standards and funding requirements, by where they come from · as at ${formatDateOnly(today)}`}
                         backHref="/governance/compliance"
                         meters={
                             <>
                                 <PageHeaderMeterBlock
-                                    label="Total"
+                                    label="Requirements"
                                     href="/governance/compliance"
+                                    ariaLabel="Open all requirements"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {report.summary.total}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>All obligations</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Complete"
-                                    href="/governance/compliance?status=compliant"
-                                    tone="brand"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {report.summary.complete}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Satisfied</PageHeaderMeterCaption>
+                                    <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {summary.cancelled > 0
+                                            ? `${summary.cancelled} cancelled`
+                                            : 'on the register'}
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
                                     label="Overdue"
                                     href="/governance/compliance?status=overdue"
-                                    tone={report.summary.overdue > 0 ? 'critical' : undefined}
+                                    tone={summary.overdue > 0 ? 'critical' : 'brand'}
+                                    ariaLabel="Open overdue requirements"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {report.summary.overdue}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Action required</PageHeaderMeterCaption>
+                                    <PageHeaderMeterBig>{summary.overdue}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>past their due date</PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Completion rate"
-                                    href="/governance/compliance"
-                                    tone={report.summary.completion_rate >= 80 ? 'brand' : 'warning'}
+                                    label={`Due in ${report.due_soon_days} days`}
+                                    href="/governance/compliance?status=due_soon"
+                                    tone={summary.due_soon > 0 ? 'warning' : 'brand'}
+                                    ariaLabel="Open requirements due soon"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {`${report.summary.completion_rate}%`}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Target coverage</PageHeaderMeterCaption>
+                                    <PageHeaderMeterBig>{summary.due_soon}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>not overdue yet</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Done"
+                                    href="/governance/compliance?status=complete"
+                                    ariaLabel="Open requirements that are done"
+                                >
+                                    <PageHeaderMeterBig>{summary.complete}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>marked as done</PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="On time"
+                                    value={`${summary.on_time}/${summary.counted}`}
+                                    href="/governance/compliance?status=on_time"
+                                    tone="success"
+                                    ariaLabel="Open requirements that are on time"
+                                >
+                                    <PageHeaderMeterDonut
+                                        percent={onTimePct}
+                                        caption="done or not yet overdue"
+                                    />
                                 </PageHeaderMeterBlock>
                             </>
                         }
                     />
                 }
             >
-                <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                    {[
-                        {
-                            label: 'Total Obligations',
-                            value: report.summary.total,
-                            tone: 'text-foreground',
-                        },
-                        {
-                            label: 'Complete',
-                            value: report.summary.complete,
-                            tone: 'text-status-success',
-                        },
-                        {
-                            label: 'Overdue',
-                            value: report.summary.overdue,
-                            tone: 'text-status-critical',
-                        },
-                        {
-                            label: 'Due Soon',
-                            value: report.summary.due_soon,
-                            tone: 'text-status-warning',
-                        },
-                        {
-                            label: 'Completion Rate',
-                            value: `${report.summary.completion_rate}%`,
-                            tone: 'text-status-info',
-                        },
-                    ].map((item) => (
-                        <Card key={item.label}>
-                            <CardContent className="pt-6">
-                                <p className="text-sm text-muted-foreground">
-                                    {item.label}
-                                </p>
-                                <p
-                                    className={`mt-2 text-3xl font-bold ${item.tone}`}
-                                >
-                                    {item.value}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-
-                <Card className="mb-8">
-                    <CardHeader>
-                        <CardTitle>Overall Progress</CardTitle>
-                        <CardDescription>
-                            Completion rate across the governance compliance
-                            register.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <Progress value={report.summary.completion_rate} />
-                        <p className="text-sm text-muted-foreground">
-                            {report.summary.completion_rate}% of tracked
-                            obligations are currently complete.
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <div className="space-y-6">
-                    {report.frameworks.length ? (
-                        report.frameworks.map((framework) => (
-                            <Card key={framework.key}>
-                                <CardHeader>
-                                    <CardTitle>{framework.title}</CardTitle>
-                                    <CardDescription>
-                                        {framework.count} obligation(s)
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {framework.items.map((item) => (
-                                        <div
-                                            key={item.id}
-                                            className="flex flex-col gap-3 rounded-lg border border-border p-4 lg:flex-row lg:items-center lg:justify-between"
-                                        >
-                                            <div className="space-y-1">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <p className="font-medium text-foreground">
-                                                        {item.title}
-                                                    </p>
-                                                    <Badge variant="outline">
-                                                        {item.code}
-                                                    </Badge>
-                                                </div>
-                                                <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                                                    {item.owner && (
-                                                        <span>
-                                                            Owner: {item.owner}
+                {report.frameworks.length === 0 ? (
+                    <EmptyState
+                        icon={ClipboardCheck}
+                        title="No requirements yet"
+                        description="Requirements appear here once they are added in Compliance."
+                    />
+                ) : (
+                    report.frameworks.map((framework) => (
+                        <section
+                            key={framework.key}
+                            className="flex flex-col gap-3"
+                            aria-label={framework.title}
+                        >
+                            <ListCaption
+                                title={framework.title}
+                                caption={`${plural(framework.count, 'requirement')} · ${onTimeSentence(framework.on_time, framework.counted)}`}
+                            />
+                            <EntityTable<RequirementRow>
+                                rows={framework.items}
+                                rowKey={(item) => item.id}
+                                identityLabel="Requirement"
+                                identity={(item) => ({
+                                    icon: ClipboardCheck,
+                                    name: item.title,
+                                    subline: refSuffix(item.code) || undefined,
+                                })}
+                                hrefFor={(item) => `/governance/compliance/${item.id}`}
+                                actionsFor={(item) => [
+                                    {
+                                        label: 'Open requirement',
+                                        icon: Eye,
+                                        onClick: () => router.visit(`/governance/compliance/${item.id}`),
+                                    },
+                                ]}
+                                onOpen={(item) => router.visit(`/governance/compliance/${item.id}`)}
+                                minWidth={760}
+                                columns={[
+                                    {
+                                        key: 'status',
+                                        label: 'Status',
+                                        width: '0.9fr',
+                                        cell: (item) => (
+                                            <EntityStatusChip variant={obligationStatusVariant(item.status)}>
+                                                {obligationStatusLabel(item.status)}
+                                            </EntityStatusChip>
+                                        ),
+                                    },
+                                    {
+                                        key: 'due',
+                                        label: 'Due',
+                                        width: '1fr',
+                                        cell: (item) =>
+                                            item.due_date ? (
+                                                <span>
+                                                    {formatDateOnly(item.due_date)}
+                                                    {item.status !== 'complete' && item.status !== 'cancelled' ? (
+                                                        <span className="text-caption block">
+                                                            {dueLabel(item.days_until_due)}
                                                         </span>
-                                                    )}
-                                                    {item.due_date && (
-                                                        <span>
-                                                            Due: {item.due_date}
-                                                        </span>
-                                                    )}
-                                                    {item.days_remaining != null && (
-                                                        <span>
-                                                            {item.days_remaining < 0
-                                                                ? `${Math.abs(item.days_remaining)} day(s) overdue`
-                                                                : `${item.days_remaining} day(s) remaining`}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <Badge
-                                                className={
-                                                    statusStyles[item.status] ??
-                                                    'border-border bg-muted text-foreground'
-                                                }
-                                            >
-                                                {item.status.replace(/_/g, ' ')}
-                                            </Badge>
-                                        </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
-                        ))
-                    ) : (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <p className="text-sm text-muted-foreground">
-                                    No compliance obligations were found.
-                                </p>
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
+                                                    ) : null}
+                                                </span>
+                                            ) : (
+                                                <EmptyValue />
+                                            ),
+                                    },
+                                    {
+                                        key: 'owner',
+                                        label: 'Owner',
+                                        width: '0.9fr',
+                                        cell: (item) =>
+                                            item.owner ? (
+                                                <span className="truncate">{item.owner}</span>
+                                            ) : (
+                                                <EmptyValue />
+                                            ),
+                                    },
+                                ]}
+                            />
+                        </section>
+                    ))
+                )}
+                <GeneratedAt at={generatedAt} />
             </PageLayout>
         </AppLayout>
     );

@@ -2158,14 +2158,22 @@ function buildReportingSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const governance: NavItem[] = [];
     if (can?.governance?.view)
         governance.push({
-            title: 'Board Reports',
+            title: 'Board monthly report',
             href: '/governance/reports/board-monthly',
             icon: FileText,
         });
-    if (can?.governance?.compliance?.view || can?.governance?.view)
+    // These reports check their register's permission on the server, so the
+    // links only show to people who can open them.
+    if (can?.governance?.compliance?.view)
         governance.push({
-            title: 'Compliance',
+            title: 'Compliance status report',
             href: '/governance/reports/compliance-status',
+            icon: ShieldCheck,
+        });
+    if (can?.governance?.risks?.view)
+        governance.push({
+            title: 'Top risks report',
+            href: '/governance/reports/risk-narrative',
             icon: ShieldCheck,
         });
     if (governance.length)

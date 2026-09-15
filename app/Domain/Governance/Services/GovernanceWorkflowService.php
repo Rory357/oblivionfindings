@@ -203,9 +203,12 @@ class GovernanceWorkflowService
                 'key' => 'quorum',
                 'label' => 'Attendance recorded',
                 'status' => $quorum['met'] ? 'done' : ($attendanceCount > 0 ? 'in_progress' : 'todo'),
-                'detail' => $attendanceCount > 0
-                    ? "{$quorum['present']} of the {$quorum['required']} members needed for decisions to be valid are recorded as present."
-                    : "Attendance hasn't been recorded yet. It's recorded at the meeting.",
+                'detail' => match (true) {
+                    $attendanceCount === 0 => "Attendance hasn't been recorded yet. It's recorded at the meeting.",
+                    (bool) $quorum['met'] => GovernanceWording::count((int) $quorum['present'], 'member')
+                        ." recorded as present — {$quorum['required']} were needed for decisions to be valid.",
+                    default => "{$quorum['present']} of the {$quorum['required']} members needed for decisions to be valid are recorded as present.",
+                },
                 'action_label' => $canRecordAttendance ? 'Record attendance' : 'View attendance',
                 'action_url' => "/governance/meetings/{$meeting->id}?tab=attendance",
                 'blocked_by' => $canRecordAttendance ? null : ($attendanceCount > 0 ? null : 'Waiting for the secretary to record attendance'),
@@ -230,7 +233,7 @@ class GovernanceWorkflowService
                 'status' => $pack !== null ? 'done' : ($agendaCount > 0 ? 'todo' : 'blocked'),
                 'detail' => $pack !== null
                     ? 'The board pack is ready to send.'
-                    : 'Prepare the board pack once the agenda is ready.',
+                    : 'Generate a draft pack once the agenda is ready. Nothing is sent to members until it is distributed.',
                 'action_label' => 'Open meeting',
                 'action_url' => "/governance/meetings/{$meeting->id}",
                 'blocked_by' => $agendaCount > 0 ? null : 'The agenda is empty',
@@ -264,9 +267,15 @@ class GovernanceWorkflowService
                 'key' => 'minutes_drafted',
                 'label' => 'Minutes written',
                 'status' => $minutes !== null ? 'done' : ($isPastMeeting ? 'todo' : 'blocked'),
-                'detail' => $minutes !== null
-                    ? 'Minutes: '.mb_strtolower(GovernanceLabels::label('minutes_status', $minutes->status)).'.'
-                    : 'Write the minutes after the meeting.',
+                'detail' => match ($minutesStatus) {
+                    null => 'Write the minutes after the meeting.',
+                    'draft' => 'A draft of the minutes has been started.',
+                    'reviewed' => 'The draft minutes have been sent to the chair for approval.',
+                    'approved' => 'The minutes are approved.',
+                    'signed' => 'The minutes are approved and signed.',
+                    'archived' => 'The minutes are signed and archived.',
+                    default => 'The minutes have been started.',
+                },
                 'action_label' => 'Open minutes',
                 'action_url' => "/governance/meetings/{$meeting->id}?tab=minutes",
                 'blocked_by' => $minutes === null && ! $isPastMeeting ? 'The meeting hasn\'t happened yet' : null,
@@ -275,9 +284,11 @@ class GovernanceWorkflowService
                 'key' => 'minutes_approved',
                 'label' => 'Minutes approved',
                 'status' => $minutesApproved ? 'done' : ($minutes !== null ? 'todo' : 'blocked'),
-                'detail' => $minutesApproved
-                    ? 'The minutes have been approved.'
-                    : 'Send the draft minutes for approval.',
+                'detail' => match (true) {
+                    $minutesApproved => 'The minutes have been approved.',
+                    $minutesStatus === 'reviewed' => 'Waiting for the chair to approve the minutes.',
+                    default => 'Send the draft minutes to the chair for approval.',
+                },
                 'action_label' => 'Review minutes',
                 'action_url' => "/governance/meetings/{$meeting->id}?tab=minutes",
                 'blocked_by' => $minutes !== null ? null : 'The minutes haven\'t been written',
@@ -386,15 +397,31 @@ class GovernanceWorkflowService
             }
         }
 
+        // Every step carries its status in words, so no screen shows a raw key.
+        $withLabel = fn (array $step): array => [...$step, 'status_label' => self::checklistStatusLabel((string) $step['status'])];
+
         return [
             'counts' => [
                 'done' => $items->where('status', 'done')->count(),
                 'remaining' => $items->whereIn('status', ['todo', 'in_progress'])->count(),
                 'blocked' => $items->where('status', 'blocked')->count(),
             ],
-            'next_step' => $nextStep,
-            'items' => $items->values()->all(),
+            'next_step' => $nextStep ? $withLabel($nextStep) : null,
+            'items' => $items->map($withLabel)->values()->all(),
         ];
+    }
+
+    /** A meeting checklist step's status in plain words. */
+    public static function checklistStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'done' => 'Done',
+            'in_progress' => 'In progress',
+            'todo' => 'To do',
+            'blocked' => 'Waiting on an earlier step',
+            'not_applicable' => 'Not needed',
+            default => GovernanceLabels::humanise($status),
+        };
     }
 
     protected function previousMeeting(GovernanceMeeting $meeting): ?GovernanceMeeting
@@ -855,8 +882,9 @@ class GovernanceWorkflowService
                     $priority,
                     'pending',
                     null,
-                    'Open budget',
-                    "/governance/budgets/{$adjustment->budget_id}",
+                    'Review budget change',
+                    // Straight to the budget's changes tab (older ?tab=adjustments links still work).
+                    "/governance/budgets/{$adjustment->budget_id}?tab=changes",
                     null
                 ));
             }

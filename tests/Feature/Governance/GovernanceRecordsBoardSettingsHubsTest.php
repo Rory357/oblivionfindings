@@ -262,9 +262,9 @@ class GovernanceRecordsBoardSettingsHubsTest extends TestCase
             'is_current' => true,
         ]);
         GovernanceDocument::create([
-            'title' => 'Board Policy Pack',
-            'document_type' => 'policy',
-            'file_path' => 'governance/documents/policy/pack.pdf',
+            'title' => 'Incident procedure',
+            'document_type' => 'procedure',
+            'file_path' => 'governance/documents/procedure/pack.pdf',
             'file_size' => 2048,
             'uploaded_by' => $admin->id,
             'version_number' => 1,
@@ -280,7 +280,7 @@ class GovernanceRecordsBoardSettingsHubsTest extends TestCase
                 ->where('filters.document_type', 'constitution')
                 ->where('summary.total', 2)
                 ->where('summary.by_type.constitution', 1)
-                ->where('summary.by_type.policy', 1));
+                ->where('summary.by_type.procedure', 1));
 
         $this->actingAs($admin)
             ->from("/governance/documents/{$document->id}")
@@ -293,15 +293,15 @@ class GovernanceRecordsBoardSettingsHubsTest extends TestCase
         $admin = $this->createAdminUser();
 
         $this->actingAs($admin)
-            ->get('/governance/records?tab=documents&category=policy')
+            ->get('/governance/records?tab=documents&category=procedure')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Governance/Records/Index')
                 ->where('tab', 'documents')
-                ->where('category', 'policy')
+                ->where('category', 'procedure')
                 ->where('capabilities.documents', true)
                 ->where('documents.first_page_url', fn ($url) => str_contains((string) $url, 'tab=documents')
-                    && str_contains((string) $url, 'category=policy')));
+                    && str_contains((string) $url, 'category=procedure')));
     }
 
     public function test_interests_register_offers_self_declaration_only_for_the_viewers_record(): void

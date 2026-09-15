@@ -29,10 +29,9 @@ class EscalateOverdueActionItems implements ShouldQueue
         $today = Carbon::today();
 
         foreach ($overdue as $item) {
-            $item->escalate(
-                $item->assigned_to,
-                'Automatically escalated due to overdue status'
-            );
+            // No person raised it: record no escalator, so the action never
+            // reads as if the owner escalated their own work.
+            $item->escalate(null, ActionItem::AUTOMATIC_ESCALATION_REASON);
 
             $recipient = $item->assignedTo;
             $profile = $recipient ? \App\Domain\Hr\Models\HrEmployeeProfile::withTrashed()->where('user_id', $recipient->id)->first() : null;

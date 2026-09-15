@@ -127,7 +127,7 @@ class GovernanceComplianceTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('Governance/Compliance/Index')
                 ->where('canCreate', true)
-                ->has('formOptions.frameworks', 10)
+                ->has('formOptions.frameworks', count(\App\Domain\Governance\Models\ComplianceObligation::frameworkOptions()))
                 ->has('formOptions.owners')
             );
 

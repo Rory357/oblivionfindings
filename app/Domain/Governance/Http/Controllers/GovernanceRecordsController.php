@@ -2,18 +2,31 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
+use App\Domain\Governance\Models\Budget;
 use App\Domain\Governance\Models\GovernanceDocument;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\GovernancePolicy;
 use App\Domain\Governance\Models\Resolution;
+use App\Domain\Governance\Models\StrategicPlan;
 use App\Domain\Governance\Services\GovernanceRecordAccessService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/**
+ * Records: search everything the board has done — past meetings, resolutions,
+ * policies, files, and (for members who can see them) approved budgets and
+ * strategic plans. Each section is gated by its own view permission.
+ */
 class GovernanceRecordsController extends Controller
 {
+    private const RESOLUTION_STATUSES = ['carried', 'implemented', 'closed', 'archived'];
+
+    private const APPROVED_BUDGET_STATUSES = ['approved', 'closed', 'archived'];
+
+    private const APPROVED_PLAN_STATUSES = ['approved', 'active', 'superseded', 'archived', 'completed'];
+
     public function __construct(
         protected GovernanceRecordAccessService $recordAccess
     ) {}
@@ -25,43 +38,40 @@ class GovernanceRecordsController extends Controller
             abort(403, 'Unauthorized.');
         }
 
-        $tab = $request->query('tab', 'all');
-        $search = $request->query('search');
+        $tab = (string) $request->query('tab', 'all');
+        $search = trim((string) $request->query('search', ''));
+        $search = $search !== '' ? $search : null;
+        $like = $search !== null ? '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%' : null;
 
         $canViewDocuments = $viewer->canDo('governance.documents.view');
         $canViewMeetings = $viewer->canDo('governance.meetings.view');
         $canViewResolutions = $viewer->canDo('governance.resolutions.view');
         $canViewPolicies = $viewer->canDo('governance.policies.view');
+        $canViewBudgets = $viewer->canDo('governance.budgets.view');
+        $canViewStrategy = $viewer->canDo('governance.strategy.view');
 
         // 1. Documents (strictly gated - if false, never query or disclose metadata)
         $documents = null;
         if ($canViewDocuments) {
-            $docQuery = GovernanceDocument::query()
+            $documents = GovernanceDocument::query()
                 ->when($request->category, fn ($q, $cat) => $q->where('document_type', $cat))
-                ->when($search, fn ($q, $s) => $q->where('title', 'like', "%{$s}%"))
-                ->orderByDesc('updated_at');
-
-            $documents = $docQuery->paginate(15, ['*'], 'doc_page')
+                ->when($like, fn ($q) => $q->where(fn ($inner) => $inner
+                    ->where('title', 'like', $like)
+                    ->orWhere('original_name', 'like', $like)))
+                ->orderByDesc('updated_at')
+                ->paginate(15, ['*'], 'doc_page')
                 ->withQueryString()
-                ->through(fn (GovernanceDocument $doc) => [
-                    'id' => $doc->id,
-                    'title' => $doc->title,
-                    'category' => $doc->document_type,
-                    'file_name' => basename($doc->file_path),
-                    'file_size' => (int) ($doc->file_size ?? 0),
-                    'is_confidential' => false,
-                    'version' => (int) $doc->version_number,
-                    'updated_at' => $doc->updated_at?->toIso8601String(),
-                ]);
+                ->through(fn (GovernanceDocument $doc) => GovernanceDocumentController::presentListItem($doc));
         }
 
-        // 2. Historical Meetings & Minutes
+        // 2. Past meetings and their minutes. Cancelled meetings were never held.
         $meetings = null;
         if ($canViewMeetings) {
             $meetQuery = GovernanceMeeting::query()
-                ->with(['chair.user', 'secretary.user', 'minutes'])
+                ->with(['minutes'])
                 ->where('scheduled_at', '<', now())
-                ->when($search, fn ($q, $s) => $q->where('title', 'like', "%{$s}%"))
+                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'cancelled'))
+                ->when($like, fn ($q) => $q->where('title', 'like', $like))
                 ->orderByDesc('scheduled_at');
 
             $meetQuery = $this->recordAccess->scopeMeetings($meetQuery, $viewer);
@@ -80,14 +90,15 @@ class GovernanceRecordsController extends Controller
                 ]);
         }
 
-        // 3. Historical Resolutions / Decisions
+        // 3. Resolutions the board has finished deciding.
         $resolutions = null;
         if ($canViewResolutions) {
             $resQuery = Resolution::query()
                 ->with(['meeting', 'committee'])
-                ->whereIn('status', ['carried', 'implemented', 'closed', 'archived'])
-                ->when($search, fn ($q, $s) => $q->where('title', 'like', "%{$s}%"))
-                ->orderByDesc('created_at');
+                ->whereIn('status', self::RESOLUTION_STATUSES)
+                ->when($like, fn ($q) => $q->where('title', 'like', $like))
+                ->orderByRaw('COALESCE(closed_at, updated_at) DESC')
+                ->orderByDesc('id');
 
             $resQuery = $this->recordAccess->scopeResolutions($resQuery, $viewer);
 
@@ -101,27 +112,65 @@ class GovernanceRecordsController extends Controller
                     'outcome' => $r->outcome,
                     'voting_threshold' => $r->voting_threshold,
                     'meeting_title' => $r->meeting?->title,
-                    'created_at' => $r->created_at?->toIso8601String(),
+                    // When the board decided, not when the draft was written.
+                    'decided_at' => ($r->closed_at ?? $r->updated_at)?->toIso8601String(),
                 ]);
         }
 
-        // 4. Approved Policies
+        // 4. Approved policies
         $policies = null;
         if ($canViewPolicies) {
-            $polQuery = GovernancePolicy::query()
+            $policies = GovernancePolicy::query()
                 ->where('status', 'approved')
-                ->when($search, fn ($q, $s) => $q->where('title', 'like', "%{$s}%"))
-                ->orderBy('title');
-
-            $policies = $polQuery->paginate(15, ['*'], 'pol_page')
+                ->when($like, fn ($q) => $q->where('title', 'like', $like))
+                ->orderBy('title')
+                ->paginate(15, ['*'], 'pol_page')
                 ->withQueryString()
                 ->through(fn (GovernancePolicy $p) => [
                     'id' => $p->id,
-                    'policy_code' => $p->policy_code,
                     'title' => $p->title,
                     'category' => $p->category,
                     'version_number' => $p->version_number,
                     'effective_from' => $p->effective_from?->toDateString(),
+                ]);
+        }
+
+        // 5. Approved budgets — read-only, for members who can see budgets.
+        $budgets = null;
+        if ($canViewBudgets) {
+            $budgets = Budget::query()
+                ->whereIn('status', self::APPROVED_BUDGET_STATUSES)
+                ->when($like, fn ($q) => $q->where('title', 'like', $like))
+                ->orderByDesc('fiscal_year')
+                ->orderByDesc('id')
+                ->paginate(15, ['*'], 'budget_page')
+                ->withQueryString()
+                ->through(fn (Budget $budget) => [
+                    'id' => $budget->id,
+                    'title' => $budget->title,
+                    'fiscal_year' => $budget->fiscal_year,
+                    'status' => $budget->status,
+                    'approved_at' => $budget->approved_by_board_at?->toIso8601String(),
+                ]);
+        }
+
+        // 6. Approved strategic plans — read-only, for members who can see the plan.
+        $plans = null;
+        if ($canViewStrategy) {
+            $plans = StrategicPlan::query()
+                ->whereIn('status', self::APPROVED_PLAN_STATUSES)
+                ->when($like, fn ($q) => $q->where('title', 'like', $like))
+                ->orderByDesc('period_start')
+                ->orderByDesc('id')
+                ->paginate(15, ['*'], 'plan_page')
+                ->withQueryString()
+                ->through(fn (StrategicPlan $plan) => [
+                    'id' => $plan->id,
+                    'title' => $plan->title,
+                    'status' => $plan->status,
+                    'version_number' => $plan->version_number,
+                    'period_start' => $plan->period_start?->toDateString(),
+                    'period_end' => $plan->period_end?->toDateString(),
                 ]);
         }
 
@@ -134,20 +183,16 @@ class GovernanceRecordsController extends Controller
                 'meetings' => $canViewMeetings,
                 'resolutions' => $canViewResolutions,
                 'policies' => $canViewPolicies,
+                'budgets' => $canViewBudgets,
+                'plans' => $canViewStrategy,
             ],
             'documents' => $documents,
             'meetings' => $meetings,
             'resolutions' => $resolutions,
             'policies' => $policies,
-            'categories' => [
-                ['value' => 'constitution', 'label' => 'Constitution / Charter'],
-                ['value' => 'terms_of_reference', 'label' => 'Terms Of Reference'],
-                ['value' => 'policy', 'label' => 'Board Policy'],
-                ['value' => 'procedure', 'label' => 'Procedure'],
-                ['value' => 'template', 'label' => 'Template'],
-                ['value' => 'report', 'label' => 'Report'],
-                ['value' => 'certificate', 'label' => 'Certificate'],
-            ],
+            'budgets' => $budgets,
+            'plans' => $plans,
+            'categories' => GovernanceDocument::typeOptions(),
         ]);
     }
 }

@@ -27,11 +27,22 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly } from '@/lib/datetime';
+import { formatDateLong, formatDateOnly } from '@/lib/datetime';
 import { PageProps } from '@/types';
 import { Head } from '@inertiajs/react';
 import { TrendingUp } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    LabelList,
+    Legend,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
 import { RiskViewToggle, riskLevelVariant } from './_shared';
 
@@ -45,23 +56,45 @@ interface Snapshot {
         low: number;
         above_appetite: number;
     };
-    by_category: Record<string, { count: number; avg_score: number }>;
+    by_category: Array<{
+        category: string;
+        label: string;
+        count: number;
+        avg_score: number;
+    }>;
 }
 
 interface Props extends PageProps {
     snapshots: Snapshot[];
+    nextSnapshotOn: string;
 }
 
 type SummaryKey = keyof Snapshot['summary'];
 
 const RANGE_OPTIONS = [
-    { value: '12', label: 'Last 12 snapshots' },
-    { value: '6', label: 'Last 6 snapshots' },
-    { value: '3', label: 'Last 3 snapshots' },
+    { value: '12', label: 'Last 12 months' },
+    { value: '6', label: 'Last 6 months' },
+    { value: '3', label: 'Last 3 months' },
 ];
 
-function snapshotDate(value: string): string {
-    return formatDateOnly(value?.slice(0, 10));
+/** Semantic tokens only (DESIGN.md) — safety colours never retint. */
+const TOKEN = {
+    critical: 'var(--status-critical)',
+    high: 'var(--status-warning)',
+    grid: 'var(--border)',
+    axis: 'var(--muted-foreground)',
+    label: 'var(--foreground)',
+    halo: 'var(--card)',
+};
+
+function monthOf(date: string): string {
+    const [year, month] = date.slice(0, 10).split('-').map(Number);
+    if (!year || !month) return date;
+    return new Date(Date.UTC(year, month - 1, 15)).toLocaleDateString('en-NZ', {
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC',
+    });
 }
 
 function scrollTo(id: string) {
@@ -70,31 +103,59 @@ function scrollTo(id: string) {
         ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-export default function RiskTrends({ snapshots }: Props) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ChartTooltip({ active, payload, label }: any) {
+    if (!active || !payload?.length) return null;
+    return (
+        // eslint-disable-next-line no-restricted-syntax -- chart tooltip popover, not a content card
+        <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg">
+            <p className="mb-1 font-semibold text-foreground">{label}</p>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {payload.map((p: any) => (
+                <p key={p.name} className="flex items-center gap-1.5 text-muted-foreground">
+                    <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ backgroundColor: p.fill }}
+                    />
+                    {p.name}
+                    <span className="ml-auto pl-3 font-semibold text-foreground tabular-nums">
+                        {p.value}
+                    </span>
+                </p>
+            ))}
+        </div>
+    );
+}
+
+export default function RiskTrends({ snapshots, nextSnapshotOn }: Props) {
     const [range, setRange] = useState('12');
     const latest = snapshots[0] ?? null;
     const previous = snapshots[1] ?? null;
     const displaySnapshots = snapshots.slice(0, Number(range));
+    const chartData = displaySnapshots
+        .slice()
+        .reverse()
+        .map((snap) => ({
+            month: monthOf(snap.snapshot_date),
+            critical: snap.summary.critical,
+            high: snap.summary.high,
+        }));
 
-    const maxCritHigh = Math.max(
-        ...displaySnapshots.map((s) => s.summary.critical + s.summary.high),
-        1,
-    );
-
-    /** Latest value + movement since the previous snapshot. */
+    /** Latest value + movement since the previous month's record. */
     const meter = (
         key: SummaryKey,
         label: string,
-        caption: string,
+        href: string,
         tone: 'critical' | 'warning' | 'success' | 'brand',
     ): ReactNode => {
-        const value = latest?.summary[key] ?? 0;
-        const change = previous ? value - previous.summary[key] : 0;
+        if (!latest) return null;
+        const value = latest.summary[key] ?? 0;
+        const change = previous ? value - (previous.summary[key] ?? 0) : 0;
         return (
             <PageHeaderMeterBlock
                 label={label}
-                ariaLabel={`View ${label.toLowerCase()} history`}
-                onClick={() => scrollTo('snapshot-timeline')}
+                ariaLabel={`View ${label.toLowerCase()} risks on the register now`}
+                href={href}
                 tone={value > 0 ? tone : 'brand'}
             >
                 <PageHeaderMeterBig>{value}</PageHeaderMeterBig>
@@ -103,10 +164,12 @@ export default function RiskTrends({ snapshots }: Props) {
                         trend={change > 0 ? 'up' : 'down'}
                         good={key === 'low' ? change > 0 : change < 0}
                     >
-                        {Math.abs(change)} since last snapshot
+                        {Math.abs(change)} since {monthOf(previous.snapshot_date)}
                     </PageHeaderMeterDelta>
                 ) : (
-                    <PageHeaderMeterCaption>{caption}</PageHeaderMeterCaption>
+                    <PageHeaderMeterCaption>
+                        on {formatDateOnly(latest.snapshot_date)}
+                    </PageHeaderMeterCaption>
                 )}
             </PageHeaderMeterBlock>
         );
@@ -119,37 +182,35 @@ export default function RiskTrends({ snapshots }: Props) {
             titleChip={
                 latest ? (
                     <PageHeaderStatusChip variant="info">
-                        Latest {snapshotDate(latest.snapshot_date)}
+                        Last recorded {formatDateOnly(latest.snapshot_date)}
                     </PageHeaderStatusChip>
                 ) : (
                     <PageHeaderStatusChip variant="neutral">
-                        No snapshots
+                        No monthly records yet
                     </PageHeaderStatusChip>
                 )
             }
-            subline={`Risk profile across reporting snapshots · ${snapshots.length} recorded`}
+            subline={`How the register changes month by month · recorded on the 1st of each month · ${snapshots.length} ${snapshots.length === 1 ? 'record' : 'records'}`}
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Snapshots"
-                        ariaLabel="View the snapshot timeline"
-                        onClick={() => scrollTo('snapshot-timeline')}
+                        label="Monthly records"
+                        ariaLabel="View the month-by-month table"
+                        onClick={() => scrollTo('risk-trend-table')}
                     >
                         <PageHeaderMeterBig>{snapshots.length}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {latest
-                                ? `since ${snapshotDate(snapshots[snapshots.length - 1].snapshot_date)}`
-                                : 'none recorded yet'}
+                            next on {formatDateOnly(nextSnapshotOn)}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
-                    {meter('critical', 'Critical', 'latest snapshot', 'critical')}
-                    {meter('high', 'High', 'latest snapshot', 'warning')}
-                    {meter('medium', 'Medium', 'latest snapshot', 'warning')}
-                    {meter('low', 'Low', 'latest snapshot', 'success')}
+                    {meter('critical', 'Critical', '/governance/risks?severity=critical', 'critical')}
+                    {meter('high', 'High', '/governance/risks?severity=high', 'warning')}
+                    {meter('medium', 'Medium', '/governance/risks?severity=medium', 'warning')}
+                    {meter('low', 'Low', '/governance/risks?severity=low', 'success')}
                     {meter(
                         'above_appetite',
-                        'Above appetite',
-                        'latest snapshot',
+                        "Above the board's limit",
+                        '/governance/risks?above_appetite=1',
                         'critical',
                     )}
                 </>
@@ -158,7 +219,7 @@ export default function RiskTrends({ snapshots }: Props) {
                 <>
                     <RiskViewToggle value="trends" />
                     <PageHeaderFilterSelect
-                        label="Range"
+                        label="Last 12 months"
                         value={range}
                         allValue="12"
                         options={RANGE_OPTIONS}
@@ -185,113 +246,196 @@ export default function RiskTrends({ snapshots }: Props) {
                 {snapshots.length === 0 ? (
                     <EmptyState
                         icon={TrendingUp}
-                        title="No risk snapshots recorded yet"
-                        description="Snapshots of the active register are captured on the reporting schedule; trends appear once the first one is taken."
+                        title="No monthly records yet"
+                        description={`Monthly risk records start on ${formatDateLong(nextSnapshotOn)}. From then, this page shows how the number of critical and high risks changes each month.`}
                     />
                 ) : (
                     <div className="flex flex-col gap-5">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Critical + high risks</CardTitle>
+                                <CardTitle>Critical and high risks each month</CardTitle>
                                 <CardDescription>
-                                    Count of critical and high risks per
-                                    snapshot · {displaySnapshots.length} shown
+                                    Risks on the register at each monthly record,
+                                    by their score after controls ·{' '}
+                                    {displaySnapshots.length} shown
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div
-                                    className="flex h-40 items-end gap-2"
-                                    role="img"
-                                    aria-label="Critical and high risks per snapshot"
+                                <figure
+                                    className="m-0"
+                                    role="group"
+                                    aria-label="Critical and high risks each month"
                                 >
-                                    {displaySnapshots
-                                        .slice()
-                                        .reverse()
-                                        .map((snap) => {
-                                            const total =
-                                                snap.summary.critical +
-                                                snap.summary.high;
-                                            const pct =
-                                                (total / maxCritHigh) * 100;
-                                            return (
-                                                <div
-                                                    key={snap.id}
-                                                    className="group relative flex h-full flex-1 items-end"
-                                                    title={`${snapshotDate(snap.snapshot_date)}: ${snap.summary.critical} critical / ${snap.summary.high} high`}
-                                                >
-                                                    <div
-                                                        className="w-full min-w-[12px] rounded-t bg-status-critical"
-                                                        style={{
-                                                            height: `${Math.max(pct, 4)}%`,
-                                                        }}
-                                                    />
-                                                </div>
-                                            );
-                                        })}
-                                </div>
-                                <div className="text-caption mt-2 flex justify-between">
-                                    <span>
-                                        {snapshotDate(
-                                            displaySnapshots[
-                                                displaySnapshots.length - 1
-                                            ].snapshot_date,
-                                        )}
-                                    </span>
-                                    <span>
-                                        {snapshotDate(
-                                            displaySnapshots[0].snapshot_date,
-                                        )}
-                                    </span>
-                                </div>
+                                    <ResponsiveContainer width="100%" height={240}>
+                                        <BarChart
+                                            data={chartData}
+                                            margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
+                                        >
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                stroke={TOKEN.grid}
+                                                vertical={false}
+                                            />
+                                            <XAxis
+                                                dataKey="month"
+                                                tick={{ fontSize: 11, fill: TOKEN.axis }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                allowDecimals={false}
+                                                tick={{ fontSize: 11, fill: TOKEN.axis }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                                width={30}
+                                            />
+                                            <Tooltip
+                                                content={<ChartTooltip />}
+                                                cursor={{ fill: 'var(--accent)', fillOpacity: 0.5 }}
+                                            />
+                                            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+                                            <Bar
+                                                dataKey="critical"
+                                                name="Critical (20–25)"
+                                                stackId="risks"
+                                                fill={TOKEN.critical}
+                                                maxBarSize={36}
+                                                isAnimationActive={false}
+                                            >
+                                                <LabelList
+                                                    dataKey="critical"
+                                                    position="center"
+                                                    formatter={(value: unknown) =>
+                                                        Number(value) > 0 ? String(value) : ''
+                                                    }
+                                                    style={{
+                                                        fontSize: 11,
+                                                        fontWeight: 700,
+                                                        fill: TOKEN.label,
+                                                        stroke: TOKEN.halo,
+                                                        strokeWidth: 3,
+                                                        paintOrder: 'stroke',
+                                                    }}
+                                                />
+                                            </Bar>
+                                            <Bar
+                                                dataKey="high"
+                                                name="High (15–19)"
+                                                stackId="risks"
+                                                fill={TOKEN.high}
+                                                radius={[3, 3, 0, 0]}
+                                                maxBarSize={36}
+                                                isAnimationActive={false}
+                                            >
+                                                <LabelList
+                                                    dataKey="high"
+                                                    position="center"
+                                                    formatter={(value: unknown) =>
+                                                        Number(value) > 0 ? String(value) : ''
+                                                    }
+                                                    style={{
+                                                        fontSize: 11,
+                                                        fontWeight: 700,
+                                                        fill: TOKEN.label,
+                                                        stroke: TOKEN.halo,
+                                                        strokeWidth: 3,
+                                                        paintOrder: 'stroke',
+                                                    }}
+                                                />
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </figure>
                             </CardContent>
                         </Card>
 
-                        {latest &&
-                        Object.keys(latest.by_category ?? {}).length > 0 ? (
+                        <Card id="risk-trend-table" className="scroll-mt-5">
+                            <CardHeader>
+                                <CardTitle>Month by month</CardTitle>
+                                <CardDescription>
+                                    Risks on the register at each record, by score
+                                    after controls
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Recorded</TableHead>
+                                            <TableHead className="text-center">Critical</TableHead>
+                                            <TableHead className="text-center">High</TableHead>
+                                            <TableHead className="text-center">Medium</TableHead>
+                                            <TableHead className="text-center">Low</TableHead>
+                                            <TableHead className="text-center">
+                                                Above the board&apos;s limit
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {displaySnapshots.map((snap) => (
+                                            <TableRow key={snap.id}>
+                                                <TableCell className="font-medium">
+                                                    {formatDateLong(snap.snapshot_date)}
+                                                </TableCell>
+                                                <TableCell className="text-center tabular-nums">
+                                                    {snap.summary.critical}
+                                                </TableCell>
+                                                <TableCell className="text-center tabular-nums">
+                                                    {snap.summary.high}
+                                                </TableCell>
+                                                <TableCell className="text-center tabular-nums">
+                                                    {snap.summary.medium}
+                                                </TableCell>
+                                                <TableCell className="text-center tabular-nums">
+                                                    {snap.summary.low}
+                                                </TableCell>
+                                                <TableCell className="text-center tabular-nums">
+                                                    {snap.summary.above_appetite}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+
+                        {latest && latest.by_category.length > 0 ? (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Risk by category</CardTitle>
+                                    <CardTitle>By kind of risk</CardTitle>
                                     <CardDescription>
-                                        Latest snapshot ·{' '}
-                                        {snapshotDate(latest.snapshot_date)}
+                                        Recorded {formatDateLong(latest.snapshot_date)}
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="overflow-x-auto">
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>Category</TableHead>
+                                                <TableHead>Kind of risk</TableHead>
                                                 <TableHead className="text-center">
-                                                    Count
+                                                    Risks
                                                 </TableHead>
                                                 <TableHead className="text-center">
-                                                    Average score
+                                                    Average risk after controls
                                                 </TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {Object.entries(
-                                                latest.by_category,
-                                            ).map(([category, data]) => (
-                                                <TableRow key={category}>
-                                                    <TableCell className="font-medium capitalize">
-                                                        {category.replace(
-                                                            /_/g,
-                                                            ' ',
-                                                        )}
+                                            {latest.by_category.map((row) => (
+                                                <TableRow key={row.category}>
+                                                    <TableCell className="font-medium">
+                                                        {row.label}
                                                     </TableCell>
                                                     <TableCell className="text-center tabular-nums">
-                                                        {data.count}
+                                                        {row.count}
                                                     </TableCell>
                                                     <TableCell className="text-center">
                                                         <StatusBadge
                                                             variant={riskLevelVariant(
-                                                                data.avg_score,
+                                                                row.avg_score,
                                                             )}
                                                         >
-                                                            {Number(
-                                                                data.avg_score,
-                                                            ).toFixed(1)}
+                                                            {Number(row.avg_score).toFixed(1)}
                                                         </StatusBadge>
                                                     </TableCell>
                                                 </TableRow>
@@ -301,50 +445,6 @@ export default function RiskTrends({ snapshots }: Props) {
                                 </CardContent>
                             </Card>
                         ) : null}
-
-                        <Card id="snapshot-timeline">
-                            <CardHeader>
-                                <CardTitle>Snapshot timeline</CardTitle>
-                                <CardDescription>
-                                    Last {displaySnapshots.length} snapshots
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex flex-col gap-2">
-                                {displaySnapshots.map((snap) => (
-                                    <div
-                                        key={snap.id}
-                                        className="flex flex-wrap items-center gap-4 rounded-lg border border-border p-3"
-                                    >
-                                        <span className="w-28 shrink-0 text-sm font-medium text-muted-foreground">
-                                            {snapshotDate(snap.snapshot_date)}
-                                        </span>
-                                        <span className="flex flex-wrap gap-2">
-                                            <StatusBadge variant="critical">
-                                                {snap.summary.critical} critical
-                                            </StatusBadge>
-                                            <StatusBadge variant="warning">
-                                                {snap.summary.high} high
-                                            </StatusBadge>
-                                            <StatusBadge variant="warning">
-                                                {snap.summary.medium} medium
-                                            </StatusBadge>
-                                            <StatusBadge variant="success">
-                                                {snap.summary.low} low
-                                            </StatusBadge>
-                                            {snap.summary.above_appetite > 0 ? (
-                                                <StatusBadge variant="critical">
-                                                    {
-                                                        snap.summary
-                                                            .above_appetite
-                                                    }{' '}
-                                                    above appetite
-                                                </StatusBadge>
-                                            ) : null}
-                                        </span>
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
                     </div>
                 )}
             </PageLayout>

@@ -173,14 +173,24 @@ class GovernanceMeeting extends Model
         return in_array($this->status, ['scheduled', 'agenda_draft']);
     }
 
+    /**
+     * Details, agenda and attendance stay editable until the minutes stage.
+     * `pack_draft` is set by BoardPackBuilderService when a pack is generated
+     * for a scheduled meeting, so it must not lock the meeting.
+     */
     public function isEditable(): bool
     {
-        return ! $this->isLocked() && in_array($this->status, ['scheduled', 'agenda_draft', 'agenda_final']);
+        return ! $this->isLocked() && in_array($this->status, ['scheduled', 'agenda_draft', 'agenda_final', 'pack_draft'], true);
     }
 
+    /**
+     * Pack preview and new pack versions are available before and during the
+     * meeting. The meeting form no longer sets agenda stages by hand, so a
+     * meeting is usually still `scheduled` (or `pack_draft`) at this point.
+     */
     public function canDistributePack(): bool
     {
-        return in_array($this->status, ['agenda_final', 'in_progress']);
+        return in_array($this->status, ['scheduled', 'agenda_draft', 'agenda_final', 'pack_draft', 'in_progress'], true);
     }
 
     public function isLocked(): bool

@@ -23,4 +23,9 @@ class UpdateRiskRegisterRequest extends FormRequest
             'mitigation_strategy' => 'sometimes|in:treat,transfer,terminate,tolerate',
         ];
     }
+
+    public function messages(): array
+    {
+        return StoreRiskRegisterRequest::plainMessages();
+    }
 }

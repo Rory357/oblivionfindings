@@ -8,6 +8,7 @@ import {
     ListCaption,
     compactMenu,
     useEntityContextMenu,
+    type EntityTableColumn,
     type MenuItem,
 } from '@/components/lists';
 import {
@@ -22,9 +23,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import type { StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateLong } from '@/lib/datetime';
+import {
+    governanceStatus,
+    meetingTypeLabel,
+    type GovernanceStatusChip,
+} from '@/lib/governance-labels';
 import { PageProps } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { ExternalLink, FolderOpen, Plus, X } from 'lucide-react';
@@ -38,6 +43,7 @@ interface Pack {
     supersedes_id: number | null;
     build_status: string;
     is_current: boolean;
+    my_read_at?: string | null;
     actual_document_count: number;
     meeting: {
         id: number;
@@ -49,8 +55,8 @@ interface Pack {
     distributed_at: string | null;
     created_at: string;
     updated_at: string;
-    read_count?: number;
-    download_count?: number;
+    read_count?: number | null;
+    download_count?: number | null;
 }
 
 interface Props extends PageProps {
@@ -70,32 +76,42 @@ interface Props extends PageProps {
         draft: number;
         superseded?: number;
         failed?: number;
+        unread?: number;
     };
+    is_recipient?: boolean;
+    next_meeting_pack?: {
+        id: number;
+        meeting_title: string;
+        scheduled_at: string | null;
+        read: boolean;
+    } | null;
     meetings_without_pack: MeetingWithoutPack[];
 }
 
 const ALL = '__all';
 
+/** One status chip per pack, from the shared Governance labels. */
 export function packState(pack: {
     build_status: string;
     is_current: boolean;
     distributed_at: string | null;
-}): { variant: StatusVariant; label: string } {
+}): GovernanceStatusChip {
     if (pack.build_status === 'failed')
-        return { variant: 'critical', label: 'Failed' };
-    if (!pack.is_current) return { variant: 'neutral', label: 'Superseded' };
-    if (pack.distributed_at) return { variant: 'success', label: 'Distributed' };
-    return { variant: 'warning', label: 'Draft' };
+        return governanceStatus('board_pack_status', 'failed');
+    if (!pack.is_current)
+        return governanceStatus('board_pack_status', 'superseded');
+    if (pack.distributed_at)
+        return governanceStatus('board_pack_status', 'distributed');
+    return governanceStatus('board_pack_status', 'draft');
 }
-
-const humanise = (value: string) =>
-    value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
 
 export default function PacksIndex({
     auth,
     packs,
     filters,
     summary,
+    is_recipient = false,
+    next_meeting_pack = null,
     meetings_without_pack,
 }: Props) {
     const [generateOpen, setGenerateOpen] = useState(false);
@@ -123,27 +139,48 @@ export default function PacksIndex({
                 onClick: () => open(pack),
             },
         ]);
-    const titleFor = (pack: Pack) => pack.meeting?.title ?? 'Untitled meeting';
+    const titleFor = (pack: Pack) =>
+        pack.meeting?.title ? `${pack.meeting.title}` : 'Meeting not found';
 
-    const statusOptions = [
-        { value: ALL, label: `All packs (${summary.total})` },
-        { value: 'distributed', label: `Current (${summary.distributed})` },
-        { value: 'draft', label: `Draft (${summary.draft})` },
-        {
-            value: 'superseded',
-            label: `Superseded (${summary.superseded ?? 0})`,
-        },
-        ...((summary.failed ?? 0) > 0 || filters.status === 'failed'
-            ? [{ value: 'failed', label: `Failed (${summary.failed ?? 0})` }]
-            : []),
-    ];
+    const statusOptions = canManagePacks
+        ? [
+              { value: ALL, label: `All packs (${summary.total})` },
+              {
+                  value: 'distributed',
+                  label: `Sent to members (${summary.distributed})`,
+              },
+              { value: 'draft', label: `Draft (${summary.draft})` },
+              {
+                  value: 'superseded',
+                  label: `Replaced by a newer version (${summary.superseded ?? 0})`,
+              },
+              ...((summary.failed ?? 0) > 0 || filters.status === 'failed'
+                  ? [
+                        {
+                            value: 'failed',
+                            label: `Couldn't be prepared (${summary.failed ?? 0})`,
+                        },
+                    ]
+                  : []),
+          ]
+        : [
+              { value: ALL, label: `All packs (${summary.total})` },
+              ...(is_recipient
+                  ? [
+                        {
+                            value: 'unread',
+                            label: `Not yet read by you (${summary.unread ?? 0})`,
+                        },
+                    ]
+                  : []),
+          ];
 
-    const columns = [
+    const columns: EntityTableColumn<Pack>[] = [
         {
             key: 'state',
             label: 'Status',
-            width: '0.8fr',
-            cell: (pack: Pack) => {
+            width: '1fr',
+            cell: (pack) => {
                 const state = packState(pack);
                 return (
                     <EntityStatusChip variant={state.variant}>
@@ -153,40 +190,50 @@ export default function PacksIndex({
             },
         },
         {
-            key: 'revision',
-            label: 'Revision',
+            key: 'version',
+            label: 'Version',
             width: '0.6fr',
-            cell: (pack: Pack) => (
-                <EntityChip>Rev {pack.revision_number ?? 1}</EntityChip>
+            cell: (pack) => (
+                <EntityChip>Version {pack.revision_number ?? 1}</EntityChip>
             ),
         },
+        ...(is_recipient
+            ? [
+                  {
+                      key: 'reading',
+                      label: 'Your reading',
+                      width: '0.9fr',
+                      cell: (pack: Pack) =>
+                          pack.my_read_at ? (
+                              <EntityStatusChip variant="success">
+                                  Read {formatDateLong(pack.my_read_at)}
+                              </EntityStatusChip>
+                          ) : pack.distributed_at ? (
+                              <EntityStatusChip variant="warning">
+                                  Not read
+                              </EntityStatusChip>
+                          ) : (
+                              <EmptyValue />
+                          ),
+                  },
+              ]
+            : []),
         {
             key: 'type',
             label: 'Meeting type',
             width: '0.9fr',
-            cell: (pack: Pack) =>
+            cell: (pack) =>
                 pack.meeting?.meeting_type ? (
-                    humanise(pack.meeting.meeting_type)
+                    meetingTypeLabel(pack.meeting.meeting_type)
                 ) : (
                     <EmptyValue />
                 ),
         },
         {
-            key: 'papers',
-            label: 'Papers & docs',
-            width: '0.7fr',
-            align: 'right' as const,
-            cell: (pack: Pack) => (
-                <span className="tabular-nums">
-                    {pack.actual_document_count}
-                </span>
-            ),
-        },
-        {
             key: 'distributed',
-            label: 'Distributed',
+            label: 'Sent to members',
             width: '0.9fr',
-            cell: (pack: Pack) =>
+            cell: (pack) =>
                 pack.distributed_at ? (
                     formatDateLong(pack.distributed_at)
                 ) : (
@@ -197,13 +244,12 @@ export default function PacksIndex({
             ? [
                   {
                       key: 'engagement',
-                      label: 'Reads · downloads',
+                      label: 'Read · downloaded',
                       width: '0.9fr',
                       cell: (pack: Pack) =>
-                          pack.read_count !== undefined ? (
+                          pack.read_count != null ? (
                               <span className="tabular-nums">
-                                  {pack.read_count} ·{' '}
-                                  {pack.download_count ?? 0}
+                                  {pack.read_count} · {pack.download_count ?? 0}
                               </span>
                           ) : (
                               <EmptyValue />
@@ -213,11 +259,115 @@ export default function PacksIndex({
             : []),
     ];
 
+    const memberMeters = (
+        <>
+            <PageHeaderMeterBlock
+                label="Next meeting pack"
+                href={
+                    next_meeting_pack
+                        ? `/governance/packs/${next_meeting_pack.id}`
+                        : '/governance/packs'
+                }
+                tone={
+                    next_meeting_pack && !next_meeting_pack.read
+                        ? 'warning'
+                        : 'brand'
+                }
+                ariaLabel={
+                    next_meeting_pack
+                        ? `Open the pack for ${next_meeting_pack.meeting_title}`
+                        : 'View all board packs'
+                }
+            >
+                <PageHeaderMeterBig>
+                    {next_meeting_pack?.scheduled_at
+                        ? formatDateLong(next_meeting_pack.scheduled_at)
+                        : 'None yet'}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {next_meeting_pack
+                        ? `${next_meeting_pack.meeting_title} · ${next_meeting_pack.read ? 'Read' : 'Not read yet'}`
+                        : 'No pack sent for an upcoming meeting'}
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            {is_recipient ? (
+                <PageHeaderMeterBlock
+                    label="Not yet read by you"
+                    href="/governance/packs?status=unread"
+                    tone={(summary.unread ?? 0) > 0 ? 'warning' : 'brand'}
+                    ariaLabel="View packs you haven't read yet"
+                >
+                    <PageHeaderMeterBig>{summary.unread ?? 0}</PageHeaderMeterBig>
+                    <PageHeaderMeterCaption>
+                        {(summary.unread ?? 0) === 0
+                            ? "You're up to date"
+                            : 'Confirm once you have read them'}
+                    </PageHeaderMeterCaption>
+                </PageHeaderMeterBlock>
+            ) : null}
+            <PageHeaderMeterBlock
+                label="All packs"
+                href="/governance/packs"
+                ariaLabel="View all board packs"
+            >
+                <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>Sent to you</PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+        </>
+    );
+
+    const managerMeters = (
+        <>
+            <PageHeaderMeterBlock
+                label="Sent to members"
+                href="/governance/packs?status=distributed"
+                tone={summary.distributed > 0 ? 'success' : 'brand'}
+            >
+                <PageHeaderMeterBig>{summary.distributed}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    The version members are reading
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Draft"
+                href="/governance/packs?status=draft"
+            >
+                <PageHeaderMeterBig>{summary.draft}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>Not sent yet</PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Replaced"
+                href="/governance/packs?status=superseded"
+            >
+                <PageHeaderMeterBig>{summary.superseded ?? 0}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    Earlier versions kept for the record
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock label="All packs" href="/governance/packs">
+                <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>Every version</PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            {(summary.failed ?? 0) > 0 ? (
+                <PageHeaderMeterBlock
+                    label="Couldn't be prepared"
+                    href="/governance/packs?status=failed"
+                    tone="critical"
+                >
+                    <PageHeaderMeterBig>{summary.failed}</PageHeaderMeterBig>
+                    <PageHeaderMeterCaption>
+                        Create a new version to try again
+                    </PageHeaderMeterCaption>
+                </PageHeaderMeterBlock>
+            ) : null}
+        </>
+    );
+
     const header = (
         <PageHeader
             icon={FolderOpen}
-            title="Board Packs"
-            subline="Immutable, audience-safe packs assembled for meetings · decision papers, snapshots and reading receipts"
+            title="Board packs"
+            subline="The reading pack for each board meeting"
             actions={
                 canManagePacks ? (
                     <PageHeaderPrimaryButton
@@ -229,69 +379,10 @@ export default function PacksIndex({
                     </PageHeaderPrimaryButton>
                 ) : undefined
             }
-            meters={
-                <>
-                    <PageHeaderMeterBlock
-                        label="Total packs"
-                        href="/governance/packs"
-                    >
-                        <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            All editions you can read
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Current"
-                        href="/governance/packs?status=distributed"
-                        tone={summary.distributed > 0 ? 'success' : 'brand'}
-                    >
-                        <PageHeaderMeterBig>
-                            {summary.distributed}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            Distributed to members
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Draft"
-                        href="/governance/packs?status=draft"
-                        tone={summary.draft > 0 ? 'warning' : 'brand'}
-                    >
-                        <PageHeaderMeterBig>{summary.draft}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            In preparation
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Superseded"
-                        href="/governance/packs?status=superseded"
-                    >
-                        <PageHeaderMeterBig>
-                            {summary.superseded ?? 0}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            Archived editions
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    {(summary.failed ?? 0) > 0 ? (
-                        <PageHeaderMeterBlock
-                            label="Failed"
-                            href="/governance/packs?status=failed"
-                            tone="critical"
-                        >
-                            <PageHeaderMeterBig>
-                                {summary.failed}
-                            </PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>
-                                Builds needing a retry
-                            </PageHeaderMeterCaption>
-                        </PageHeaderMeterBlock>
-                    ) : null}
-                </>
-            }
+            meters={canManagePacks ? managerMeters : memberMeters}
             filters={
                 <PageHeaderFilterSelect
-                    label="Status"
+                    label="Show"
                     value={statusValue}
                     allValue={ALL}
                     options={statusOptions}
@@ -310,7 +401,7 @@ export default function PacksIndex({
                 { title: 'Board packs', href: '/governance/packs' },
             ]}
         >
-            <Head title="Board Packs" />
+            <Head title="Board packs" />
 
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
@@ -327,7 +418,13 @@ export default function PacksIndex({
                                     ? 'No board packs match this filter'
                                     : 'No board packs yet'
                             }
-                            description="Board packs are generated from scheduled meetings with frozen snapshots and decision papers."
+                            description={
+                                filters.status === 'unread'
+                                    ? "You've confirmed reading every pack sent to you."
+                                    : canManagePacks
+                                      ? 'Generate a pack from a meeting once its agenda is ready.'
+                                      : 'Packs appear here once the secretary sends them for a meeting.'
+                            }
                             action={
                                 filters.status ? (
                                     <Button
@@ -344,7 +441,7 @@ export default function PacksIndex({
                                         onClick={() => setGenerateOpen(true)}
                                     >
                                         <Plus className="h-3.5 w-3.5" />
-                                        Generate from a meeting
+                                        Generate board pack
                                     </Button>
                                 ) : undefined
                             }
@@ -358,8 +455,8 @@ export default function PacksIndex({
                                 icon: FolderOpen,
                                 name: titleFor(pack),
                                 subline: pack.meeting?.scheduled_at
-                                    ? `Scheduled ${formatDateLong(pack.meeting.scheduled_at)}`
-                                    : 'Not scheduled',
+                                    ? `Meeting on ${formatDateLong(pack.meeting.scheduled_at)}`
+                                    : 'Date not set',
                             })}
                             hrefFor={(pack) => `/governance/packs/${pack.id}`}
                             onOpen={open}

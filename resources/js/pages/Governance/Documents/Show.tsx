@@ -30,10 +30,11 @@ interface Document {
     id: number;
     title: string;
     category: string;
+    category_label: string;
     description: string | null;
     file_name: string;
+    format_label: string;
     file_size: number;
-    mime_type: string | null;
     version: number;
     is_current: boolean;
     uploaded_by: { id: number; name: string } | null;
@@ -58,8 +59,8 @@ export default function DocumentShow({ auth, document }: Props) {
     const canManage = Boolean(auth.can?.governance?.documents?.manage);
     const [confirmRemove, setConfirmRemove] = useState(false);
     const TypeIcon = documentTypeIcon(document.category);
-    const typeLabel = document.category.replace(/_/g, ' ');
     const downloadHref = `/governance/documents/${document.id}/download`;
+    const size = formatFileSize(document.file_size);
 
     return (
         <AppLayout
@@ -91,7 +92,9 @@ export default function DocumentShow({ auth, document }: Props) {
                                 {document.is_current ? 'Current' : 'Archived'}
                             </PageHeaderStatusChip>
                         }
-                        subline={`${typeLabel.charAt(0).toUpperCase()}${typeLabel.slice(1)} · Version ${document.version} · ${document.file_name}`}
+                        subline={[document.category_label, document.format_label, size]
+                            .filter(Boolean)
+                            .join(' · ')}
                         actions={
                             <>
                                 {canManage ? (
@@ -113,51 +116,20 @@ export default function DocumentShow({ auth, document }: Props) {
                             </>
                         }
                         meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Document type"
-                                    ariaLabel={`View ${typeLabel} documents`}
-                                    href={`/governance/documents?document_type=${document.category}`}
-                                >
-                                    <PageHeaderMeterBig>
-                                        <span className="capitalize">
-                                            {typeLabel}
-                                        </span>
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Version {document.version}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Last updated"
-                                    ariaLabel="View recently updated documents"
-                                    href="/governance/documents"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {formatDateLong(document.updated_at)}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {document.uploaded_by
-                                            ? `Uploaded by ${document.uploaded_by.name}`
-                                            : 'Uploader not recorded'}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="File"
-                                    value={formatFileSize(document.file_size) || '—'}
-                                    ariaLabel="View all documents"
-                                    href="/governance/documents"
-                                >
-                                    <PageHeaderMeterBig>
-                                        <span className="uppercase">
-                                            {document.file_name.split('.').pop() ?? '—'}
-                                        </span>
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {document.mime_type ?? 'Unknown format'}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
+                            <PageHeaderMeterBlock
+                                label="Document type"
+                                ariaLabel={`Show all ${document.category_label.toLowerCase()} documents`}
+                                href={`/governance/documents?document_type=${document.category}`}
+                            >
+                                <PageHeaderMeterBig>
+                                    <span className="text-base">
+                                        {document.category_label}
+                                    </span>
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    see others of this type
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
                         }
                     />
                 }
@@ -171,10 +143,8 @@ export default function DocumentShow({ auth, document }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-4">
-                            <DetailItem label="Filename">
-                                <span className="font-mono">
-                                    {document.file_name}
-                                </span>
+                            <DetailItem label="File name">
+                                {document.file_name}
                             </DetailItem>
                             <DetailItem label="Description">
                                 {document.description ? (
@@ -183,36 +153,34 @@ export default function DocumentShow({ auth, document }: Props) {
                                     </p>
                                 ) : (
                                     <span className="text-muted-foreground">
-                                        No description recorded
+                                        No description
                                     </span>
                                 )}
                             </DetailItem>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <DetailItem label="Format">
-                                    {document.mime_type ?? '—'}
+                                    {document.format_label}
                                 </DetailItem>
-                                <DetailItem label="Size">
-                                    {formatFileSize(document.file_size) || '—'}
-                                </DetailItem>
+                                <DetailItem label="Size">{size || '—'}</DetailItem>
                             </div>
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Metadata</CardTitle>
+                            <CardTitle>Details</CardTitle>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-4">
                             <DetailItem label="Uploaded by">
                                 <span className="font-medium">
-                                    {document.uploaded_by?.name ?? 'Unknown'}
+                                    {document.uploaded_by?.name ?? 'Not recorded'}
                                 </span>
                             </DetailItem>
-                            <DetailItem label="Created">
+                            <DetailItem label="Added">
                                 {formatDateTimeLong(document.created_at)}
                             </DetailItem>
                             <DetailItem label="Last updated">
-                                {formatDateTimeLong(document.updated_at)}
+                                {formatDateLong(document.updated_at)}
                             </DetailItem>
                         </CardContent>
                     </Card>
@@ -226,7 +194,7 @@ export default function DocumentShow({ auth, document }: Props) {
                     router.delete(`/governance/documents/${document.id}`)
                 }
                 title="Remove this document?"
-                description={`“${document.title}” will be removed from the governance library.`}
+                description={`“${document.title}” will be removed from Documents. Board members will no longer be able to open it.`}
                 confirmText="Remove document"
             />
         </AppLayout>

@@ -367,6 +367,81 @@ class GovernanceMyWorkTest extends TestCase
         $this->assertFalse($pendingVotes->contains('source.id', $open->id));
     }
 
+    /**
+     * "My performance review": the person being reviewed is asked for their
+     * self-assessment — counted like their other work — and told when the
+     * board has completed the review. Other members never get these items,
+     * and no item carries the board's rating, decision or narrative.
+     */
+    public function test_only_the_reviewee_gets_their_performance_review_work(): void
+    {
+        $chair = User::find($this->fixtures['users']['chair']);
+        $member = User::find($this->fixtures['users']['member']);
+        $reviewee = $this->createUserWithRole('ceo', ['name' => 'Aroha Chief']);
+        $review = $this->createPerformanceReview($reviewee, $chair, [
+            'review_cycle' => '2026-Annual',
+            'status' => 'self_review',
+            'overall_rating' => 'needs_improvement',
+            'board_decision' => 'performance_improvement',
+            'overall_assessment' => 'CONFIDENTIAL board narrative',
+        ]);
+
+        $feed = $this->actingAs($reviewee)->getJson('/governance/my-work/data')->assertOk();
+        $ask = collect($feed->json('items'))->firstWhere('id', "performance_review:{$review->id}:self_assessment");
+        $this->assertNotNull($ask);
+        $this->assertSame('act', $ask['kind']);
+        $this->assertSame('Write your self-assessment for Annual review 2026', $ask['title']);
+        $this->assertSame('pending', $ask['status']);
+        $this->assertSame("/governance/performance/{$review->id}#self-assessment", $ask['required_action']['href']);
+        $this->assertTrue($ask['required_action']['allowed']);
+        $this->assertSame(1, $feed->json('totals.act'));
+        $this->assertGreaterThanOrEqual(1, $feed->json('totals.pending'));
+        foreach (['needs_improvement', 'Needs improvement', 'performance_improvement', 'CONFIDENTIAL board narrative'] as $secret) {
+            $this->assertStringNotContainsString($secret, $feed->getContent());
+        }
+
+        // Nobody else is asked about someone else's review.
+        $memberFeed = $this->actingAs($member)->getJson('/governance/my-work/data?per_page=100')->assertOk();
+        $this->assertFalse(collect($memberFeed->json('items'))->contains('source.type', 'performance_review'));
+        $this->assertFalse(collect($memberFeed->json('coming_up'))->contains('source.type', 'performance_review'));
+
+        // Once the self-assessment is sent, the ask is gone.
+        $review->submitSelfAssessment('My reflections on the year.');
+        $sent = $this->actingAs($reviewee)->getJson('/governance/my-work/data')->assertOk();
+        $this->assertFalse(collect($sent->json('items'))->contains('source.type', 'performance_review'));
+        $this->assertSame(0, $sent->json('totals.act'));
+
+        // When the board completes the review, the reviewee is told — for information, not as work.
+        $review->forceFill(['status' => 'completed', 'approved_by_board_at' => now()])->save();
+        $completed = $this->actingAs($reviewee)->getJson('/governance/my-work/data')->assertOk();
+        $outcome = collect($completed->json('coming_up'))->firstWhere('id', "performance_review:{$review->id}:outcome");
+        $this->assertNotNull($outcome);
+        $this->assertSame('know', $outcome['kind']);
+        $this->assertSame('Your performance review is complete — read the outcome', $outcome['title']);
+        $this->assertSame('Read the outcome', $outcome['required_action']['label']);
+        $this->assertSame(0, $completed->json('totals.pending'));
+        $this->assertGreaterThanOrEqual(1, $completed->json('totals.know'));
+        $this->assertStringNotContainsString('Needs improvement', $completed->getContent());
+        $this->assertFalse(collect(
+            $this->actingAs($member)->getJson('/governance/my-work/data')->assertOk()->json('coming_up')
+        )->contains('source.type', 'performance_review'));
+
+        // A reviewee who can't open reviews still sees the ask, with the reason.
+        $restricted = $this->createUserWithRole('ceo');
+        $restrictedReview = $this->createPerformanceReview($restricted, $chair, ['status' => 'self_review']);
+        $permission = \App\Models\Permission::where('key', 'governance.performance.view')->firstOrFail();
+        $restricted->permissionOverrides()->attach($permission->id, ['allowed' => false]);
+        $restrictedAsk = collect(
+            $this->actingAs($restricted)->getJson('/governance/my-work/data')->assertOk()->json('items')
+        )->firstWhere('id', "performance_review:{$restrictedReview->id}:self_assessment");
+        $this->assertNotNull($restrictedAsk);
+        $this->assertFalse($restrictedAsk['required_action']['allowed']);
+        $this->assertSame(
+            "You don't have access to open performance reviews yet. Ask the board chair.",
+            $restrictedAsk['required_action']['blocked_reason'],
+        );
+    }
+
     public function test_my_work_page_gives_pagination_links_that_keep_the_filters(): void
     {
         $member = User::find($this->fixtures['users']['member']);

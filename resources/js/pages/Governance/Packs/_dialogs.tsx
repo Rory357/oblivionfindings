@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -8,10 +7,20 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
-import { router } from '@inertiajs/react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Field, InfoCard, TilePicker } from '@/components/wizard/primitives';
+import { formatDateTimeLong } from '@/lib/datetime';
+import { meetingStatusLabel } from '@/lib/governance-labels';
+import { Link, router } from '@inertiajs/react';
 import axios from 'axios';
-import { AlertCircle, CalendarDays, FolderOpen, Loader2 } from 'lucide-react';
+import {
+    AlertCircle,
+    CalendarDays,
+    CalendarX2,
+    FolderOpen,
+    Info,
+    Loader2,
+} from 'lucide-react';
 import { useState } from 'react';
 
 export interface MeetingWithoutPack {
@@ -28,15 +37,24 @@ interface GenerateBoardPackDialogProps {
     meetings: MeetingWithoutPack[];
 }
 
-function formatScheduled(iso: string | null): string {
-    if (!iso) return 'Not scheduled';
-    return new Date(iso).toLocaleString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
+/** Meetings split into the ones a pack can be prepared for and the ones that need an agenda first. */
+export function splitMeetingsForPacks(meetings: MeetingWithoutPack[]): {
+    ready: MeetingWithoutPack[];
+    needsAgenda: MeetingWithoutPack[];
+} {
+    return {
+        ready: meetings.filter((m) => m.agenda_items_count > 0),
+        needsAgenda: meetings.filter((m) => m.agenda_items_count === 0),
+    };
+}
+
+function meetingFacts(meeting: MeetingWithoutPack): string {
+    return [
+        meeting.scheduled_at
+            ? formatDateTimeLong(meeting.scheduled_at)
+            : 'Date not set',
+        meetingStatusLabel(meeting.status),
+    ].join(' · ');
 }
 
 export function GenerateBoardPackDialog({
@@ -44,7 +62,34 @@ export function GenerateBoardPackDialog({
     onClose,
     meetings,
 }: GenerateBoardPackDialogProps) {
-    const [selectedId, setSelectedId] = useState<number | null>(null);
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent
+                className="max-h-[85vh] overflow-y-auto"
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
+            >
+                {isOpen ? (
+                    <GenerateBoardPackBody onClose={onClose} meetings={meetings} />
+                ) : null}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function GenerateBoardPackBody({
+    onClose,
+    meetings,
+}: {
+    onClose: () => void;
+    meetings: MeetingWithoutPack[];
+}) {
+    const { ready, needsAgenda } = splitMeetingsForPacks(meetings);
+    const [selectedId, setSelectedId] = useState<string>(
+        ready.length === 1 ? String(ready[0].id) : '',
+    );
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -64,144 +109,142 @@ export function GenerateBoardPackDialog({
                 },
             );
             const status = response.data?.status as string | undefined;
+            onClose();
             if (status === 'generated' && response.data?.pack_id) {
-                onClose();
                 router.visit(`/governance/packs/${response.data.pack_id}`);
             } else {
-                onClose();
                 router.reload();
             }
-        } catch (err: any) {
-            const status = err?.response?.status;
-            const message =
-                err?.response?.data?.message ??
-                (status === 403
-                    ? 'You do not have permission to generate this pack.'
-                    : 'Failed to generate the board pack. Make sure the meeting has at least one agenda item.');
-            setError(message);
+        } catch (err: unknown) {
+            const response = (
+                err as {
+                    response?: { status?: number; data?: { message?: string } };
+                }
+            )?.response;
+            setError(
+                response?.data?.message ??
+                    (response?.status === 403
+                        ? "You don't have permission to generate a board pack for this meeting."
+                        : "The board pack couldn't be generated. Try again in a few minutes."),
+            );
         } finally {
             setGenerating(false);
         }
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent
-                className="max-h-[85vh] overflow-y-auto"
-                style={{
-                    maxWidth: 'min(92vw, 720px)',
-                    width: 'min(92vw, 720px)',
-                }}
-            >
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <FolderOpen className="h-4 w-4 text-primary" />
-                        Generate Board Pack
-                    </DialogTitle>
-                    <DialogDescription>
-                        A board pack is generated from a meeting&apos;s agenda,
-                        CEO report, resolutions, and attendance. Pick a meeting
-                        below — one pack per meeting.
-                    </DialogDescription>
-                </DialogHeader>
+        <>
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <FolderOpen className="h-4 w-4 text-primary" />
+                    Generate a board pack
+                </DialogTitle>
+                <DialogDescription>
+                    Choose a meeting. The pack is put together from its agenda,
+                    CEO report and resolutions.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-3 flex flex-col gap-4">
+                <InfoCard icon={Info}>
+                    Generating creates a draft pack — nothing is sent. Members
+                    won&apos;t see it until you send it to them.
+                </InfoCard>
 
                 {meetings.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                        Every scheduled meeting already has a board pack. Add a
-                        new meeting first.
-                    </div>
-                ) : (
-                    <div className="space-y-2">
-                        {meetings.map((m) => {
-                            const active = selectedId === m.id;
-                            const hasAgenda = m.agenda_items_count > 0;
-                            return (
-                                <Button
-                                    unstyled
-                                    key={m.id}
-                                    type="button"
-                                    onClick={() => setSelectedId(m.id)}
-                                    className={cn(
-                                        'flex w-full items-start gap-3 rounded-xl border bg-card/40 p-3 text-left transition-all',
-                                        'hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                                        active
-                                            ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
-                                            : 'border-border',
-                                    )}
-                                    aria-pressed={active}
-                                    dusk={`pack-meeting-${m.id}`}
+                    <EmptyState
+                        variant="compact"
+                        icon={CalendarX2}
+                        title="No meetings need a pack"
+                        description="Every upcoming meeting already has a board pack. Schedule a meeting first, then come back here."
+                    />
+                ) : null}
+
+                {ready.length > 0 ? (
+                    <Field label="Meeting" required>
+                        <TilePicker
+                            value={selectedId}
+                            onChange={setSelectedId}
+                            options={ready.map((meeting) => ({
+                                key: String(meeting.id),
+                                label: meeting.title,
+                                description: meetingFacts(meeting),
+                                icon: CalendarDays,
+                                meta:
+                                    meeting.agenda_items_count === 1
+                                        ? '1 agenda item'
+                                        : `${meeting.agenda_items_count} agenda items`,
+                            }))}
+                        />
+                    </Field>
+                ) : null}
+
+                {needsAgenda.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                        <p className="text-sm font-medium">
+                            Add an agenda first
+                        </p>
+                        <p className="text-caption">
+                            These meetings have no agenda items yet, so a pack
+                            can&apos;t be generated for them.
+                        </p>
+                        <ul className="flex flex-col gap-2">
+                            {needsAgenda.map((meeting) => (
+                                <li
+                                    key={meeting.id}
+                                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-border px-3 py-2"
+                                    aria-disabled="true"
                                 >
-                                    <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
-                                        <CalendarDays className="h-4 w-4 text-status-info" />
-                                    </span>
-                                    <span className="min-w-0 flex-1 space-y-1">
-                                        <span className="flex flex-wrap items-center gap-2">
-                                            <span className="truncate text-sm font-medium">
-                                                {m.title}
-                                            </span>
-                                            <Badge
-                                                variant="outline"
-                                                className="text-[10px] uppercase"
-                                            >
-                                                {m.status}
-                                            </Badge>
-                                            <Badge
-                                                variant="outline"
-                                                className={cn(
-                                                    'text-[10px]',
-                                                    hasAgenda
-                                                        ? 'border-status-success/30 text-status-success'
-                                                        : 'border-status-warning/30 text-status-warning',
-                                                )}
-                                            >
-                                                {m.agenda_items_count} agenda{' '}
-                                                {m.agenda_items_count === 1
-                                                    ? 'item'
-                                                    : 'items'}
-                                            </Badge>
+                                    <span className="min-w-0">
+                                        <span className="block truncate text-sm text-muted-foreground">
+                                            {meeting.title}
                                         </span>
-                                        <span className="block text-xs text-muted-foreground">
-                                            Scheduled{' '}
-                                            {formatScheduled(m.scheduled_at)}
+                                        <span className="text-caption block">
+                                            {meetingFacts(meeting)}
                                         </span>
-                                        {!hasAgenda && (
-                                            <span className="block text-xs text-status-warning italic">
-                                                Add at least one agenda item
-                                                before generating.
-                                            </span>
-                                        )}
                                     </span>
-                                </Button>
-                            );
-                        })}
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link
+                                            href={`/governance/meetings/${meeting.id}`}
+                                        >
+                                            Add an agenda
+                                        </Link>
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
                     </div>
-                )}
+                ) : null}
 
-                {error && (
-                    <div className="flex items-start gap-2 rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
-                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                        <span>{error}</span>
-                    </div>
-                )}
+                {error ? (
+                    <InfoCard icon={AlertCircle} tone="crit">
+                        {error}
+                    </InfoCard>
+                ) : null}
+            </div>
 
-                <DialogFooter>
-                    <Button type="button" variant="outline" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={handleGenerate}
-                        disabled={!selectedId || generating}
-                        dusk="generate-pack-confirm"
-                    >
-                        {generating && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        Generate pack
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            <DialogFooter className="mt-4">
+                {ready.length > 0 && !selectedId ? (
+                    <p className="text-caption mr-auto self-center">
+                        Choose a meeting to continue.
+                    </p>
+                ) : null}
+                <Button type="button" variant="outline" onClick={onClose}>
+                    Cancel
+                </Button>
+                <Button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={!selectedId || generating}
+                    dusk="generate-pack-confirm"
+                >
+                    {generating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : null}
+                    Generate draft pack
+                </Button>
+            </DialogFooter>
+        </>
     );
 }
 

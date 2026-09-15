@@ -7,6 +7,7 @@ import {
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageHeaderStatusChip,
+    PageHeaderViewToggle,
     PageLayout,
 } from '@/components/page';
 import {
@@ -19,17 +20,29 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { riskScoreLevel } from '@/lib/governance-status';
+import {
+    riskImpactLabel,
+    riskLevelLabel,
+    riskLikelihoodLabel,
+} from '@/lib/governance-labels';
 import { cn } from '@/lib/utils';
 import { PageProps } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Grid3x3 } from 'lucide-react';
 
-import { RiskViewToggle, riskLevelVariant } from './_shared';
+import {
+    RISK_BANDS,
+    RiskScoreExplainer,
+    RiskViewToggle,
+    riskBand,
+    type RiskBand,
+} from './_shared';
 
 interface HeatmapCell {
     score: number;
     count: number;
+    likelihood: number;
+    impact: number;
 }
 
 interface TrendPoint {
@@ -37,47 +50,37 @@ interface TrendPoint {
     new_risks: number;
 }
 
+type Basis = 'before' | 'after';
+
 interface Props extends PageProps {
     heatmap: HeatmapCell[][];
+    bands: Record<Basis, Record<RiskBand, number>>;
     trend: TrendPoint[];
     categories?: Array<{ value: string; label: string }>;
-    filters?: { category?: string; active?: string };
+    filters?: { category?: string; include_closed?: string; score?: Basis };
 }
 
-const IMPACT_LABELS = [
-    'Insignificant',
-    'Minor',
-    'Moderate',
-    'Major',
-    'Catastrophic',
-];
-const LIKELIHOOD_LABELS = [
-    'Almost certain',
-    'Likely',
-    'Possible',
-    'Unlikely',
-    'Rare',
-];
-
-const LEVELS = ['Critical', 'High', 'Medium', 'Low'] as const;
-
-const LEVEL_RANGE: Record<(typeof LEVELS)[number], string> = {
-    Critical: '20–25',
-    High: '15–19',
-    Medium: '10–14',
-    Low: '1–9',
+const BASIS_LABEL: Record<Basis, string> = {
+    before: 'before controls',
+    after: 'after controls',
 };
 
-/** Token pair per band — safety colours never retint with branding. */
-function cellTone(score: number): string {
-    const level = riskScoreLevel(score);
-    if (level === 'Critical')
-        return 'border-status-critical/40 bg-status-critical-bg text-status-critical';
-    if (level === 'High')
-        return 'border-status-warning/60 bg-status-warning-bg text-status-warning';
-    if (level === 'Medium')
-        return 'border-status-warning/25 bg-status-warning-bg text-status-warning';
-    return 'border-status-success/30 bg-status-success-bg text-status-success';
+/**
+ * Cell look per band — a word in every cell so colour is never the only
+ * signal, and High gets its own dashed border so it reads apart from Medium.
+ * Safety colours never retint with branding.
+ */
+function cellTone(band: RiskBand): string {
+    switch (band) {
+        case 'critical':
+            return 'border-2 border-status-critical bg-status-critical-bg text-status-critical';
+        case 'high':
+            return 'border-2 border-dashed border-status-warning bg-status-warning-bg text-status-warning';
+        case 'medium':
+            return 'border border-status-warning/40 bg-status-warning-bg/50 text-status-warning';
+        default:
+            return 'border border-status-success/40 bg-status-success-bg text-status-success';
+    }
 }
 
 function monthLabel(month: string): string {
@@ -85,36 +88,42 @@ function monthLabel(month: string): string {
     if (!year || !m) return month;
     return new Date(Date.UTC(year, m - 1, 15)).toLocaleDateString('en-NZ', {
         month: 'short',
-        year: '2-digit',
+        year: 'numeric',
         timeZone: 'UTC',
     });
 }
 
 export default function RiskHeatmap({
     heatmap,
+    bands,
     trend,
     categories = [],
     filters = {},
 }: Props) {
+    const basis: Basis = filters.score === 'after' ? 'after' : 'before';
+    const includeClosed = filters.include_closed === '1';
     const cells = heatmap.flat();
     const total = cells.reduce((sum, c) => sum + c.count, 0);
-    const byLevel = cells.reduce<Record<string, number>>((acc, cell) => {
-        const level = riskScoreLevel(cell.score);
-        acc[level] = (acc[level] ?? 0) + cell.count;
-        return acc;
-    }, {});
+    const counts = bands[basis];
     const recentTrend = trend.slice(-6);
     const trendMax = Math.max(1, ...recentTrend.map((p) => p.new_risks));
     const categoryLabel = categories.find(
         (c) => c.value === filters.category,
     )?.label;
 
-    const scrollToMatrix = () =>
-        document
-            .getElementById('risk-matrix')
-            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Links into the register keep the same scope as these counts.
+    const registerHref = (params: Record<string, string | number | undefined>) => {
+        const query = new URLSearchParams();
+        if (filters.category) query.set('category', filters.category);
+        if (includeClosed) query.set('status', 'all');
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined) query.set(key, String(value));
+        });
+        const qs = query.toString();
+        return `/governance/risks${qs ? `?${qs}` : ''}`;
+    };
 
-    const go = (patch: { category?: string; active?: string }) => {
+    const go = (patch: { category?: string; include_closed?: string; score?: Basis }) => {
         const next = { ...filters, ...patch };
         router.get(
             '/governance/risks/heatmap',
@@ -130,95 +139,85 @@ export default function RiskHeatmap({
             icon={Grid3x3}
             title="Risk heatmap"
             titleChip={
-                (byLevel.Critical ?? 0) > 0 ? (
+                total === 0 ? (
+                    <PageHeaderStatusChip variant="neutral">
+                        No risks to show
+                    </PageHeaderStatusChip>
+                ) : counts.critical > 0 ? (
                     <PageHeaderStatusChip variant="critical">
-                        {byLevel.Critical} critical
+                        {counts.critical} critical {BASIS_LABEL[basis]}
                     </PageHeaderStatusChip>
                 ) : (
                     <PageHeaderStatusChip variant="success">
-                        No critical risks
+                        None critical {BASIS_LABEL[basis]}
                     </PageHeaderStatusChip>
                 )
             }
-            subline={`Likelihood × impact distribution · ${categoryLabel ?? 'All categories'} · ${filters.active ? 'active risks' : 'all statuses'}`}
+            subline={`Where risks sit by likelihood and impact · ${categoryLabel ?? 'All kinds of risk'} · ${includeClosed ? 'including closed risks' : 'open and accepted risks'}`}
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="On the matrix"
-                        ariaLabel="View the risk register"
-                        href="/governance/risks"
+                        label="On the heatmap"
+                        ariaLabel="View these risks on the register"
+                        href={registerHref({})}
                     >
                         <PageHeaderMeterBig>{total}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            risks assessed
+                            {includeClosed ? 'including closed' : 'open and accepted'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Critical"
-                        ariaLabel="View the critical band on the matrix"
-                        onClick={scrollToMatrix}
-                        tone={(byLevel.Critical ?? 0) > 0 ? 'critical' : 'brand'}
-                    >
-                        <PageHeaderMeterBig>
-                            {byLevel.Critical ?? 0}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            Inherent 20–25
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="High"
-                        ariaLabel="View the high band on the matrix"
-                        onClick={scrollToMatrix}
-                        tone={(byLevel.High ?? 0) > 0 ? 'warning' : 'brand'}
-                    >
-                        <PageHeaderMeterBig>{byLevel.High ?? 0}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            Inherent 15–19
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Medium"
-                        ariaLabel="View the medium band on the matrix"
-                        onClick={scrollToMatrix}
-                    >
-                        <PageHeaderMeterBig>
-                            {byLevel.Medium ?? 0}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            Inherent 10–14
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Low"
-                        ariaLabel="View the low band on the matrix"
-                        onClick={scrollToMatrix}
-                        tone="success"
-                    >
-                        <PageHeaderMeterBig>{byLevel.Low ?? 0}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>Inherent 1–9</PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
+                    {RISK_BANDS.map((band) => (
+                        <PageHeaderMeterBlock
+                            key={band.key}
+                            label={`${riskLevelLabel(band.key)} (${BASIS_LABEL[basis]})`}
+                            ariaLabel={`View ${riskLevelLabel(band.key).toLowerCase()} risks ${BASIS_LABEL[basis]} on the register`}
+                            href={registerHref({ severity: band.key, score: basis })}
+                            tone={
+                                counts[band.key] > 0
+                                    ? band.key === 'critical'
+                                        ? 'critical'
+                                        : band.key === 'low'
+                                          ? 'success'
+                                          : 'warning'
+                                    : 'brand'
+                            }
+                        >
+                            <PageHeaderMeterBig>{counts[band.key]}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                score {band.range}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ))}
                 </>
             }
             filters={
                 <>
                     <RiskViewToggle value="heatmap" />
                     <PageHeaderFilterSelect
-                        label="Category"
+                        label="All kinds of risk"
                         value={filters.category ?? 'all'}
                         options={[
-                            { value: 'all', label: 'All categories' },
+                            { value: 'all', label: 'All kinds of risk' },
                             ...categories,
                         ]}
                         onChange={(v) =>
                             go({ category: v === 'all' ? undefined : v })
                         }
                     />
+                    <PageHeaderViewToggle<Basis>
+                        ariaLabel="Which score the levels use"
+                        value={basis}
+                        onChange={(value) => go({ score: value })}
+                        options={[
+                            { value: 'before', label: 'Before controls' },
+                            { value: 'after', label: 'After controls' },
+                        ]}
+                    />
                     <PageHeaderFilterCheck
-                        label="Active only"
-                        checked={filters.active === '1'}
+                        label="Include closed"
+                        checked={includeClosed}
                         onChange={(checked) =>
-                            go({ active: checked ? '1' : undefined })
+                            go({ include_closed: checked ? '1' : undefined })
                         }
                     />
                 </>
@@ -242,38 +241,47 @@ export default function RiskHeatmap({
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
                     <Card id="risk-matrix" className="lg:col-span-2">
                         <CardHeader>
-                            <CardTitle>Inherent risk matrix</CardTitle>
-                            <CardDescription>
-                                Each cell counts the risks assessed at that
-                                likelihood and impact (score = likelihood ×
-                                impact).
-                            </CardDescription>
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                    <CardTitle>
+                                        Risks before controls (likelihood × impact)
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Each square counts the risks assessed at
+                                        that likelihood and impact. Controls lower
+                                        the score, not the likelihood or impact, so
+                                        this grid always shows risk before
+                                        controls. Select a square to see its risks.
+                                    </CardDescription>
+                                </div>
+                                <RiskScoreExplainer />
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="scrollbar-pretty overflow-x-auto">
                                 <div
                                     role="table"
-                                    aria-label="Risk matrix"
-                                    className="grid min-w-[560px] gap-1.5"
+                                    aria-label="Risks before controls by likelihood and impact"
+                                    className="grid min-w-[600px] gap-1.5"
                                     style={{
                                         gridTemplateColumns:
-                                            '112px repeat(5, minmax(0, 1fr))',
+                                            '120px repeat(5, minmax(0, 1fr))',
                                     }}
                                 >
                                     <div role="row" className="contents">
                                         <span
                                             role="columnheader"
-                                            className="text-caption self-end pb-1 text-right uppercase"
+                                            className="text-caption self-end pb-1 text-right"
                                         >
-                                            Likelihood ↓ / Impact →
+                                            Likelihood ↓ · Impact →
                                         </span>
-                                        {IMPACT_LABELS.map((label) => (
+                                        {[1, 2, 3, 4, 5].map((impact) => (
                                             <span
-                                                key={label}
+                                                key={impact}
                                                 role="columnheader"
                                                 className="text-caption pb-1 text-center"
                                             >
-                                                {label}
+                                                {impact} · {riskImpactLabel(String(impact))}
                                             </span>
                                         ))}
                                     </div>
@@ -287,56 +295,74 @@ export default function RiskHeatmap({
                                                 role="rowheader"
                                                 className="text-caption flex items-center justify-end pr-2 text-right"
                                             >
-                                                {LIKELIHOOD_LABELS[rowIndex]}
+                                                {row[0]?.likelihood} ·{' '}
+                                                {riskLikelihoodLabel(String(row[0]?.likelihood))}
                                             </span>
-                                            {row.map((cell, colIndex) => (
-                                                <span
-                                                    key={colIndex}
-                                                    role="cell"
-                                                    title={`${LIKELIHOOD_LABELS[rowIndex]} × ${IMPACT_LABELS[colIndex]}: score ${cell.score}, ${cell.count} ${cell.count === 1 ? 'risk' : 'risks'}`}
-                                                    className={cn(
-                                                        'flex h-16 flex-col items-center justify-center rounded-md border tabular-nums',
-                                                        cellTone(cell.score),
-                                                        cell.count === 0 &&
-                                                            'opacity-45',
-                                                    )}
-                                                >
-                                                    <span className="text-base leading-none font-bold">
-                                                        {cell.count}
+                                            {row.map((cell) => {
+                                                const band = riskBand(cell.score);
+                                                const place = `${riskLikelihoodLabel(String(cell.likelihood))} × ${riskImpactLabel(String(cell.impact))}`;
+                                                const label = `${cell.count} ${cell.count === 1 ? 'risk' : 'risks'}: ${place}, score ${cell.score} (${riskLevelLabel(band)})`;
+                                                const body = (
+                                                    <>
+                                                        <span className="text-base leading-none font-bold">
+                                                            {cell.count}
+                                                        </span>
+                                                        <span className="mt-1 text-xs leading-none font-medium">
+                                                            {riskLevelLabel(band)} · {cell.score}
+                                                        </span>
+                                                    </>
+                                                );
+                                                const classes = cn(
+                                                    'flex h-16 flex-col items-center justify-center rounded-md tabular-nums',
+                                                    cellTone(band),
+                                                );
+                                                return cell.count > 0 ? (
+                                                    <Link
+                                                        key={`${cell.likelihood}-${cell.impact}`}
+                                                        role="cell"
+                                                        href={registerHref({
+                                                            likelihood: cell.likelihood,
+                                                            impact: cell.impact,
+                                                        })}
+                                                        aria-label={label}
+                                                        className={cn(
+                                                            classes,
+                                                            'outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring',
+                                                        )}
+                                                    >
+                                                        {body}
+                                                    </Link>
+                                                ) : (
+                                                    <span
+                                                        key={`${cell.likelihood}-${cell.impact}`}
+                                                        role="cell"
+                                                        aria-label={`No risks: ${place}, score ${cell.score} (${riskLevelLabel(band)})`}
+                                                        className={cn(classes, 'opacity-50')}
+                                                    >
+                                                        {body}
                                                     </span>
-                                                    <span className="mt-1 text-[10.5px] leading-none font-medium">
-                                                        score {cell.score}
-                                                    </span>
-                                                </span>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                                {LEVELS.map((level) => (
+                            <div className="mt-5 flex flex-wrap items-center justify-center gap-4">
+                                {RISK_BANDS.map((band) => (
                                     <span
-                                        key={level}
+                                        key={band.key}
                                         className="flex items-center gap-2"
                                     >
                                         <span
                                             aria-hidden="true"
                                             className={cn(
-                                                'h-3.5 w-3.5 rounded-[4px] border',
-                                                cellTone(
-                                                    level === 'Critical'
-                                                        ? 20
-                                                        : level === 'High'
-                                                          ? 15
-                                                          : level === 'Medium'
-                                                            ? 10
-                                                            : 1,
-                                                ),
+                                                'h-4 w-4 rounded-[4px]',
+                                                cellTone(band.key),
                                             )}
                                         />
                                         <span className="text-subtle">
-                                            {level} ({LEVEL_RANGE[level]})
+                                            {riskLevelLabel(band.key)} ({band.range})
                                         </span>
                                     </span>
                                 ))}
@@ -347,44 +373,44 @@ export default function RiskHeatmap({
                     <div className="flex flex-col gap-5">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Risk distribution</CardTitle>
+                                <CardTitle>Risk levels {BASIS_LABEL[basis]}</CardTitle>
                                 <CardDescription>
-                                    Risks per inherent band
+                                    Use the switch in the header to compare before
+                                    and after controls
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="flex flex-col gap-3">
-                                {LEVELS.map((level) => (
-                                    <div
-                                        key={level}
-                                        className="flex items-center justify-between"
+                                {RISK_BANDS.map((band) => (
+                                    <Link
+                                        key={band.key}
+                                        href={registerHref({ severity: band.key, score: basis })}
+                                        className="flex items-center justify-between rounded-md px-1 py-0.5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                         <span className="text-sm">
-                                            {level}{' '}
-                                            <span className="text-caption">
-                                                {LEVEL_RANGE[level]}
-                                            </span>
+                                            {riskLevelLabel(band.key)}{' '}
+                                            <span className="text-caption">{band.range}</span>
                                         </span>
                                         <StatusBadge
-                                            variant={riskLevelVariant(
-                                                level === 'Critical'
-                                                    ? 20
-                                                    : level === 'Low'
-                                                      ? 1
-                                                      : 10,
-                                            )}
+                                            variant={
+                                                band.key === 'critical'
+                                                    ? 'critical'
+                                                    : band.key === 'low'
+                                                      ? 'success'
+                                                      : 'warning'
+                                            }
                                         >
-                                            {byLevel[level] ?? 0}
+                                            {counts[band.key]}
                                         </StatusBadge>
-                                    </div>
+                                    </Link>
                                 ))}
                             </CardContent>
                         </Card>
 
                         <Card>
                             <CardHeader>
-                                <CardTitle>New risks</CardTitle>
+                                <CardTitle>New risks added</CardTitle>
                                 <CardDescription>
-                                    Identified per month · last 6 months
+                                    Each month, for the last 6 months
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -395,29 +421,32 @@ export default function RiskHeatmap({
                                         title="No new risks in the last 6 months"
                                     />
                                 ) : (
-                                    <div className="flex flex-col gap-2">
+                                    <ul className="flex flex-col gap-2">
                                         {recentTrend.map((point) => (
-                                            <div
+                                            <li
                                                 key={point.month}
                                                 className="flex items-center gap-2"
                                             >
-                                                <span className="text-caption w-14">
+                                                <span className="text-caption w-20">
                                                     {monthLabel(point.month)}
                                                 </span>
-                                                <div className="h-3 flex-1 overflow-hidden rounded-full bg-muted">
-                                                    <div
-                                                        className="h-full rounded-full bg-primary"
+                                                <span
+                                                    aria-hidden="true"
+                                                    className="h-3 flex-1 overflow-hidden rounded-full bg-muted"
+                                                >
+                                                    <span
+                                                        className="block h-full rounded-full bg-primary"
                                                         style={{
                                                             width: `${(point.new_risks / trendMax) * 100}%`,
                                                         }}
                                                     />
-                                                </div>
+                                                </span>
                                                 <span className="w-6 text-right text-xs font-semibold tabular-nums">
                                                     {point.new_risks}
                                                 </span>
-                                            </div>
+                                            </li>
                                         ))}
-                                    </div>
+                                    </ul>
                                 )}
                             </CardContent>
                         </Card>

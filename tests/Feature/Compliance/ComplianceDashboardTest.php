@@ -220,7 +220,7 @@ class ComplianceDashboardTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->has('whatsDue.obligations', 1)
                 ->where('whatsDue.obligations.0.title', 'Annual self-assessment')
-                ->where('whatsDue.obligations.0.framework', 'Ngā Paerewa NZS 8134:2021')
+                ->where('whatsDue.obligations.0.framework', \App\Domain\Governance\Models\ComplianceObligation::frameworkOptions()['nga_paerewa'])
                 ->where('whatsDue.obligations.0.type', 'obligation')
             );
     }

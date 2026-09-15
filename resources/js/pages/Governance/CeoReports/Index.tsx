@@ -75,16 +75,20 @@ const ALL = '__all';
 
 const STATUS_OPTIONS = [
     { value: ALL, label: 'Any status' },
-    { value: 'draft', label: 'Draft' },
-    { value: 'submitted', label: 'Submitted' },
-    { value: 'presented', label: 'Presented' },
-    { value: 'overdue', label: 'Overdue drafts' },
+    { value: 'draft', label: ceoReportStatusLabel('draft') },
+    { value: 'submitted', label: ceoReportStatusLabel('submitted') },
+    { value: 'presented', label: ceoReportStatusLabel('presented') },
+    { value: 'overdue', label: 'Drafts past their deadline' },
 ];
 
 function deadlineChip(report: Report) {
     if (report.status !== 'draft') return null;
     if (report.is_overdue) {
-        return <EntityStatusChip variant="critical">Overdue</EntityStatusChip>;
+        return (
+            <EntityStatusChip variant="critical">
+                Past the deadline
+            </EntityStatusChip>
+        );
     }
     if (report.days_until_deadline == null) return null;
     const label =
@@ -151,8 +155,12 @@ export default function CeoReportsIndex({
     const actionsFor = (report: Report): MenuItem[] =>
         compactMenu([
             {
-                label: report.status === 'draft' ? 'Continue draft' : 'Read report',
-                icon: report.status === 'draft' ? Pencil : BookOpen,
+                label:
+                    report.status === 'draft' && can_create
+                        ? 'Continue draft'
+                        : 'Read report',
+                icon:
+                    report.status === 'draft' && can_create ? Pencil : BookOpen,
                 onClick: () => open(report),
             },
         ]);
@@ -160,8 +168,8 @@ export default function CeoReportsIndex({
     const header = (
         <PageHeader
             icon={FileText}
-            title="CEO Board Reports"
-            subline="CEO updates for the board — narrative, KPIs, decisions sought and matters arising"
+            title="CEO reports"
+            subline="The CEO's update to the board for each meeting — what happened, key figures and decisions needed"
             actions={
                 <>
                     <PageHeaderSearch
@@ -188,34 +196,33 @@ export default function CeoReportsIndex({
                     >
                         <PageHeaderMeterBig>{counts.draft}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Being prepared
+                            Still being written
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Overdue"
+                        label="Past the deadline"
                         href="/governance/ceo-reports?status=overdue"
                         tone={counts.overdue > 0 ? 'critical' : 'brand'}
                     >
                         <PageHeaderMeterBig>{counts.overdue}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Drafts past their deadline
+                            Drafts not submitted in time
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Submitted"
+                        label="Waiting for the board"
                         href="/governance/ceo-reports?status=submitted"
                     >
                         <PageHeaderMeterBig>
                             {counts.submitted}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Ready for the board
+                            Submitted, not presented yet
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Presented"
                         href="/governance/ceo-reports?status=presented"
-                        tone={counts.presented > 0 ? 'success' : 'brand'}
                     >
                         <PageHeaderMeterBig>
                             {counts.presented}
@@ -249,7 +256,7 @@ export default function CeoReportsIndex({
                 { title: 'CEO reports', href: '/governance/ceo-reports' },
             ]}
         >
-            <Head title="CEO Board Reports" />
+            <Head title="CEO reports" />
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
                     <ListCaption

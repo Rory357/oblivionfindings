@@ -1,4 +1,5 @@
 import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
 import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
 import { meetingWorkspaceUrl } from '@/components/governance/meeting-workspace-links';
 import {
@@ -44,9 +45,12 @@ import {
     formatDurationMinutes,
     formatTime,
 } from '@/lib/datetime';
+import { governanceLabel, meetingTypeLabel } from '@/lib/governance-labels';
+import { canDoGovernance } from '@/lib/governance-permissions';
 import { PageProps } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
+    ArrowLeft,
     CalendarDays,
     CalendarRange,
     ClipboardList,
@@ -58,14 +62,10 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import {
-    MeetingWizardDialog,
-    meetingStatusLabel,
-    meetingStatusVariant,
-    meetingTypeLabel,
-    MEETING_STATUS_OPTIONS,
-    type MeetingFormOptions,
-} from './_dialogs';
+import { MeetingWizardDialog, type MeetingFormOptions } from './_dialogs';
+import { MEETING_STATUS_FILTERS, meetingStatusChip } from './_workspace';
+
+type QuorumState = 'met' | 'not_met' | 'not_recorded' | 'upcoming' | 'cancelled';
 
 interface Meeting {
     id: number;
@@ -77,6 +77,10 @@ interface Meeting {
     virtual_link?: string | null;
     status: string;
     quorum_met: boolean;
+    /** What the register can truthfully say about the quorum (server-derived). */
+    quorum_state?: QuorumState;
+    /** The viewer runs this meeting (edits it or handles its minutes). */
+    can_run?: boolean;
     committee?: { id: number; name: string } | null;
     chair?: { user: { name: string } } | null;
     secretary?: { user: { name: string } } | null;
@@ -103,6 +107,8 @@ interface Props extends PageProps {
         upcoming: number;
         minutes_pending: number;
         held: number;
+        /** Held meetings whose quorum is known (attendance was recorded). */
+        held_recorded?: number;
         held_quorum_met: number;
         next_meeting: { id: number; title: string; scheduled_at: string } | null;
         today: string;
@@ -122,6 +128,20 @@ const EMPTY_FILTERS: Filters = {
     search: null,
 };
 
+function QuorumCell({ state }: { state?: QuorumState }) {
+    switch (state) {
+        case 'met':
+            return <EntityStatusChip variant="success">Met</EntityStatusChip>;
+        case 'not_met':
+            return <EntityStatusChip variant="warning">Not met</EntityStatusChip>;
+        case 'not_recorded':
+            return <EntityStatusChip variant="neutral">Not recorded</EntityStatusChip>;
+        default:
+            // Before a meeting (or for a cancelled one) there's nothing to say yet.
+            return <EmptyValue />;
+    }
+}
+
 export default function MeetingsIndex({
     auth,
     meetings,
@@ -133,6 +153,12 @@ export default function MeetingsIndex({
     initialScheduledAt = null,
 }: Props) {
     const canSchedule = canCreate && formOptions !== null;
+    // Members reach Meetings from Home, and have no Meetings hub in the
+    // sidebar — give them the way back.
+    const governancePermissions =
+        (auth as { can?: { governance?: Record<string, unknown> } })?.can
+            ?.governance ?? null;
+    const showHomeLink = !canDoGovernance(governancePermissions, 'meetings', 'manage');
     // Retired /meetings/create deep links (and calendar slots) arrive as ?create=1.
     const [createOpen, setCreateOpen] = useDialogDeepLink('create', canSchedule);
     const [search, setSearch] = useState(filters.search ?? '');
@@ -151,9 +177,7 @@ export default function MeetingsIndex({
         const merged = { ...filters, ...patch };
         router.get(
             '/governance/meetings',
-            Object.fromEntries(
-                Object.entries(merged).filter(([, value]) => value),
-            ),
+            Object.fromEntries(Object.entries(merged).filter(([, value]) => value)),
             { preserveState: true, preserveScroll: true, replace: true },
         );
     };
@@ -186,7 +210,7 @@ export default function MeetingsIndex({
                 onClick: () => open(meeting),
             },
             {
-                label: 'Papers & resolutions',
+                label: 'Resolutions',
                 icon: Vote,
                 onClick: () => open(meeting, 'resolutions'),
             },
@@ -195,25 +219,28 @@ export default function MeetingsIndex({
                 icon: Pencil,
                 onClick: () => open(meeting, 'minutes'),
             },
-            {
-                label: 'Workflow checklist',
-                icon: ClipboardList,
-                onClick: () => open(meeting, 'workflow'),
-            },
+            // The checklist is the chair and secretary's; nobody else has a Workflow tab.
+            meeting.can_run
+                ? {
+                      label: 'Workflow checklist',
+                      icon: ClipboardList,
+                      onClick: () => open(meeting, 'workflow'),
+                  }
+                : null,
         ]);
 
     const typeOptions = [
         { value: ALL, label: 'Any type' },
-        ...Object.entries(meetingTypes).map(([value, label]) => ({
-            value,
-            label,
-        })),
+        ...Object.entries(meetingTypes).map(([value, label]) => ({ value, label })),
     ];
     const statusOptions = [
         { value: ALL, label: 'Any status' },
-        { value: 'upcoming', label: 'Upcoming' },
-        { value: 'minutes_pending', label: 'Awaiting minutes' },
-        ...MEETING_STATUS_OPTIONS,
+        { value: 'upcoming', label: governanceLabel('meeting_status', 'upcoming') },
+        { value: 'minutes_pending', label: governanceLabel('meeting_status', 'minutes_pending') },
+        ...MEETING_STATUS_FILTERS.map((value) => ({
+            value,
+            label: meetingStatusChip(value).label,
+        })),
     ];
     const rangeLabel =
         filters.from || filters.to
@@ -221,18 +248,27 @@ export default function MeetingsIndex({
             : 'Any date';
 
     const next = summary?.next_meeting ?? null;
+    const heldRecorded = summary ? (summary.held_recorded ?? summary.held) : 0;
     const heldPct =
-        summary && summary.held > 0
-            ? Math.round((summary.held_quorum_met / summary.held) * 100)
+        summary && heldRecorded > 0
+            ? Math.round((summary.held_quorum_met / heldRecorded) * 100)
             : null;
 
     const header = (
         <PageHeader
             icon={CalendarDays}
-            title="Board meetings"
-            subline={`Board and committee meetings · ${summary?.upcoming ?? 0} upcoming · ${summary?.total ?? meetings.total ?? meetings.data.length} on record`}
+            title="Meetings"
+            subline={`Board and committee meetings · ${summary?.upcoming ?? 0} coming up · ${summary?.total ?? meetings.total ?? meetings.data.length} on record`}
             actions={
                 <>
+                    {showHomeLink ? (
+                        <PageHeaderGlassButton
+                            icon={ArrowLeft}
+                            onClick={() => router.visit('/governance/dashboard')}
+                        >
+                            Governance home
+                        </PageHeaderGlassButton>
+                    ) : null}
                     <PageHeaderSearch
                         value={search}
                         onChange={setSearch}
@@ -240,9 +276,7 @@ export default function MeetingsIndex({
                     />
                     <PageHeaderGlassButton
                         icon={CalendarRange}
-                        onClick={() =>
-                            router.visit('/governance/meetings/calendar')
-                        }
+                        onClick={() => router.visit('/governance/meetings/calendar')}
                     >
                         Calendar
                     </PageHeaderGlassButton>
@@ -270,7 +304,7 @@ export default function MeetingsIndex({
                             ariaLabel={
                                 next
                                     ? `Open the next meeting: ${next.title}`
-                                    : 'View upcoming meetings'
+                                    : 'Show meetings coming up'
                             }
                         >
                             <PageHeaderMeterBig>
@@ -283,47 +317,42 @@ export default function MeetingsIndex({
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
-                            label="Upcoming"
+                            label="Coming up"
                             href="/governance/meetings?status=upcoming"
-                            ariaLabel="View upcoming meetings"
+                            ariaLabel="Show meetings coming up"
                         >
                             <PageHeaderMeterBig>{summary.upcoming}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>
-                                Scheduled from today
-                            </PageHeaderMeterCaption>
+                            <PageHeaderMeterCaption>Scheduled from today</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
-                            label="Awaiting minutes"
+                            label="Minutes to finish"
                             href="/governance/meetings?status=minutes_pending"
-                            ariaLabel="View meetings awaiting minutes"
+                            ariaLabel="Show meetings whose minutes aren't finished"
                             tone={summary.minutes_pending > 0 ? 'warning' : 'brand'}
                         >
-                            <PageHeaderMeterBig>
-                                {summary.minutes_pending}
-                            </PageHeaderMeterBig>
+                            <PageHeaderMeterBig>{summary.minutes_pending}</PageHeaderMeterBig>
                             <PageHeaderMeterCaption>
-                                Minutes in draft or review
+                                Being written or waiting for approval
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
                             label="Quorum met"
                             value={
                                 heldPct !== null
-                                    ? `${summary.held_quorum_met}/${summary.held}`
+                                    ? `${summary.held_quorum_met}/${heldRecorded}`
                                     : undefined
                             }
                             href={`/governance/meetings?to=${summary.today}`}
-                            ariaLabel="View meetings already held"
+                            ariaLabel="Show meetings already held"
                         >
                             {heldPct !== null ? (
                                 <PageHeaderMeterDonut
                                     percent={heldPct}
                                     caption={
                                         <>
-                                            {summary.held_quorum_met} of{' '}
-                                            {summary.held}
+                                            {summary.held_quorum_met} of {heldRecorded}
                                             <br />
-                                            held meetings
+                                            with attendance recorded
                                         </>
                                     }
                                 />
@@ -331,7 +360,9 @@ export default function MeetingsIndex({
                                 <>
                                     <PageHeaderMeterBig>—</PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        No meetings held yet
+                                        {summary.held > 0
+                                            ? 'No attendance recorded yet'
+                                            : 'No meetings held yet'}
                                     </PageHeaderMeterCaption>
                                 </>
                             )}
@@ -339,12 +370,10 @@ export default function MeetingsIndex({
                         <PageHeaderMeterBlock
                             label="All meetings"
                             href="/governance/meetings"
-                            ariaLabel="View every meeting"
+                            ariaLabel="Show every meeting"
                         >
                             <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>
-                                Scheduled and held
-                            </PageHeaderMeterCaption>
+                            <PageHeaderMeterCaption>Scheduled and held</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                     </>
                 ) : undefined
@@ -356,18 +385,14 @@ export default function MeetingsIndex({
                         value={filters.status ?? ALL}
                         allValue={ALL}
                         options={statusOptions}
-                        onChange={(value) =>
-                            go({ status: value === ALL ? null : value })
-                        }
+                        onChange={(value) => go({ status: value === ALL ? null : value })}
                     />
                     <PageHeaderFilterSelect
                         label="Any type"
                         value={filters.meeting_type ?? ALL}
                         allValue={ALL}
                         options={typeOptions}
-                        onChange={(value) =>
-                            go({ meeting_type: value === ALL ? null : value })
-                        }
+                        onChange={(value) => go({ meeting_type: value === ALL ? null : value })}
                     />
                     <Popover open={rangeOpen} onOpenChange={setRangeOpen}>
                         <PopoverTrigger asChild>
@@ -385,10 +410,7 @@ export default function MeetingsIndex({
                                 onSubmit={(e) => {
                                     e.preventDefault();
                                     setRangeOpen(false);
-                                    go({
-                                        from: range.from || null,
-                                        to: range.to || null,
-                                    });
+                                    go({ from: range.from || null, to: range.to || null });
                                 }}
                             >
                                 <div className="flex flex-col gap-1.5">
@@ -397,12 +419,7 @@ export default function MeetingsIndex({
                                         id="meetings-from"
                                         type="date"
                                         value={range.from}
-                                        onChange={(e) =>
-                                            setRange((r) => ({
-                                                ...r,
-                                                from: e.target.value,
-                                            }))
-                                        }
+                                        onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
                                     />
                                 </div>
                                 <div className="flex flex-col gap-1.5">
@@ -411,12 +428,7 @@ export default function MeetingsIndex({
                                         id="meetings-to"
                                         type="date"
                                         value={range.to}
-                                        onChange={(e) =>
-                                            setRange((r) => ({
-                                                ...r,
-                                                to: e.target.value,
-                                            }))
-                                        }
+                                        onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
                                     />
                                 </div>
                                 <div className="flex justify-between gap-2">
@@ -461,22 +473,22 @@ export default function MeetingsIndex({
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
                     <ListCaption
-                        title={
-                            filters.status === 'upcoming'
-                                ? 'Upcoming meetings'
-                                : 'Meetings'
-                        }
+                        title={filters.status === 'upcoming' ? 'Meetings coming up' : 'Meetings'}
                         caption={`${meetings.data.length} of ${total} shown`}
+                        right={
+                            meetings.data.length > 0 ? (
+                                <span className="text-caption flex items-center gap-1">
+                                    Quorum: enough members present for decisions to be valid
+                                    <GovernanceTermHint term="quorum" align="end" />
+                                </span>
+                            ) : undefined
+                        }
                     />
 
                     {meetings.data.length === 0 ? (
                         <EmptyState
                             icon={CalendarDays}
-                            title={
-                                hasFilters
-                                    ? 'No meetings match your filters'
-                                    : 'No meetings yet'
-                            }
+                            title={hasFilters ? 'No meetings match your filters' : 'No meetings yet'}
                             description={
                                 hasFilters
                                     ? 'Try clearing a filter, search term or date range.'
@@ -484,19 +496,12 @@ export default function MeetingsIndex({
                             }
                             action={
                                 hasFilters ? (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={clearFilters}
-                                    >
+                                    <Button variant="outline" size="sm" onClick={clearFilters}>
                                         <X className="h-3.5 w-3.5" />
                                         Clear filters
                                     </Button>
                                 ) : canSchedule ? (
-                                    <Button
-                                        size="sm"
-                                        onClick={() => setCreateOpen(true)}
-                                    >
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
                                         <Plus className="h-3.5 w-3.5" />
                                         Schedule meeting
                                     </Button>
@@ -509,14 +514,9 @@ export default function MeetingsIndex({
                             rowKey={(meeting) => meeting.id}
                             identityLabel="Meeting"
                             identity={(meeting) => ({
-                                icon:
-                                    meeting.meeting_type === 'executive_session'
-                                        ? Lock
-                                        : CalendarDays,
+                                icon: meeting.meeting_type === 'executive_session' ? Lock : CalendarDays,
                                 name: meeting.title,
-                                subline:
-                                    meeting.committee?.name ??
-                                    meetingTypeLabel(meeting.meeting_type),
+                                subline: meeting.committee?.name ?? meetingTypeLabel(meeting.meeting_type),
                             })}
                             hrefFor={(meeting) => meetingWorkspaceUrl(meeting.id)}
                             onOpen={(meeting) => open(meeting)}
@@ -535,9 +535,7 @@ export default function MeetingsIndex({
                                             </span>
                                             <span className="truncate text-xs text-muted-foreground">
                                                 {formatTime(meeting.scheduled_at)} ·{' '}
-                                                {formatDurationMinutes(
-                                                    meeting.duration_minutes,
-                                                )}
+                                                {formatDurationMinutes(meeting.duration_minutes)}
                                             </span>
                                         </span>
                                     ),
@@ -548,12 +546,7 @@ export default function MeetingsIndex({
                                     width: '0.9fr',
                                     cell: (meeting) => (
                                         <EntityChip
-                                            icon={
-                                                meeting.meeting_type ===
-                                                'executive_session'
-                                                    ? Lock
-                                                    : undefined
-                                            }
+                                            icon={meeting.meeting_type === 'executive_session' ? Lock : undefined}
                                         >
                                             {meetingTypeLabel(meeting.meeting_type)}
                                         </EntityChip>
@@ -563,25 +556,16 @@ export default function MeetingsIndex({
                                     key: 'status',
                                     label: 'Status',
                                     width: '0.9fr',
-                                    cell: (meeting) => (
-                                        <EntityStatusChip
-                                            variant={meetingStatusVariant(
-                                                meeting.status,
-                                            )}
-                                        >
-                                            {meetingStatusLabel(meeting.status)}
-                                        </EntityStatusChip>
-                                    ),
+                                    cell: (meeting) => {
+                                        const chip = meetingStatusChip(meeting.status);
+                                        return <EntityStatusChip variant={chip.variant}>{chip.label}</EntityStatusChip>;
+                                    },
                                 },
                                 {
                                     key: 'chair',
                                     label: 'Chair',
                                     width: '1fr',
-                                    cell: (meeting) => (
-                                        <PersonCell
-                                            name={meeting.chair?.user?.name}
-                                        />
-                                    ),
+                                    cell: (meeting) => <PersonCell name={meeting.chair?.user?.name} />,
                                 },
                                 {
                                     key: 'location',
@@ -589,16 +573,11 @@ export default function MeetingsIndex({
                                     width: '1fr',
                                     cell: (meeting) =>
                                         meeting.location ? (
-                                            <span
-                                                className="truncate"
-                                                title={meeting.location}
-                                            >
+                                            <span className="truncate" title={meeting.location}>
                                                 {meeting.location}
                                             </span>
                                         ) : meeting.virtual_link ? (
-                                            <span className="truncate">
-                                                Online
-                                            </span>
+                                            <span className="truncate">Online</span>
                                         ) : (
                                             <EmptyValue />
                                         ),
@@ -606,15 +585,15 @@ export default function MeetingsIndex({
                                 {
                                     key: 'quorum',
                                     label: 'Quorum',
-                                    width: '0.6fr',
-                                    cell: (meeting) =>
-                                        meeting.quorum_met ? (
-                                            <EntityStatusChip variant="success">
-                                                Met
-                                            </EntityStatusChip>
-                                        ) : (
-                                            <EmptyValue />
-                                        ),
+                                    width: '0.7fr',
+                                    cell: (meeting) => (
+                                        <QuorumCell
+                                            state={
+                                                meeting.quorum_state ??
+                                                (meeting.quorum_met ? 'met' : undefined)
+                                            }
+                                        />
+                                    ),
                                 },
                             ]}
                         />

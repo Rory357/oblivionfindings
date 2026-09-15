@@ -1,14 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import {
-    BookOpen,
-    Download,
-    Eye,
-    FolderOpen,
-    Landmark,
-    Tag,
-    Upload,
-    X,
-} from 'lucide-react';
+import { BookOpen, Download, Eye, FolderOpen, Landmark, Tag, Upload, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
@@ -24,12 +15,14 @@ import {
 } from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderFilterCheck,
     PageHeaderFilterSelect,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
     PageHeaderSearch,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -46,9 +39,10 @@ interface Document {
     id: number;
     title: string;
     category: string;
+    category_label: string;
     file_name: string;
+    format_label: string;
     file_size: number;
-    is_confidential: boolean;
     version: number;
     updated_at: string | null;
 }
@@ -56,6 +50,7 @@ interface Document {
 interface Filters {
     search: string | null;
     document_type: string | null;
+    updated: string | null;
 }
 
 interface Props extends PageProps {
@@ -80,6 +75,10 @@ function cleanParams(values: Partial<Filters>): Record<string, string> {
             ([, v]) => v !== null && v !== undefined && v !== '' && v !== 'all',
         ),
     ) as Record<string, string>;
+}
+
+function plural(count: number, one: string, many: string): string {
+    return `${count} ${count === 1 ? one : many}`;
 }
 
 export default function DocumentsIndex({
@@ -118,10 +117,11 @@ export default function DocumentsIndex({
     const typeCount = (type: string): number =>
         (summary.by_type as Record<string, number>)[type] ?? 0;
     const categoryLabel = (value: string) =>
-        categories.find((c) => c.value === value)?.label ??
-        value.replace(/_/g, ' ');
+        categories.find((c) => c.value === value)?.label ?? value;
 
-    const hasFilters = Boolean(filters.search || filters.document_type);
+    const hasFilters = Boolean(
+        filters.search || filters.document_type || filters.updated,
+    );
     const clearFilters = () =>
         router.get('/governance/documents', {}, { preserveScroll: true });
 
@@ -144,18 +144,16 @@ export default function DocumentsIndex({
             width: '1.1fr',
             cell: (d) => (
                 <EntityChip icon={documentTypeIcon(d.category)}>
-                    {categoryLabel(d.category)}
+                    {d.category_label}
                 </EntityChip>
             ),
         },
         {
-            key: 'version',
-            label: 'Version',
-            width: '0.5fr',
+            key: 'format',
+            label: 'Format',
+            width: '0.8fr',
             cell: (d) => (
-                <span className="text-muted-foreground tabular-nums">
-                    v{d.version}
-                </span>
+                <span className="text-muted-foreground">{d.format_label}</span>
             ),
         },
         {
@@ -179,14 +177,21 @@ export default function DocumentsIndex({
     const header = (
         <PageHeader
             icon={FolderOpen}
-            title="Governance documents"
-            subline="Constitution, terms of reference, templates and board archives"
+            title="Documents"
+            titleChip={
+                <PageHeaderStatusChip variant={summary.total > 0 ? 'info' : 'neutral'}>
+                    {summary.total > 0
+                        ? plural(summary.total, 'document', 'documents')
+                        : 'No documents yet'}
+                </PageHeaderStatusChip>
+            }
+            subline="Reference files: constitution, terms of reference, templates, certificates"
             actions={
                 <>
                     <PageHeaderSearch
                         value={search}
                         onChange={setSearch}
-                        placeholder="Search documents by title…"
+                        placeholder="Search documents…"
                     />
                     {canManage ? (
                         <PageHeaderPrimaryButton
@@ -202,61 +207,72 @@ export default function DocumentsIndex({
                 <>
                     <PageHeaderMeterBlock
                         label="Documents"
-                        ariaLabel="View all documents"
+                        ariaLabel="Show all documents"
                         href="/governance/documents"
                     >
                         <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            in the governance library
+                            reference files
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Constitution"
-                        ariaLabel="View constitution and charter documents"
+                        label={categoryLabel('constitution')}
+                        ariaLabel="Show governing documents"
                         href="/governance/documents?document_type=constitution"
                     >
                         <PageHeaderMeterBig>
                             {typeCount('constitution')}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {typeCount('terms_of_reference')} terms of reference
+                            constitution or trust deed
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Board policies"
-                        ariaLabel="View board policy documents"
-                        href="/governance/documents?document_type=policy"
+                        label={categoryLabel('terms_of_reference')}
+                        ariaLabel="Show terms of reference"
+                        href="/governance/documents?document_type=terms_of_reference"
                     >
-                        <PageHeaderMeterBig>{typeCount('policy')}</PageHeaderMeterBig>
+                        <PageHeaderMeterBig>
+                            {typeCount('terms_of_reference')}
+                        </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {typeCount('procedure')} procedures
+                            for the board and committees
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Updated · 30 days"
-                        ariaLabel="View recently updated documents"
-                        href="/governance/documents"
+                        label="Updated in the last 30 days"
+                        ariaLabel="Show documents updated in the last 30 days"
+                        href="/governance/documents?updated=30d"
                     >
                         <PageHeaderMeterBig>
                             {summary.updated_last_30_days}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            newest listed first
+                            newest first
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
             }
             filters={
-                <PageHeaderFilterSelect
-                    icon={Tag}
-                    label="All document types"
-                    value={filters.document_type ?? 'all'}
-                    options={[
-                        { value: 'all', label: 'All document types' },
-                        ...categories,
-                    ]}
-                    onChange={(v) => go({ document_type: v })}
-                />
+                <>
+                    <PageHeaderFilterSelect
+                        icon={Tag}
+                        label="Type"
+                        value={filters.document_type ?? 'all'}
+                        options={[
+                            { value: 'all', label: 'All document types' },
+                            ...categories,
+                        ]}
+                        onChange={(v) => go({ document_type: v })}
+                    />
+                    <PageHeaderFilterCheck
+                        label="Updated in the last 30 days"
+                        checked={filters.updated === '30d'}
+                        onChange={(checked) =>
+                            go({ updated: checked ? '30d' : null })
+                        }
+                    />
+                </>
             }
             rail={<GovernanceSectionRail />}
         />
@@ -271,14 +287,16 @@ export default function DocumentsIndex({
                 { title: 'Documents', href: '/governance/documents' },
             ]}
         >
-            <Head title="Governance documents" />
+            <Head title="Documents" />
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
                     <ListCaption
                         title={
                             filters.document_type
                                 ? categoryLabel(filters.document_type)
-                                : 'Document library'
+                                : filters.updated
+                                  ? 'Updated in the last 30 days'
+                                  : 'All documents'
                         }
                         caption={`${documents.data.length} of ${documents.total} shown`}
                         right={
@@ -306,10 +324,10 @@ export default function DocumentsIndex({
                             }
                             description={
                                 hasFilters
-                                    ? 'Try clearing the type filter or search term.'
+                                    ? 'Try clearing a filter or the search.'
                                     : canManage
                                       ? 'Upload the constitution, terms of reference and board templates.'
-                                      : 'Board documents will appear here once they are uploaded.'
+                                      : 'Board documents appear here once they are uploaded.'
                             }
                             action={
                                 hasFilters ? (

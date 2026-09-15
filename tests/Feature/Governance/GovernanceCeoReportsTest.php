@@ -104,4 +104,88 @@ class GovernanceCeoReportsTest extends TestCase
         $this->assertSame(CeoBoardReport::STATUS_SUBMITTED, $report->status);
         $this->assertSame('Approve FY27 budget', $report->decisions_sought[0]['title']);
     }
+
+    public function test_a_5pm_nz_deadline_is_stored_as_the_real_instant_and_shown_back_as_5pm(): void
+    {
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin, ['scheduled_at' => now()->addMonth()]);
+
+        // 20 August is NZ standard time (UTC+12): 5:00 pm NZ = 5:00 am UTC.
+        $this->actingAs($admin)->post('/governance/ceo-reports', [
+            'governance_meeting_id' => $meeting->id,
+            'deadline' => '2026-08-20T17:00',
+        ])->assertRedirect();
+
+        $report = CeoBoardReport::firstOrFail();
+        $this->assertSame('2026-08-20 05:00:00', $report->deadline->utc()->format('Y-m-d H:i:s'));
+        $this->assertSame(
+            '2026-08-20 17:00',
+            $report->deadline->copy()->setTimezone('Pacific/Auckland')->format('Y-m-d H:i'),
+        );
+
+        $this->actingAs($admin)->get("/governance/ceo-reports/{$report->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('report.deadline', '2026-08-20T05:00:00+00:00')
+                ->where('report.title', "CEO report — {$meeting->title}"));
+
+        // Editing and saving the same wall time again keeps it at 5:00 pm.
+        $this->actingAs($admin)->put("/governance/ceo-reports/{$report->id}", [
+            'deadline' => '2026-08-20T17:00',
+            'executive_summary' => 'Updated',
+        ])->assertRedirect()->assertSessionHas('success', 'Changes saved.');
+
+        $this->assertSame('2026-08-20 05:00:00', $report->fresh()->deadline->utc()->format('Y-m-d H:i:s'));
+    }
+
+    public function test_a_meeting_can_only_have_one_report_and_the_message_says_so(): void
+    {
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin, ['scheduled_at' => now()->addWeek()]);
+        CeoBoardReport::create([
+            'governance_meeting_id' => $meeting->id,
+            'submitted_by' => $admin->id,
+            'status' => CeoBoardReport::STATUS_DRAFT,
+        ]);
+
+        $this->actingAs($admin)
+            ->from('/governance/ceo-reports')
+            ->post('/governance/ceo-reports', ['governance_meeting_id' => $meeting->id])
+            ->assertSessionHasErrors([
+                'governance_meeting_id' => 'That meeting already has a CEO report. Open it from the CEO reports list instead.',
+            ]);
+
+        $this->assertSame(1, CeoBoardReport::query()->count());
+    }
+
+    public function test_submitted_reports_are_locked_and_presented_only_after_submission(): void
+    {
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin, ['scheduled_at' => now()->addWeek()]);
+        $report = CeoBoardReport::create([
+            'governance_meeting_id' => $meeting->id,
+            'submitted_by' => $admin->id,
+            'status' => CeoBoardReport::STATUS_DRAFT,
+            'executive_summary' => 'Draft wording',
+        ]);
+
+        $this->actingAs($admin)->from("/governance/ceo-reports/{$report->id}")
+            ->post("/governance/ceo-reports/{$report->id}/present")
+            ->assertSessionHas('error', 'Submit the report to the board before marking it as presented.');
+        $this->assertTrue($report->fresh()->isDraft());
+
+        $this->actingAs($admin)->from("/governance/ceo-reports/{$report->id}")
+            ->post("/governance/ceo-reports/{$report->id}/submit")
+            ->assertSessionHas('success', "Report sent to the board. It can't be edited now.");
+        $this->assertTrue($report->fresh()->isSubmitted());
+
+        $this->actingAs($admin)->from("/governance/ceo-reports/{$report->id}")
+            ->put("/governance/ceo-reports/{$report->id}", ['executive_summary' => 'Changed after submitting'])
+            ->assertSessionHas('error', "This report has been sent to the board, so it can't be edited.");
+        $this->assertSame('Draft wording', $report->fresh()->executive_summary);
+
+        $this->actingAs($admin)->from("/governance/ceo-reports/{$report->id}")
+            ->post("/governance/ceo-reports/{$report->id}/present")
+            ->assertSessionHas('success', 'Report marked as presented to the board.');
+        $this->assertTrue($report->fresh()->isPresented());
+    }
 }

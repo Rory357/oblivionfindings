@@ -6,9 +6,11 @@ use App\Domain\Governance\Models\CeoBoardReport;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Services\DashboardAggregatorService;
 use App\Http\Controllers\Controller;
+use App\Support\WorkerClock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class CeoBoardReportController extends Controller
@@ -98,7 +100,9 @@ class CeoBoardReportController extends Controller
             ? response()->json(['id' => $report->id, 'status' => $report->status])
             : redirect()
                 ->route('governance.ceo-reports.show', $report)
-                ->with('success', 'CEO report created.');
+                ->with('success', $report->isSubmitted()
+                    ? "Report sent to the board. It can't be edited now."
+                    : "Draft saved. It stays a draft until you submit it to the board.");
     }
 
     public function show(CeoBoardReport $report)
@@ -117,7 +121,15 @@ class CeoBoardReportController extends Controller
     {
         $this->authorize('update', $report);
 
-        $validated = $this->validateReport($request, creating: false);
+        if (! $report->isDraft()) {
+            $message = "This report has been sent to the board, so it can't be edited.";
+
+            return $request->wantsJson()
+                ? response()->json(['message' => $message], 422)
+                : redirect()->back()->with('error', $message);
+        }
+
+        $validated = $this->validateReport($request, creating: false, report: $report);
         // Cannot reassign the meeting after creation (one report per meeting unique constraint).
         unset($validated['governance_meeting_id']);
 
@@ -125,25 +137,35 @@ class CeoBoardReportController extends Controller
 
         return $request->wantsJson()
             ? response()->json(['id' => $report->id])
-            : redirect()->back()->with('success', 'CEO report updated.');
+            : redirect()->back()->with('success', 'Changes saved.');
     }
 
     public function submit(CeoBoardReport $report)
     {
         $this->authorize('submit', $report);
 
+        if (! $report->isDraft()) {
+            return redirect()->back()->with('error', 'This report has already been sent to the board.');
+        }
+
         $report->submit($this->captureKpiSnapshot());
 
-        return redirect()->back()->with('success', 'CEO report submitted to board.');
+        return redirect()->back()->with('success', "Report sent to the board. It can't be edited now.");
     }
 
     public function markPresented(CeoBoardReport $report)
     {
         $this->authorize('submit', $report);
 
+        if (! $report->isSubmitted()) {
+            return redirect()->back()->with('error', $report->isPresented()
+                ? 'This report is already marked as presented.'
+                : 'Submit the report to the board before marking it as presented.');
+        }
+
         $report->markPresented(auth()->user());
 
-        return redirect()->back()->with('success', 'CEO report marked as presented.');
+        return redirect()->back()->with('success', 'Report marked as presented to the board.');
     }
 
     public function kpiSnapshot()
@@ -163,6 +185,10 @@ class CeoBoardReportController extends Controller
     {
         $this->authorize('update', $report);
 
+        if (! $report->isDraft()) {
+            return response()->json(['message' => "This report has been sent to the board, so its files can't be changed."], 422);
+        }
+
         $request->validate([
             'files' => 'required|array|min:1|max:10',
             'files.*' => [
@@ -171,6 +197,11 @@ class CeoBoardReportController extends Controller
                 'max:20480', // 20 MB per file
                 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif,webp,csv,txt,md',
             ],
+        ], [
+            'files.required' => 'Choose at least one file.',
+            'files.max' => 'Add up to 10 files at a time.',
+            'files.*.max' => 'Each file must be 20 MB or smaller.',
+            'files.*.mimes' => 'Files must be PDF, Word, Excel, PowerPoint, an image, CSV or text.',
         ]);
 
         $existing = is_array($report->attachments) ? $report->attachments : [];
@@ -196,8 +227,8 @@ class CeoBoardReportController extends Controller
         $report->update(['attachments' => $existing]);
 
         return $request->wantsJson()
-            ? response()->json(['attachments' => $existing])
-            : redirect()->back()->with('success', 'Attachment(s) uploaded.');
+            ? response()->json(['attachments' => $this->presentAttachments($report->fresh())])
+            : redirect()->back()->with('success', count($request->file('files')) === 1 ? 'File added.' : 'Files added.');
     }
 
     /**
@@ -207,11 +238,15 @@ class CeoBoardReportController extends Controller
     {
         $this->authorize('update', $report);
 
+        if (! $report->isDraft()) {
+            return response()->json(['message' => "This report has been sent to the board, so its files can't be changed."], 422);
+        }
+
         $existing = is_array($report->attachments) ? $report->attachments : [];
         $target = collect($existing)->firstWhere('id', $attachment);
 
         if (! $target) {
-            abort(404, 'Attachment not found.');
+            abort(404, "That file couldn't be found.");
         }
 
         if (isset($target['path']) && Storage::disk('local')->exists($target['path'])) {
@@ -225,8 +260,8 @@ class CeoBoardReportController extends Controller
         $report->update(['attachments' => $remaining]);
 
         return $request->wantsJson()
-            ? response()->json(['attachments' => $remaining])
-            : redirect()->back()->with('success', 'Attachment removed.');
+            ? response()->json(['attachments' => $this->presentAttachments($report->fresh())])
+            : redirect()->back()->with('success', 'File removed.');
     }
 
     /**
@@ -240,7 +275,7 @@ class CeoBoardReportController extends Controller
         $target = collect($existing)->firstWhere('id', $attachment);
 
         if (! $target || empty($target['path']) || ! Storage::disk('local')->exists($target['path'])) {
-            abort(404, 'Attachment not found.');
+            abort(404, "That file couldn't be found.");
         }
 
         return Storage::disk('local')->download(
@@ -250,10 +285,29 @@ class CeoBoardReportController extends Controller
         );
     }
 
-    protected function validateReport(Request $request, bool $creating): array
+    protected function validateReport(Request $request, bool $creating, ?CeoBoardReport $report = null): array
     {
+        // The wizard's <input type="datetime-local"> sends NZ wall time
+        // ("2026-08-20T17:00"). Store the real instant, not that wall time as
+        // UTC — otherwise the deadline moves by 12–13 hours.
+        $deadline = $request->input('deadline');
+        if (is_string($deadline) && trim($deadline) !== '') {
+            try {
+                $utc = WorkerClock::toUtc(trim($deadline));
+                if ($utc !== null) {
+                    $request->merge(['deadline' => $utc->toDateTimeString()]);
+                }
+            } catch (\Throwable) {
+                // The `date` rule reports an unreadable value.
+            }
+        }
+
+        $meetingRule = $creating
+            ? ['required', 'exists:governance_meetings,id', Rule::unique('ceo_board_reports', 'governance_meeting_id')]
+            : ['sometimes', 'exists:governance_meetings,id'];
+
         $rules = [
-            'governance_meeting_id' => ($creating ? 'required' : 'sometimes').'|exists:governance_meetings,id',
+            'governance_meeting_id' => $meetingRule,
             'period_start' => 'nullable|date',
             'period_end' => 'nullable|date|after_or_equal:period_start',
             'deadline' => 'nullable|date',
@@ -275,7 +329,18 @@ class CeoBoardReportController extends Controller
             'matters_arising.*.update' => 'nullable|string',
         ];
 
-        return $request->validate($rules);
+        return $request->validate($rules, [
+            'governance_meeting_id.required' => 'Choose the board meeting this report is for.',
+            'governance_meeting_id.exists' => "The meeting you chose doesn't exist any more. Choose another meeting.",
+            'governance_meeting_id.unique' => 'That meeting already has a CEO report. Open it from the CEO reports list instead.',
+            'period_start.date' => 'Enter the start of the reporting period as a date.',
+            'period_end.date' => 'Enter the end of the reporting period as a date.',
+            'period_end.after_or_equal' => "The reporting period can't end before it starts.",
+            'deadline.date' => 'Enter the deadline as a date and time.',
+            'decisions_sought.*.title.max' => 'Keep each decision title under 255 characters.',
+            'matters_arising.*.title.max' => 'Keep each matter title under 255 characters.',
+            'matters_arising.*.status.max' => 'Choose a status for each matter arising.',
+        ]);
     }
 
     /**
@@ -347,8 +412,8 @@ class CeoBoardReportController extends Controller
         $report->loadMissing(['meeting', 'submittedBy', 'presentedBy']);
 
         $title = $report->meeting
-            ? 'CEO Report — '.$report->meeting->title
-            : 'CEO Report #'.$report->id;
+            ? 'CEO report — '.$report->meeting->title
+            : 'CEO report';
 
         $base = [
             'id' => $report->id,

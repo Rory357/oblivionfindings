@@ -1,302 +1,299 @@
+import { Head, router } from '@inertiajs/react';
+import { BarChart3, Eye, ShieldAlert, Users } from 'lucide-react';
+
+import {
+    EmptyValue,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+} from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterAvatars,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
+import { refSuffix } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
-import { Head } from '@inertiajs/react';
-import { BarChart3 } from 'lucide-react';
 
-interface Metric {
-    label: string;
-    value: string;
-    tone: string;
-}
+import { riskBandLabel, riskLevelVariant, riskStatusChip } from '../Risks/_shared';
+import {
+    GeneratedAt,
+    ReportSections,
+    metricTone,
+    plural,
+    type ReportMetric,
+    type ReportSection,
+} from './_shared';
 
-interface ReportCard {
-    key: string;
+interface CommitteeRisk {
+    id: number;
+    reference: string | null;
     title: string;
-    description: string;
+    category: string;
+    residual_score: number;
+    owner: string | null;
+    within_appetite: boolean;
     status: string;
-    metrics: Metric[];
-    highlights: string[];
 }
 
 interface Props extends PageProps {
     report: {
         committee: {
-            name: string;
-            description?: string | null;
-        };
-        headline: Metric[];
-        sections: Array<{
-            key: string;
-            title: string;
-            cards: ReportCard[];
-        }>;
-        risks: Array<{
             id: number;
-            reference: string;
-            title: string;
-            category: string;
-            residual_score: number;
-            owner: string | null;
-            within_appetite: boolean;
-        }>;
+            name: string;
+            type: string;
+            description?: string | null;
+            members: Array<{ name: string; role: string; is_chair: boolean }>;
+            categories: Array<{ value: string; label: string }>;
+            risk_view_href: string;
+        };
+        headline: ReportMetric[];
+        sections: ReportSection[];
+        risks: CommitteeRisk[];
     };
+    committees: Array<{ id: number; name: string; type: string }>;
+    period: { label: string };
     generatedAt: string;
 }
 
-const statusStyles: Record<string, string> = {
-    good: 'bg-status-success-bg text-status-success border-status-success/30',
-    warning:
-        'bg-status-warning-bg text-status-warning border-status-warning/30',
-    critical:
-        'bg-status-critical-bg text-status-critical border-status-critical/30',
-    unknown: 'bg-muted text-foreground border-border',
-};
+function scrollToMembers() {
+    document
+        .getElementById('committee-members')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
-const toneStyles: Record<string, string> = {
-    default: 'text-foreground',
-    warning: 'text-status-warning',
-    critical: 'text-status-critical',
-    muted: 'text-muted-foreground',
-};
+export default function CommitteeReport({
+    auth,
+    report,
+    committees = [],
+    period,
+    generatedAt,
+}: Props) {
+    const { committee } = report;
+    const highOrCritical = report.risks.filter((risk) => risk.residual_score >= 15).length;
+    const critical = report.risks.filter((risk) => risk.residual_score >= 20).length;
+    const oversees = committee.categories.map((c) => c.label.toLowerCase()).join(', ');
 
-const severityStyle = (score: number) => {
-    if (score >= 20) return 'bg-status-critical text-white';
-    if (score >= 15) return 'bg-status-warning text-white';
-    if (score >= 10) return 'bg-status-warning text-foreground';
-
-    return 'bg-status-success text-white';
-};
-
-export default function CommitteeReport({ auth, report, generatedAt }: Props) {
     return (
         <AppLayout
             user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Reports', href: '/governance/reports/board-monthly' },
-                { title: `${report.committee.name} Report`, href: '/governance/reports/board-monthly' },
+                { title: 'Risk register', href: '/governance/risks' },
+                {
+                    title: `${committee.name} report`,
+                    href: `/governance/reports/committee/${committee.id}`,
+                },
             ]}
         >
-            <Head title={`${report.committee.name} Report`} />
+            <Head title={`${committee.name} report`} />
 
             <PageLayout
                 hero={
                     <PageHeader
                         icon={BarChart3}
-                        title={`${report.committee.name} Report`}
-                        subline={
-                            report.committee.description ||
-                            'Committee-level assurance, delivery, and decision support.'
+                        title={`${committee.name} report`}
+                        titleChip={
+                            critical > 0 ? (
+                                <PageHeaderStatusChip variant="critical">
+                                    {plural(critical, 'critical risk', 'critical risks')}
+                                </PageHeaderStatusChip>
+                            ) : highOrCritical > 0 ? (
+                                <PageHeaderStatusChip variant="warning">
+                                    {plural(highOrCritical, 'high risk', 'high risks')}
+                                </PageHeaderStatusChip>
+                            ) : (
+                                <PageHeaderStatusChip variant="success">
+                                    No high or critical risks
+                                </PageHeaderStatusChip>
+                            )
                         }
-                        backHref="/governance/reports/board-monthly"
+                        subline={`${period.label}${oversees ? ` · Oversees ${oversees} risks` : ''}`}
+                        backHref={committee.risk_view_href}
+                        actions={
+                            <PageHeaderGlassButton
+                                icon={ShieldAlert}
+                                onClick={() => router.visit(committee.risk_view_href)}
+                            >
+                                Committee risks
+                            </PageHeaderGlassButton>
+                        }
                         meters={
                             <>
+                                {report.headline.map((metric) => (
+                                    <PageHeaderMeterBlock
+                                        key={metric.label}
+                                        label={metric.label}
+                                        href={metric.href ?? committee.risk_view_href}
+                                        tone={metricTone(metric.tone)}
+                                        ariaLabel={`Open ${committee.name} risks`}
+                                    >
+                                        <PageHeaderMeterBig>{metric.value}</PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {metric.label === 'High or critical'
+                                                ? 'score 15 or more after controls'
+                                                : 'open or accepted by the board'}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ))}
                                 <PageHeaderMeterBlock
-                                    label="Sections"
-                                    href="/governance/reports/board-monthly"
+                                    label="Members"
+                                    value={committee.members.length}
+                                    ariaLabel="Go to this committee's members"
+                                    onClick={scrollToMembers}
                                 >
-                                    <PageHeaderMeterBig>
-                                        {report.sections.length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Reporting domains</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Risks"
-                                    href="/governance/risks"
-                                    tone={report.risks.length > 0 ? 'warning' : undefined}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {report.risks.length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Assigned risks</PageHeaderMeterCaption>
+                                    {committee.members.length > 0 ? (
+                                        <PageHeaderMeterAvatars
+                                            people={committee.members
+                                                .slice(0, 6)
+                                                .map((member, index) => ({
+                                                    id: `${member.name}-${index}`,
+                                                    name: member.name,
+                                                    detail: member.role,
+                                                }))}
+                                            overflow={Math.max(0, committee.members.length - 6)}
+                                        />
+                                    ) : (
+                                        <PageHeaderMeterCaption>
+                                            No current members
+                                        </PageHeaderMeterCaption>
+                                    )}
                                 </PageHeaderMeterBlock>
                             </>
+                        }
+                        filters={
+                            committees.length > 1 ? (
+                                <PageHeaderFilterSelect
+                                    icon={Users}
+                                    label="Committee"
+                                    value={String(committee.id)}
+                                    allValue={String(committee.id)}
+                                    options={committees.map((c) => ({
+                                        value: String(c.id),
+                                        label: c.name,
+                                    }))}
+                                    onChange={(value) =>
+                                        router.visit(`/governance/reports/committee/${value}`)
+                                    }
+                                />
+                            ) : undefined
                         }
                     />
                 }
             >
-                <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    {report.headline.map((metric) => (
-                        <Card key={metric.label}>
-                            <CardContent className="pt-6">
-                                <p className="text-sm text-muted-foreground">
-                                    {metric.label}
-                                </p>
-                                <p
-                                    className={cn(
-                                        'mt-2 text-3xl font-bold',
-                                        toneStyles[metric.tone] ??
-                                            toneStyles.default,
-                                    )}
-                                >
-                                    {metric.value}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                <ReportSections sections={report.sections} />
 
-                <div className="space-y-8">
-                    {report.sections.map((section) => (
-                        <section key={section.key} className="space-y-4">
-                            <h2 className="text-xl font-semibold text-foreground">
-                                {section.title}
-                            </h2>
-                            <div className="grid gap-4 lg:grid-cols-2">
-                                {section.cards.map((card) => (
-                                    <Card key={card.key}>
-                                        <CardHeader className="space-y-3 pb-3">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div>
-                                                    <CardTitle className="text-lg">
-                                                        {card.title}
-                                                    </CardTitle>
-                                                    <CardDescription>
-                                                        {card.description}
-                                                    </CardDescription>
-                                                </div>
-                                                <Badge
-                                                    className={
-                                                        statusStyles[
-                                                            card.status
-                                                        ] ??
-                                                        statusStyles.unknown
-                                                    }
-                                                >
-                                                    {card.status.replace(
-                                                        /_/g,
-                                                        ' ',
-                                                    )}
-                                                </Badge>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {card.metrics.map((metric) => (
-                                                    <div
-                                                        key={`${card.key}-${metric.label}`}
-                                                        className="rounded-lg bg-muted p-3"
-                                                    >
-                                                        <p className="text-xs tracking-wide text-muted-foreground uppercase">
-                                                            {metric.label}
-                                                        </p>
-                                                        <p
-                                                            className={cn(
-                                                                'mt-1 text-lg font-semibold',
-                                                                toneStyles[
-                                                                    metric.tone
-                                                                ] ??
-                                                                    toneStyles.default,
-                                                            )}
-                                                        >
-                                                            {metric.value}
-                                                        </p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            {card.highlights.length > 0 && (
-                                                <div className="space-y-2">
-                                                    {card.highlights
-                                                        .slice(0, 3)
-                                                        .map((highlight) => (
-                                                            <p
-                                                                key={highlight}
-                                                                className="rounded-lg border border-border px-3 py-2 text-sm text-foreground"
-                                                            >
-                                                                {highlight}
-                                                            </p>
-                                                        ))}
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        </section>
-                    ))}
-                </div>
+                <section className="flex flex-col gap-3" aria-label="Risks this committee oversees">
+                    <ListCaption
+                        title="Risks this committee oversees"
+                        caption={`Highest after controls first · ${plural(report.risks.length, 'risk', 'risks')}`}
+                    />
+                    {report.risks.length === 0 ? (
+                        <EmptyState
+                            icon={ShieldAlert}
+                            title="No open risks for this committee"
+                            description="Risks appear here when they are open or accepted by the board and belong to this committee's kinds of risk."
+                        />
+                    ) : (
+                        <EntityTable<CommitteeRisk>
+                            rows={report.risks}
+                            rowKey={(risk) => risk.id}
+                            identityLabel="Risk"
+                            identity={(risk) => ({
+                                icon: ShieldAlert,
+                                name: risk.title,
+                                subline: [risk.category, refSuffix(risk.reference)]
+                                    .filter(Boolean)
+                                    .join(' · '),
+                            })}
+                            hrefFor={(risk) => `/governance/risks/${risk.id}`}
+                            actionsFor={(risk) => [
+                                {
+                                    label: 'Open risk',
+                                    icon: Eye,
+                                    onClick: () => router.visit(`/governance/risks/${risk.id}`),
+                                },
+                            ]}
+                            onOpen={(risk) => router.visit(`/governance/risks/${risk.id}`)}
+                            minWidth={760}
+                            columns={[
+                                {
+                                    key: 'after',
+                                    label: 'Risk after controls',
+                                    width: '1fr',
+                                    cell: (risk) => (
+                                        <EntityStatusChip variant={riskLevelVariant(risk.residual_score)}>
+                                            {risk.residual_score} · {riskBandLabel(risk.residual_score)}
+                                        </EntityStatusChip>
+                                    ),
+                                },
+                                {
+                                    key: 'status',
+                                    label: 'Status',
+                                    width: '1.1fr',
+                                    cell: (risk) => {
+                                        const chip = riskStatusChip(risk);
+                                        return (
+                                            <EntityStatusChip variant={chip.variant}>
+                                                {chip.label}
+                                            </EntityStatusChip>
+                                        );
+                                    },
+                                },
+                                {
+                                    key: 'owner',
+                                    label: 'Owner',
+                                    width: '0.9fr',
+                                    cell: (risk) =>
+                                        risk.owner ? (
+                                            <span className="truncate">{risk.owner}</span>
+                                        ) : (
+                                            <EmptyValue />
+                                        ),
+                                },
+                            ]}
+                        />
+                    )}
+                </section>
 
-                <Card className="mt-8">
+                <Card id="committee-members" className="scroll-mt-24">
                     <CardHeader>
-                        <CardTitle>Assigned Risks</CardTitle>
-                        <CardDescription>
-                            Highest residual exposure within this committee’s
-                            remit.
-                        </CardDescription>
+                        <CardTitle>Members</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-3">
-                        {report.risks.length ? (
-                            report.risks.map((risk) => (
-                                <div
-                                    key={risk.id}
-                                    className="flex flex-col gap-3 rounded-lg border border-border p-4 lg:flex-row lg:items-center lg:justify-between"
-                                >
-                                    <div className="space-y-1">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <p className="font-medium text-foreground">
-                                                {risk.title}
-                                            </p>
-                                            <Badge variant="outline">
-                                                {risk.reference}
-                                            </Badge>
-                                            <Badge variant="outline">
-                                                {risk.category}
-                                            </Badge>
-                                        </div>
-                                        {risk.owner && (
-                                            <p className="text-sm text-muted-foreground">
-                                                Owner: {risk.owner}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        {!risk.within_appetite && (
-                                            <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">
-                                                Outside appetite
-                                            </Badge>
-                                        )}
-                                        <Badge
-                                            className={severityStyle(
-                                                risk.residual_score,
-                                            )}
-                                        >
-                                            {risk.residual_score}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-sm text-muted-foreground">
-                                No risks are currently assigned to this
-                                committee.
+                    <CardContent>
+                        {committee.members.length === 0 ? (
+                            <p className="text-subtle">
+                                Nobody is appointed to this committee at the moment.
                             </p>
+                        ) : (
+                            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {committee.members.map((member, index) => (
+                                    <li
+                                        key={`${member.name}-${index}`}
+                                        className="flex flex-col rounded-lg border border-border px-3 py-2"
+                                    >
+                                        <span className="text-sm font-medium text-foreground">
+                                            {member.name}
+                                        </span>
+                                        <span className="text-caption">{member.role}</span>
+                                    </li>
+                                ))}
+                            </ul>
                         )}
                     </CardContent>
                 </Card>
 
-                <p className="mt-6 text-right text-sm text-muted-foreground">
-                    Generated{' '}
-                    {new Date(generatedAt).toLocaleString('en-NZ', {
-                        timeZone: 'Pacific/Auckland',
-                    })}
-                </p>
+                <GeneratedAt at={generatedAt} />
             </PageLayout>
         </AppLayout>
     );

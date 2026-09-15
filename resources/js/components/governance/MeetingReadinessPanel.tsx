@@ -20,6 +20,8 @@ export interface MeetingChecklistItem {
     key: string;
     label: string;
     status: 'done' | 'todo' | 'in_progress' | 'blocked' | string;
+    /** Plain status name from the server (falls back to the key's label). */
+    status_label?: string;
     detail: string;
     action_label: string;
     action_url: string;
@@ -195,7 +197,7 @@ export function MeetingReadinessPanel({
                         const meta =
                             STATUS_ICON[item.status] ?? STATUS_ICON.todo;
                         const badge = STATUS_BADGE[item.status] ?? {
-                            label: humaniseGovernanceValue(item.status) || 'To do',
+                            label: item.status_label || humaniseGovernanceValue(item.status) || 'To do',
                             variant: 'neutral' as const,
                         };
                         const StatusIcon = meta.icon;

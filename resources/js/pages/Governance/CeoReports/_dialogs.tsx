@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DiscardDraftDialog } from '@/components/governance/DiscardDraftDialog';
 import {
     firstErrorStep,
@@ -5,6 +6,7 @@ import {
 } from '@/components/governance/governance-dialog-deep-link';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import type { StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,7 +24,13 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/wizard/shell';
-import { formatDateLong, formatDateOnly } from '@/lib/datetime';
+import {
+    formatDateLong,
+    formatDateOnly,
+    toDateInput,
+    toDatetimeLocal,
+} from '@/lib/datetime';
+import { governanceStatus } from '@/lib/governance-labels';
 import { router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -47,18 +55,56 @@ import { useEffect, useMemo, useState } from 'react';
 import { AttachmentsPanel, type Attachment } from './_attachments';
 
 export function ceoReportStatusVariant(status: string): StatusVariant {
-    switch (status) {
-        case 'presented':
-            return 'success';
-        case 'submitted':
-            return 'info';
-        default:
-            return 'neutral';
-    }
+    return governanceStatus('ceo_report_status', status).variant;
 }
 
 export const ceoReportStatusLabel = (status: string) =>
-    status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
+    governanceStatus('ceo_report_status', status).label;
+
+/** One chip for a report: "Overdue" wins while a draft is past its deadline. */
+export function ceoReportChip(status: string, isOverdue: boolean) {
+    return governanceStatus(
+        'ceo_report_status',
+        isOverdue && status === 'draft' ? 'overdue' : status,
+    );
+}
+
+/** Matters arising carry their own simple status. */
+export const MATTER_STATUSES = [
+    { value: 'open', label: 'Open', variant: 'warning' as StatusVariant },
+    {
+        value: 'in_progress',
+        label: 'In progress',
+        variant: 'info' as StatusVariant,
+    },
+    { value: 'done', label: 'Done', variant: 'success' as StatusVariant },
+];
+
+export function matterStatus(status: string | null | undefined) {
+    return (
+        MATTER_STATUSES.find((option) => option.value === status) ??
+        MATTER_STATUSES[0]
+    );
+}
+
+/** "2026-09-10T17:00" (NZ wall time from a datetime input) → "10 Sep 2026, 5:00 pm". */
+export function formatWallTime(value: string | null | undefined): string | null {
+    if (!value) return null;
+    const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(value);
+    if (!match) return null;
+    const [, date, hours, minutes] = match;
+    const hour = Number(hours);
+    const suffix = hour >= 12 ? 'pm' : 'am';
+    const twelve = hour % 12 === 0 ? 12 : hour % 12;
+    return `${formatDateOnly(date)}, ${twelve}:${minutes} ${suffix}`;
+}
+
+/** Whole-day arithmetic on a calendar date string, free of time zones. */
+function shiftDate(ymd: string, days: number, months = 0): string {
+    const [year, month, day] = ymd.split('-').map(Number);
+    const shifted = new Date(Date.UTC(year, month - 1 + months, day + days));
+    return shifted.toISOString().slice(0, 10);
+}
 
 // ── Form shape ────────────────────────────────────────────────────────────
 
@@ -117,7 +163,7 @@ export const CEO_REPORT_SECTIONS: Array<{ key: SectionKey; label: string }> = [
     { key: 'operational_summary', label: 'Operational summary' },
     { key: 'key_achievements', label: 'Key achievements' },
     { key: 'financial_summary', label: 'Financial summary' },
-    { key: 'challenges_and_risks', label: 'Challenges & risks' },
+    { key: 'challenges_and_risks', label: 'Challenges and risks' },
     { key: 'compliance_status', label: 'Compliance status' },
     { key: 'staffing_update', label: 'Workforce update' },
     { key: 'recommendations', label: 'Strategic progress' },
@@ -138,8 +184,8 @@ type StepKey =
 export const CEO_REPORT_STEPS: readonly (WizardStep & { key: StepKey })[] = [
     {
         key: 'meeting',
-        label: 'Meeting & period',
-        blurb: 'Board meeting, period & deadline',
+        label: 'Meeting and period',
+        blurb: 'Board meeting, period and deadline',
         icon: CalendarDays,
     },
     {
@@ -150,20 +196,20 @@ export const CEO_REPORT_STEPS: readonly (WizardStep & { key: StepKey })[] = [
     },
     {
         key: 'operations',
-        label: 'Operations & people',
-        blurb: 'Utilisation, wins & workforce',
+        label: 'Operations and people',
+        blurb: 'Services, wins and workforce',
         icon: Briefcase,
     },
     {
         key: 'finance',
-        label: 'Finance & risk',
-        blurb: 'Financials, risks & compliance',
+        label: 'Finance and risk',
+        blurb: 'Money, risks and compliance',
         icon: ShieldCheck,
     },
     {
         key: 'strategy',
-        label: 'Strategy & decisions',
-        blurb: 'Strategic progress & decisions sought',
+        label: 'Strategy and decisions',
+        blurb: 'Strategic progress and decisions sought',
         icon: Gavel,
     },
     {
@@ -222,10 +268,12 @@ function DecisionsSoughtEditor({
     return (
         <div className="space-y-3">
             {rows.length === 0 && (
-                <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                    No decisions for the board this period. Add one if you need
-                    a vote.
-                </div>
+                <EmptyState
+                    variant="compact"
+                    icon={Gavel}
+                    title="No decisions for the board"
+                    description="Add one if you need the board to decide something."
+                />
             )}
             {rows.map((row, i) => (
                 <GuardrailCard
@@ -236,7 +284,7 @@ function DecisionsSoughtEditor({
                     <div className="flex items-start justify-between gap-2">
                         <Input
                             aria-label={`Decision ${i + 1} title`}
-                            placeholder="Decision title (e.g. Approve FY27 budget)"
+                            placeholder="e.g. Approve the 2026/27 budget"
                             value={row.title}
                             onChange={(e) =>
                                 update(i, { title: e.target.value })
@@ -263,7 +311,7 @@ function DecisionsSoughtEditor({
                     <Textarea
                         rows={2}
                         aria-label={`Decision ${i + 1} recommendation`}
-                        placeholder="CEO recommendation to the board."
+                        placeholder="What the CEO recommends the board decides."
                         value={row.recommendation}
                         onChange={(e) =>
                             update(i, { recommendation: e.target.value })
@@ -296,9 +344,12 @@ function MattersArisingEditor({
     return (
         <div className="space-y-3">
             {rows.length === 0 && (
-                <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                    Nothing carried over from the previous report.
-                </div>
+                <EmptyState
+                    variant="compact"
+                    icon={MessageCircleQuestion}
+                    title="Nothing carried over"
+                    description="Add anything from the last meeting the board asked to hear back about."
+                />
             )}
             {rows.map((row, i) => (
                 <GuardrailCard
@@ -322,14 +373,10 @@ function MattersArisingEditor({
                                 onChange={(v) => update(i, { status: v })}
                                 placeholder="Status"
                                 ariaLabel={`Matter ${i + 1} status`}
-                                options={[
-                                    { value: 'open', label: 'Open' },
-                                    {
-                                        value: 'in_progress',
-                                        label: 'In progress',
-                                    },
-                                    { value: 'done', label: 'Done' },
-                                ]}
+                                options={MATTER_STATUSES.map((option) => ({
+                                    value: option.value,
+                                    label: option.label,
+                                }))}
                             />
                         </div>
                         <Button
@@ -369,22 +416,25 @@ function defaultsFromMeeting(meeting: MeetingOption | null): {
     if (!meeting?.scheduled_at) {
         return { period_start: '', period_end: '', deadline: '' };
     }
-    const dt = new Date(meeting.scheduled_at);
-    const end = new Date(dt);
-    end.setDate(end.getDate() - 1);
-    const start = new Date(end);
-    start.setMonth(start.getMonth() - 1);
-    start.setDate(start.getDate() + 1);
-    const deadline = new Date(dt);
-    deadline.setDate(deadline.getDate() - 3);
-    const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
-    const fmtDateTime = (d: Date) => d.toISOString().slice(0, 16);
+    // Every default is an NZ calendar date / wall time — never a UTC slice,
+    // which would move dates by a day and times by 12–13 hours.
+    const meetingDay = toDateInput(meeting.scheduled_at);
+    if (!meetingDay) {
+        return { period_start: '', period_end: '', deadline: '' };
+    }
+    const periodEnd = shiftDate(meetingDay, -1);
+    const periodStart = shiftDate(periodEnd, 1, -1);
+    const deadline = toDatetimeLocal(
+        new Date(Date.parse(meeting.scheduled_at) - 3 * 86_400_000),
+    );
     return {
-        period_start: fmtDate(start),
-        period_end: fmtDate(end),
-        deadline: fmtDateTime(deadline),
+        period_start: periodStart,
+        period_end: periodEnd,
+        deadline,
     };
 }
+
+export { defaultsFromMeeting as ceoReportDefaultsFromMeeting };
 
 function validateStep(
     step: StepKey,
@@ -514,6 +564,7 @@ function CeoReportWizardBody({
     );
     const [done, setDone] = useState<'draft' | 'board' | null>(null);
     const [confirmClose, setConfirmClose] = useState(false);
+    const [confirmSubmit, setConfirmSubmit] = useState(false);
 
     // Sync period defaults when a different meeting is picked (create only).
     useEffect(() => {
@@ -637,15 +688,15 @@ function CeoReportWizardBody({
         <WizardSuccessPane
             title={
                 done === 'board'
-                    ? 'Report submitted to the board'
+                    ? 'Report sent to the board'
                     : isEdit
                       ? 'Report saved'
                       : 'Draft saved'
             }
             blurb={
                 done === 'board'
-                    ? 'A KPI snapshot was captured at submission and the report is now with the board.'
-                    : 'The report stays in draft until you submit it to the board.'
+                    ? "The key figures were saved as they stood when you submitted it, and the report can't be edited now."
+                    : 'The report stays a draft until you submit it to the board.'
             }
             actions={<Button onClick={onClose}>Close</Button>}
         />
@@ -674,11 +725,11 @@ function CeoReportWizardBody({
                 open={isOpen}
                 onClose={requestClose}
                 title={isEdit ? 'Edit CEO report' : 'New CEO report'}
-                description="A guided wizard to compose the CEO's board report section by section."
+                description="Write the CEO's report for a board meeting, one section at a time."
                 railIcon={FileText}
                 railTitle={isEdit ? 'Edit report' : 'New report'}
                 railSub={
-                    selectedMeeting ? selectedMeeting.title : 'CEO board report'
+                    selectedMeeting ? selectedMeeting.title : 'CEO report'
                 }
                 steps={CEO_REPORT_STEPS}
                 stepIndex={stepIndex}
@@ -725,7 +776,7 @@ function CeoReportWizardBody({
                                 </Button>
                                 <Button
                                     type="button"
-                                    onClick={() => save(true)}
+                                    onClick={() => setConfirmSubmit(true)}
                                     disabled={busy}
                                 >
                                     {submitting === 'board' ? (
@@ -792,11 +843,15 @@ function CeoReportWizardBody({
                             {meetingLocked ? (
                                 <InfoCard icon={Lock}>
                                     {isEdit
-                                        ? 'The meeting cannot be changed after the report is created.'
-                                        : 'Locked from the meeting you opened.'}
+                                        ? "The meeting can't be changed after the report is created."
+                                        : 'This report is for the meeting you opened.'}
                                 </InfoCard>
                             ) : null}
-                            <Field label="Deadline" error={err('deadline')}>
+                            <Field
+                                label="Deadline"
+                                hint="New Zealand time"
+                                error={err('deadline')}
+                            >
                                 <Input
                                     id="ceo-deadline"
                                     type="datetime-local"
@@ -838,12 +893,12 @@ function CeoReportWizardBody({
                             <StepHead
                                 icon={FileText}
                                 title="Executive summary"
-                                blurb="The top-line the board reads first."
+                                blurb="The part the board reads first."
                             />
                             {sectionField(
                                 'executive_summary',
                                 'Executive summary',
-                                '3-paragraph top-line for the board. Headline outcomes only.',
+                                'Up to three short paragraphs with the main things the board should know.',
                                 8,
                             )}
                         </div>
@@ -859,18 +914,18 @@ function CeoReportWizardBody({
                             {sectionField(
                                 'operational_summary',
                                 'Operational summary',
-                                'Service utilisation, occupancy, throughput. Use plain numbers.',
+                                'How busy services were — for example how full homes were and how many people were supported. Use plain numbers.',
                             )}
                             {sectionField(
                                 'key_achievements',
                                 'Key achievements',
-                                'Wins for the period the board should know about.',
+                                'Wins from this period the board should know about.',
                                 4,
                             )}
                             {sectionField(
                                 'staffing_update',
                                 'Workforce update',
-                                'Hires, exits, training compliance %, turnover.',
+                                'New staff, people who left, how many are up to date with training, and staff turnover.',
                                 4,
                             )}
                         </div>
@@ -881,23 +936,23 @@ function CeoReportWizardBody({
                             <StepHead
                                 icon={ShieldCheck}
                                 title="Finance, risk and compliance"
-                                blurb="Budget position, material risks and regulatory standing."
+                                blurb="Where the money is, the big risks, and whether legal requirements are met."
                             />
                             {sectionField(
                                 'financial_summary',
                                 'Financial summary',
-                                'Budget vs actual, key revenue / expense items, any variance > 5%.',
+                                'Spending compared with the budget, the main income and costs, and anything more than 5% over or under budget.',
                             )}
                             {sectionField(
                                 'challenges_and_risks',
-                                'Challenges & risks',
-                                'Risks above appetite, notifiable incidents, regulator engagement.',
+                                'Challenges and risks',
+                                "Risks above the board's limit, incidents that had to be reported, and contact with regulators.",
                                 4,
                             )}
                             {sectionField(
                                 'compliance_status',
                                 'Compliance status',
-                                'Audits closed, evidence gaps, regulatory deadlines.',
+                                'Audits finished, missing evidence, and upcoming legal deadlines.',
                                 4,
                             )}
                         </div>
@@ -913,7 +968,7 @@ function CeoReportWizardBody({
                             {sectionField(
                                 'recommendations',
                                 'Strategic progress',
-                                'Movement against the current strategic plan and roadmap.',
+                                'Progress on the strategic plan and roadmap since the last report.',
                             )}
                             <Field
                                 label="Decisions sought"
@@ -955,7 +1010,7 @@ function CeoReportWizardBody({
                                 blurb={
                                     isEdit
                                         ? 'Files upload straight to the report.'
-                                        : 'Save the draft first, then attach documents from the report page.'
+                                        : 'Save the draft first — then you can add documents from the report page.'
                                 }
                             />
                             <AttachmentsPanel
@@ -971,7 +1026,7 @@ function CeoReportWizardBody({
                             <StepHead
                                 icon={ClipboardCheck}
                                 title="Review the report"
-                                blurb="Save it as a draft, or submit it to the board — a KPI snapshot is captured on submission."
+                                blurb="Save it as a draft, or submit it to the board. The key figures are saved as they stand when you submit."
                             />
                             {Object.keys(form.errors).length > 0 ? (
                                 <InfoCard icon={AlertTriangle} tone="crit">
@@ -982,7 +1037,7 @@ function CeoReportWizardBody({
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <ReviewCard
                                     icon={CalendarDays}
-                                    title="Meeting & period"
+                                    title="Meeting and period"
                                     onEdit={() => goTo('meeting')}
                                 >
                                     <ReviewRow
@@ -999,49 +1054,48 @@ function CeoReportWizardBody({
                                     />
                                     <ReviewRow
                                         label="Deadline"
-                                        value={
-                                            data.deadline
-                                                ? data.deadline.replace('T', ' ')
-                                                : null
-                                        }
+                                        value={formatWallTime(data.deadline)}
                                     />
                                 </ReviewCard>
                                 <ReviewCard
                                     icon={FileText}
-                                    title="Narrative sections"
+                                    title="Report sections"
                                     onEdit={() => goTo('summary')}
+                                    span
                                 >
-                                    <ReviewRow
-                                        label="Completed"
-                                        value={`${sectionsFilled} of ${CEO_REPORT_SECTIONS.length}`}
-                                    />
-                                    <ReviewRow
-                                        label="Missing"
-                                        value={
-                                            CEO_REPORT_SECTIONS.filter(
-                                                (s) => !data[s.key].trim(),
-                                            )
-                                                .map((s) => s.label)
-                                                .join(', ') || null
-                                        }
-                                    />
+                                    {CEO_REPORT_SECTIONS.map((section) => (
+                                        <ReviewRow
+                                            key={section.key}
+                                            label={section.label}
+                                            value={
+                                                firstLine(data[section.key]) ??
+                                                'Not written yet'
+                                            }
+                                        />
+                                    ))}
                                 </ReviewCard>
                                 <ReviewCard
                                     icon={Gavel}
-                                    title="Board items"
+                                    title="Decisions and matters arising"
                                     onEdit={() => goTo('strategy')}
                                 >
                                     <ReviewRow
                                         label="Decisions sought"
-                                        value={String(
-                                            data.decisions_sought.length,
-                                        )}
+                                        value={
+                                            data.decisions_sought
+                                                .map((row) => row.title.trim())
+                                                .filter(Boolean)
+                                                .join('; ') || 'None'
+                                        }
                                     />
                                     <ReviewRow
                                         label="Matters arising"
-                                        value={String(
-                                            data.matters_arising.length,
-                                        )}
+                                        value={
+                                            data.matters_arising
+                                                .map((row) => row.title.trim())
+                                                .filter(Boolean)
+                                                .join('; ') || 'None'
+                                        }
                                     />
                                 </ReviewCard>
                                 <ReviewCard
@@ -1076,6 +1130,26 @@ function CeoReportWizardBody({
                 }}
                 description="Unsaved changes to this CEO report will be lost."
             />
+
+            <ConfirmDialog
+                open={confirmSubmit}
+                onClose={() => setConfirmSubmit(false)}
+                onConfirm={() => save(true)}
+                title="Submit your report to the board?"
+                description="Board members will be able to read it. You won't be able to edit it afterwards, and the key figures are saved as they stand right now."
+                confirmText="Submit to board"
+                variant="default"
+            />
         </>
     );
+}
+
+/** The first line of a section, shortened for the review step. */
+function firstLine(value: string): string | null {
+    const line = value
+        .split(/\r\n|\r|\n/)
+        .map((part) => part.trim())
+        .find(Boolean);
+    if (!line) return null;
+    return line.length > 140 ? `${line.slice(0, 137)}…` : line;
 }

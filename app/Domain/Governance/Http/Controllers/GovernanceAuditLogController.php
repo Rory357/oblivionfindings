@@ -5,8 +5,9 @@ namespace App\Domain\Governance\Http\Controllers;
 use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\Governance\Services\GovernanceAuditService;
+use App\Domain\Governance\Support\GovernanceAuditEntryPresenter;
+use App\Domain\Governance\Support\GovernanceLabels;
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -15,12 +16,16 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Renders the governance audit log — a unified stream of (a) action events
- * from `governance_audit_log` and (b) entity-write events from the global
- * `audit_logs` table filtered to governance-domain models.
+ * from `governance_audit_log` and (b) record changes from
+ * `governance_change_log` — as plain sentences. Titles, links and "What
+ * changed" details are only included for records the viewer can open.
  */
 class GovernanceAuditLogController extends Controller
 {
-    public function __construct(protected BoardPackAccessService $boardPackAccess) {}
+    public function __construct(
+        protected BoardPackAccessService $boardPackAccess,
+        protected GovernanceAuditEntryPresenter $presenter,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -33,7 +38,7 @@ class GovernanceAuditLogController extends Controller
         )->withQueryString();
 
         // Header meters: unfiltered stream totals (same entity exclusions).
-        $lastSevenDaysFrom = now()->subDays(7)->startOfDay();
+        $lastSevenDaysFrom = now((string) (config('app.worker_timezone') ?: GovernanceLabels::TIMEZONE))->subDays(7)->startOfDay();
         $summary = [
             'all_time' => GovernanceAuditService::paginate(
                 [],
@@ -41,37 +46,20 @@ class GovernanceAuditLogController extends Controller
                 excludedEntityTypes: $excludedEntityTypes,
             )->total(),
             'last_7_days' => GovernanceAuditService::paginate(
-                ['from' => $lastSevenDaysFrom->toDateTimeString()],
+                ['from' => $lastSevenDaysFrom->copy()->utc()->toDateTimeString()],
                 perPage: 1,
                 excludedEntityTypes: $excludedEntityTypes,
             )->total(),
             'last_7_days_from' => $lastSevenDaysFrom->toDateString(),
         ];
 
-        // Hydrate user names for the visible page only.
-        $userIds = collect($entries->items())->pluck('user_id')->filter()->unique()->values();
-        $userMap = User::whereIn('id', $userIds)
-            ->get(['id', 'name', 'email'])
-            ->keyBy('id')
-            ->map(fn ($u) => [
-                'id' => $u->id,
-                'name' => $u->name,
-                'email' => $u->email,
-            ]);
-
-        $items = collect($entries->items())->map(function ($row) use ($userMap) {
-            $row = (array) $row;
-            $row['user'] = $row['user_id'] ? ($userMap[$row['user_id']] ?? null) : null;
-            $row['metadata'] = $row['metadata'] ? json_decode($row['metadata'], true) : null;
-            $row['old_values'] = $row['old_values'] ? json_decode($row['old_values'], true) : null;
-            $row['new_values'] = $row['new_values'] ? json_decode($row['new_values'], true) : null;
-
-            return $row;
-        });
+        $entityTypes = $this->entityTypes($excludedEntityTypes);
+        $actionTypes = $this->actionTypes($excludedEntityTypes);
+        $changeTypes = $this->changeTypes($excludedEntityTypes);
 
         return Inertia::render('Governance/AuditLog/Index', [
             'entries' => [
-                'data' => $items,
+                'data' => $this->presenter->present($entries->items(), $request->user()),
                 'links' => $entries->linkCollection()->toArray(),
                 'current_page' => $entries->currentPage(),
                 'last_page' => $entries->lastPage(),
@@ -83,13 +71,37 @@ class GovernanceAuditLogController extends Controller
                 'entity_type' => $filters['entity_type'] ?? null,
                 'action' => $filters['action'] ?? null,
                 'change_type' => $filters['change_type'] ?? null,
-                'from' => $filters['from'] ?? null,
-                'to' => $filters['to'] ?? null,
+                // The calendar days as chosen, not the UTC instants queried.
+                'from' => isset($filters['from']) ? substr((string) $request->query('from'), 0, 10) : null,
+                'to' => isset($filters['to']) ? substr((string) $request->query('to'), 0, 10) : null,
             ],
             'summary' => $summary,
-            'entityTypes' => $this->entityTypes($excludedEntityTypes),
-            'actionTypes' => $this->actionTypes($excludedEntityTypes),
-            'changeTypes' => $this->changeTypes($excludedEntityTypes),
+            'entityTypes' => $entityTypes,
+            'actionTypes' => $actionTypes,
+            'changeTypes' => $changeTypes,
+            // Plain names for the "Record type" and "Activity" filters.
+            'recordTypeOptions' => collect($entityTypes)
+                ->map(fn (string $type) => [
+                    'value' => $type,
+                    'label' => GovernanceAuditEntryPresenter::recordTypeLabel($type),
+                ])
+                ->sortBy('label')
+                ->values()
+                ->all(),
+            'activityOptions' => collect($actionTypes)
+                ->map(fn (string $type) => [
+                    'value' => $type,
+                    'kind' => 'action',
+                    'label' => ucfirst(GovernanceAuditEntryPresenter::activityPhrase($type)),
+                ])
+                ->merge(collect($changeTypes)->map(fn (string $type) => [
+                    'value' => $type,
+                    'kind' => 'change',
+                    'label' => ucfirst(GovernanceAuditEntryPresenter::activityPhrase($type)),
+                ]))
+                ->sortBy('label')
+                ->values()
+                ->all(),
         ]);
     }
 
@@ -98,52 +110,47 @@ class GovernanceAuditLogController extends Controller
         $filters = $this->resolveFilters($request);
         $excludedEntityTypes = $this->excludedEntityTypes($request);
 
-        $callback = function () use ($filters, $excludedEntityTypes) {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Kind', 'Type', 'EntityType', 'EntityId', 'UserId', 'IP', 'Description', 'CreatedAt']);
+        // A generous slice (up to 10k rows) — far cheaper than paging.
+        $entries = GovernanceAuditService::paginate(
+            $filters,
+            perPage: 10000,
+            excludedEntityTypes: $excludedEntityTypes,
+        );
 
-            // Stream a generous slice (up to 10k rows) — far cheaper than paging.
-            $entries = GovernanceAuditService::paginate(
-                $filters,
-                perPage: 10000,
-                excludedEntityTypes: $excludedEntityTypes,
-            );
-            foreach ($entries->items() as $row) {
-                $row = (array) $row;
-                fputcsv($handle, [
-                    $row['kind'] ?? '',
-                    $row['type'] ?? '',
-                    $row['entity_type'] ?? '',
-                    $row['entity_id'] ?? '',
-                    $row['user_id'] ?? '',
-                    $row['ip_address'] ?? '',
-                    $row['description'] ?? '',
-                    $row['created_at'] ?? '',
-                ]);
-            }
-            fclose($handle);
-        };
+        $rows = collect($this->presenter->present($entries->items(), $request->user()))
+            ->map(fn (array $entry) => GovernanceAuditEntryPresenter::csvRow($entry));
 
-        return response()->streamDownload($callback, 'governance-audit-log-'.now()->format('Y-m-d-Hi').'.csv', [
-            'Content-Type' => 'text/csv',
-        ]);
+        return $this->streamSanitizedCsv(
+            'governance-audit-log-'.now()->format('Y-m-d-Hi').'.csv',
+            GovernanceAuditEntryPresenter::csvHeader(),
+            $rows,
+        );
     }
 
+    /**
+     * "From" and "To" are New Zealand calendar days; the log stores UTC, so the
+     * query uses the start of the first day and the end of the last day.
+     */
     private function resolveFilters(Request $request): array
     {
+        $timezone = (string) (config('app.worker_timezone') ?: GovernanceLabels::TIMEZONE);
+
         return array_filter([
             'user_id' => $request->integer('user_id') ?: null,
             'entity_type' => $request->string('entity_type')->toString() ?: null,
             'entity_id' => $request->integer('entity_id') ?: null,
             'action' => $request->string('action')->toString() ?: null,
             'change_type' => $request->string('change_type')->toString() ?: null,
-            'from' => $request->date('from')?->toDateTimeString(),
-            'to' => $request->date('to')?->toDateTimeString(),
+            'from' => $request->date('from', null, $timezone)?->startOfDay()->utc()->toDateTimeString(),
+            'to' => $request->date('to', null, $timezone)?->endOfDay()->utc()->toDateTimeString(),
         ]);
     }
 
-    /** Distinct entity types in the unified audit stream. */
-    /** @param array<int, string> $excludedEntityTypes */
+    /**
+     * Distinct entity types in the unified audit stream.
+     *
+     * @param  array<int, string>  $excludedEntityTypes
+     */
     private function entityTypes(array $excludedEntityTypes): array
     {
         $a = DB::table('governance_audit_log')

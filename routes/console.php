@@ -756,6 +756,21 @@ app(Schedule::class)
     ->dailyAt('07:45')
     ->withoutOverlapping();
 
+// Refresh compliance requirement statuses (overdue / due in 30 days / not due)
+// from their due dates just after midnight NZ: daily at 00:10
+app(Schedule::class)
+    ->command('governance:refresh-compliance-statuses')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('00:10')
+    ->withoutOverlapping();
+
+// Monthly risk register snapshot for Risk trends: 1st of the month at 06:00
+app(Schedule::class)
+    ->job(new \App\Domain\Governance\Jobs\CaptureRiskHeatmapSnapshot)
+    ->timezone('Pacific/Auckland')
+    ->monthlyOn(1, '06:00')
+    ->withoutOverlapping();
+
 // Single hourly budget-actuals sync (C6). SyncBudgetActualsJob refreshes each
 // budget line item's actual_amount from posted GL journals — the model's saving
 // event recomputes variance — and fires variance alerts. The separate hourly

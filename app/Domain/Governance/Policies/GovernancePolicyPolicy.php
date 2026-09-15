@@ -39,10 +39,11 @@ class GovernancePolicyPolicy
 
     public function attest(User $user, GovernancePolicy $policy): bool
     {
-        // Only approved or published policies that are currently effective may be attested.
+        // Read and confirm: only approved policies that ask for confirmation and
+        // whose effective date (NZ calendar date) has arrived.
         return $user->canDo('governance.policies.view')
-            && in_array($policy->status, ['approved', 'published', 'active'], true)
-            && (! $policy->effective_from || ! $policy->effective_from->isFuture());
+            && $policy->needsConfirmation()
+            && $policy->isInEffect();
     }
 
     public function newVersion(User $user, GovernancePolicy $policy): bool

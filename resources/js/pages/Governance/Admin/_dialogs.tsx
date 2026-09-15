@@ -1,4 +1,4 @@
-import { useForm } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import {
     CalendarRange,
     Check,
@@ -7,7 +7,9 @@ import {
     ClipboardCheck,
     Crown,
     Eye,
+    Info,
     Loader2,
+    Lock,
     NotebookPen,
     UserCheck,
     UserRound,
@@ -16,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DiscardDraftDialog } from '@/components/governance/DiscardDraftDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -35,43 +37,35 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { formatDateOnly } from '@/lib/datetime';
+import { boardRoleLabel } from '@/lib/governance-labels';
 
 export const BOARD_ROLES = [
     {
         key: 'chair',
-        label: 'Chair',
-        description: 'Leads the board and its meetings',
+        description: 'Leads the board and runs its meetings',
         icon: Crown,
     },
     {
         key: 'secretary',
-        label: 'Secretary',
-        description: 'Agendas, minutes and records',
+        description: 'Agendas, minutes and board records',
         icon: NotebookPen,
     },
     {
         key: 'treasurer',
-        label: 'Treasurer',
-        description: 'Financial oversight lead',
+        description: "Keeps an eye on the board's money",
         icon: Wallet,
     },
     {
         key: 'member',
-        label: 'Member',
-        description: 'Voting board member',
+        description: 'Takes part in meetings and votes',
         icon: UserRound,
     },
     {
         key: 'observer',
-        label: 'Observer',
-        description: 'Attends without a vote',
+        description: "Attends meetings but doesn't vote",
         icon: Eye,
     },
 ] as const;
-
-export function boardRoleLabel(role: string | null | undefined): string {
-    return BOARD_ROLES.find((r) => r.key === role)?.label ?? (role ?? '—');
-}
 
 export interface BoardMemberUser {
     id: number;
@@ -86,6 +80,10 @@ export interface BoardMemberRecord {
     term_start: string | null;
     term_end: string | null;
     is_active: boolean;
+    /** active · inactive · term_not_started · term_ended (server, NZ today). */
+    standing?: string;
+    can_vote?: boolean;
+    ending_soon?: boolean;
 }
 
 /** Eloquent date casts arrive as ISO instants; inputs want YYYY-MM-DD. */
@@ -98,14 +96,14 @@ type StepKey = 'member' | 'term' | 'review';
 const STEPS: readonly (WizardStep & { key: StepKey })[] = [
     {
         key: 'member',
-        label: 'Member & role',
-        blurb: 'Who is appointed and their seat',
+        label: 'Person and role',
+        blurb: 'Who is appointed and their role',
         icon: UserCheck,
     },
     {
         key: 'term',
         label: 'Term',
-        blurb: 'Start, end & standing',
+        blurb: 'Start, end and status',
         icon: CalendarRange,
     },
     {
@@ -137,31 +135,50 @@ export function BoardMemberWizardDialog({
     onClose,
     availableUsers,
     member = null,
+    canInvitePeople = false,
 }: {
     open: boolean;
     onClose: () => void;
-    /** Staff not already on the board (add only). */
+    /** People with an approved login who aren't on the board (add only). */
     availableUsers: BoardMemberUser[];
     /** Present = edit (prefilled); absent = appoint. */
     member?: BoardMemberRecord | null;
+    /** Whether the viewer can open Settings → Users to invite someone. */
+    canInvitePeople?: boolean;
 }) {
     return open ? (
         <BoardMemberWizardBody
             onClose={onClose}
             availableUsers={availableUsers}
             member={member}
+            canInvitePeople={canInvitePeople}
         />
     ) : null;
+}
+
+/** What the edit wizard sends: clearing the end date sends null (an ongoing term). */
+export function appointmentUpdatePayload(values: {
+    board_role: string;
+    is_active: boolean;
+    term_end: string;
+}) {
+    return {
+        board_role: values.board_role,
+        is_active: values.is_active,
+        term_end: values.term_end || null,
+    };
 }
 
 function BoardMemberWizardBody({
     onClose,
     availableUsers,
     member,
+    canInvitePeople,
 }: {
     onClose: () => void;
     availableUsers: BoardMemberUser[];
     member: BoardMemberRecord | null;
+    canInvitePeople: boolean;
 }) {
     const isEdit = member !== null;
     const form = useForm<MemberForm>({
@@ -265,16 +282,8 @@ function BoardMemberWizardBody({
         };
 
         if (isEdit && member) {
-            form.transform((values) => ({
-                board_role: values.board_role,
-                is_active: values.is_active,
-                // term_end is validated "after:term_start", so the stored
-                // start travels with it; clearing the end date is not
-                // supported by the update endpoint and is simply not sent.
-                ...(values.term_end
-                    ? { term_end: values.term_end, term_start: values.term_start }
-                    : {}),
-            }));
+            // An empty end date is sent as null, which makes the term ongoing.
+            form.transform((values) => appointmentUpdatePayload(values));
             form.put(`/governance/admin/board-members/${member.id}`, options);
         } else {
             form.transform((values) => ({
@@ -288,7 +297,7 @@ function BoardMemberWizardBody({
     };
 
     const isReview = current.key === 'review';
-    const roleDef = BOARD_ROLES.find((r) => r.key === data.board_role);
+    const roleLabel = data.board_role ? boardRoleLabel(data.board_role) : null;
 
     return (
         <>
@@ -298,12 +307,12 @@ function BoardMemberWizardBody({
                 title={isEdit ? 'Edit board appointment' : 'Appoint board member'}
                 description={
                     isEdit
-                        ? 'Update this board member’s role, term end and standing.'
-                        : 'Appoint a staff member to the board with a role and term.'
+                        ? 'Change this board member’s role, when their term ends and whether they are active.'
+                        : 'Appoint someone to the board with a role and term.'
                 }
                 railIcon={Users}
                 railTitle={isEdit ? 'Edit appointment' : 'Appoint member'}
-                railSub={isEdit ? memberName : 'Board & members'}
+                railSub={isEdit ? memberName : 'Board and members'}
                 steps={STEPS}
                 stepIndex={stepIndex}
                 onStepClick={setStepIndex}
@@ -318,7 +327,7 @@ function BoardMemberWizardBody({
                             blurb={
                                 isEdit
                                     ? `${memberName}’s appointment has been saved.`
-                                    : `${memberName || 'The new member'} has been appointed as ${roleDef?.label.toLowerCase() ?? 'a member'}.`
+                                    : `${memberName || 'The new member'} has been appointed as ${roleLabel?.toLowerCase() ?? 'a board member'}.`
                             }
                             actions={<Button onClick={onClose}>Done</Button>}
                         />
@@ -384,26 +393,45 @@ function BoardMemberWizardBody({
                                     remove and re-appoint instead.
                                 </InfoCard>
                             ) : (
-                                <Field
-                                    label="Staff member"
-                                    required
-                                    error={err('user_id')}
-                                >
-                                    <SelectInput
-                                        ariaLabel="Staff member"
-                                        placeholder={
-                                            availableUsers.length > 0
-                                                ? 'Choose a staff member…'
-                                                : 'Everyone eligible is already on the board'
-                                        }
-                                        value={data.user_id}
-                                        onChange={(v) => setData('user_id', v)}
-                                        options={availableUsers.map((u) => ({
-                                            value: String(u.id),
-                                            label: `${u.name} (${u.email})`,
-                                        }))}
-                                    />
-                                </Field>
+                                <>
+                                    <Field
+                                        label="Person"
+                                        required
+                                        error={err('user_id')}
+                                    >
+                                        <SelectInput
+                                            ariaLabel="Person"
+                                            placeholder={
+                                                availableUsers.length > 0
+                                                    ? 'Choose a person…'
+                                                    : 'No people without a board seat'
+                                            }
+                                            value={data.user_id}
+                                            onChange={(v) => setData('user_id', v)}
+                                            options={availableUsers.map((u) => ({
+                                                value: String(u.id),
+                                                label: `${u.name} (${u.email})`,
+                                            }))}
+                                        />
+                                    </Field>
+                                    <InfoCard icon={Info}>
+                                        People need an Oblivion Care login
+                                        first. Don&apos;t see them? Ask an
+                                        administrator to invite them (Settings →
+                                        Users).
+                                        {canInvitePeople ? (
+                                            <>
+                                                {' '}
+                                                <Link
+                                                    href="/settings/users"
+                                                    className="font-medium text-primary underline-offset-4 hover:underline"
+                                                >
+                                                    Invite someone
+                                                </Link>
+                                            </>
+                                        ) : null}
+                                    </InfoCard>
+                                </>
                             )}
                             <Field
                                 label="Board role"
@@ -416,7 +444,7 @@ function BoardMemberWizardBody({
                                     onChange={(v) => setData('board_role', v)}
                                     options={BOARD_ROLES.map((r) => ({
                                         key: r.key,
-                                        label: r.label,
+                                        label: boardRoleLabel(r.key),
                                         description: r.description,
                                         icon: r.icon,
                                     }))}
@@ -437,6 +465,9 @@ function BoardMemberWizardBody({
                                     type="date"
                                     value={data.term_start}
                                     disabled={isEdit}
+                                    aria-describedby={
+                                        isEdit ? 'member-term-start-locked' : undefined
+                                    }
                                     onChange={(e) =>
                                         setData('term_start', e.target.value)
                                     }
@@ -444,7 +475,7 @@ function BoardMemberWizardBody({
                             </Field>
                             <Field
                                 label="Term end"
-                                hint="Leave blank if ongoing"
+                                hint="Leave blank if the term is ongoing"
                                 error={err('term_end')}
                             >
                                 <Input
@@ -457,7 +488,17 @@ function BoardMemberWizardBody({
                                 />
                             </Field>
                             {isEdit ? (
-                                <Field label="Standing" span error={err('is_active')}>
+                                <p
+                                    id="member-term-start-locked"
+                                    className="text-caption flex items-start gap-1.5 sm:col-span-2"
+                                >
+                                    <Lock className="mt-0.5 size-3.5 shrink-0" />
+                                    The start date can&apos;t be changed — remove
+                                    and re-appoint the person to correct it.
+                                </p>
+                            ) : null}
+                            {isEdit ? (
+                                <Field label="Status" span error={err('is_active')}>
                                     <Segmented
                                         value={data.is_active ? 'active' : 'inactive'}
                                         onChange={(v) =>
@@ -477,11 +518,11 @@ function BoardMemberWizardBody({
                         <div className="grid gap-4 sm:grid-cols-2">
                             <ReviewCard
                                 icon={UserCheck}
-                                title="Member & role"
+                                title="Person and role"
                                 onEdit={() => goTo('member')}
                             >
-                                <ReviewRow label="Member" value={memberName} />
-                                <ReviewRow label="Role" value={roleDef?.label} />
+                                <ReviewRow label="Person" value={memberName} />
+                                <ReviewRow label="Role" value={roleLabel} />
                             </ReviewCard>
                             <ReviewCard
                                 icon={CalendarRange}
@@ -501,7 +542,7 @@ function BoardMemberWizardBody({
                                     }
                                 />
                                 <ReviewRow
-                                    label="Standing"
+                                    label="Status"
                                     value={data.is_active ? 'Active' : 'Inactive'}
                                 />
                             </ReviewCard>
@@ -510,13 +551,14 @@ function BoardMemberWizardBody({
                 </WizardStepPane>
             </WizardShell>
 
-            <ConfirmDialog
+            <DiscardDraftDialog
                 open={confirmClose}
-                onClose={() => setConfirmClose(false)}
-                onConfirm={onClose}
-                title="Discard this draft?"
+                onKeepEditing={() => setConfirmClose(false)}
+                onDiscard={() => {
+                    setConfirmClose(false);
+                    onClose();
+                }}
                 description="Any details entered for this appointment will be lost."
-                confirmText="Discard"
             />
         </>
     );

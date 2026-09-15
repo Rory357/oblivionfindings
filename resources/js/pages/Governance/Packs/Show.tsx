@@ -1,10 +1,13 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     GovernanceAttachmentsPanel,
     type GovernanceAttachment,
 } from '@/components/governance/GovernanceAttachmentsPanel';
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
 import {
     PageHeader,
     PageHeaderGlassButton,
+    PageHeaderMeterBar,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -12,7 +15,6 @@ import {
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -21,32 +23,25 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Progress } from '@/components/ui/progress';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { InfoCard } from '@/components/wizard/primitives';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateLong, formatDateTimeLong } from '@/lib/datetime';
+import { governanceStatus, refSuffix } from '@/lib/governance-labels';
 import { download as downloadPack } from '@/routes/governance/packs';
 import { PageProps } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
     AlertCircle,
-    AlertTriangle,
+    ArrowRight,
     BookOpen,
+    CalendarDays,
     CheckCircle,
     FileDown,
-    Files,
     FolderOpen,
     History,
-    Layers,
     Paperclip,
     RotateCw,
     ShieldAlert,
@@ -64,6 +59,20 @@ interface PackRevisionSummary {
     file_size: string | null;
 }
 
+interface ReadingItem {
+    title: string;
+    reference: string | null;
+    href: string | null;
+}
+
+export interface ReadingSection {
+    key: string;
+    title: string;
+    summary: string;
+    href: string | null;
+    items: ReadingItem[];
+}
+
 interface Props extends PageProps {
     pack: {
         id: number;
@@ -75,7 +84,6 @@ interface Props extends PageProps {
         generated_at: string;
         distributed_at: string | null;
         file_size: string | null;
-        checksum: string | null;
         watermark_text: string;
         meeting: {
             id: number;
@@ -87,10 +95,15 @@ interface Props extends PageProps {
         actual_document_count: number;
     };
     all_revisions?: PackRevisionSummary[];
-    current_pack_id?: number;
-    current_revision_number?: number;
+    newer_version?: {
+        id: number;
+        revision_number: number;
+        is_distributed: boolean;
+    } | null;
     is_distributed: boolean;
+    can_manage?: boolean;
     can_mark_read: boolean;
+    is_recipient?: boolean;
     has_read?: boolean;
     my_receipt?: {
         receipt_id: string;
@@ -98,20 +111,8 @@ interface Props extends PageProps {
         revision_number: number;
         read_at: string;
     } | null;
-    read_count?: number;
-    download_count?: number;
-    manifestSections: Array<{
-        id: string;
-        title: string;
-        type: string;
-        included: boolean;
-    }>;
-    contentSections: Array<{
-        key: string;
-        title: string;
-        summary: string;
-        type: string;
-    }>;
+    meeting_url?: string | null;
+    readingSections?: ReadingSection[];
     distributionStats: {
         intended_recipients: number;
         read_count: number;
@@ -119,7 +120,8 @@ interface Props extends PageProps {
         outstanding_reads: number;
         read_rate: number;
         download_rate: number;
-    };
+    } | null;
+    distribution_recipient_count?: number | null;
     supplementaryAttachments: GovernanceAttachment[];
 }
 
@@ -128,40 +130,65 @@ const scrollTo = (id: string) =>
         .getElementById(id)
         ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+/** One header chip: the most useful state of THIS version for the viewer. */
+export function packHeaderChip(
+    buildStatus: string,
+    isDistributed: boolean,
+    newerVersion: Props['newer_version'],
+) {
+    if (buildStatus === 'failed') {
+        return governanceStatus('board_pack_status', 'failed');
+    }
+    if (newerVersion?.is_distributed) {
+        return governanceStatus('board_pack_status', 'superseded');
+    }
+    return governanceStatus(
+        'board_pack_status',
+        isDistributed ? 'distributed' : 'draft',
+    );
+}
+
 export default function PackShow({
     auth,
     pack,
     all_revisions = [],
-    current_pack_id,
-    current_revision_number,
+    newer_version = null,
     is_distributed,
+    can_manage,
     can_mark_read,
+    is_recipient = false,
     has_read = false,
     my_receipt = null,
-    manifestSections,
-    contentSections,
+    meeting_url = null,
+    readingSections = [],
     distributionStats,
+    distribution_recipient_count = null,
     supplementaryAttachments,
 }: Props) {
-    const [distributing, setDistributing] = useState(false);
+    const [confirm, setConfirm] = useState<
+        'read' | 'distribute' | 'new-version' | null
+    >(null);
     const [acknowledging, setAcknowledging] = useState(false);
     const [acknowledgeError, setAcknowledgeError] = useState<string | null>(
         null,
     );
-    const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
-    const [regenerating, setRegenerating] = useState(false);
+    const [busy, setBusy] = useState(false);
 
-    const canManagePack = !!auth.can?.governance?.packs?.manage;
-    const isCurrent = pack.is_current;
-    const revisionNumber = pack.revision_number ?? 1;
-    const isSuperseded =
-        !isCurrent && (current_revision_number ?? 1) > revisionNumber;
+    const canManagePack =
+        can_manage ?? Boolean(auth.can?.governance?.packs?.manage);
+    const version = pack.revision_number ?? 1;
+    const nextVersion = version + 1;
+    const meetingTitle = pack.meeting.title;
+    const title = `${meetingTitle} — board pack`;
+    const failed = pack.build_status === 'failed';
+    const chip = packHeaderChip(pack.build_status, is_distributed, newer_version);
+    const downloadUrl = downloadPack.url({ pack: pack.id });
+    const recipients = distribution_recipient_count ?? 0;
+    const canSend = canManagePack && !is_distributed && !failed;
 
-    // Explicit manual read acknowledgement (NO automatic on-mount POST)
-    const handleMarkAsRead = async () => {
+    const markAsRead = async () => {
         setAcknowledging(true);
         setAcknowledgeError(null);
-
         try {
             await axios.post(
                 `/governance/packs/${pack.id}/read`,
@@ -174,55 +201,38 @@ export default function PackShow({
                 },
             );
             router.reload({ preserveScroll: true });
-        } catch (err: any) {
-            const message =
-                err?.response?.data?.message ||
-                'Failed to record reading acknowledgement. Please try again.';
-            setAcknowledgeError(message);
+        } catch (err: unknown) {
+            const message = (
+                err as { response?: { data?: { message?: string } } }
+            )?.response?.data?.message;
+            setAcknowledgeError(
+                message ??
+                    "We couldn't save that you've read the pack. Try again.",
+            );
         } finally {
             setAcknowledging(false);
         }
     };
 
-    const distributePack = () => {
-        setDistributing(true);
-
+    const distribute = () => {
+        setBusy(true);
         router.post(
             `/governance/packs/${pack.id}/distribute`,
             {},
-            {
-                preserveScroll: true,
-                onFinish: () => setDistributing(false),
-            },
+            { preserveScroll: true, onFinish: () => setBusy(false) },
         );
     };
 
-    const handleRegenerate = () => {
-        setRegenerating(true);
+    const createNewVersion = () => {
+        setBusy(true);
         router.post(
             `/governance/packs/${pack.id}/regenerate`,
             {},
-            {
-                preserveScroll: true,
-                onFinish: () => {
-                    setRegenerating(false);
-                    setRegenerateDialogOpen(false);
-                },
-            },
+            { preserveScroll: true, onFinish: () => setBusy(false) },
         );
     };
 
-    const formatNZDate = (iso: string | null | undefined) => {
-        if (!iso) return '—';
-        return new Date(iso).toLocaleString('en-NZ', {
-            timeZone: 'Pacific/Auckland',
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-        });
-    };
+    const hasMultipleVersions = all_revisions.length > 1;
 
     return (
         <AppLayout
@@ -230,13 +240,10 @@ export default function PackShow({
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Board packs', href: '/governance/packs' },
-                {
-                    title: `${pack.meeting.title} · Rev ${revisionNumber}`,
-                    href: `/governance/packs/${pack.id}`,
-                },
+                { title, href: `/governance/packs/${pack.id}` },
             ]}
         >
-            <Head title={`Board Pack - Rev ${revisionNumber}`} />
+            <Head title={title} />
 
             <PageLayout
                 hero={
@@ -244,640 +251,654 @@ export default function PackShow({
                         variant="profile"
                         backHref="/governance/packs"
                         icon={FolderOpen}
-                        title={`Board Pack · Revision ${revisionNumber}`}
+                        title={title}
                         titleDusk="pack-heading"
+                        wrapTitle
                         titleChip={
-                            <>
-                                <PageHeaderStatusChip
-                                    variant={isCurrent ? 'success' : 'neutral'}
-                                >
-                                    {isCurrent ? 'Current' : 'Superseded'}
-                                </PageHeaderStatusChip>
-                                <PageHeaderStatusChip
-                                    variant={
-                                        is_distributed ? 'success' : 'warning'
-                                    }
-                                >
-                                    {is_distributed ? 'Distributed' : 'Draft'}
-                                </PageHeaderStatusChip>
-                                {pack.build_status === 'failed' && (
-                                    <PageHeaderStatusChip variant="critical">
-                                        Failed
-                                    </PageHeaderStatusChip>
-                                )}
-                            </>
+                            <PageHeaderStatusChip variant={chip.variant}>
+                                {chip.label}
+                            </PageHeaderStatusChip>
                         }
-                        subline={`${pack.meeting.title} · Generated ${formatNZDate(pack.generated_at)}${pack.checksum ? ` · SHA-256: ${pack.checksum.slice(0, 12)}…` : ''}`}
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Revision"
-                                    onClick={() => scrollTo('pack-versions')}
-                                    ariaLabel="View pack version history"
-                                >
-                                    <PageHeaderMeterBig>
-                                        v{revisionNumber}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {all_revisions.length > 1
-                                            ? `of ${all_revisions.length} editions`
-                                            : 'Edition'}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Papers & docs"
-                                    onClick={() => scrollTo('pack-sections')}
-                                    ariaLabel="View included sections"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {pack.actual_document_count ??
-                                            manifestSections.length}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Included items
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Read"
-                                    value={`${distributionStats.read_rate}%`}
-                                    onClick={() =>
-                                        scrollTo('pack-distribution')
-                                    }
-                                    ariaLabel="View distribution and engagement"
-                                    tone={
-                                        is_distributed &&
-                                        distributionStats.outstanding_reads > 0
-                                            ? 'warning'
-                                            : 'brand'
-                                    }
-                                >
-                                    <PageHeaderMeterBig>
-                                        {distributionStats.read_count}/
-                                        {distributionStats.intended_recipients}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {distributionStats.outstanding_reads}{' '}
-                                        outstanding
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Downloads"
-                                    onClick={() =>
-                                        scrollTo('pack-distribution')
-                                    }
-                                    ariaLabel="View download engagement"
-                                >
-                                    <PageHeaderMeterBig>
-                                        {distributionStats.download_count}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        PDF retrievals
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
-                        }
+                        subline={[
+                            pack.meeting.scheduled_at
+                                ? `Meeting on ${formatDateTimeLong(pack.meeting.scheduled_at)}`
+                                : null,
+                            `Version ${version}`,
+                            pack.generated_at
+                                ? `Generated ${formatDateLong(pack.generated_at)}`
+                                : null,
+                        ]
+                            .filter(Boolean)
+                            .join(' · ')}
                         actions={
                             <>
-                                <PageHeaderGlassButton
-                                    icon={FileDown}
-                                    onClick={() => {
-                                        window.location.href = downloadPack.url(
-                                            { pack: pack.id },
-                                        );
-                                    }}
-                                    dusk="download-pack"
-                                >
-                                    Download PDF
-                                </PageHeaderGlassButton>
-
-                                {canManagePack && (
+                                {meeting_url ? (
+                                    <PageHeaderGlassButton
+                                        icon={CalendarDays}
+                                        onClick={() => router.visit(meeting_url)}
+                                    >
+                                        Go to meeting
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                {canManagePack ? (
                                     <PageHeaderGlassButton
                                         icon={RotateCw}
-                                        onClick={() =>
-                                            setRegenerateDialogOpen(true)
-                                        }
+                                        onClick={() => setConfirm('new-version')}
                                         dusk="regenerate-pack"
                                     >
                                         Create new version
                                     </PageHeaderGlassButton>
-                                )}
-
-                                {canManagePack && !is_distributed && (
-                                    <PageHeaderGlassButton
-                                        icon={Users}
-                                        onClick={distributePack}
-                                        disabled={distributing}
-                                        dusk="distribute-pack"
-                                    >
-                                        {distributing
-                                            ? 'Distributing…'
-                                            : 'Distribute pack'}
-                                    </PageHeaderGlassButton>
-                                )}
-
-                                {can_mark_read && (
+                                ) : null}
+                                {canSend ? (
+                                    <>
+                                        <PageHeaderGlassButton
+                                            icon={FileDown}
+                                            onClick={() => {
+                                                window.location.href =
+                                                    downloadUrl;
+                                            }}
+                                            dusk="download-pack"
+                                        >
+                                            Download pack
+                                        </PageHeaderGlassButton>
+                                        <PageHeaderPrimaryButton
+                                            icon={Users}
+                                            onClick={() =>
+                                                setConfirm('distribute')
+                                            }
+                                            disabled={busy}
+                                            dusk="distribute-pack"
+                                        >
+                                            Send to members
+                                        </PageHeaderPrimaryButton>
+                                    </>
+                                ) : !failed ? (
                                     <PageHeaderPrimaryButton
-                                        icon={BookOpen}
-                                        onClick={handleMarkAsRead}
-                                        disabled={acknowledging}
-                                        dusk="mark-read-button"
+                                        icon={FileDown}
+                                        onClick={() => {
+                                            window.location.href = downloadUrl;
+                                        }}
+                                        dusk="download-pack"
                                     >
-                                        {acknowledging
-                                            ? 'Confirming…'
-                                            : `Mark Rev ${revisionNumber} as read`}
+                                        Download pack
                                     </PageHeaderPrimaryButton>
-                                )}
+                                ) : null}
+                            </>
+                        }
+                        meters={
+                            <>
+                                {is_recipient ? (
+                                    <PageHeaderMeterBlock
+                                        label="Your reading"
+                                        tone={has_read ? 'success' : 'warning'}
+                                        onClick={() => scrollTo('pack-reading')}
+                                        ariaLabel="Confirm you've read the pack"
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {has_read ? 'Read' : 'Not read yet'}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {has_read && my_receipt
+                                                ? `Confirmed ${formatDateLong(my_receipt.read_at)}`
+                                                : "Confirm once you've read it"}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                                {canManagePack && distributionStats ? (
+                                    <PageHeaderMeterBlock
+                                        label="Read by"
+                                        value={
+                                            is_distributed
+                                                ? `${distributionStats.read_count}/${distributionStats.intended_recipients}`
+                                                : undefined
+                                        }
+                                        onClick={() =>
+                                            scrollTo('pack-distribution')
+                                        }
+                                        ariaLabel="View who has read the pack"
+                                    >
+                                        {is_distributed ? (
+                                            <PageHeaderMeterBar
+                                                percent={distributionStats.read_rate}
+                                            />
+                                        ) : (
+                                            <PageHeaderMeterBig>
+                                                Not sent
+                                            </PageHeaderMeterBig>
+                                        )}
+                                        <PageHeaderMeterCaption>
+                                            {is_distributed
+                                                ? `${distributionStats.outstanding_reads} not read yet`
+                                                : `Goes to ${recipients} board member${recipients === 1 ? '' : 's'}`}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                                <PageHeaderMeterBlock
+                                    label="Papers"
+                                    onClick={() => scrollTo('pack-contents')}
+                                    ariaLabel="View what's in the pack"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {pack.actual_document_count}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Reports, resolutions and documents
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Version"
+                                    onClick={() =>
+                                        scrollTo(
+                                            hasMultipleVersions
+                                                ? 'pack-versions'
+                                                : 'pack-contents',
+                                        )
+                                    }
+                                    ariaLabel="View the pack's versions"
+                                >
+                                    <PageHeaderMeterBig>
+                                        Version {version}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {newer_version?.is_distributed
+                                            ? `Version ${newer_version.revision_number} is newer`
+                                            : hasMultipleVersions
+                                              ? `${all_revisions.length} versions`
+                                              : 'The only version'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                {meeting_url ? (
+                                    <PageHeaderMeterBlock
+                                        label="Meeting"
+                                        href={meeting_url}
+                                        ariaLabel="Go to the meeting"
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {formatDateLong(
+                                                pack.meeting.scheduled_at,
+                                            )}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {meetingTitle}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
                             </>
                         }
                     />
                 }
             >
                 <div className="flex flex-col gap-5">
-                    {/* Notice if viewing a superseded version */}
-                    {isSuperseded && current_pack_id && (
-                        <Card className="border-status-warning/40 bg-status-warning-bg">
-                            <CardContent className="flex items-center justify-between gap-4 pt-6">
+                    {newer_version &&
+                    (newer_version.is_distributed || canManagePack) ? (
+                        <Card>
+                            <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
                                 <div className="flex items-start gap-3">
-                                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+                                    <History className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
                                     <div>
                                         <p className="font-medium text-foreground">
-                                            You are viewing Revision{' '}
-                                            {revisionNumber} (Superseded)
+                                            {newer_version.is_distributed
+                                                ? `There's a newer version of this pack`
+                                                : `Version ${newer_version.revision_number} is a draft`}
                                         </p>
                                         <p className="text-subtle">
-                                            A newer version (Revision{' '}
-                                            {current_revision_number}) has been
-                                            published for this meeting.
+                                            {newer_version.is_distributed
+                                                ? `You're looking at version ${version}. Version ${newer_version.revision_number} has been sent to members.`
+                                                : `Members keep seeing version ${version} until you send version ${newer_version.revision_number} to them.`}
                                         </p>
                                     </div>
                                 </div>
-                                <Button asChild size="sm">
+                                <Button asChild size="sm" variant="outline">
                                     <Link
-                                        href={`/governance/packs/${current_pack_id}`}
+                                        href={`/governance/packs/${newer_version.id}`}
                                     >
-                                        View current version (v
-                                        {current_revision_number})
+                                        Open version{' '}
+                                        {newer_version.revision_number}
+                                        <ArrowRight className="h-3.5 w-3.5" />
                                     </Link>
                                 </Button>
                             </CardContent>
                         </Card>
-                    )}
+                    ) : null}
 
-                    {/* Build failure notice */}
-                    {pack.build_status === 'failed' && (
-                        <Card className="border-status-critical/40 bg-status-critical-bg">
-                            <CardContent className="flex items-start gap-3 pt-6">
-                                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
-                                <div className="space-y-1">
-                                    <p className="font-medium text-status-critical">
-                                        Pack generation failed
-                                    </p>
-                                    <p className="text-subtle">
-                                        {pack.error_reference ||
-                                            'An unexpected error occurred during PDF generation.'}
-                                    </p>
-                                    {canManagePack && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="mt-2"
-                                            onClick={() =>
-                                                setRegenerateDialogOpen(true)
-                                            }
-                                        >
-                                            Retry generation
-                                        </Button>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                    {failed ? (
+                        <InfoCard icon={AlertCircle} tone="crit">
+                            <p className="font-medium">
+                                This version couldn&apos;t be prepared
+                            </p>
+                            <p className="text-subtle">
+                                {canManagePack
+                                    ? 'Nothing was sent to members. Create a new version to try again.'
+                                    : 'Ask the board secretary to create a new version.'}
+                            </p>
+                            {canManagePack ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="mt-2"
+                                    onClick={() => setConfirm('new-version')}
+                                >
+                                    Create a new version
+                                </Button>
+                            ) : null}
+                        </InfoCard>
+                    ) : null}
 
-                    {/* Personal Reading Acknowledgement Receipt */}
-                    {has_read && my_receipt && (
-                        <Card className="border-status-success/30 bg-status-success-bg">
-                            <CardContent className="flex items-center gap-3 pt-6">
-                                <CheckCircle className="h-5 w-5 shrink-0 text-status-success" />
-                                <div>
-                                    <p className="font-medium text-foreground">
-                                        Reading acknowledged
-                                    </p>
-                                    <p className="text-subtle">
-                                        You acknowledged reading Revision{' '}
-                                        {revisionNumber} on{' '}
-                                        {formatNZDate(my_receipt.read_at)}{' '}
-                                        (Receipt #
-                                        {my_receipt.receipt_id.slice(0, 8)}).
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Explicit Read Action Card when eligible and unacknowledged */}
-                    {can_mark_read && (
-                        <Card className="border-primary/40 bg-primary/5">
-                            <CardContent className="flex flex-col justify-between gap-4 pt-6 sm:flex-row sm:items-center">
-                                <div className="flex items-start gap-3">
-                                    <BookOpen className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                                    <div>
-                                        <p className="font-medium text-foreground">
-                                            Board member reading required
-                                        </p>
+                    <div className="grid items-start gap-5 lg:grid-cols-3">
+                        <div className="flex flex-col gap-5 lg:col-span-2">
+                            <Card id="pack-contents" className="scroll-mt-5">
+                                <CardHeader>
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <CardTitle className="text-section-title flex items-center gap-2">
+                                                <BookOpen className="h-4 w-4 text-primary" />
+                                                Read the pack
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Download the whole pack, or open
+                                                each paper on its own page.
+                                            </CardDescription>
+                                        </div>
+                                        {!failed ? (
+                                            <Button asChild>
+                                                <a href={downloadUrl}>
+                                                    <FileDown className="h-4 w-4" />
+                                                    Download pack
+                                                </a>
+                                            </Button>
+                                        ) : null}
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    {readingSections.length === 0 ? (
                                         <p className="text-subtle">
-                                            Please review the papers and confirm
-                                            reading for Revision{' '}
-                                            {revisionNumber}. Note: Downloading
-                                            the PDF does not mark the pack as
-                                            read.
+                                            This version has no sections to list.
+                                            Download the pack to read it.
                                         </p>
-                                        {acknowledgeError && (
-                                            <p className="mt-1 text-sm font-medium text-status-critical">
-                                                {acknowledgeError}
+                                    ) : (
+                                        <ol className="divide-y divide-border">
+                                            {readingSections.map((section) => (
+                                                <li
+                                                    key={section.key}
+                                                    className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0"
+                                                >
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <div className="min-w-0">
+                                                            <p className="font-medium text-foreground">
+                                                                {section.title}
+                                                            </p>
+                                                            <p className="text-caption">
+                                                                {section.summary}
+                                                            </p>
+                                                        </div>
+                                                        {section.href ? (
+                                                            <Button
+                                                                asChild
+                                                                size="sm"
+                                                                variant="outline"
+                                                            >
+                                                                <Link
+                                                                    href={
+                                                                        section.href
+                                                                    }
+                                                                >
+                                                                    Open{' '}
+                                                                    {section.title}
+                                                                    <ArrowRight className="h-3.5 w-3.5" />
+                                                                </Link>
+                                                            </Button>
+                                                        ) : section.items
+                                                              .length === 0 ? (
+                                                            <span className="text-caption">
+                                                                In the download
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                    {section.items.length > 0 ? (
+                                                        <ul className="flex flex-col gap-1.5 pl-3">
+                                                            {section.items.map(
+                                                                (item, index) => (
+                                                                    <li
+                                                                        key={`${section.key}-${index}`}
+                                                                        className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                                                                    >
+                                                                        <span className="min-w-0">
+                                                                            {item.href ? (
+                                                                                <Link
+                                                                                    href={
+                                                                                        item.href
+                                                                                    }
+                                                                                    className="font-medium text-primary underline-offset-4 hover:underline"
+                                                                                >
+                                                                                    {
+                                                                                        item.title
+                                                                                    }
+                                                                                </Link>
+                                                                            ) : (
+                                                                                <span>
+                                                                                    {
+                                                                                        item.title
+                                                                                    }
+                                                                                </span>
+                                                                            )}
+                                                                            {item.reference ? (
+                                                                                <span className="text-caption ml-2">
+                                                                                    {refSuffix(
+                                                                                        item.reference,
+                                                                                    )}
+                                                                                </span>
+                                                                            ) : null}
+                                                                        </span>
+                                                                        {!item.href ? (
+                                                                            <span className="text-caption">
+                                                                                In the download
+                                                                            </span>
+                                                                        ) : null}
+                                                                    </li>
+                                                                ),
+                                                            )}
+                                                        </ul>
+                                                    ) : null}
+                                                </li>
+                                            ))}
+                                        </ol>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-section-title flex items-center gap-2">
+                                        <Paperclip className="h-4 w-4 text-primary" />
+                                        Extra documents
+                                        <span className="text-caption font-normal">
+                                            ({supplementaryAttachments.length})
+                                        </span>
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Files added to this pack by hand, such
+                                        as a legal opinion or a late report.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <GovernanceAttachmentsPanel
+                                        canManage={canManagePack}
+                                        attachments={supplementaryAttachments}
+                                        urls={{
+                                            upload: `/governance/packs/${pack.id}/attachments`,
+                                            delete: (id) =>
+                                                `/governance/packs/${pack.id}/attachments/${id}`,
+                                        }}
+                                        reloadProp="supplementaryAttachments"
+                                        helperText="PDF, Office, images, CSV or text — up to 20 MB each."
+                                        emptyText={{
+                                            managed:
+                                                'No extra documents yet. Drop files above to add one.',
+                                            readOnly:
+                                                'No extra documents were added to this pack.',
+                                        }}
+                                    />
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <div className="flex flex-col gap-5">
+                            {is_recipient ? (
+                                <Card id="pack-reading" className="scroll-mt-5">
+                                    <CardHeader>
+                                        <CardTitle className="text-section-title flex items-center gap-2">
+                                            <CheckCircle className="h-4 w-4 text-primary" />
+                                            Your reading
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="flex flex-col gap-3">
+                                        {has_read && my_receipt ? (
+                                            <p className="text-sm">
+                                                You confirmed you read version{' '}
+                                                {my_receipt.revision_number} on{' '}
+                                                {formatDateLong(my_receipt.read_at)}.
+                                            </p>
+                                        ) : can_mark_read ? (
+                                            <>
+                                                <p className="text-subtle">
+                                                    When you&apos;ve read the
+                                                    pack, confirm it here so the
+                                                    board secretary knows.
+                                                    Downloading the pack
+                                                    doesn&apos;t count as
+                                                    reading it.
+                                                </p>
+                                                <Button
+                                                    onClick={() =>
+                                                        setConfirm('read')
+                                                    }
+                                                    disabled={acknowledging}
+                                                    dusk="mark-read-button"
+                                                >
+                                                    <CheckCircle className="h-4 w-4" />
+                                                    {acknowledging
+                                                        ? 'Saving…'
+                                                        : "I've read this pack"}
+                                                </Button>
+                                                {acknowledgeError ? (
+                                                    <p
+                                                        role="alert"
+                                                        className="text-sm text-status-critical"
+                                                    >
+                                                        {acknowledgeError}
+                                                    </p>
+                                                ) : null}
+                                            </>
+                                        ) : (
+                                            <p className="text-subtle">
+                                                You can confirm reading once the
+                                                pack has been sent to you.
                                             </p>
                                         )}
-                                    </div>
-                                </div>
-                                <Button
-                                    onClick={handleMarkAsRead}
-                                    disabled={acknowledging}
-                                    dusk="hero-mark-read"
-                                    className="shrink-0"
-                                >
-                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                    {acknowledging
-                                        ? 'Confirming…'
-                                        : `Mark Version ${revisionNumber} as Read`}
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    )}
+                                    </CardContent>
+                                </Card>
+                            ) : null}
 
-                    {/* Revisions line-up / history */}
-                    {all_revisions.length > 1 && (
-                        <Card id="pack-versions" className="scroll-mt-5">
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-section-title flex items-center gap-2">
-                                    <History className="h-4 w-4 text-primary" />
-                                    Pack version history
-                                </CardTitle>
-                                <CardDescription>
-                                    Immutable revisions published for this
-                                    meeting.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="divide-y divide-border">
-                                    {all_revisions.map((rev) => (
-                                        <div
-                                            key={rev.id}
-                                            className="flex items-center justify-between py-2.5 text-sm"
-                                        >
-                                            <div className="flex items-center gap-2.5">
-                                                <Badge
-                                                    variant={
-                                                        rev.id === pack.id
-                                                            ? 'default'
-                                                            : 'outline'
+                            {canManagePack && distributionStats ? (
+                                <Card id="pack-distribution" className="scroll-mt-5">
+                                    <CardHeader>
+                                        <CardTitle className="text-section-title flex items-center gap-2">
+                                            <Users className="h-4 w-4 text-primary" />
+                                            Who has read it
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Only people who manage board packs
+                                            see this.
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="flex flex-col gap-3">
+                                        {is_distributed ? (
+                                            <>
+                                                <dl className="grid grid-cols-2 gap-3 text-sm">
+                                                    <div>
+                                                        <dt className="text-caption">
+                                                            Sent to
+                                                        </dt>
+                                                        <dd className="font-medium tabular-nums">
+                                                            {
+                                                                distributionStats.intended_recipients
+                                                            }
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-caption">
+                                                            Read
+                                                        </dt>
+                                                        <dd className="font-medium tabular-nums">
+                                                            {
+                                                                distributionStats.read_count
+                                                            }
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-caption">
+                                                            Not read yet
+                                                        </dt>
+                                                        <dd className="font-medium tabular-nums">
+                                                            {
+                                                                distributionStats.outstanding_reads
+                                                            }
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-caption">
+                                                            Downloads
+                                                        </dt>
+                                                        <dd className="font-medium tabular-nums">
+                                                            {
+                                                                distributionStats.download_count
+                                                            }
+                                                        </dd>
+                                                    </div>
+                                                </dl>
+                                                <Progress
+                                                    value={
+                                                        distributionStats.read_rate
                                                     }
-                                                    className="text-xs"
-                                                >
-                                                    v{rev.revision_number}
-                                                </Badge>
-                                                {rev.is_current && (
-                                                    <StatusBadge
-                                                        size="sm"
-                                                        variant="success"
-                                                    >
-                                                        Current
-                                                    </StatusBadge>
-                                                )}
-                                                {rev.build_status ===
-                                                    'failed' && (
-                                                    <StatusBadge
-                                                        size="sm"
-                                                        variant="critical"
-                                                    >
-                                                        Failed
-                                                    </StatusBadge>
-                                                )}
-                                                <span className="text-caption">
-                                                    Generated{' '}
-                                                    {formatNZDate(
-                                                        rev.generated_at,
-                                                    )}
-                                                </span>
-                                            </div>
-                                            {rev.id === pack.id ? (
-                                                <span className="text-xs font-semibold text-primary">
-                                                    Viewing
-                                                </span>
-                                            ) : (
-                                                <Button
-                                                    asChild
-                                                    variant="ghost"
-                                                    size="sm"
-                                                >
-                                                    <Link
-                                                        href={`/governance/packs/${rev.id}`}
-                                                    >
-                                                        View version
-                                                    </Link>
-                                                </Button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-                        <Card id="pack-distribution" className="scroll-mt-5">
-                            <CardHeader>
-                                <CardTitle className="text-section-title flex items-center gap-2">
-                                    <Users className="h-4 w-4" />
-                                    Distribution & engagement
-                                </CardTitle>
-                                <CardDescription>
-                                    Engagement tracking for Revision{' '}
-                                    {revisionNumber}.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                                    {[
-                                        [
-                                            'Recipients',
-                                            distributionStats.intended_recipients,
-                                        ],
-                                        ['Read', distributionStats.read_count],
-                                        [
-                                            'Downloads',
-                                            distributionStats.download_count,
-                                        ],
-                                        [
-                                            'Outstanding',
-                                            distributionStats.outstanding_reads,
-                                        ],
-                                    ].map(([label, value]) => (
-                                        <div
-                                            key={label}
-                                            className="rounded-lg bg-muted p-4 text-center"
-                                        >
-                                            <p className="text-caption tracking-wide uppercase">
-                                                {label}
-                                            </p>
-                                            <p className="mt-2 text-lg font-semibold text-foreground tabular-nums">
-                                                {value}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="space-y-3">
-                                    <div>
-                                        <div className="text-subtle mb-1 flex items-center justify-between">
-                                            <span>Read rate</span>
-                                            <span>
-                                                {distributionStats.read_rate}%
-                                            </span>
-                                        </div>
-                                        <Progress
-                                            value={distributionStats.read_rate}
-                                        />
-                                    </div>
-                                    <div>
-                                        <div className="text-subtle mb-1 flex items-center justify-between">
-                                            <span>Download rate</span>
-                                            <span>
-                                                {
-                                                    distributionStats.download_rate
-                                                }
-                                                %
-                                            </span>
-                                        </div>
-                                        <Progress
-                                            value={Math.min(
-                                                distributionStats.download_rate,
-                                                100,
-                                            )}
-                                        />
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card id="pack-sections" className="scroll-mt-5">
-                            <CardHeader>
-                                <CardTitle className="text-section-title flex items-center gap-2">
-                                    <Files className="h-4 w-4" />
-                                    Included sections
-                                </CardTitle>
-                                <CardDescription>
-                                    {manifestSections.length} structural
-                                    section(s)
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                {manifestSections.length === 0 ? (
-                                    <EmptyState
-                                        variant="compact"
-                                        icon={Files}
-                                        title="No sections recorded"
-                                        description="This revision has no structural sections in its manifest."
-                                    />
-                                ) : (
-                                    manifestSections.map((section, index) => (
-                                        <div
-                                            key={`${section.id}-${index}`}
-                                            className="flex items-center justify-between rounded-lg border border-border px-3 py-3"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-caption">
-                                                    {index + 1}.
-                                                </span>
-                                                <div>
-                                                    <p className="font-medium text-foreground">
-                                                        {section.title}
-                                                    </p>
-                                                    <p className="text-caption">
-                                                        {section.type}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            {section.included && (
-                                                <CheckCircle
-                                                    className="h-5 w-5 text-status-success"
-                                                    aria-label="Included"
+                                                    aria-label="Share of members who have read the pack"
                                                 />
-                                            )}
-                                        </div>
-                                    ))
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
+                                            </>
+                                        ) : (
+                                            <p className="text-subtle">
+                                                Not sent yet.{' '}
+                                                {failed
+                                                    ? ''
+                                                    : `When you send it, ${recipients} board member${recipients === 1 ? '' : 's'} will get it.`}
+                                            </p>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ) : null}
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-section-title flex items-center gap-2">
-                                <Paperclip className="h-4 w-4" />
-                                Supplementary documents
-                                <span className="text-caption ml-1 font-normal">
-                                    ({supplementaryAttachments.length})
+                            {hasMultipleVersions ? (
+                                <Card id="pack-versions" className="scroll-mt-5">
+                                    <CardHeader>
+                                        <CardTitle className="text-section-title flex items-center gap-2">
+                                            <History className="h-4 w-4 text-primary" />
+                                            Versions
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Earlier versions stay available.
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <ul className="divide-y divide-border">
+                                            {all_revisions.map((rev) => {
+                                                const revChip =
+                                                    rev.build_status === 'failed'
+                                                        ? governanceStatus(
+                                                              'board_pack_status',
+                                                              'failed',
+                                                          )
+                                                        : governanceStatus(
+                                                              'board_pack_status',
+                                                              rev.distributed_at
+                                                                  ? 'distributed'
+                                                                  : 'draft',
+                                                          );
+                                                return (
+                                                    <li
+                                                        key={rev.id}
+                                                        className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm"
+                                                    >
+                                                        <span className="flex flex-col">
+                                                            <span className="font-medium">
+                                                                Version{' '}
+                                                                {rev.revision_number}
+                                                            </span>
+                                                            <span className="text-caption">
+                                                                Generated{' '}
+                                                                {formatDateLong(
+                                                                    rev.generated_at,
+                                                                )}
+                                                            </span>
+                                                        </span>
+                                                        <span className="flex items-center gap-2">
+                                                            <StatusBadge
+                                                                size="sm"
+                                                                variant={
+                                                                    revChip.variant
+                                                                }
+                                                            >
+                                                                {revChip.label}
+                                                            </StatusBadge>
+                                                            {rev.id === pack.id ? (
+                                                                <span className="text-caption">
+                                                                    You&apos;re
+                                                                    here
+                                                                </span>
+                                                            ) : (
+                                                                <Button
+                                                                    asChild
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                >
+                                                                    <Link
+                                                                        href={`/governance/packs/${rev.id}`}
+                                                                    >
+                                                                        Open
+                                                                    </Link>
+                                                                </Button>
+                                                            )}
+                                                        </span>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    </CardContent>
+                                </Card>
+                            ) : null}
+
+                            <InfoCard icon={ShieldAlert} tone="warn">
+                                <span className="inline-flex items-center gap-1 font-medium">
+                                    Confidential — board only
+                                    <GovernanceTermHint term="board_pack" />
                                 </span>
-                            </CardTitle>
-                            <CardDescription>
-                                Manually-uploaded papers that travel with this
-                                pack — legal opinions, external reports, late
-                                additions. The auto-generated sections above
-                                are unaffected.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <GovernanceAttachmentsPanel
-                                canManage={canManagePack}
-                                attachments={supplementaryAttachments}
-                                urls={{
-                                    upload: `/governance/packs/${pack.id}/attachments`,
-                                    delete: (id) =>
-                                        `/governance/packs/${pack.id}/attachments/${id}`,
-                                }}
-                                reloadProp="supplementaryAttachments"
-                                helperText="PDF, Office, images, CSV / TXT — up to 20 MB each. These do not change the audit checksum."
-                                emptyText={{
-                                    managed:
-                                        'No supplementary documents yet. Drop files above to attach one.',
-                                    readOnly:
-                                        'No supplementary documents are attached to this pack.',
-                                }}
-                            />
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-section-title flex items-center gap-2">
-                                <Layers className="h-4 w-4" />
-                                Content sections & decision papers
-                            </CardTitle>
-                            <CardDescription>
-                                Frozen snapshot data captured for Revision{' '}
-                                {revisionNumber}.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {contentSections.length === 0 ? (
-                                <EmptyState
-                                    variant="compact"
-                                    icon={Layers}
-                                    title="No content sections"
-                                    description="No snapshot content was captured for this revision."
-                                />
-                            ) : (
-                                contentSections.map((section) => (
-                                    <div
-                                        key={section.key}
-                                        className="rounded-lg border border-border p-4"
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div>
-                                                <p className="font-medium text-foreground">
-                                                    {section.title}
-                                                </p>
-                                                <p className="text-subtle">
-                                                    {section.summary}
-                                                </p>
-                                            </div>
-                                            <Badge variant="outline">
-                                                {section.type}
-                                            </Badge>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border-status-critical/30">
-                        <CardContent className="flex items-start gap-3 pt-6">
-                            <ShieldAlert className="mt-0.5 h-5 w-5 text-status-critical" />
-                            <div className="space-y-1">
-                                <p className="font-medium text-status-critical">
-                                    Confidential — Board only
-                                </p>
-                                <p className="text-sm text-status-critical">
-                                    This pack is confidential governance
-                                    material. Watermark: {pack.watermark_text}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                <br />
+                                Please don&apos;t share this pack outside the
+                                board.
+                            </InfoCard>
+                        </div>
+                    </div>
                 </div>
             </PageLayout>
 
-            {/* Create New Version Dialog */}
-            <Dialog
-                open={regenerateDialogOpen}
-                onOpenChange={setRegenerateDialogOpen}
-            >
-                <DialogContent style={{ maxWidth: 'min(92vw, 480px)' }}>
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <RotateCw className="h-4 w-4 text-primary" />
-                            Create new board pack revision
-                        </DialogTitle>
-                        <DialogDescription>
-                            Generate Revision {revisionNumber + 1} for this
-                            meeting.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="text-subtle space-y-3 py-3">
-                        <p>
-                            A new immutable revision will be generated with
-                            updated dashboard metrics, CEO reports, and decision
-                            paper snapshots.
-                        </p>
-                        <div className="space-y-1.5 rounded-md border border-border bg-muted/40 p-3 text-xs">
-                            <p className="font-semibold text-foreground">
-                                Version management rules:
-                            </p>
-                            <ul className="list-inside list-disc space-y-1">
-                                <li>
-                                    Current Revision {revisionNumber} remains
-                                    preserved and accessible as superseded.
-                                </li>
-                                <li>
-                                    New Revision {revisionNumber + 1} will
-                                    become the active version for members.
-                                </li>
-                                <li>
-                                    Board members will be required to
-                                    acknowledge reading the new revision.
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setRegenerateDialogOpen(false)}
-                            disabled={regenerating}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleRegenerate}
-                            disabled={regenerating}
-                        >
-                            {regenerating
-                                ? 'Generating…'
-                                : `Generate Revision ${revisionNumber + 1}`}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <ConfirmDialog
+                open={confirm === 'read'}
+                onClose={() => setConfirm(null)}
+                onConfirm={() => void markAsRead()}
+                title="Confirm you've read the pack?"
+                description={`Confirm you've read the pack for ${meetingTitle} (version ${version}). The board secretary can see who has confirmed.`}
+                confirmText="I've read this pack"
+                variant="default"
+            />
+            <ConfirmDialog
+                open={confirm === 'distribute'}
+                onClose={() => setConfirm(null)}
+                onConfirm={distribute}
+                title={`Send the pack to ${recipients} board member${recipients === 1 ? '' : 's'}?`}
+                description={`Each of them gets an email and a notification with a link to version ${version} of the pack for ${meetingTitle}. Once it's sent, it can't be unsent — to change it, create a new version.`}
+                confirmText="Send the pack"
+                variant="default"
+            />
+            <ConfirmDialog
+                open={confirm === 'new-version'}
+                onClose={() => setConfirm(null)}
+                onConfirm={createNewVersion}
+                title={`Create version ${nextVersion}?`}
+                description={
+                    is_distributed
+                        ? `Version ${nextVersion} is created as a draft with up-to-date reports, figures and resolutions. Members keep seeing version ${version} until you send version ${nextVersion} to them.`
+                        : `Version ${nextVersion} is created as a draft with up-to-date reports, figures and resolutions. Version ${version} stays available. Nothing is sent to members.`
+                }
+                confirmText={`Create version ${nextVersion}`}
+                variant="default"
+            />
         </AppLayout>
     );
 }

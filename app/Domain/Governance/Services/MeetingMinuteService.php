@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Services;
 
+use App\Domain\Governance\Exceptions\MinutesChangedByOthers;
 use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\MeetingMinute;
@@ -40,7 +41,7 @@ class MeetingMinuteService
                     'created_by_user_id' => $user->id,
                     'created_by_name' => $user->name,
                     'created_at' => now()->toIso8601String(),
-                    'note' => 'Initial draft created',
+                    'note' => 'First draft started',
                 ],
             ];
 
@@ -73,14 +74,14 @@ class MeetingMinuteService
             // 1. Guard against in-place edits to frozen minutes
             if (! $minutes->canEdit()) {
                 throw new DomainException(
-                    "Minutes in status '{$minutes->status}' cannot be edited in place. Approved and signed minutes are immutable. Create a correction draft to propose revisions."
+                    "Approved minutes can't be edited. The secretary can start a correction if something is wrong."
                 );
             }
 
             // 2. Concurrency guard (optimistic locking)
             if ($expectedVersion !== null && (int) $expectedVersion !== (int) $minutes->version_number) {
-                throw new DomainException(
-                    "Stale edit conflict: you submitted version {$expectedVersion}, but the current version is {$minutes->version_number}. Please refresh to review the latest changes."
+                throw new MinutesChangedByOthers(
+                    "Someone else saved these minutes while you were editing (you started from version {$expectedVersion}; they're now version {$minutes->version_number}). Refresh the page to see their changes, then make yours again."
                 );
             }
 
@@ -94,7 +95,7 @@ class MeetingMinuteService
                 'updated_by_user_id' => $user->id,
                 'updated_by_name' => $user->name,
                 'archived_at' => now()->toIso8601String(),
-                'note' => 'Prior version superseded by update',
+                'note' => 'Replaced by a later edit',
             ];
 
             $minutes->content_blocks = $contentBlocks;
@@ -116,7 +117,7 @@ class MeetingMinuteService
             $minutes = MeetingMinute::where('governance_meeting_id', $lockedMeeting->id)->lockForUpdate()->firstOrFail();
 
             if (! in_array($minutes->status, ['draft', 'reviewed'])) {
-                throw new DomainException("Minutes in status '{$minutes->status}' cannot be submitted for review.");
+                throw new DomainException('Only draft minutes can be sent for approval.');
             }
 
             $boardMember = $user->boardMember ?? BoardMember::where('user_id', $user->id)->first();
@@ -159,22 +160,24 @@ class MeetingMinuteService
             }
 
             if (! in_array($minutes->status, ['draft', 'reviewed'])) {
-                throw new DomainException("Minutes in status '{$minutes->status}' cannot be approved.");
+                throw new DomainException("These minutes are already signed, so they can't be approved again.");
             }
 
             // Must have reviewable content
             if (! $minutes->hasReviewableContent()) {
-                throw new DomainException('Cannot approve empty minutes. At least one agenda or minute section must contain written content.');
+                throw new DomainException("You can't approve empty minutes. Write something under at least one heading first.");
             }
 
             // Concurrency guard: verify reviewer saw the current version
             if ($expectedVersion !== null && (int) $minutes->version_number !== (int) $expectedVersion) {
-                throw new DomainException("Concurrency conflict: expected minute version {$expectedVersion}, but current version is {$minutes->version_number}.");
+                throw new MinutesChangedByOthers(
+                    "The minutes changed while you had this page open (you were looking at version {$expectedVersion}; they're now version {$minutes->version_number}). Refresh the page and check them again."
+                );
             }
 
             $currentHash = hash('sha256', json_encode($minutes->content_blocks ?? []));
             if ($expectedHash !== null && $currentHash !== $expectedHash) {
-                throw new DomainException("Concurrency conflict: minute content hash does not match expected hash.");
+                throw new MinutesChangedByOthers('The minutes changed while you had this page open. Refresh the page and check them again.');
             }
 
             $boardMember = $user->boardMember ?? BoardMember::where('user_id', $user->id)->first();
@@ -231,17 +234,19 @@ class MeetingMinuteService
             }
 
             if (! $minutes->isApproved()) {
-                throw new DomainException("Minutes must be approved before they can be signed. Current status is '{$minutes->status}'.");
+                throw new DomainException('The minutes need to be approved before they can be signed.');
             }
 
             // Concurrency guard: verify signer signed the exact approved version
             if ($expectedVersion !== null && (int) $minutes->version_number !== (int) $expectedVersion) {
-                throw new DomainException("Concurrency conflict: expected minute version {$expectedVersion}, but current version is {$minutes->version_number}.");
+                throw new MinutesChangedByOthers(
+                    "The minutes changed while you had this page open (you were looking at version {$expectedVersion}; they're now version {$minutes->version_number}). Refresh the page and check them again."
+                );
             }
 
             $currentHash = hash('sha256', json_encode($minutes->content_blocks ?? []));
             if ($expectedHash !== null && $currentHash !== $expectedHash) {
-                throw new DomainException("Concurrency conflict: minute content hash does not match expected hash.");
+                throw new MinutesChangedByOthers('The minutes changed while you had this page open. Refresh the page and check them again.');
             }
 
             $boardMember = $user->boardMember ?? BoardMember::where('user_id', $user->id)->first();
@@ -257,7 +262,7 @@ class MeetingMinuteService
                 'signer_user_name' => $user->name,
                 'signer_board_member_id' => $boardMemberId,
                 'timestamp' => now()->toIso8601String(),
-                'attestation' => 'Minutes confirmed as an accurate, true, and complete record of proceedings by the authorized signatory.',
+                'attestation' => 'Confirmed as a true and complete record of the meeting by the authorised signatory.',
             ];
 
             $minutes->status = 'signed';
@@ -286,7 +291,7 @@ class MeetingMinuteService
             $minutes = MeetingMinute::where('governance_meeting_id', $lockedMeeting->id)->lockForUpdate()->firstOrFail();
 
             if (! $minutes->isSigned()) {
-                throw new DomainException("Only signed minutes can be archived. Current status is '{$minutes->status}'.");
+                throw new DomainException('Only signed minutes can be archived.');
             }
 
             $history = $minutes->version_history ?? [];
@@ -321,7 +326,7 @@ class MeetingMinuteService
             $minutes = MeetingMinute::where('governance_meeting_id', $lockedMeeting->id)->lockForUpdate()->firstOrFail();
 
             if (! in_array($minutes->status, ['approved', 'signed', 'archived'])) {
-                throw new DomainException("Only approved, signed, or archived minutes can have a correction draft created. Current status is '{$minutes->status}'.");
+                throw new DomainException('A correction can only be started on approved, signed or archived minutes.');
             }
 
             // Capture complete immutable snapshot of previous version

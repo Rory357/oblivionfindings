@@ -7,7 +7,6 @@ import {
     EntityTable,
     ListCaption,
     PersonCell,
-    ProgressValue,
     compactMenu,
     useEntityContextMenu,
     type MenuItem,
@@ -16,7 +15,6 @@ import {
     PageHeader,
     PageHeaderFilterCheck,
     PageHeaderFilterSelect,
-    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -27,23 +25,14 @@ import {
     PageLayout,
 } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly, toDateInput } from '@/lib/datetime';
+import { formatDateOnly } from '@/lib/datetime';
+import { governanceStatus } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import {
-    CalendarDays,
-    ExternalLink,
-    FileCheck,
-    LayoutDashboard,
-    Plus,
-    ShieldCheck,
-    X,
-} from 'lucide-react';
+import { ExternalLink, FileCheck, Plus, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import {
@@ -52,20 +41,22 @@ import {
     type ObligationFormOptions,
 } from './_dialogs';
 import {
-    daysUntil,
     dueLabel,
     OBLIGATION_STATUS_FILTERS,
     obligationStatusLabel,
     obligationStatusVariant,
-    priorityVariant,
+    onTimeSentence,
+    plural,
 } from './_shared';
 
 interface Obligation {
     id: number;
     framework: string;
+    framework_label: string;
     obligation_code: string | null;
     obligation_title: string;
     due_date: string | null;
+    days_until_due: number | null;
     status: string;
     priority: string | null;
     evidence_provided: boolean;
@@ -73,12 +64,15 @@ interface Obligation {
     owner: { name: string } | null;
 }
 
-interface FrameworkSummary {
+interface Counts {
     total: number;
+    counted: number;
     complete: number;
     overdue: number;
     due_soon: number;
     not_due: number;
+    cancelled: number;
+    on_time: number;
 }
 
 interface Filters {
@@ -96,11 +90,12 @@ interface Props extends PageProps {
         last_page?: number;
     };
     summary: {
-        by_framework: Record<string, FrameworkSummary>;
+        by_framework: Record<string, Counts>;
+        totals: Counts;
         total_overdue: number;
         total_due_soon: number;
-        next_30_days: unknown[];
     };
+    upcomingCount: number;
     frameworks: Array<{ value: string; label: string }>;
     filters?: Filters;
     canCreate?: boolean;
@@ -119,6 +114,7 @@ export default function ComplianceIndex({
     auth,
     obligations,
     summary,
+    upcomingCount,
     frameworks,
     filters = {},
     canCreate = false,
@@ -131,11 +127,7 @@ export default function ComplianceIndex({
         canCreate && formOptions != null,
     );
     const ctxMenu = useEntityContextMenu<Obligation>();
-    const today = toDateInput(new Date());
     const userId = auth?.user?.id != null ? String(auth.user.id) : null;
-    const canViewCentre = Boolean(
-        (auth?.can?.compliance as { view?: boolean } | undefined)?.view,
-    );
 
     useEffect(() => {
         setSearch(filters.search ?? '');
@@ -159,17 +151,22 @@ export default function ComplianceIndex({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
 
-    const frameworkLabel = (value: string) =>
-        frameworks.find((f) => f.value === value)?.label ?? value;
+    const totals = summary.totals;
+    const onTimePercent =
+        totals.counted > 0 ? (totals.on_time / totals.counted) * 100 : 0;
+    const frameworksInUse = Object.values(summary.by_framework).filter(
+        (f) => f.counted > 0,
+    ).length;
 
-    const frameworkTotals = Object.values(summary.by_framework);
-    const totalTracked = frameworkTotals.reduce((a, f) => a + f.total, 0);
-    const totalComplete = frameworkTotals.reduce((a, f) => a + f.complete, 0);
-    const complianceRate =
-        totalTracked > 0 ? (totalComplete / totalTracked) * 100 : 0;
-    const frameworkEntries = Object.entries(summary.by_framework).filter(
-        ([, data]) => data.total > 0,
-    );
+    // Per-framework progress lives in the Framework filter options.
+    const frameworkOptions = frameworks.map((framework) => {
+        const counts = summary.by_framework[framework.value];
+        if (!counts || counts.counted === 0) return framework;
+        return {
+            value: framework.value,
+            label: `${framework.label} · ${counts.on_time} of ${counts.counted} on time`,
+        };
+    });
 
     const hasFilters = Object.keys(cleanFilters(filters)).length > 0;
     const shown = obligations.data.length;
@@ -178,7 +175,7 @@ export default function ComplianceIndex({
     const actionsFor = (obligation: Obligation): MenuItem[] =>
         compactMenu([
             {
-                label: 'Open obligation',
+                label: 'Open requirement',
                 icon: ExternalLink,
                 onClick: () =>
                     router.visit(`/governance/compliance/${obligation.id}`),
@@ -190,46 +187,38 @@ export default function ComplianceIndex({
             icon={ShieldCheck}
             title="Compliance"
             titleChip={
-                summary.total_overdue > 0 ? (
+                totals.counted === 0 ? (
+                    <PageHeaderStatusChip variant="neutral">
+                        No requirements yet
+                    </PageHeaderStatusChip>
+                ) : totals.overdue > 0 ? (
                     <PageHeaderStatusChip variant="critical">
-                        {summary.total_overdue} overdue
+                        {totals.overdue} overdue
+                    </PageHeaderStatusChip>
+                ) : totals.due_soon > 0 ? (
+                    <PageHeaderStatusChip variant="warning">
+                        {totals.due_soon} due in 30 days
                     </PageHeaderStatusChip>
                 ) : (
                     <PageHeaderStatusChip variant="success">
-                        On track
+                        Nothing overdue
                     </PageHeaderStatusChip>
                 )
             }
-            subline={`Regulatory obligations, deadlines and evidence · ${frameworks.length} frameworks · ${totalTracked} tracked`}
+            subline={`Legal, standards and funding requirements the organisation must meet · ${plural(totals.counted, 'requirement')}`}
             actions={
                 <>
                     <PageHeaderSearch
                         value={search}
                         onChange={setSearch}
-                        placeholder="Search obligations or references…"
+                        placeholder="Search requirements or references…"
                     />
-                    <PageHeaderGlassButton
-                        icon={CalendarDays}
-                        onClick={() =>
-                            router.visit('/governance/compliance/calendar')
-                        }
-                    >
-                        Calendar
-                    </PageHeaderGlassButton>
-                    {canViewCentre ? (
-                        <PageHeaderGlassButton
-                            icon={LayoutDashboard}
-                            onClick={() => router.visit('/compliance')}
-                        >
-                            Compliance centre
-                        </PageHeaderGlassButton>
-                    ) : null}
                     {canCreate && formOptions ? (
                         <PageHeaderPrimaryButton
                             icon={Plus}
                             onClick={() => setWizardOpen(true)}
                         >
-                            Add obligation
+                            Add requirement
                         </PageHeaderPrimaryButton>
                     ) : null}
                 </>
@@ -237,71 +226,86 @@ export default function ComplianceIndex({
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Obligations"
-                        ariaLabel="View all obligations"
+                        label="Requirements"
+                        ariaLabel="View all requirements"
                         href="/governance/compliance"
                     >
-                        <PageHeaderMeterBig>{totalTracked}</PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{totals.counted}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            across {frameworkEntries.length} frameworks
+                            {frameworksInUse === 1
+                                ? 'from 1 law, standard or contract'
+                                : `from ${frameworksInUse} laws, standards or contracts`}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Overdue"
-                        ariaLabel="View overdue obligations"
+                        ariaLabel="View overdue requirements"
                         href="/governance/compliance?status=overdue"
-                        tone={summary.total_overdue > 0 ? 'critical' : 'brand'}
+                        tone={totals.overdue > 0 ? 'critical' : 'brand'}
                     >
-                        <PageHeaderMeterBig>
-                            {summary.total_overdue}
-                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{totals.overdue}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Requires attention
+                            past their due date
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Due in 30 days"
-                        ariaLabel="View upcoming obligations on the calendar"
-                        href="/governance/compliance/calendar"
-                        tone={summary.total_due_soon > 0 ? 'warning' : 'brand'}
+                        ariaLabel="View requirements due in the next 30 days"
+                        href="/governance/compliance?status=due_soon"
+                        tone={totals.due_soon > 0 ? 'warning' : 'brand'}
                     >
-                        <PageHeaderMeterBig>
-                            {summary.total_due_soon}
-                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{totals.due_soon}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {summary.next_30_days.length} open items on the
-                            calendar
+                            not overdue yet
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Compliance rate"
-                        value={`${totalComplete}/${totalTracked}`}
-                        ariaLabel="View completed obligations"
-                        href="/governance/compliance?status=complete"
-                        tone={complianceRate >= 80 ? 'success' : 'brand'}
+                        label="On time"
+                        value={`${totals.on_time}/${totals.counted}`}
+                        ariaLabel="View requirements that are on time"
+                        href="/governance/compliance?status=on_time"
+                        tone={
+                            totals.counted > 0 && totals.overdue === 0
+                                ? 'success'
+                                : 'brand'
+                        }
                     >
                         <PageHeaderMeterDonut
-                            percent={complianceRate}
-                            caption={`${totalComplete} of ${totalTracked} complete`}
+                            percent={onTimePercent}
+                            caption={
+                                totals.counted > 0
+                                    ? onTimeSentence(totals.on_time, totals.counted)
+                                    : 'No requirements yet'
+                            }
                         />
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Calendar"
+                        ariaLabel="Open the compliance calendar"
+                        href="/governance/compliance/calendar"
+                    >
+                        <PageHeaderMeterBig>{upcomingCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            due in the next 90 days
+                        </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
             }
             filters={
                 <>
                     <PageHeaderFilterSelect
-                        label="Framework"
+                        label="All laws and contracts"
                         value={filters.framework ?? 'all'}
                         options={[
-                            { value: 'all', label: 'All frameworks' },
-                            ...frameworks,
+                            { value: 'all', label: 'All laws and contracts' },
+                            ...frameworkOptions,
                         ]}
                         onChange={(v) =>
                             go({ framework: v === 'all' ? undefined : v })
                         }
                     />
                     <PageHeaderFilterSelect
-                        label="Status"
+                        label="All statuses"
                         value={filters.status ?? 'all'}
                         options={OBLIGATION_STATUS_FILTERS}
                         onChange={(v) =>
@@ -335,91 +339,11 @@ export default function ComplianceIndex({
 
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
-                    {frameworkEntries.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-                            {frameworkEntries.map(([framework, data]) => {
-                                const Icon = frameworkIcon(framework);
-                                const rate =
-                                    data.total > 0
-                                        ? (data.complete / data.total) * 100
-                                        : 0;
-                                const active = filters.framework === framework;
-                                return (
-                                    <Card
-                                        key={framework}
-                                        className={
-                                            active
-                                                ? 'border-primary ring-1 ring-primary/40'
-                                                : undefined
-                                        }
-                                    >
-                                        <CardContent className="flex flex-col gap-3 pt-5">
-                                            <div className="flex items-center gap-2">
-                                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-primary/15 text-primary">
-                                                    <Icon className="size-4" />
-                                                </span>
-                                                <span className="min-w-0 truncate text-sm font-semibold">
-                                                    {frameworkLabel(framework)}
-                                                </span>
-                                            </div>
-                                            <ProgressValue
-                                                percent={rate}
-                                                tone={
-                                                    data.overdue > 0
-                                                        ? 'critical'
-                                                        : 'brand'
-                                                }
-                                            >
-                                                {data.complete} of {data.total}{' '}
-                                                complete · {Math.round(rate)}%
-                                            </ProgressValue>
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                {data.overdue > 0 ? (
-                                                    <StatusBadge
-                                                        variant="critical"
-                                                        size="sm"
-                                                    >
-                                                        {data.overdue} overdue
-                                                    </StatusBadge>
-                                                ) : null}
-                                                {data.due_soon > 0 ? (
-                                                    <StatusBadge
-                                                        variant="warning"
-                                                        size="sm"
-                                                    >
-                                                        {data.due_soon} due in
-                                                        30 days
-                                                    </StatusBadge>
-                                                ) : null}
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="ml-auto"
-                                                    onClick={() =>
-                                                        go({
-                                                            framework: active
-                                                                ? undefined
-                                                                : framework,
-                                                        })
-                                                    }
-                                                >
-                                                    {active
-                                                        ? 'Show all'
-                                                        : 'View'}
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
-                        </div>
-                    ) : null}
-
                     <ListCaption
                         title={
                             hasFilters
-                                ? 'Matching obligations'
-                                : 'All obligations'
+                                ? 'Matching requirements'
+                                : 'All requirements'
                         }
                         caption={`${shown} of ${total} shown · soonest due first`}
                     />
@@ -429,15 +353,15 @@ export default function ComplianceIndex({
                             icon={ShieldCheck}
                             title={
                                 hasFilters
-                                    ? 'No obligations match your filters'
-                                    : 'No compliance obligations yet'
+                                    ? 'No requirements match your filters'
+                                    : 'No requirements yet'
                             }
                             description={
                                 hasFilters
                                     ? 'Try clearing a filter or search term.'
                                     : canCreate
-                                      ? 'Add the first regulatory obligation to start tracking deadlines and evidence.'
-                                      : 'Obligations added by the compliance lead will appear here.'
+                                      ? 'Add the first legal or funding requirement to track when it is due and the evidence that it is met.'
+                                      : 'Requirements added by the compliance lead appear here.'
                             }
                             action={
                                 hasFilters ? (
@@ -462,14 +386,16 @@ export default function ComplianceIndex({
                         <EntityTable<Obligation>
                             rows={obligations.data}
                             rowKey={(o) => o.id}
-                            identityLabel="Obligation"
+                            identityLabel="Requirement"
                             identity={(o) => ({
                                 icon: frameworkIcon(o.framework),
                                 name: o.obligation_title,
                                 linkLabel: `Open ${o.obligation_title}`,
                                 subline: [
-                                    frameworkLabel(o.framework),
-                                    o.obligation_code,
+                                    o.framework_label,
+                                    o.obligation_code
+                                        ? `Ref ${o.obligation_code}`
+                                        : null,
                                 ]
                                     .filter(Boolean)
                                     .join(' · '),
@@ -505,14 +431,10 @@ export default function ComplianceIndex({
                                                         o.due_date.slice(0, 10),
                                                     )}
                                                 </span>
-                                                {o.status !== 'complete' ? (
+                                                {o.status !== 'complete' &&
+                                                o.status !== 'cancelled' ? (
                                                     <span className="text-caption truncate">
-                                                        {dueLabel(
-                                                            daysUntil(
-                                                                o.due_date,
-                                                                today,
-                                                            ),
-                                                        )}
+                                                        {dueLabel(o.days_until_due)}
                                                     </span>
                                                 ) : null}
                                             </span>
@@ -524,21 +446,18 @@ export default function ComplianceIndex({
                                     key: 'priority',
                                     label: 'Priority',
                                     width: '0.8fr',
-                                    cell: (o) =>
-                                        o.priority ? (
-                                            <EntityStatusChip
-                                                variant={priorityVariant(
-                                                    o.priority,
-                                                )}
-                                            >
-                                                {o.priority
-                                                    .charAt(0)
-                                                    .toUpperCase() +
-                                                    o.priority.slice(1)}
+                                    cell: (o) => {
+                                        if (!o.priority) return <EmptyValue />;
+                                        const chip = governanceStatus(
+                                            'priority',
+                                            o.priority,
+                                        );
+                                        return (
+                                            <EntityStatusChip variant={chip.variant}>
+                                                {chip.label}
                                             </EntityStatusChip>
-                                        ) : (
-                                            <EmptyValue />
-                                        ),
+                                        );
+                                    },
                                 },
                                 {
                                     key: 'owner',
@@ -562,10 +481,12 @@ export default function ComplianceIndex({
                                             </EntityStatusChip>
                                         ) : o.evidence_required ? (
                                             <EntityStatusChip variant="warning">
-                                                Required
+                                                Needed
                                             </EntityStatusChip>
                                         ) : (
-                                            <EmptyValue />
+                                            <span className="text-xs text-muted-foreground">
+                                                Not needed
+                                            </span>
                                         ),
                                 },
                             ]}

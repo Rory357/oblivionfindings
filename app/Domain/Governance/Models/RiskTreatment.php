@@ -88,6 +88,29 @@ class RiskTreatment extends Model
         return $this->status === 'complete';
     }
 
+    /** Planned or in progress and past its due date (NZ calendar date). */
+    public function isOverdue(?string $today = null): bool
+    {
+        return in_array($this->status, ['planned', 'in_progress', 'overdue'], true)
+            && $this->due_date !== null
+            && $this->due_date->toDateString() < ($today ?? ComplianceObligation::nzToday());
+    }
+
+    /** planned · in_progress · overdue · complete · cancelled — overdue from the date. */
+    public function presentedStatus(?string $today = null): string
+    {
+        if ($this->isOverdue($today)) {
+            return 'overdue';
+        }
+
+        return $this->status === 'overdue' ? 'planned' : (string) $this->status;
+    }
+
+    public function hasEvidence(): bool
+    {
+        return is_array($this->evidence_attachments) && count($this->evidence_attachments) > 0;
+    }
+
     public function start(): void
     {
         $this->update([

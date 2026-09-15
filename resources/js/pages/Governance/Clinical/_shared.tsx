@@ -1,11 +1,12 @@
 /**
- * Shared pieces for the Clinical governance pages (dashboard + trends): the
- * view toggle that lives in each header's filter row, status token mapping
- * and date helpers.
+ * Shared pieces for the Care quality pages (this month + month by month): the
+ * view toggle in each header's filter row, status chips and wording helpers.
  */
 import { PageHeaderViewToggle } from '@/components/page';
-import type { StatusVariant } from '@/components/ui/status-badge';
-import { formatDateOnly } from '@/lib/datetime';
+import {
+    governanceStatus,
+    type GovernanceStatusChip,
+} from '@/lib/governance-labels';
 import { router } from '@inertiajs/react';
 import { Activity, LayoutGrid } from 'lucide-react';
 
@@ -16,18 +17,18 @@ const CLINICAL_VIEW_HREFS: Record<ClinicalView, string> = {
     trends: '/governance/clinical/trends',
 };
 
-/** Dashboard · Trends — switches between the clinical governance views. */
+/** This month · Month by month — switches between the Care quality views. */
 export function ClinicalViewToggle({ value }: { value: ClinicalView }) {
     return (
         <PageHeaderViewToggle<ClinicalView>
-            ariaLabel="Clinical governance view"
+            ariaLabel="Care quality view"
             value={value}
             onChange={(next) => {
                 if (next !== value) router.visit(CLINICAL_VIEW_HREFS[next]);
             }}
             options={[
-                { value: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
-                { value: 'trends', label: 'Trends', icon: Activity },
+                { value: 'dashboard', label: 'This month', icon: LayoutGrid },
+                { value: 'trends', label: 'Month by month', icon: Activity },
             ]}
         />
     );
@@ -35,29 +36,80 @@ export function ClinicalViewToggle({ value }: { value: ClinicalView }) {
 
 export type IndicatorStatus = 'normal' | 'warning' | 'critical';
 
-export const INDICATOR_STATUS_VARIANTS: Record<IndicatorStatus, StatusVariant> =
-    {
-        normal: 'success',
-        warning: 'warning',
-        critical: 'critical',
-    };
-
-export const INDICATOR_STATUS_LABELS: Record<IndicatorStatus, string> = {
-    normal: 'On target',
-    warning: 'Warning',
-    critical: 'Critical',
+export type SnapshotValue = {
+    indicator_id: number;
+    indicator_code: string;
+    value: number;
+    status: IndicatorStatus;
+    trend: 'up' | 'down' | 'stable';
+    previous_value: number | null;
+    /** False when nothing has ever been recorded where this number comes from. */
+    recorded: boolean;
+    source_href: string | null;
+    source_label: string | null;
 };
 
+export type Snapshot = {
+    id: number;
+    period_start: string | null;
+    period_end: string | null;
+    period_label: string;
+    short_label: string;
+    is_complete: boolean;
+    compared_with_label: string | null;
+    indicator_values: SnapshotValue[];
+};
+
+/** The chip for one measure: "No data yet" until its records are in use. */
+export function indicatorChip(
+    value: SnapshotValue | null | undefined,
+): GovernanceStatusChip {
+    if (!value || !value.recorded) {
+        return governanceStatus('care_quality_status', 'no_data');
+    }
+    return governanceStatus('care_quality_status', value.status);
+}
+
+export function indicatorStatusKey(
+    value: SnapshotValue | null | undefined,
+): IndicatorStatus | 'no_data' {
+    return !value || !value.recorded ? 'no_data' : value.status;
+}
+
+/** "Target: none" for a zero target; the unit "count" is never shown. */
 export function targetLabel(
     direction: 'above' | 'below' | 'equal',
     value: number | null,
 ): string {
-    const symbol =
-        direction === 'below' ? '≤' : direction === 'above' ? '≥' : '=';
-    return `${symbol} ${value ?? '—'}`;
+    if (value === null) return 'No target set';
+    if (direction === 'below') {
+        return value === 0 ? 'Target: none' : `Target: ${value} or fewer`;
+    }
+    if (direction === 'above') return `Target: ${value} or more`;
+    return `Target: ${value}`;
 }
 
-export function formatPeriod(start: string | null, end: string | null): string {
-    if (!start || !end) return 'Current period';
-    return `${formatDateOnly(start.slice(0, 10))} – ${formatDateOnly(end.slice(0, 10))}`;
+export function unitLabel(unit: string | null): string | null {
+    if (!unit || unit.trim().toLowerCase() === 'count') return null;
+    return unit;
+}
+
+/** "Up from 1 in 1–14 Aug" / "Down from 3 in August 2026" / "Same as 1–14 Aug". */
+export function comparisonText(
+    value: SnapshotValue,
+    comparedWith: string | null,
+): string | null {
+    if (value.previous_value === null || !comparedWith) return null;
+    const previous = formatCount(value.previous_value);
+    if (value.value > value.previous_value) {
+        return `Up from ${previous} in ${comparedWith}`;
+    }
+    if (value.value < value.previous_value) {
+        return `Down from ${previous} in ${comparedWith}`;
+    }
+    return `Same as ${comparedWith}`;
+}
+
+export function formatCount(value: number): string {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }

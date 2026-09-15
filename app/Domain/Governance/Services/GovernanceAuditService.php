@@ -114,11 +114,19 @@ class GovernanceAuditService
             $actions->where('resource_id', $filters['entity_id']);
             $changes->where('entity_id', $filters['entity_id']);
         }
+        // An activity filter names one kind of event, so the other table's
+        // rows can't match it.
         if (! empty($filters['action'])) {
             $actions->where('action', $filters['action']);
+            if (empty($filters['change_type'])) {
+                $changes->whereRaw('1 = 0');
+            }
         }
         if (! empty($filters['change_type'])) {
             $changes->where('change_type', $filters['change_type']);
+            if (empty($filters['action'])) {
+                $actions->whereRaw('1 = 0');
+            }
         }
         if (! empty($filters['from'])) {
             $actions->where('created_at', '>=', $filters['from']);

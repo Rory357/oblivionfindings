@@ -1,5 +1,13 @@
 import { Head } from '@inertiajs/react';
-import { BarChart3, CheckCircle2, ListChecks, Star, Users } from 'lucide-react';
+import {
+    BarChart3,
+    CheckCircle2,
+    EyeOff,
+    ListChecks,
+    MessageSquareText,
+    Star,
+    Users,
+} from 'lucide-react';
 import { useMemo } from 'react';
 
 import { EntityChip, ProgressValue } from '@/components/lists';
@@ -20,12 +28,11 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import type { StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateLong } from '@/lib/datetime';
+import { governanceStatus } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
 
-import { evaluationTypeLabel } from './_dialogs';
+import { RATING_ANCHORS, evaluationSubject } from './_dialogs';
 
 interface RawQuestion {
     id?: number | string | null;
@@ -41,7 +48,7 @@ interface RawAnswer {
 }
 
 /** Answers arrive detached from identity (no member, id or timestamp). */
-interface RawResponse {
+export interface RawResponse {
     answers?: RawAnswer[] | null;
     submitted: boolean;
 }
@@ -67,17 +74,11 @@ interface Props extends PageProps {
         responses?: RawResponse[] | null;
         respondents?: Respondent[] | null;
         anonymous_respondent_count?: number;
+        active_member_count?: number;
+        committee_name?: string | null;
         aggregate_results?: Record<string, RawAggregate> | RawAggregate[] | null;
     };
 }
-
-/** Stored statuses ("open") presented the same way as the register. */
-const STATUS: Record<string, { label: string; variant: StatusVariant }> = {
-    open: { label: 'Open', variant: 'info' },
-    active: { label: 'Open', variant: 'info' },
-    draft: { label: 'Draft', variant: 'neutral' },
-    closed: { label: 'Closed', variant: 'success' },
-};
 
 interface QuestionResult {
     key: string;
@@ -86,10 +87,49 @@ interface QuestionResult {
     answered: number;
     average: number | null;
     distribution: { label: string; count: number }[];
+    comments: string[];
 }
 
 function isYes(value: unknown): boolean {
     return [true, 1, '1', 'true', 'yes', 'Yes'].includes(value as never);
+}
+
+/**
+ * Written answers for one question (or `overall_comments`), without names.
+ * Sorted alphabetically per question, so the order can't be used to line a
+ * comment up with the same person's other answers.
+ */
+export function writtenComments(
+    responses: RawResponse[],
+    questionId: string | number,
+): string[] {
+    return responses
+        .filter((response) => response.submitted)
+        .map((response) =>
+            (response.answers ?? []).find(
+                (answer) => String(answer.question_id) === String(questionId),
+            ),
+        )
+        .map((answer) =>
+            typeof answer?.answer === 'string' ? answer.answer.trim() : '',
+        )
+        .filter((text) => text !== '')
+        .sort((a, b) => a.localeCompare(b, 'en-NZ'));
+}
+
+function CommentList({ comments }: { comments: string[] }) {
+    return (
+        <ul className="flex flex-col gap-2">
+            {comments.map((comment, index) => (
+                <li
+                    key={index}
+                    className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm whitespace-pre-line"
+                >
+                    {comment}
+                </li>
+            ))}
+        </ul>
+    );
 }
 
 export default function EvaluationResults({ auth, evaluation }: Props) {
@@ -98,29 +138,29 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
     const completed = responses.filter((r) => r.submitted);
     const respondents = evaluation.respondents ?? [];
     const anonymousCount = evaluation.anonymous_respondent_count ?? 0;
+    // Completion is measured against everyone who could answer.
+    const activeMembers = evaluation.active_member_count ?? 0;
     const completionRate =
-        responses.length > 0
-            ? Math.round((completed.length / responses.length) * 100)
+        activeMembers > 0
+            ? Math.min(100, Math.round((completed.length / activeMembers) * 100))
             : 0;
-    const status = STATUS[evaluation.status] ?? {
-        label: evaluation.status,
-        variant: 'neutral' as StatusVariant,
-    };
+    const chip = governanceStatus('evaluation_status', evaluation.status);
 
     // Results are derived from the submitted responses; a stored aggregate
     // (written when an evaluation is closed through the model) is only used
     // for the average when present.
     const results = useMemo<QuestionResult[]>(() => {
         const aggregates = evaluation.aggregate_results ?? {};
-        return questions.map((question, index) => {
+        const submitted = (evaluation.responses ?? []).filter((r) => r.submitted);
+        return (evaluation.questions ?? []).map((question, index) => {
             const id = question.id ?? index + 1;
-            const answers = completed
+            const answers = submitted
                 .map((r) =>
                     (r.answers ?? []).find(
                         (a) => String(a.question_id) === String(id),
                     ),
                 )
-                .filter((a): a is RawAnswer => a !== undefined && a.answer != null);
+                .filter((a): a is RawAnswer => a !== undefined && a.answer != null && a.answer !== '');
             const type = question.type ?? 'text';
             const stored = (aggregates as Record<string, RawAggregate>)[String(id)];
             let average: number | null = null;
@@ -137,7 +177,7 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                         ? ratings.reduce((sum, n) => sum + n, 0) / ratings.length
                         : null);
                 distribution = [5, 4, 3, 2, 1].map((score) => ({
-                    label: String(score),
+                    label: `${score} – ${RATING_ANCHORS[score]}`,
                     count: ratings.filter((n) => Math.round(n) === score).length,
                 }));
             } else if (type === 'yes_no') {
@@ -155,10 +195,15 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                 answered: answers.length,
                 average,
                 distribution,
+                comments: type === 'text' ? writtenComments(submitted, id) : [],
             };
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [evaluation]);
+
+    const overallComments = useMemo(
+        () => writtenComments(evaluation.responses ?? [], 'overall_comments'),
+        [evaluation],
+    );
 
     const ratingAverages = results
         .map((r) => r.average)
@@ -168,7 +213,8 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
             ? ratingAverages.reduce((sum, n) => sum + n, 0) / ratingAverages.length
             : null;
 
-    const resultsHref = `/governance/evaluations/${evaluation.id}/results`;
+    const evaluationHref = `/governance/evaluations/${evaluation.id}`;
+    const resultsHref = `${evaluationHref}/results`;
 
     return (
         <AppLayout
@@ -177,10 +223,7 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Evaluations', href: '/governance/evaluations' },
-                {
-                    title: evaluation.title,
-                    href: `/governance/evaluations/${evaluation.id}`,
-                },
+                { title: evaluation.title, href: evaluationHref },
                 { title: 'Results', href: resultsHref },
             ]}
         >
@@ -190,60 +233,69 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                 hero={
                     <PageHeader
                         variant="profile"
-                        backHref={`/governance/evaluations/${evaluation.id}`}
+                        backHref={evaluationHref}
                         icon={BarChart3}
                         title={`${evaluation.title} — results`}
                         wrapTitle
                         titleChip={
-                            <PageHeaderStatusChip variant={status.variant}>
-                                {status.label}
+                            <PageHeaderStatusChip variant={chip.variant}>
+                                {chip.label}
                             </PageHeaderStatusChip>
                         }
-                        subline={`${evaluationTypeLabel(evaluation.evaluation_type)} evaluation · outcome summary from submitted responses`}
+                        subline={`${evaluationSubject(evaluation.evaluation_type, evaluation.committee_name)} · Results from submitted responses · Answers are shown without names`}
                         meters={
                             <>
                                 <PageHeaderMeterBlock
-                                    label="Completion"
-                                    value={`${completed.length}/${responses.length}`}
+                                    label="Responded"
+                                    value={`${completed.length}/${activeMembers}`}
                                     tone={
-                                        responses.length > 0 && completionRate < 80
+                                        activeMembers > 0 && completionRate < 80
                                             ? 'warning'
                                             : 'brand'
                                     }
-                                    ariaLabel="View respondents"
-                                    href={`/governance/evaluations/${evaluation.id}`}
+                                    ariaLabel="See who has responded"
+                                    href={evaluationHref}
                                 >
                                     <PageHeaderMeterBar percent={completionRate} />
                                     <PageHeaderMeterCaption>
-                                        {completionRate}% of started responses
-                                        submitted
+                                        {completionRate}% of current board members
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
                                     label="Average rating"
-                                    ariaLabel="View results by question"
-                                    href={resultsHref}
+                                    ariaLabel="Go to the results by question"
+                                    onClick={() =>
+                                        document
+                                            .getElementById('question-results')
+                                            ?.scrollIntoView({ behavior: 'smooth' })
+                                    }
                                 >
                                     <PageHeaderMeterBig>
                                         {overallAverage !== null
                                             ? `${overallAverage.toFixed(1)} / 5`
-                                            : '—'}
+                                            : 'Not available'}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        across {ratingAverages.length} rated
-                                        questions
+                                        {ratingAverages.length === 1
+                                            ? 'across 1 rating question'
+                                            : `across ${ratingAverages.length} rating questions`}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Questions"
-                                    ariaLabel="View the evaluation"
-                                    href={`/governance/evaluations/${evaluation.id}`}
+                                    label="Comments"
+                                    ariaLabel="Go to the overall comments"
+                                    onClick={() =>
+                                        document
+                                            .getElementById('overall-comments')
+                                            ?.scrollIntoView({ behavior: 'smooth' })
+                                    }
                                 >
                                     <PageHeaderMeterBig>
-                                        {questions.length}
+                                        {overallComments.length +
+                                            results.reduce((sum, r) => sum + r.comments.length, 0)}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        in this evaluation
+                                        written answers and comments
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                             </>
@@ -252,102 +304,122 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                 }
             >
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-                    <Card className="lg:col-span-2">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <ListChecks className="h-4 w-4 text-primary" />
-                                Question results
-                            </CardTitle>
-                            <CardDescription>
-                                {questions.length} questions ·{' '}
-                                {completed.length} submitted responses
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {results.length === 0 ? (
-                                <EmptyState
-                                    variant="compact"
-                                    icon={ListChecks}
-                                    title="No questions found"
-                                    description="This evaluation has no questions configured."
-                                />
-                            ) : (
-                                <ol className="flex flex-col gap-4">
-                                    {results.map((result, idx) => (
-                                        <li
-                                            key={result.key}
-                                            className="rounded-lg border border-border p-4"
-                                        >
-                                            <div className="flex items-start gap-3">
-                                                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-                                                    {idx + 1}
-                                                </span>
-                                                <div className="flex min-w-0 flex-1 flex-col gap-3">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <p className="text-sm font-medium">
-                                                            {result.text}
-                                                        </p>
-                                                        <EntityChip>
-                                                            {result.answered}{' '}
-                                                            answered
-                                                        </EntityChip>
-                                                        {result.average !== null ? (
-                                                            <EntityChip icon={Star}>
-                                                                {result.average.toFixed(1)}{' '}
-                                                                average
+                    <div className="flex flex-col gap-5 lg:col-span-2">
+                        <Card id="question-results">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <ListChecks className="h-4 w-4 text-primary" />
+                                    Results by question
+                                </CardTitle>
+                                <CardDescription>
+                                    {questions.length === 1 ? '1 question' : `${questions.length} questions`}{' '}
+                                    ·{' '}
+                                    {completed.length === 1
+                                        ? '1 response'
+                                        : `${completed.length} responses`}
+                                    . Comments are shown without names.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {results.length === 0 ? (
+                                    <EmptyState
+                                        variant="compact"
+                                        icon={ListChecks}
+                                        title="No questions"
+                                        description="This evaluation doesn't have any questions."
+                                    />
+                                ) : (
+                                    <ol className="flex flex-col gap-4">
+                                        {results.map((result, idx) => (
+                                            <li
+                                                key={result.key}
+                                                className="rounded-lg border border-border p-4"
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                                                        {idx + 1}
+                                                    </span>
+                                                    <div className="flex min-w-0 flex-1 flex-col gap-3">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <p className="text-sm font-medium">
+                                                                {result.text}
+                                                            </p>
+                                                            <EntityChip>
+                                                                {result.answered} answered
                                                             </EntityChip>
-                                                        ) : null}
-                                                    </div>
-                                                    {result.distribution.length > 0 &&
-                                                    result.answered > 0 ? (
-                                                        <div className="grid gap-2 sm:grid-cols-2">
-                                                            {result.distribution.map(
-                                                                (bucket) => (
+                                                            {result.average !== null ? (
+                                                                <EntityChip icon={Star}>
+                                                                    {result.average.toFixed(1)} average
+                                                                </EntityChip>
+                                                            ) : null}
+                                                        </div>
+                                                        {result.answered === 0 ? (
+                                                            <p className="text-caption">
+                                                                No answers yet.
+                                                            </p>
+                                                        ) : result.type === 'text' ? (
+                                                            <div className="flex flex-col gap-2">
+                                                                <p className="text-caption">
+                                                                    Comments ({result.comments.length})
+                                                                </p>
+                                                                <CommentList comments={result.comments} />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                                {result.distribution.map((bucket) => (
                                                                     <ProgressValue
                                                                         key={bucket.label}
-                                                                        percent={
-                                                                            (bucket.count /
-                                                                                result.answered) *
-                                                                            100
-                                                                        }
+                                                                        percent={(bucket.count / result.answered) * 100}
                                                                     >
-                                                                        {result.type ===
-                                                                        'rating'
-                                                                            ? `${bucket.label} of 5`
-                                                                            : bucket.label}{' '}
-                                                                        · {bucket.count}
+                                                                        {bucket.label} · {bucket.count}
                                                                     </ProgressValue>
-                                                                ),
-                                                            )}
-                                                        </div>
-                                                    ) : result.answered === 0 ? (
-                                                        <p className="text-caption">
-                                                            No submitted answers yet.
-                                                        </p>
-                                                    ) : (
-                                                        <p className="text-caption">
-                                                            Free-text question —
-                                                            answers are not
-                                                            summarised here.
-                                                        </p>
-                                                    )}
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ol>
-                            )}
-                        </CardContent>
-                    </Card>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card id="overall-comments">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <MessageSquareText className="h-4 w-4 text-primary" />
+                                    Overall comments
+                                </CardTitle>
+                                <CardDescription className="flex items-center gap-1.5">
+                                    <EyeOff className="h-3.5 w-3.5" />
+                                    Comments are shown without names.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {overallComments.length === 0 ? (
+                                    <EmptyState
+                                        variant="inline"
+                                        icon={MessageSquareText}
+                                        title="No overall comments"
+                                    />
+                                ) : (
+                                    <CommentList comments={overallComments} />
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
 
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Users className="h-4 w-4 text-primary" />
-                                Respondents
+                                Who has responded
                             </CardTitle>
                             <CardDescription>
-                                Board members who submitted a response
+                                {completed.length} of {activeMembers} current board{' '}
+                                {activeMembers === 1 ? 'member' : 'members'}. Names
+                                aren't linked to answers.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -355,7 +427,7 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                                 <EmptyState
                                     variant="inline"
                                     icon={CheckCircle2}
-                                    title="No completed responses yet"
+                                    title="No responses yet"
                                 />
                             ) : (
                                 <ul className="flex flex-col gap-2">
@@ -364,20 +436,17 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                                             key={`${respondent.name}-${index}`}
                                             className="flex items-center gap-2 text-sm"
                                         >
-                                            <CheckCircle2 className="h-4 w-4 text-status-success" />
+                                            <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
                                             <span className="truncate">
                                                 {respondent.name}
-                                            </span>
-                                            <span className="ml-auto shrink-0 text-caption">
-                                                {formatDateLong(respondent.submitted_at)}
                                             </span>
                                         </li>
                                     ))}
                                     {anonymousCount > 0 ? (
                                         <li className="text-caption">
                                             {anonymousCount === 1
-                                                ? '1 anonymous response'
-                                                : `${anonymousCount} anonymous responses`}
+                                                ? '1 person responded without their name shown'
+                                                : `${anonymousCount} people responded without their names shown`}
                                         </li>
                                     ) : null}
                                 </ul>

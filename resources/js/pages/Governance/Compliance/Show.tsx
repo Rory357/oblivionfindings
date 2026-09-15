@@ -8,6 +8,7 @@ import {
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
+import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
@@ -16,62 +17,75 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { formatFileSize } from '@/components/ui/file-dropzone';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly, formatDateTime, toDateInput } from '@/lib/datetime';
-import { index as complianceIndex } from '@/routes/governance/compliance';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
+import {
+    complianceEvidenceTypeLabel,
+    frequencyLabel,
+    governanceStatus,
+    refSuffix,
+} from '@/lib/governance-labels';
 import { PageProps } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle,
     Clock,
+    Download,
+    ExternalLink,
     FileCheck,
     Pencil,
     Upload,
     User,
 } from 'lucide-react';
 import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
 import { useState } from 'react';
 
 import {
     CompleteObligationDialog,
     frameworkIcon,
-    FREQUENCY_OPTIONS,
-    isEvidenceExpired,
     ObligationWizardDialog,
     UploadEvidenceDialog,
     type ObligationFormOptions,
 } from './_dialogs';
 import {
-    daysUntil,
     dueLabel,
     obligationStatusLabel,
     obligationStatusVariant,
-    priorityVariant,
+    plural,
 } from './_shared';
 
 interface Evidence {
     id: number;
     evidence_type: string;
     title: string;
-    file_path: string;
+    description: string | null;
+    file_name: string | null;
+    file_size: number | null;
     valid_until: string | null;
+    expired: boolean;
     uploaded_by: { name: string } | null;
-    uploaded_at: string;
+    uploaded_at: string | null;
+    open_url: string | null;
+    download_url: string | null;
 }
 
 interface Reminder {
     id: number;
     days_before_due: number;
-    scheduled_at: string;
+    scheduled_at: string | null;
     status: string;
     sent_at: string | null;
+    is_escalation: boolean;
 }
 
 interface Obligation {
     id: number;
     framework: string;
+    framework_label: string;
     obligation_code: string | null;
     obligation_title: string;
     description: string;
@@ -80,6 +94,7 @@ interface Obligation {
     priority?: string | null;
     due_date: string;
     next_due_date: string | null;
+    days_until_due: number | null;
     status: string;
     owner_id?: number | null;
     owner: { id: number; name: string } | null;
@@ -119,27 +134,15 @@ interface Props extends PageProps {
     formOptions?: ObligationFormOptions | null;
 }
 
-const FRAMEWORK_LABELS: Record<string, string> = {
-    charities: 'Charities Services',
-    nga_paerewa: 'Ngā Paerewa NZS 8134:2021',
-    hdsa_safety: 'H&D Services (Safety) Act',
-    privacy_act: 'Privacy Act 2020',
-    hip_code: 'Health Information Privacy Code',
-    hswa: 'Health and Safety at Work Act',
-    employment: 'Employment Relations',
-    funding_moh: 'MoH/Health NZ Funding',
-    funding_msd: 'MSD Funding',
-    funding_acc: 'ACC Funding',
-};
-
 function dateOnly(value: string | null | undefined): string {
     return formatDateOnly(value ? value.slice(0, 10) : null);
 }
 
-function humanise(value: string | null | undefined): string {
-    if (!value) return '—';
-    return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
+const REMINDER_STATUS: Record<string, { label: string; variant: 'success' | 'neutral' | 'critical' }> = {
+    pending: { label: 'Scheduled', variant: 'neutral' },
+    sent: { label: 'Sent', variant: 'success' },
+    failed: { label: "Couldn't send", variant: 'critical' },
+};
 
 function scrollTo(id: string) {
     document
@@ -158,22 +161,30 @@ export default function ComplianceShow({
     const [completeOpen, setCompleteOpen] = useState(false);
     const canEdit = Boolean(abilities.update) && formOptions != null;
     const canComplete =
-        Boolean(abilities.complete) && obligation.status !== 'complete';
+        Boolean(abilities.complete) &&
+        obligation.status !== 'complete' &&
+        obligation.status !== 'cancelled';
     const canUpload = Boolean(abilities.uploadEvidence);
     // Retired /compliance/{id}/edit deep links arrive as ?edit=1.
     const [editOpen, setEditOpen] = useDialogDeepLink('edit', canEdit);
 
-    const frameworkLabel =
-        FRAMEWORK_LABELS[obligation.framework] ?? humanise(obligation.framework);
-    const days = daysUntil(obligation.due_date, toDateInput(new Date()));
-    const validEvidence = evidenceItems.filter((ev) => !isEvidenceExpired(ev));
+    const frameworkLabel = obligation.framework_label;
+    const currentEvidence = evidenceItems.filter((ev) => !ev.expired);
     const sentReminders = reminderItems.filter((r) => r.status === 'sent').length;
     const isComplete = obligation.status === 'complete';
+    const statusTone =
+        obligation.status === 'overdue'
+            ? 'critical'
+            : obligation.status === 'due_soon'
+              ? 'warning'
+              : isComplete
+                ? 'success'
+                : 'brand';
 
     const header = (
         <PageHeader
             variant="profile"
-            backHref={complianceIndex.url()}
+            backHref="/governance/compliance"
             icon={frameworkIcon(obligation.framework)}
             title={obligation.obligation_title}
             titleDusk="compliance-heading"
@@ -187,11 +198,11 @@ export default function ComplianceShow({
             }
             subline={[
                 frameworkLabel,
-                obligation.obligation_code,
                 `Due ${dateOnly(obligation.due_date)}`,
                 obligation.owner?.name
                     ? `Owner ${obligation.owner.name}`
                     : 'No owner',
+                refSuffix(obligation.obligation_code),
             ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -219,7 +230,7 @@ export default function ComplianceShow({
                             onClick={() => setCompleteOpen(true)}
                             data-dusk="open-complete-dialog-button"
                         >
-                            Mark complete
+                            Mark as done
                         </PageHeaderPrimaryButton>
                     ) : null}
                 </>
@@ -230,15 +241,7 @@ export default function ComplianceShow({
                         label="Due date"
                         ariaLabel="View due date and status"
                         onClick={() => scrollTo('obligation-status')}
-                        tone={
-                            obligation.status === 'overdue'
-                                ? 'critical'
-                                : obligation.status === 'due_soon'
-                                  ? 'warning'
-                                  : isComplete
-                                    ? 'success'
-                                    : 'brand'
-                        }
+                        tone={statusTone}
                     >
                         <PageHeaderMeterBig>
                             <span className="text-base">
@@ -247,8 +250,8 @@ export default function ComplianceShow({
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
                             {isComplete
-                                ? `Completed ${dateOnly(obligation.completed_at)}`
-                                : dueLabel(days)}
+                                ? `Done ${dateOnly(obligation.completed_at)}`
+                                : dueLabel(obligation.days_until_due)}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
@@ -257,7 +260,8 @@ export default function ComplianceShow({
                         onClick={() => scrollTo('obligation-evidence')}
                         tone={
                             obligation.evidence_required &&
-                            validEvidence.length === 0
+                            currentEvidence.length === 0 &&
+                            !isComplete
                                 ? 'warning'
                                 : 'brand'
                         }
@@ -266,15 +270,15 @@ export default function ComplianceShow({
                             {evidenceItems.length}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {validEvidence.length} valid ·{' '}
+                            {currentEvidence.length} current ·{' '}
                             {obligation.evidence_required
-                                ? 'required'
-                                : 'optional'}
+                                ? 'needed to mark done'
+                                : 'not needed to mark done'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Reminders"
-                        ariaLabel="View scheduled reminders"
+                        ariaLabel="View reminders"
                         onClick={() => scrollTo('obligation-reminders')}
                     >
                         <PageHeaderMeterBig>
@@ -282,22 +286,14 @@ export default function ComplianceShow({
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
                             {sentReminders} sent ·{' '}
-                            {reminderItems.length - sentReminders} pending
+                            {reminderItems.length - sentReminders} still to send
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Status"
-                        ariaLabel={`View ${obligationStatusLabel(obligation.status).toLowerCase()} obligations`}
+                        ariaLabel={`View requirements that are ${obligationStatusLabel(obligation.status).toLowerCase()}`}
                         href={`/governance/compliance?status=${obligation.status}`}
-                        tone={
-                            obligation.status === 'overdue'
-                                ? 'critical'
-                                : obligation.status === 'due_soon'
-                                  ? 'warning'
-                                  : isComplete
-                                    ? 'success'
-                                    : 'brand'
-                        }
+                        tone={statusTone}
                     >
                         <PageHeaderMeterBig>
                             <span className="text-base">
@@ -305,7 +301,7 @@ export default function ComplianceShow({
                             </span>
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {humanise(obligation.frequency)} obligation
+                            Due {frequencyLabel(obligation.frequency).toLowerCase()}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
@@ -332,7 +328,10 @@ export default function ComplianceShow({
                     <div className="flex flex-col gap-5 lg:col-span-2">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Description</CardTitle>
+                                <CardTitle className="flex items-center gap-1.5">
+                                    About this requirement
+                                    <GovernanceTermHint term="requirement" />
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="flex flex-col gap-4">
                                 <p className="whitespace-pre-wrap text-foreground">
@@ -341,7 +340,7 @@ export default function ComplianceShow({
                                 {obligation.requirements ? (
                                     <div className="rounded-lg bg-muted p-4">
                                         <p className="text-sm font-medium text-foreground">
-                                            Requirements
+                                            What must be done
                                         </p>
                                         <p className="text-subtle whitespace-pre-wrap">
                                             {obligation.requirements}
@@ -363,72 +362,122 @@ export default function ComplianceShow({
 
                         <Card id="obligation-evidence">
                             <CardHeader>
-                                <CardTitle>Evidence</CardTitle>
+                                <CardTitle className="flex items-center gap-1.5">
+                                    Evidence
+                                    <GovernanceTermHint term="evidence" />
+                                </CardTitle>
                                 <CardDescription>
                                     {obligation.evidence_required
-                                        ? 'Evidence is required for this obligation'
-                                        : 'Evidence is optional'}
+                                        ? 'Evidence that hasn’t expired is needed before this can be marked done.'
+                                        : 'Evidence is optional for this requirement.'}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 {evidenceItems.length > 0 ? (
                                     <div className="flex flex-col gap-3">
-                                        {evidenceItems.map((ev) => {
-                                            const expired = isEvidenceExpired(ev);
-                                            return (
-                                                <div
-                                                    key={ev.id}
-                                                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-4"
-                                                >
-                                                    <div className="flex min-w-0 items-center gap-3">
-                                                        <FileCheck className="h-6 w-6 shrink-0 text-status-success" />
-                                                        <div className="min-w-0">
-                                                            <p className="truncate font-medium">
-                                                                {ev.title}
-                                                            </p>
-                                                            <div className="text-subtle flex flex-wrap items-center gap-3">
-                                                                <StatusBadge
-                                                                    variant="neutral"
-                                                                    size="sm"
-                                                                >
-                                                                    {humanise(
-                                                                        ev.evidence_type,
-                                                                    )}
-                                                                </StatusBadge>
-                                                                <span>
-                                                                    by{' '}
-                                                                    {ev
-                                                                        .uploaded_by
-                                                                        ?.name ??
-                                                                        'Unknown'}
+                                        {evidenceItems.map((ev) => (
+                                            <div
+                                                key={ev.id}
+                                                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-4"
+                                            >
+                                                <div className="flex min-w-0 items-center gap-3">
+                                                    {ev.expired ? (
+                                                        <AlertTriangle
+                                                            className="h-6 w-6 shrink-0 text-status-warning"
+                                                            aria-label="Expired"
+                                                        />
+                                                    ) : (
+                                                        <FileCheck
+                                                            className="h-6 w-6 shrink-0 text-status-success"
+                                                            aria-label="Current"
+                                                        />
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <p className="truncate font-medium">
+                                                            {ev.title}
+                                                        </p>
+                                                        <div className="text-subtle flex flex-wrap items-center gap-x-3 gap-y-1">
+                                                            <StatusBadge
+                                                                variant="neutral"
+                                                                size="sm"
+                                                            >
+                                                                {complianceEvidenceTypeLabel(
+                                                                    ev.evidence_type,
+                                                                )}
+                                                            </StatusBadge>
+                                                            {ev.file_name ? (
+                                                                <span className="truncate">
+                                                                    {ev.file_name}
+                                                                    {ev.file_size
+                                                                        ? ` · ${formatFileSize(ev.file_size)}`
+                                                                        : ''}
                                                                 </span>
-                                                                <span>
-                                                                    {formatDateTime(
-                                                                        ev.uploaded_at,
-                                                                    )}
+                                                            ) : (
+                                                                <span className="text-status-warning">
+                                                                    File missing
                                                                 </span>
-                                                            </div>
+                                                            )}
+                                                            <span>
+                                                                Uploaded by{' '}
+                                                                {ev.uploaded_by?.name ??
+                                                                    'someone no longer listed'}
+                                                                {ev.uploaded_at
+                                                                    ? ` · ${formatDateTime(ev.uploaded_at)}`
+                                                                    : ''}
+                                                            </span>
                                                         </div>
                                                     </div>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     {ev.valid_until ? (
                                                         <StatusBadge
                                                             variant={
-                                                                expired
-                                                                    ? 'critical'
+                                                                ev.expired
+                                                                    ? 'warning'
                                                                     : 'success'
                                                             }
                                                         >
-                                                            {expired
+                                                            {ev.expired
                                                                 ? 'Expired'
                                                                 : 'Valid until'}{' '}
-                                                            {dateOnly(
-                                                                ev.valid_until,
-                                                            )}
+                                                            {dateOnly(ev.valid_until)}
                                                         </StatusBadge>
                                                     ) : null}
+                                                    {ev.open_url ? (
+                                                        <Button
+                                                            asChild
+                                                            variant="outline"
+                                                            size="sm"
+                                                        >
+                                                            <a
+                                                                href={ev.open_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                aria-label={`Open ${ev.title} in a new tab`}
+                                                            >
+                                                                <ExternalLink className="h-4 w-4" />
+                                                                Open
+                                                            </a>
+                                                        </Button>
+                                                    ) : null}
+                                                    {ev.download_url ? (
+                                                        <Button
+                                                            asChild
+                                                            variant="outline"
+                                                            size="sm"
+                                                        >
+                                                            <a
+                                                                href={ev.download_url}
+                                                                aria-label={`Download ${ev.title}`}
+                                                            >
+                                                                <Download className="h-4 w-4" />
+                                                                Download
+                                                            </a>
+                                                        </Button>
+                                                    ) : null}
                                                 </div>
-                                            );
-                                        })}
+                                            </div>
+                                        ))}
                                     </div>
                                 ) : (
                                     <EmptyState
@@ -437,8 +486,8 @@ export default function ComplianceShow({
                                         title="No evidence uploaded yet"
                                         description={
                                             canUpload
-                                                ? 'Upload documents, audit reports or attestations that prove this obligation is met.'
-                                                : undefined
+                                                ? 'Upload a document, audit report or certificate showing this requirement is met.'
+                                                : 'Evidence the owner uploads appears here.'
                                         }
                                     />
                                 )}
@@ -447,35 +496,44 @@ export default function ComplianceShow({
 
                         <Card id="obligation-reminders">
                             <CardHeader>
-                                <CardTitle>Scheduled reminders</CardTitle>
+                                <CardTitle>Reminders</CardTitle>
+                                <CardDescription>
+                                    Emails to the owner before the due date.
+                                </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 {reminderItems.length > 0 ? (
                                     <div className="flex flex-col gap-2">
-                                        {reminderItems.map((reminder) => (
-                                            <div
-                                                key={reminder.id}
-                                                className="flex items-center justify-between rounded-lg border border-border p-3"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                                    <span className="text-sm">
-                                                        {reminder.days_before_due}{' '}
-                                                        days before due
-                                                    </span>
-                                                </div>
-                                                <StatusBadge
-                                                    variant={
-                                                        reminder.status ===
-                                                        'sent'
-                                                            ? 'success'
-                                                            : 'neutral'
-                                                    }
+                                        {reminderItems.map((reminder) => {
+                                            const chip =
+                                                REMINDER_STATUS[reminder.status] ?? {
+                                                    label: governanceStatus(
+                                                        'compliance_status',
+                                                        reminder.status,
+                                                    ).label,
+                                                    variant: 'neutral' as const,
+                                                };
+                                            return (
+                                                <div
+                                                    key={reminder.id}
+                                                    className="flex items-center justify-between rounded-lg border border-border p-3"
                                                 >
-                                                    {humanise(reminder.status)}
-                                                </StatusBadge>
-                                            </div>
-                                        ))}
+                                                    <div className="flex items-center gap-2">
+                                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                                        <span className="text-sm">
+                                                            {reminder.is_escalation
+                                                                ? 'Follow-up because it is overdue'
+                                                                : reminder.days_before_due === 0
+                                                                  ? 'On the due date'
+                                                                  : `${plural(reminder.days_before_due, 'day')} before it is due`}
+                                                        </span>
+                                                    </div>
+                                                    <StatusBadge variant={chip.variant}>
+                                                        {chip.label}
+                                                    </StatusBadge>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <EmptyState
@@ -510,21 +568,23 @@ export default function ComplianceShow({
                                     className="w-fit"
                                 >
                                     {isComplete
-                                        ? 'Completed'
-                                        : dueLabel(days)}
+                                        ? 'Done'
+                                        : obligation.status === 'cancelled'
+                                          ? 'Cancelled'
+                                          : dueLabel(obligation.days_until_due)}
                                 </StatusBadge>
                                 {isComplete ? (
                                     <>
                                         <p className="text-subtle">
-                                            {dateOnly(obligation.completed_at)}{' '}
-                                            by{' '}
+                                            Marked done on{' '}
+                                            {dateOnly(obligation.completed_at)} by{' '}
                                             {obligation.completed_by?.name ||
-                                                'Authorised staff'}
+                                                'someone no longer listed'}
                                         </p>
                                         {obligation.completion_notes ? (
                                             <div className="rounded-md bg-muted p-2 text-xs">
                                                 <p className="font-semibold text-muted-foreground">
-                                                    Completion notes
+                                                    How it was met
                                                 </p>
                                                 <p className="whitespace-pre-wrap text-foreground">
                                                     {obligation.completion_notes}
@@ -546,126 +606,104 @@ export default function ComplianceShow({
                             </CardHeader>
                             <CardContent className="flex flex-col gap-4">
                                 <div>
+                                    <p className="text-subtle">Comes from</p>
+                                    <p className="font-medium">{frameworkLabel}</p>
+                                </div>
+                                <div>
                                     <p className="text-subtle">Owner</p>
                                     <p className="flex items-center gap-2 font-medium">
                                         <User className="h-4 w-4" />
-                                        {obligation.owner?.name ||
-                                            'Not assigned'}
+                                        {obligation.owner?.name || 'No owner'}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-subtle">Frequency</p>
+                                    <p className="text-subtle">How often</p>
                                     <p className="font-medium">
-                                        {FREQUENCY_OPTIONS.find(
-                                            (f) =>
-                                                f.value === obligation.frequency,
-                                        )?.label ??
-                                            humanise(obligation.frequency)}
+                                        {frequencyLabel(obligation.frequency)}
                                     </p>
                                 </div>
                                 {obligation.priority ? (
                                     <div>
                                         <p className="text-subtle">Priority</p>
                                         <StatusBadge
-                                            variant={priorityVariant(
-                                                obligation.priority,
-                                            )}
+                                            variant={
+                                                governanceStatus(
+                                                    'priority',
+                                                    obligation.priority,
+                                                ).variant
+                                            }
                                         >
-                                            {humanise(obligation.priority)}
+                                            {
+                                                governanceStatus(
+                                                    'priority',
+                                                    obligation.priority,
+                                                ).label
+                                            }
                                         </StatusBadge>
                                     </div>
                                 ) : null}
                                 {obligation.parent_obligation ? (
                                     <div>
-                                        <p className="text-subtle">
-                                            Prior cycle
-                                        </p>
+                                        <p className="text-subtle">Previous time</p>
                                         <Link
                                             href={`/governance/compliance/${obligation.parent_obligation.id}`}
                                             className="text-sm font-medium text-primary hover:underline"
                                         >
-                                            {
-                                                obligation.parent_obligation
-                                                    .obligation_title
-                                            }{' '}
-                                            (
+                                            Due{' '}
                                             {dateOnly(
-                                                obligation.parent_obligation
-                                                    .due_date,
+                                                obligation.parent_obligation.due_date,
                                             )}
-                                            )
                                         </Link>
                                     </div>
                                 ) : null}
                                 {obligation.recurrences &&
                                 obligation.recurrences.length > 0 ? (
                                     <div>
-                                        <p className="text-subtle">
-                                            Next cycle
-                                        </p>
+                                        <p className="text-subtle">Next time</p>
                                         <div className="mt-0.5 flex flex-col gap-1">
-                                            {obligation.recurrences.map(
-                                                (rec) => (
-                                                    <Link
-                                                        key={rec.id}
-                                                        href={`/governance/compliance/${rec.id}`}
-                                                        className="text-sm font-medium text-primary hover:underline"
-                                                    >
-                                                        Due{' '}
-                                                        {dateOnly(rec.due_date)}{' '}
-                                                        (
-                                                        {obligationStatusLabel(
-                                                            rec.status,
-                                                        )}
-                                                        )
-                                                    </Link>
-                                                ),
-                                            )}
+                                            {obligation.recurrences.map((rec) => (
+                                                <Link
+                                                    key={rec.id}
+                                                    href={`/governance/compliance/${rec.id}`}
+                                                    className="text-sm font-medium text-primary hover:underline"
+                                                >
+                                                    Due {dateOnly(rec.due_date)} (
+                                                    {obligationStatusLabel(rec.status)})
+                                                </Link>
+                                            ))}
                                         </div>
                                     </div>
                                 ) : null}
-                                {obligation.next_due_date ? (
-                                    <div>
-                                        <p className="text-subtle">
-                                            Next due date
-                                        </p>
-                                        <p className="font-medium">
-                                            {dateOnly(obligation.next_due_date)}
-                                        </p>
-                                    </div>
-                                ) : null}
                                 <div>
-                                    <p className="text-subtle">Evidence</p>
+                                    <p className="text-subtle">
+                                        Evidence needed to mark done
+                                    </p>
                                     {obligation.evidence_provided ? (
                                         <StatusBadge variant="success">
                                             <CheckCircle className="h-3.5 w-3.5" />
                                             Provided
                                         </StatusBadge>
                                     ) : obligation.evidence_required ? (
-                                        <StatusBadge variant="critical">
-                                            Required — not provided
+                                        <StatusBadge variant="warning">
+                                            Needed — not provided yet
                                         </StatusBadge>
                                     ) : (
                                         <p className="font-medium text-muted-foreground">
-                                            Not required
+                                            Not needed
                                         </p>
                                     )}
                                 </div>
                                 {obligation.sign_off_required ? (
                                     <div>
-                                        <p className="text-subtle">Sign-off</p>
+                                        <p className="text-subtle">Signed off</p>
                                         {obligation.signed_off_at ? (
                                             <StatusBadge variant="success">
-                                                Signed by{' '}
-                                                {obligation.signed_off_by?.name}{' '}
-                                                on{' '}
-                                                {dateOnly(
-                                                    obligation.signed_off_at,
-                                                )}
+                                                By {obligation.signed_off_by?.name}{' '}
+                                                on {dateOnly(obligation.signed_off_at)}
                                             </StatusBadge>
                                         ) : (
                                             <StatusBadge variant="warning">
-                                                Pending sign-off
+                                                Waiting to be signed off
                                             </StatusBadge>
                                         )}
                                     </div>

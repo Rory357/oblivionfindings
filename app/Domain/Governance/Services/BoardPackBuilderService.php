@@ -9,7 +9,9 @@ use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Governance\Models\DashboardSnapshot;
 use App\Domain\Governance\Models\GovernanceDocument;
 use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Support\GovernanceLabels;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -144,7 +146,7 @@ class BoardPackBuilderService
                 foreach ($section['items'] as $res) {
                     $manifest[] = [
                         'id' => "res_{$res['id']}",
-                        'title' => "Paper: {$res['title']}",
+                        'title' => (string) $res['title'],
                         'type' => 'paper',
                         'included' => true,
                     ];
@@ -338,26 +340,23 @@ class BoardPackBuilderService
      */
     protected function getMeetingTypeLabel(string $type): string
     {
-        return match ($type) {
-            'full_board' => 'Full Board Meeting',
-            'audit_risk' => 'Audit & Risk Committee',
-            'people' => 'People Committee',
-            'finance' => 'Finance Committee',
-            'special_general' => 'Special General Meeting',
-            'executive_session' => 'Executive Session',
-            default => 'Board Meeting',
-        };
+        return GovernanceLabels::label('meeting_type', $type);
     }
 
     /**
-     * Distribute pack to board members with audience intersection and after-commit queueing.
+     * Who a pack would be sent to: current board members, narrowed to people
+     * with authority for a board-only session or confidential agenda. The
+     * distribute confirmation counts exactly this list.
+     *
+     * @param  array<int, int>|null  $boardMemberIds
+     * @return Collection<int, BoardMember>
      */
-    public function distribute(BoardPack $pack, ?array $boardMemberIds = null): void
+    public function distributionRecipients(BoardPack $pack, ?array $boardMemberIds = null): Collection
     {
         $meeting = $pack->meeting;
 
         // Explicit and default recipient lists use the same canonical active-term boundary.
-        $recipientQuery = BoardMember::query()->active();
+        $recipientQuery = BoardMember::query()->active()->with('user');
         if (! empty($boardMemberIds)) {
             $recipientQuery->whereIn('id', array_unique(array_map('intval', $boardMemberIds)));
         }
@@ -377,7 +376,7 @@ class BoardPackBuilderService
             }
         }
 
-        if ($hasConfidential || $meeting->isExecutiveSession()) {
+        if ($meeting && ($hasConfidential || $meeting->isExecutiveSession())) {
             $executiveAccess = app(\App\Domain\Governance\Services\ExecutiveMeetingAccessService::class);
             $recipients = $recipients->filter(function (BoardMember $member) use ($executiveAccess, $meeting) {
                 if (! $member->user) {
@@ -391,6 +390,20 @@ class BoardPackBuilderService
                 );
             })->values();
         }
+
+        return $recipients->values();
+    }
+
+    /**
+     * Distribute pack to board members with audience intersection and after-commit queueing.
+     */
+    public function distribute(BoardPack $pack, ?array $boardMemberIds = null): void
+    {
+        $meeting = $pack->meeting;
+
+        // Executive-session / confidential-agenda intersection lives in
+        // distributionRecipients(), so the confirmation count matches.
+        $recipients = $this->distributionRecipients($pack, $boardMemberIds);
 
         $ids = $recipients->pluck('id')->toArray();
         $pack->markAsDistributed($ids);
@@ -536,16 +549,16 @@ class BoardPackBuilderService
     protected function sectionTitle(string $key): string
     {
         return match ($key) {
-            'cover' => 'Cover & Meeting Overview',
+            'cover' => 'Meeting details',
             'agenda' => 'Agenda',
-            'dashboard' => 'Executive Dashboard Snapshot',
-            'risk_report' => 'Risk Report',
-            'finance_report' => 'Financial Summary',
-            'ceo_report' => 'CEO Board Report',
-            'committee_reports' => 'Committee Updates',
-            'supporting_documents' => 'Supporting Documents',
-            'resolutions' => 'Decision Papers',
-            default => str($key)->replace('_', ' ')->title()->toString(),
+            'dashboard' => 'Organisation dashboard',
+            'risk_report' => 'Risk report',
+            'finance_report' => 'Finance summary',
+            'ceo_report' => 'CEO report',
+            'committee_reports' => 'Committee updates',
+            'supporting_documents' => 'Supporting documents',
+            'resolutions' => 'Resolutions',
+            default => GovernanceLabels::humanise($key),
         };
     }
 }

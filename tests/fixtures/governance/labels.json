@@ -130,7 +130,8 @@
             "minutes_approved": "Minutes approved",
             "minutes_signed": "Minutes signed",
             "archived": "Archived",
-            "cancelled": "Cancelled"
+            "cancelled": "Cancelled",
+            "pack_draft": "Board pack being prepared"
         },
         "rsvp_response": {
             "accepted": "Attending",
@@ -159,7 +160,9 @@
             "in_review": "Waiting for the board",
             "approved": "Approved",
             "signed": "Signed",
-            "locked": "Final version"
+            "locked": "Final version",
+            "reviewed": "Sent for approval",
+            "archived": "Archived"
         },
         "board_pack_status": {
             "draft": "Draft",
@@ -253,16 +256,18 @@
             "hs_event": "Health and safety event"
         },
         "compliance_framework": {
-            "charities": "Charities Act (Charities Services)",
-            "nga_paerewa": "Ngā Paerewa Health and Disability Services Standard",
-            "hdsa_safety": "Health and Disability Services (Safety) Act",
+            "charities": "Charities Act 2005 (Charities Services)",
+            "nga_paerewa": "Ngā Paerewa Health and Disability Services Standard (NZS 8134:2021)",
+            "code_of_rights": "Code of Rights (Health and Disability Commissioner)",
+            "hdsa_safety": "Health and Disability Services (Safety) Act 2001",
             "privacy_act": "Privacy Act 2020",
-            "hip_code": "Health Information Privacy Code",
+            "hip_code": "Health Information Privacy Code 2020",
             "hswa": "Health and Safety at Work Act 2015",
-            "employment": "Employment law",
-            "funding_moh": "Health NZ funding contract",
-            "funding_msd": "Ministry of Social Development funding contract",
-            "funding_acc": "ACC funding contract"
+            "employment": "Employment Relations Act 2000",
+            "funding_moh": "Health New Zealand funding",
+            "funding_dss": "Disability Support Services funding",
+            "funding_msd": "Ministry of Social Development funding",
+            "funding_acc": "ACC funding"
         },
         "compliance_status": {
             "not_due": "Not due yet",
@@ -312,17 +317,19 @@
         },
         "te_tiriti_principle": {
             "partnership": "Partnership",
-            "participation": "Participation",
-            "protection": "Protection",
+            "tino_rangatiratanga": "Tino rangatiratanga",
+            "active_protection": "Active protection",
             "equity": "Equity",
-            "options": "Options"
+            "options": "Options (Kōwhiringa)",
+            "participation": "Tino rangatiratanga",
+            "protection": "Active protection"
         },
         "te_tiriti_status": {
             "not_started": "Not started",
             "in_progress": "In progress",
-            "ongoing": "Ongoing",
-            "implemented": "In place",
-            "achieved": "Achieved",
+            "ongoing": "Part of everyday practice",
+            "implemented": "Done",
+            "achieved": "Done",
             "embedded": "Part of everyday practice"
         },
         "policy_status": {
@@ -362,7 +369,8 @@
             "template": "Template",
             "report": "Report",
             "certificate": "Certificate or registration",
-            "minutes": "Minutes"
+            "minutes": "Minutes",
+            "other": "Other"
         },
         "budget_status": {
             "drafting": "Draft",
@@ -618,7 +626,19 @@
             "board_member_removed": "removed a board member",
             "role_changed": "changed a board role",
             "policy_updated": "updated a policy",
-            "key_person_changed": "changed a key person"
+            "key_person_changed": "changed a key person",
+            "action.escalated": "raised an action with the board",
+            "action.evidence_added": "added evidence to an action",
+            "action.evidence_removed": "removed evidence from an action",
+            "resolution.published": "shared a resolution with members",
+            "budget.returned_to_drafting": "returned a budget to drafting",
+            "risk.accepted": "recorded the board accepting a risk",
+            "risk.closed": "closed a risk",
+            "risk_treatment.completed": "marked a risk action as done",
+            "risk_treatment.due_date_changed": "changed the due date of a risk action",
+            "policy.approved": "approved a policy",
+            "compliance.updated": "updated a requirement",
+            "compliance.evidence_downloaded": "downloaded evidence for a requirement"
         }
     },
     "humanise": {

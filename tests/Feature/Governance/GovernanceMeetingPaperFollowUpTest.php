@@ -267,13 +267,14 @@ class GovernanceMeetingPaperFollowUpTest extends TestCase
             'is_confidential' => true,
         ]);
 
-        // Member meeting workspace: Agenda (0) and the checklist agrees.
+        // Member meeting workspace: Agenda (0). The preparation checklist is
+        // the chair and secretary's, so a member's payload carries none of it.
         $this->actingAs($member)->get("/governance/meetings/{$meeting->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Governance/Meetings/Show')
                 ->has('meeting.agenda_items', 0)
-                ->where('workflowChecklist.items', fn ($items) => collect($items)->firstWhere('key', 'agenda')['status'] === 'todo')
+                ->where('workflowChecklist.items', [])
             );
 
         // Service contract: counts derive from the member-visible agenda.

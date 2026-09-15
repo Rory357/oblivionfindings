@@ -1,9 +1,28 @@
-import { Head, Link, useForm } from '@inertiajs/react';
-import { BookOpen, CheckCircle2, Clock, Tag } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import {
+    BookOpen,
+    CalendarClock,
+    CheckCircle2,
+    ClipboardCheck,
+    Eye,
+    Tag,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
-import { EntityChip, EntityStatusChip, ListCaption } from '@/components/lists';
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
+import {
+    EmptyValue,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
 import {
     PageHeader,
     PageHeaderFilterSelect,
@@ -12,225 +31,309 @@ import {
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageHeaderSearch,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateLong, formatDateOnly } from '@/lib/datetime';
 import { PageProps } from '@/types';
 
-import { POLICY_CATEGORIES, policyCategoryLabel } from './_dialogs';
+import { policyCategoryLabel } from './_dialogs';
+import {
+    PolicyViewToggle,
+    confirmationChip,
+    confirmedOf,
+    plural,
+    type ConfirmationState,
+    type MyConfirmation,
+} from './_shared';
 
-interface PolicySummary {
+interface PolicyRow {
     id: number;
     title: string;
     category: string;
     version: number;
     effective_from: string | null;
     next_review_date: string | null;
-    my_attestation: {
-        acknowledged: boolean;
-        acknowledged_at: string | null;
-        notes: string | null;
-    } | null;
-    total_required: number;
-    total_attested: number | null;
+    state: ConfirmationState;
+    my_confirmation: MyConfirmation | null;
+    confirmed_count: number | null;
+    board_member_count: number | null;
 }
 
 interface Props extends PageProps {
-    outstanding: PolicySummary[];
-    completed: PolicySummary[];
+    toConfirm: PolicyRow[];
+    confirmed: PolicyRow[];
+    upcoming: PolicyRow[];
     canManage: boolean;
     summary: {
-        outstanding_count: number;
-        completed_count: number;
+        to_confirm: number;
+        confirmed: number;
+        upcoming: number;
         board_member_count: number;
     };
+    categories: Array<{ value: string; label: string }>;
 }
 
-type ShowFilter = 'all' | 'outstanding' | 'completed';
+type ShowFilter = 'all' | 'to_confirm' | 'upcoming' | 'confirmed';
 
-function AttestForm({ policy }: { policy: PolicySummary }) {
-    const [open, setOpen] = useState(false);
-    const form = useForm({
-        acknowledged: true,
-        notes: '',
-    });
+const SHOW_OPTIONS: { value: ShowFilter; label: string }[] = [
+    { value: 'all', label: 'Everything' },
+    { value: 'to_confirm', label: 'To confirm' },
+    { value: 'upcoming', label: 'Coming into effect' },
+    { value: 'confirmed', label: 'Confirmed' },
+];
 
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
-        form.post(`/governance/policies/${policy.id}/attest`, {
-            preserveScroll: true,
-            onSuccess: () => setOpen(false),
-        });
-    };
+const confirmHref = (policy: PolicyRow) => `/governance/policies/${policy.id}#confirm`;
+const policyHref = (policy: PolicyRow) => `/governance/policies/${policy.id}`;
 
-    if (!open) {
-        return (
-            <Button size="sm" onClick={() => setOpen(true)}>
-                Attest to this policy
-            </Button>
-        );
-    }
-
-    return (
-        <form
-            onSubmit={submit}
-            className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3"
-        >
-            <label className="flex items-start gap-2 text-sm">
-                <Checkbox
-                    checked={form.data.acknowledged}
-                    onCheckedChange={(v) =>
-                        form.setData('acknowledged', v === true)
-                    }
-                />
-                <span>I have read and understood this policy.</span>
-            </label>
-            <Textarea
-                rows={3}
-                aria-label="Attestation notes"
-                placeholder="Optional notes (e.g. queries, clarifications)"
-                value={form.data.notes}
-                onChange={(e) => form.setData('notes', e.target.value)}
-            />
-            <div className="flex items-center justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setOpen(false)}
-                >
-                    Cancel
-                </Button>
-                <Button
-                    type="submit"
-                    size="sm"
-                    disabled={!form.data.acknowledged || form.processing}
-                >
-                    {form.processing ? 'Recording…' : 'Confirm attestation'}
-                </Button>
-            </div>
-        </form>
-    );
-}
-
-export default function PolicyAttestations({
+export default function PoliciesToConfirm({
     auth,
-    outstanding,
-    completed,
+    toConfirm,
+    confirmed,
+    upcoming,
     canManage,
     summary,
+    categories,
 }: Props) {
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('all');
     const [show, setShow] = useState<ShowFilter>('all');
+    const ctxMenu = useEntityContextMenu<PolicyRow>();
 
     const matches = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return (policy: PolicySummary) =>
+        return (policy: PolicyRow) =>
             (category === 'all' || policy.category === category) &&
             (q === '' || policy.title.toLowerCase().includes(q));
     }, [search, category]);
 
-    const visibleOutstanding = outstanding.filter(matches);
-    const visibleCompleted = completed.filter(matches);
-    const total = summary.outstanding_count + summary.completed_count;
-    const donePercent = total > 0 ? (summary.completed_count / total) * 100 : 0;
+    const visibleToConfirm = toConfirm.filter(matches);
+    const visibleUpcoming = upcoming.filter(matches);
+    const visibleConfirmed = confirmed.filter(matches);
+    const inEffect = summary.to_confirm + summary.confirmed;
+    const donePercent = inEffect > 0 ? (summary.confirmed / inEffect) * 100 : 0;
     const filtered = search.trim() !== '' || category !== 'all';
+
+    const actionsFor = (policy: PolicyRow): MenuItem[] =>
+        compactMenu([
+            (policy.state === 'to_confirm' || policy.state === 'due_again') && {
+                label: 'Read and confirm',
+                icon: ClipboardCheck,
+                onClick: () => router.visit(confirmHref(policy)),
+            },
+            {
+                label: 'Open policy',
+                icon: Eye,
+                onClick: () => router.visit(policyHref(policy)),
+            },
+        ]);
+
+    const baseColumns: EntityTableColumn<PolicyRow>[] = [
+        {
+            key: 'category',
+            label: 'Category',
+            width: '1fr',
+            cell: (p) => (
+                <EntityChip icon={Tag}>{policyCategoryLabel(p.category)}</EntityChip>
+            ),
+        },
+        {
+            key: 'version',
+            label: 'Version',
+            width: '0.6fr',
+            cell: (p) => (
+                <span className="text-muted-foreground tabular-nums">
+                    Version {p.version}
+                </span>
+            ),
+        },
+    ];
+
+    const boardColumn: EntityTableColumn<PolicyRow>[] = canManage
+        ? [
+              {
+                  key: 'board',
+                  label: 'Board members confirmed',
+                  width: '0.9fr',
+                  cell: (p) =>
+                      p.confirmed_count !== null && p.board_member_count !== null ? (
+                          <span className="tabular-nums">
+                              {confirmedOf(p.confirmed_count, p.board_member_count)}
+                          </span>
+                      ) : (
+                          <EmptyValue />
+                      ),
+              },
+          ]
+        : [];
+
+    const toConfirmColumns: EntityTableColumn<PolicyRow>[] = [
+        ...baseColumns,
+        {
+            key: 'state',
+            label: 'Your confirmation',
+            width: '1.1fr',
+            cell: (p) => {
+                const chip = confirmationChip(p.state, p.effective_from);
+                return (
+                    <EntityStatusChip variant={chip.variant}>
+                        {chip.label}
+                    </EntityStatusChip>
+                );
+            },
+        },
+        ...boardColumn,
+    ];
+
+    const upcomingColumns: EntityTableColumn<PolicyRow>[] = [
+        ...baseColumns,
+        {
+            key: 'effective',
+            label: 'Comes into effect',
+            width: '1.1fr',
+            cell: (p) =>
+                p.effective_from ? formatDateLong(p.effective_from) : <EmptyValue />,
+        },
+    ];
+
+    const confirmedColumns: EntityTableColumn<PolicyRow>[] = [
+        ...baseColumns,
+        {
+            key: 'confirmed',
+            label: 'You confirmed',
+            width: '1.1fr',
+            cell: (p) =>
+                p.my_confirmation ? (
+                    <span className="flex min-w-0 flex-col">
+                        <span className="truncate">
+                            Version {p.my_confirmation.version} on{' '}
+                            {formatDateLong(p.my_confirmation.confirmed_at)}
+                        </span>
+                        {p.my_confirmation.due_again_on ? (
+                            <span className="text-caption truncate">
+                                Due again on{' '}
+                                {formatDateOnly(p.my_confirmation.due_again_on)}
+                            </span>
+                        ) : null}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        ...boardColumn,
+    ];
 
     const header = (
         <PageHeader
-            icon={BookOpen}
-            title="Policy attestations"
-            subline="Record that you have read and understood each approved governance policy"
+            icon={ClipboardCheck}
+            title="Policies to confirm"
+            titleChip={
+                summary.to_confirm > 0 ? (
+                    <PageHeaderStatusChip variant="warning">
+                        {summary.to_confirm} to confirm
+                    </PageHeaderStatusChip>
+                ) : summary.confirmed > 0 ? (
+                    <PageHeaderStatusChip variant="success">
+                        All confirmed
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="neutral">
+                        Nothing to confirm
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline="Read each policy and confirm you have read the current version"
             actions={
                 <PageHeaderSearch
                     value={search}
                     onChange={setSearch}
-                    placeholder="Search approved policies…"
+                    placeholder="Search policies to confirm…"
                 />
             }
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Outstanding"
-                        tone={summary.outstanding_count > 0 ? 'warning' : 'success'}
-                        ariaLabel="View outstanding attestations"
-                        onClick={() => setShow('outstanding')}
+                        label="To confirm"
+                        tone={summary.to_confirm > 0 ? 'warning' : 'brand'}
+                        ariaLabel="Show policies you still need to confirm"
+                        onClick={() => setShow('to_confirm')}
                     >
-                        <PageHeaderMeterBig>
-                            {summary.outstanding_count}
-                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{summary.to_confirm}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            policies awaiting your sign-off
+                            {summary.to_confirm === 1
+                                ? 'policy waiting for you'
+                                : 'policies waiting for you'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Completed"
-                        value={`${summary.completed_count}/${total}`}
-                        ariaLabel="View completed attestations"
-                        onClick={() => setShow('completed')}
+                        label="Confirmed"
+                        value={`${summary.confirmed} of ${inEffect}`}
+                        ariaLabel="Show policies you have confirmed"
+                        onClick={() => setShow('confirmed')}
                     >
                         <PageHeaderMeterBar percent={donePercent} />
                         <PageHeaderMeterCaption>
-                            {Math.round(donePercent)}% of approved policies
+                            of the policies in effect
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Board members"
-                        ariaLabel={
-                            auth.can?.governance?.meetings?.manage
-                                ? 'View board members'
-                                : 'View policies'
-                        }
-                        href={
-                            auth.can?.governance?.meetings?.manage
-                                ? '/governance/admin/board-members'
-                                : '/governance/policies'
-                        }
+                        label="Coming into effect"
+                        ariaLabel="Show policies that come into effect later"
+                        onClick={() => setShow('upcoming')}
                     >
-                        <PageHeaderMeterBig>
-                            {summary.board_member_count}
-                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{summary.upcoming}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            active members in scope
+                            confirm once they are in effect
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
             }
             filters={
                 <>
+                    <PolicyViewToggle value="confirm" />
                     <PageHeaderFilterSelect
                         icon={Tag}
                         label="All categories"
                         value={category}
                         options={[
                             { value: 'all', label: 'All categories' },
-                            ...POLICY_CATEGORIES.map((c) => ({
-                                value: c.key,
-                                label: c.label,
-                            })),
+                            ...categories,
                         ]}
                         onChange={setCategory}
                     />
                     <PageHeaderFilterSelect
-                        label="Outstanding & completed"
+                        label="Everything"
                         value={show}
-                        options={[
-                            { value: 'all', label: 'Outstanding & completed' },
-                            { value: 'outstanding', label: 'Outstanding only' },
-                            { value: 'completed', label: 'Completed only' },
-                        ]}
+                        options={SHOW_OPTIONS}
                         onChange={(v) => setShow(v as ShowFilter)}
                     />
                 </>
             }
             rail={<GovernanceSectionRail />}
+        />
+    );
+
+    const table = (rows: PolicyRow[], columns: EntityTableColumn<PolicyRow>[], href: (p: PolicyRow) => string) => (
+        <EntityTable
+            rows={rows}
+            rowKey={(p) => p.id}
+            identityLabel="Policy"
+            identity={(p) => ({
+                icon: BookOpen,
+                name: p.title,
+                linkLabel: `Open ${p.title}`,
+                subline: p.effective_from
+                    ? `In effect from ${formatDateOnly(p.effective_from)}`
+                    : undefined,
+            })}
+            columns={columns}
+            actionsFor={actionsFor}
+            hrefFor={href}
+            onOpen={(p) => router.visit(href(p))}
+            onRowContextMenu={(e, p) => ctxMenu.open(e, p)}
+            minWidth={760}
         />
     );
 
@@ -242,146 +345,105 @@ export default function PolicyAttestations({
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Policies', href: '/governance/policies' },
                 {
-                    title: 'Attestations',
+                    title: 'Policies to confirm',
                     href: '/governance/policies/attestations',
                 },
             ]}
         >
-            <Head title="Policy attestations" />
+            <Head title="Policies to confirm" />
 
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
-                    {show !== 'completed' ? (
+                    {show === 'all' || show === 'to_confirm' ? (
                         <section className="flex flex-col gap-3">
                             <ListCaption
-                                title="Outstanding"
-                                caption={`${visibleOutstanding.length} of ${outstanding.length} shown`}
+                                title={
+                                    <span className="inline-flex items-center gap-1">
+                                        To confirm
+                                        <GovernanceTermHint term="read_and_confirm" />
+                                    </span>
+                                }
+                                caption={`${visibleToConfirm.length} of ${toConfirm.length} shown`}
                             />
-                            {visibleOutstanding.length === 0 ? (
+                            {visibleToConfirm.length === 0 ? (
                                 <EmptyState
-                                    icon={filtered ? Clock : CheckCircle2}
+                                    icon={filtered ? BookOpen : CheckCircle2}
                                     variant="compact"
                                     title={
                                         filtered
-                                            ? 'No outstanding policies match'
+                                            ? 'No policies to confirm match'
                                             : "You're up to date"
                                     }
                                     description={
                                         filtered
                                             ? 'Try clearing the search or category.'
-                                            : 'All approved policies have been attested to.'
+                                            : 'There are no policies waiting for you to read and confirm.'
                                     }
                                 />
                             ) : (
-                                <Card className="gap-0 overflow-hidden rounded-[14px] py-0">
-                                    <ul className="divide-y divide-border">
-                                        {visibleOutstanding.map((policy) => (
-                                            <li
-                                                key={policy.id}
-                                                className="flex flex-col gap-3 p-4"
-                                            >
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <Link
-                                                        href={`/governance/policies/${policy.id}`}
-                                                        className="text-[13px] font-semibold text-foreground underline-offset-4 hover:underline"
-                                                    >
-                                                        {policy.title}
-                                                    </Link>
-                                                    <EntityChip>
-                                                        v{policy.version}
-                                                    </EntityChip>
-                                                    <EntityChip icon={Tag}>
-                                                        {policyCategoryLabel(
-                                                            policy.category,
-                                                        )}
-                                                    </EntityChip>
-                                                    {canManage &&
-                                                    policy.total_attested !==
-                                                        null ? (
-                                                        <span className="ml-auto text-caption">
-                                                            {policy.total_attested}/
-                                                            {policy.total_required}{' '}
-                                                            board members attested
-                                                        </span>
-                                                    ) : null}
-                                                </div>
-                                                <p className="text-caption">
-                                                    Effective{' '}
-                                                    {formatDateOnly(
-                                                        policy.effective_from,
-                                                    )}{' '}
-                                                    · Next review{' '}
-                                                    {formatDateOnly(
-                                                        policy.next_review_date,
-                                                    )}
-                                                </p>
-                                                <div>
-                                                    <AttestForm policy={policy} />
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </Card>
+                                table(visibleToConfirm, toConfirmColumns, confirmHref)
                             )}
                         </section>
                     ) : null}
 
-                    {show !== 'outstanding' ? (
+                    {(show === 'all' || show === 'upcoming') &&
+                    (upcoming.length > 0 || show === 'upcoming') ? (
                         <section className="flex flex-col gap-3">
                             <ListCaption
-                                title="Completed"
-                                caption={`${visibleCompleted.length} of ${completed.length} shown`}
+                                title="Coming into effect"
+                                caption={`${plural(visibleUpcoming.length, 'policy', 'policies')} · you can confirm these once they are in effect`}
                             />
-                            {visibleCompleted.length === 0 ? (
+                            {visibleUpcoming.length === 0 ? (
                                 <EmptyState
-                                    icon={Clock}
+                                    icon={CalendarClock}
+                                    variant="compact"
+                                    title="No policies are waiting to come into effect"
+                                />
+                            ) : (
+                                table(visibleUpcoming, upcomingColumns, policyHref)
+                            )}
+                        </section>
+                    ) : null}
+
+                    {show === 'all' || show === 'confirmed' ? (
+                        <section className="flex flex-col gap-3">
+                            <ListCaption
+                                title="Confirmed"
+                                caption={`${visibleConfirmed.length} of ${confirmed.length} shown`}
+                            />
+                            {visibleConfirmed.length === 0 ? (
+                                <EmptyState
+                                    icon={ClipboardCheck}
                                     variant="compact"
                                     title={
                                         filtered
-                                            ? 'No completed attestations match'
-                                            : 'No attestations recorded yet'
+                                            ? 'No confirmed policies match'
+                                            : 'You haven’t confirmed any policies yet'
                                     }
                                     description={
                                         filtered
                                             ? 'Try clearing the search or category.'
-                                            : 'Policies you have attested to will appear here.'
+                                            : 'Policies you confirm appear here with the version and date.'
                                     }
                                 />
                             ) : (
-                                <Card className="gap-0 overflow-hidden rounded-[14px] py-0">
-                                    <ul className="divide-y divide-border">
-                                        {visibleCompleted.map((policy) => (
-                                            <li key={policy.id}>
-                                                <Link
-                                                    href={`/governance/policies/${policy.id}`}
-                                                    className="flex flex-wrap items-center gap-2 p-4 transition-colors hover:bg-primary/5"
-                                                >
-                                                    <span className="text-[13px] font-semibold">
-                                                        {policy.title}
-                                                    </span>
-                                                    <EntityChip>
-                                                        v{policy.version}
-                                                    </EntityChip>
-                                                    <EntityStatusChip variant="success">
-                                                        Attested
-                                                    </EntityStatusChip>
-                                                    <span className="ml-auto text-caption">
-                                                        {formatDateLong(
-                                                            policy.my_attestation
-                                                                ?.acknowledged_at,
-                                                            '',
-                                                        )}
-                                                    </span>
-                                                </Link>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </Card>
+                                table(visibleConfirmed, confirmedColumns, policyHref)
                             )}
                         </section>
                     ) : null}
                 </div>
             </PageLayout>
+
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={BookOpen}
+                    title={ctxMenu.ctx.record.title}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
         </AppLayout>
     );
 }

@@ -6,30 +6,38 @@ use App\Domain\Governance\Models\GovernanceDocument;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
+/**
+ * Documents: reference files such as the constitution, terms of reference,
+ * templates and certificates. Board policies live in Policies instead.
+ */
 class GovernanceDocumentController extends Controller
 {
+    private const UPLOAD_TYPES = 'pdf,doc,docx,odt,rtf,txt,xls,xlsx,ods,csv,ppt,pptx,odp,jpg,jpeg,png,webp';
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', GovernanceDocument::class);
 
+        $type = in_array($request->query('document_type'), GovernanceDocument::TYPES, true)
+            ? (string) $request->query('document_type')
+            : null;
+        $updated = $request->query('updated') === '30d' ? '30d' : null;
+        $search = trim((string) $request->query('search', ''));
+
         $documents = GovernanceDocument::query()
-            ->when($request->document_type, fn ($q, $type) => $q->where('document_type', $type))
-            ->when($request->search, fn ($q, $s) => $q->where('title', 'like', "%{$s}%"))
+            ->when($type, fn ($q, $value) => $q->where('document_type', $value))
+            ->when($updated, fn ($q) => $q->where('updated_at', '>=', now()->subDays(30)))
+            ->when($search !== '', fn ($q) => $q->where(fn ($inner) => $inner
+                ->where('title', 'like', '%'.$this->escapeLike($search).'%')
+                ->orWhere('original_name', 'like', '%'.$this->escapeLike($search).'%')))
             ->orderByDesc('updated_at')
             ->paginate(20)
             ->withQueryString()
-            ->through(fn (GovernanceDocument $document) => [
-                'id' => $document->id,
-                'title' => $document->title,
-                'category' => $document->document_type,
-                'file_name' => basename($document->file_path),
-                'file_size' => (int) ($document->file_size ?? 0),
-                'is_confidential' => false,
-                'version' => (int) $document->version_number,
-                'updated_at' => $document->updated_at?->toIso8601String(),
-            ]);
+            ->through(fn (GovernanceDocument $document) => $this->presentListItem($document));
 
         $typeCounts = GovernanceDocument::query()
             ->selectRaw('document_type, count(*) as aggregate')
@@ -39,8 +47,9 @@ class GovernanceDocumentController extends Controller
         return Inertia::render('Governance/Documents/Index', [
             'documents' => $documents,
             'filters' => [
-                'search' => $request->query('search'),
-                'document_type' => $request->query('document_type'),
+                'search' => $search !== '' ? $search : null,
+                'document_type' => $type,
+                'updated' => $updated,
             ],
             'summary' => [
                 'total' => (int) $typeCounts->sum(),
@@ -49,15 +58,7 @@ class GovernanceDocumentController extends Controller
                     ->where('updated_at', '>=', now()->subDays(30))
                     ->count(),
             ],
-            'categories' => [
-                ['value' => 'constitution', 'label' => 'Constitution / Charter'],
-                ['value' => 'terms_of_reference', 'label' => 'Terms Of Reference'],
-                ['value' => 'policy', 'label' => 'Board Policy'],
-                ['value' => 'procedure', 'label' => 'Procedure'],
-                ['value' => 'template', 'label' => 'Template'],
-                ['value' => 'report', 'label' => 'Report'],
-                ['value' => 'certificate', 'label' => 'Certificate'],
-            ],
+            'categories' => GovernanceDocument::typeOptions(),
         ]);
     }
 
@@ -67,12 +68,22 @@ class GovernanceDocumentController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'category' => 'required|string',
+            'category' => ['required', 'string', Rule::in(GovernanceDocument::TYPES)],
             'description' => 'nullable|string',
-            'file' => 'required|file|max:20480',
+            'file' => 'required|file|max:20480|mimes:'.self::UPLOAD_TYPES,
+        ], [
+            'title.required' => 'Give the document a title.',
+            'title.max' => 'Keep the title to 255 characters or fewer.',
+            'category.required' => 'Choose what kind of document this is.',
+            'category.in' => 'Choose what kind of document this is from the list. Board policies go in Policies.',
+            'file.required' => 'Choose the file to upload.',
+            'file.file' => 'Choose the file to upload.',
+            'file.max' => 'The file must be 20 MB or smaller.',
+            'file.mimes' => 'Upload a PDF, Word, spreadsheet, presentation, text or image file.',
         ]);
 
-        $path = $request->file('file')->store('governance/documents/'.$validated['category'], 'local');
+        $file = $request->file('file');
+        $path = $file->store('governance/documents/'.$validated['category'], 'local');
 
         GovernanceDocument::create([
             'title' => $validated['title'],
@@ -80,8 +91,9 @@ class GovernanceDocumentController extends Controller
             'category' => null,
             'description' => $validated['description'] ?? null,
             'file_path' => $path,
-            'file_size' => $request->file('file')->getSize(),
-            'mime_type' => $request->file('file')->getMimeType(),
+            'original_name' => $this->cleanFileName($file->getClientOriginalName(), $file->extension()),
+            'file_size' => $file->getSize(),
+            'mime_type' => $file->getMimeType(),
             'uploaded_by' => auth()->id(),
             'version_number' => 1,
             'is_current' => true,
@@ -94,17 +106,18 @@ class GovernanceDocumentController extends Controller
     {
         $this->authorize('view', $document);
 
-        $document->load('uploadedBy:id,name,email');
+        $document->load('uploadedBy:id,name');
 
         return Inertia::render('Governance/Documents/Show', [
             'document' => [
                 'id' => $document->id,
                 'title' => $document->title,
                 'category' => $document->document_type,
+                'category_label' => GovernanceDocument::typeLabel($document->document_type),
                 'description' => $document->description,
-                'file_name' => basename($document->file_path),
+                'file_name' => $document->displayName(),
+                'format_label' => $document->formatLabel(),
                 'file_size' => (int) ($document->file_size ?? 0),
-                'mime_type' => $document->mime_type,
                 'version' => (int) $document->version_number,
                 'is_current' => (bool) $document->is_current,
                 'uploaded_by' => $document->uploadedBy ? [
@@ -121,16 +134,18 @@ class GovernanceDocumentController extends Controller
     {
         $this->authorize('download', $document);
 
+        $name = $document->displayName();
+
         if (! Storage::disk('local')->exists($document->file_path)) {
             $legacyPath = storage_path('app/'.$document->file_path);
             if (! is_file($legacyPath)) {
-                abort(404, 'Document not found.');
+                abort(404, 'This file could not be found.');
             }
 
-            return response()->download($legacyPath, basename($document->file_path));
+            return response()->download($legacyPath, $name);
         }
 
-        return Storage::disk('local')->download($document->file_path, basename($document->file_path));
+        return Storage::disk('local')->download($document->file_path, $name);
     }
 
     public function destroy(GovernanceDocument $document)
@@ -142,5 +157,40 @@ class GovernanceDocumentController extends Controller
         // Return to the register: going "back" from the removed record's own
         // page would land on a document that no longer exists.
         return redirect()->route('governance.documents.index')->with('success', 'Document removed.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function presentListItem(GovernanceDocument $document): array
+    {
+        return [
+            'id' => $document->id,
+            'title' => $document->title,
+            'category' => $document->document_type,
+            'category_label' => GovernanceDocument::typeLabel($document->document_type),
+            'file_name' => $document->displayName(),
+            'format_label' => $document->formatLabel(),
+            'file_size' => (int) ($document->file_size ?? 0),
+            'version' => (int) $document->version_number,
+            'updated_at' => $document->updated_at?->toIso8601String(),
+        ];
+    }
+
+    /** A safe display and download name: no folders, no control characters. */
+    protected function cleanFileName(?string $name, ?string $extension): string
+    {
+        $clean = trim((string) preg_replace('/[\x00-\x1F\x7F"\\\\\/]+/u', ' ', basename((string) $name)));
+
+        if ($clean === '') {
+            $clean = 'document'.($extension ? '.'.$extension : '');
+        }
+
+        return Str::limit($clean, 250, '');
+    }
+
+    protected function escapeLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 }

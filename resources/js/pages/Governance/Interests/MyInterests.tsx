@@ -1,15 +1,19 @@
 import { Head } from '@inertiajs/react';
-import { FileText, Info, Plus, X } from 'lucide-react';
+import { CalendarX2, Eye, FileText, Info, Pencil, Plus, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
 import {
     EmptyValue,
     EntityChip,
+    EntityContextMenu,
     EntityStatusChip,
     EntityTable,
     ListCaption,
+    compactMenu,
+    useEntityContextMenu,
     type EntityTableColumn,
+    type MenuItem,
 } from '@/components/lists';
 import {
     PageHeader,
@@ -23,12 +27,17 @@ import {
 } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { InfoCard } from '@/components/wizard/primitives';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
 import { PageProps } from '@/types';
 
 import {
     DeclareInterestDialog,
+    EndInterestDialog,
     INTEREST_TYPES,
+    InterestDetailsDialog,
+    interestChip,
     interestPeriod,
     interestTypeIcon,
     interestTypeLabel,
@@ -41,7 +50,21 @@ interface Props extends PageProps {
     canDeclare: boolean;
 }
 
-type StandingFilter = 'all' | 'current' | 'ceased';
+type StatusFilter = 'all' | 'current' | 'ended';
+
+/** Why this person can't declare, in words that say who can help — or null. */
+export function declarationBlockedReason(
+    hasBoardRecord: boolean,
+    canManageInterests: boolean,
+): string | null {
+    if (!hasBoardRecord) {
+        return "You're not listed as a board member yet, so you can't declare interests here. Ask the board secretary to add you as a board member.";
+    }
+    if (!canManageInterests) {
+        return "Your account can't add declarations yet. Ask the board secretary to give you access.";
+    }
+    return null;
+}
 
 export default function MyInterests({
     auth,
@@ -49,42 +72,70 @@ export default function MyInterests({
     boardMember,
     canDeclare,
 }: Props) {
+    const canManageInterests = Boolean(auth.can?.governance?.interests?.manage);
     // Declaring also needs the manage permission the store route requires.
-    const declareAllowed = Boolean(
-        canDeclare && boardMember && auth.can?.governance?.interests?.manage,
+    const declareAllowed = Boolean(canDeclare && boardMember && canManageInterests);
+    const blockedReason = declarationBlockedReason(
+        Boolean(canDeclare && boardMember),
+        canManageInterests,
     );
     const [declareOpen, setDeclareOpen] = useState(false);
+    const [editing, setEditing] = useState<InterestRecord | null>(null);
+    const [ending, setEnding] = useState<InterestRecord | null>(null);
+    const [viewing, setViewing] = useState<InterestRecord | null>(null);
     const [search, setSearch] = useState('');
     const [type, setType] = useState('all');
-    const [standing, setStanding] = useState<StandingFilter>('all');
+    const [status, setStatus] = useState<StatusFilter>('all');
+    const ctxMenu = useEntityContextMenu<InterestRecord>();
 
     const currentCount = interests.filter((i) => i.is_active).length;
+    const endedCount = interests.length - currentCount;
 
     const visible = useMemo(() => {
         const q = search.trim().toLowerCase();
         return interests.filter(
             (i) =>
                 (type === 'all' || i.interest_type === type) &&
-                (standing === 'all' ||
-                    (standing === 'current' ? i.is_active : !i.is_active)) &&
+                (status === 'all' ||
+                    (status === 'current' ? i.is_active : !i.is_active)) &&
                 (q === '' ||
                     i.nature_of_interest.toLowerCase().includes(q) ||
                     (i.organization_name ?? '').toLowerCase().includes(q) ||
                     i.description.toLowerCase().includes(q)),
         );
-    }, [interests, search, type, standing]);
+    }, [interests, search, type, status]);
 
-    const hasFilters = search.trim() !== '' || type !== 'all' || standing !== 'all';
+    const hasFilters = search.trim() !== '' || type !== 'all' || status !== 'all';
     const clearFilters = () => {
         setSearch('');
         setType('all');
-        setStanding('all');
+        setStatus('all');
     };
+
+    const actionsFor = (i: InterestRecord): MenuItem[] =>
+        compactMenu(
+            i.can_update
+                ? [
+                      {
+                          label: 'Update details',
+                          icon: Pencil,
+                          onClick: () => setEditing(i),
+                      },
+                      i.is_active
+                          ? {
+                                label: 'This interest has ended…',
+                                icon: CalendarX2,
+                                onClick: () => setEnding(i),
+                            }
+                          : null,
+                  ]
+                : [{ label: 'View', icon: Eye, onClick: () => setViewing(i) }],
+        );
 
     const columns: EntityTableColumn<InterestRecord>[] = [
         {
             key: 'type',
-            label: 'Type',
+            label: 'Kind',
             width: '0.8fr',
             cell: (i) => (
                 <EntityChip icon={interestTypeIcon(i.interest_type)}>
@@ -93,31 +144,43 @@ export default function MyInterests({
             ),
         },
         {
-            key: 'organisation',
-            label: 'Organisation',
-            width: '1fr',
+            key: 'effect',
+            label: 'How it could affect decisions',
+            width: '1.4fr',
             cell: (i) =>
-                i.organization_name ? (
-                    <span className="truncate">{i.organization_name}</span>
+                i.description ? (
+                    <span className="truncate" title={i.description}>
+                        {i.description}
+                    </span>
                 ) : (
                     <EmptyValue />
                 ),
         },
         {
             key: 'period',
-            label: 'Period',
-            width: '1.1fr',
+            label: 'When',
+            width: '1fr',
             cell: (i) => interestPeriod(i),
+        },
+        {
+            key: 'declared',
+            label: 'Declared',
+            width: '0.7fr',
+            cell: (i) =>
+                i.declared_at ? formatDateOnly(i.declared_at) : <EmptyValue />,
         },
         {
             key: 'status',
             label: 'Status',
             width: '0.6fr',
-            cell: (i) => (
-                <EntityStatusChip variant={i.is_active ? 'success' : 'neutral'}>
-                    {i.is_active ? 'Current' : 'Ceased'}
-                </EntityStatusChip>
-            ),
+            cell: (i) => {
+                const chip = interestChip(i.is_active);
+                return (
+                    <EntityStatusChip variant={chip.variant}>
+                        {chip.label}
+                    </EntityStatusChip>
+                );
+            },
         },
     ];
 
@@ -125,7 +188,7 @@ export default function MyInterests({
         <PageHeader
             icon={FileText}
             title="My interests"
-            subline="Your personal declarations of interest on the board register"
+            subline="Your declarations of interest. Keep them up to date, and mark an interest as ended when it stops."
             actions={
                 <>
                     <PageHeaderSearch
@@ -139,7 +202,7 @@ export default function MyInterests({
                             dusk="declare-interest"
                             onClick={() => setDeclareOpen(true)}
                         >
-                            Declare interest
+                            Declare an interest
                         </PageHeaderPrimaryButton>
                     ) : null}
                 </>
@@ -153,31 +216,27 @@ export default function MyInterests({
                     >
                         <PageHeaderMeterBig>{interests.length}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            recorded on your board record
+                            Everything you have declared
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Current"
                         ariaLabel="View my current declarations"
-                        onClick={() => setStanding('current')}
+                        onClick={() => setStatus('current')}
                     >
                         <PageHeaderMeterBig>{currentCount}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {interests.length - currentCount} ceased
+                            On the board’s register now
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Board register"
-                        ariaLabel="View the board interests register"
-                        href="/governance/interests"
+                        label="Ended"
+                        ariaLabel="View my ended declarations"
+                        onClick={() => setStatus('ended')}
                     >
-                        <PageHeaderMeterBig>
-                            {boardMember ? 'Linked' : 'Not linked'}
-                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{endedCount}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {boardMember
-                                ? 'your declarations appear there'
-                                : 'no board-member record yet'}
+                            Kept for the record
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
@@ -185,26 +244,28 @@ export default function MyInterests({
             filters={
                 <>
                     <PageHeaderFilterSelect
-                        label="All types"
+                        label="Kind"
                         value={type}
+                        allValue="all"
                         options={[
-                            { value: 'all', label: 'All types' },
+                            { value: 'all', label: 'Any kind' },
                             ...INTEREST_TYPES.map((t) => ({
                                 value: t.key,
-                                label: t.label,
+                                label: interestTypeLabel(t.key),
                             })),
                         ]}
                         onChange={setType}
                     />
                     <PageHeaderFilterSelect
-                        label="Current & ceased"
-                        value={standing}
+                        label="Status"
+                        value={status}
+                        allValue="all"
                         options={[
-                            { value: 'all', label: 'Current & ceased' },
-                            { value: 'current', label: 'Current only' },
-                            { value: 'ceased', label: 'Ceased only' },
+                            { value: 'all', label: 'Current and ended' },
+                            { value: 'current', label: 'Current' },
+                            { value: 'ended', label: 'Ended' },
                         ]}
-                        onChange={(v) => setStanding(v as StandingFilter)}
+                        onChange={(v) => setStatus(v as StatusFilter)}
                     />
                 </>
             }
@@ -225,12 +286,8 @@ export default function MyInterests({
             <Head title="My interests" />
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
-                    {!canDeclare ? (
-                        <EmptyState
-                            variant="inline"
-                            icon={Info}
-                            title="Your account is not linked to an active board-member record yet, so personal interest declarations are unavailable."
-                        />
+                    {blockedReason ? (
+                        <InfoCard icon={Info}>{blockedReason}</InfoCard>
                     ) : null}
 
                     <ListCaption
@@ -242,7 +299,6 @@ export default function MyInterests({
                                     variant="outline"
                                     size="sm"
                                     onClick={clearFilters}
-                                    className="text-xs text-muted-foreground"
                                 >
                                     <X className="h-3.5 w-3.5" />
                                     Clear filters
@@ -257,20 +313,25 @@ export default function MyInterests({
                             title={
                                 hasFilters
                                     ? 'No declarations match your filters'
-                                    : 'No interests declared'
+                                    : 'You have not declared any interests'
                             }
                             description={
                                 hasFilters
                                     ? 'Try clearing a filter or search term.'
                                     : declareAllowed
-                                      ? 'Declare any interest that could conflict with your board duties.'
-                                      : 'No personal interest declarations are available for this account.'
+                                      ? 'Declare anything that could affect, or look like it affects, your board decisions.'
+                                      : (blockedReason ?? 'Nothing to show yet.')
                             }
                             action={
                                 hasFilters ? (
                                     <Button variant="outline" size="sm" onClick={clearFilters}>
                                         <X className="h-3.5 w-3.5" />
                                         Clear filters
+                                    </Button>
+                                ) : declareAllowed ? (
+                                    <Button size="sm" onClick={() => setDeclareOpen(true)}>
+                                        <Plus className="h-3.5 w-3.5" />
+                                        Declare an interest
                                     </Button>
                                 ) : undefined
                             }
@@ -279,19 +340,38 @@ export default function MyInterests({
                         <EntityTable
                             rows={visible}
                             rowKey={(i) => i.id}
-                            identityLabel="Interest"
+                            identityLabel="Organisation or person"
                             identity={(i) => ({
                                 icon: interestTypeIcon(i.interest_type),
-                                name: i.nature_of_interest,
-                                subline: i.description,
+                                name: i.organization_name ?? i.nature_of_interest,
+                                subline: i.nature_of_interest,
                             })}
                             columns={columns}
-                            actionsFor={() => []}
-                            minWidth={760}
+                            actionsFor={actionsFor}
+                            onOpen={(i) =>
+                                i.can_update ? setEditing(i) : setViewing(i)
+                            }
+                            onRowContextMenu={(e, i) => ctxMenu.open(e, i)}
+                            mutedFor={(i) => !i.is_active}
+                            minWidth={900}
                         />
                     )}
                 </div>
             </PageLayout>
+
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={FileText}
+                    title={
+                        ctxMenu.ctx.record.organization_name ??
+                        ctxMenu.ctx.record.nature_of_interest
+                    }
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
 
             {declareAllowed && boardMember ? (
                 <DeclareInterestDialog
@@ -300,6 +380,16 @@ export default function MyInterests({
                     boardMemberId={boardMember.id}
                 />
             ) : null}
+            <DeclareInterestDialog
+                open={editing !== null}
+                onClose={() => setEditing(null)}
+                interest={editing}
+            />
+            <EndInterestDialog interest={ending} onClose={() => setEnding(null)} />
+            <InterestDetailsDialog
+                interest={viewing}
+                onClose={() => setViewing(null)}
+            />
         </AppLayout>
     );
 }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
+use App\Domain\Governance\Exceptions\MinutesChangedByOthers;
 use App\Domain\Governance\Http\Requests\StoreMeetingRequest;
 use App\Domain\Governance\Http\Requests\UpdateMeetingRequest;
 use App\Domain\Governance\Models\ActionItem;
@@ -10,16 +11,19 @@ use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\MeetingAgendaItem;
 use App\Domain\Governance\Models\MeetingAttendance;
+use App\Domain\Governance\Models\MeetingMinute;
 use App\Domain\Governance\Models\MeetingRsvp;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\Governance\Services\ExecutiveMeetingAccessService;
+use App\Domain\Governance\Services\GovernanceCalendarQuery;
 use App\Domain\Governance\Services\GovernanceNestedMutationService;
 use App\Domain\Governance\Services\GovernanceRecordAccessService;
 use App\Domain\Governance\Services\GovernanceVotingProfileService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Domain\Governance\Services\MeetingMinuteService;
 use App\Domain\Governance\Services\VotingService;
+use App\Domain\Governance\Support\GovernanceLabels;
 use App\Domain\Governance\Support\GovernancePresenter;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -41,20 +45,27 @@ class GovernanceMeetingController extends Controller
         protected GovernanceRecordAccessService $recordAccess,
     ) {}
 
-    /** Meeting types accepted by Store/UpdateMeetingRequest, in display order. */
-    private const MEETING_TYPES = [
-        'full_board' => 'Full Board',
-        'audit_risk' => 'Audit & Risk',
-        'people' => 'People Committee',
-        'finance' => 'Finance Committee',
-        'special_general' => 'Special General',
-        'executive_session' => 'Executive Session',
+    /**
+     * Meeting statuses the register can filter by — every stage a meeting
+     * can reach, including a board pack being prepared and cancellation.
+     */
+    private const MEETING_STATUSES = [
+        'scheduled', 'agenda_draft', 'agenda_final', 'pack_draft', 'in_progress', 'minutes_draft',
+        'minutes_review', 'minutes_approved', 'minutes_signed', 'archived', 'cancelled',
     ];
 
-    /** Meeting lifecycle statuses accepted by UpdateMeetingRequest. */
-    private const MEETING_STATUSES = [
-        'scheduled', 'agenda_draft', 'agenda_final', 'in_progress', 'minutes_draft',
-        'minutes_review', 'minutes_approved', 'minutes_signed', 'archived',
+    /** Plain agenda item validation messages (vocabulary.md). */
+    private const AGENDA_MESSAGES = [
+        'title.required' => 'Give the agenda item a title.',
+        'title.max' => 'Keep the title under 255 characters.',
+        'presenter_id.exists' => 'Choose the presenter from the list.',
+        'duration_minutes.required' => 'Say how long this item will take, between 5 and 120 minutes.',
+        'duration_minutes.integer' => 'Enter the time for this item in whole minutes.',
+        'duration_minutes.min' => 'An agenda item needs at least 5 minutes.',
+        'duration_minutes.max' => 'An agenda item can take at most 120 minutes.',
+        'item_type.required' => 'Choose what kind of agenda item this is.',
+        'item_type.in' => 'Choose what kind of agenda item this is.',
+        'order.min' => 'Choose a position on the agenda.',
     ];
 
     /**
@@ -82,12 +93,18 @@ class GovernanceMeetingController extends Controller
     {
         $validated = $request->validate([
             'status' => 'nullable|in:upcoming,minutes_pending,'.implode(',', self::MEETING_STATUSES),
-            'meeting_type' => 'nullable|in:'.implode(',', array_keys(self::MEETING_TYPES)),
+            'meeting_type' => 'nullable|in:'.implode(',', StoreMeetingRequest::MEETING_TYPES),
             'from' => 'nullable|date_format:Y-m-d',
             'to' => 'nullable|date_format:Y-m-d',
             'search' => 'nullable|string|max:120',
             'date' => 'nullable|date_format:Y-m-d',
             'hour' => 'nullable|integer|min:0|max:23',
+        ], [
+            'status.in' => 'Choose a status from the list.',
+            'meeting_type.in' => 'Choose a type of meeting from the list.',
+            'from.date_format' => 'Enter the start of the date range as a date.',
+            'to.date_format' => 'Enter the end of the date range as a date.',
+            'search.max' => 'Keep the search under 120 characters.',
         ]);
 
         $viewer = $request->user();
@@ -95,13 +112,13 @@ class GovernanceMeetingController extends Controller
         $visible = fn () => $this->executiveAccess->applyMeetingVisibilityScope(GovernanceMeeting::query(), $viewer);
 
         $query = $this->executiveAccess->applyMeetingVisibilityScope(
-            GovernanceMeeting::with(['chair.user', 'secretary.user', 'committee:id,name']),
+            GovernanceMeeting::with(['chair.user', 'secretary.user', 'committee:id,name'])->withCount('attendances'),
             $viewer
         );
 
         $status = $validated['status'] ?? null;
         if ($status === 'upcoming') {
-            $query->where('scheduled_at', '>=', now())->whereNotIn('status', ['archived']);
+            $query->where('scheduled_at', '>=', now())->whereNotIn('status', ['archived', 'cancelled']);
         } elseif ($status === 'minutes_pending') {
             $query->whereIn('status', ['minutes_draft', 'minutes_review']);
         } elseif ($status !== null) {
@@ -131,22 +148,30 @@ class GovernanceMeetingController extends Controller
             : $query->orderByDesc('scheduled_at');
 
         // Page links keep the filters but never the one-shot wizard deep link.
-        $meetings = $query->paginate(15)->appends(
-            collect($request->query())->except(['create', 'date', 'hour', 'page'])->all()
-        );
+        $meetings = $query->paginate(15)
+            ->appends(collect($request->query())->except(['create', 'date', 'hour', 'page'])->all())
+            ->through(function (GovernanceMeeting $meeting) use ($viewer) {
+                // Row menus only offer the meeting checklist to people who run the meeting.
+                $meeting->setAttribute('can_run', $this->canRunMeeting($viewer, $meeting));
+                $meeting->setAttribute('quorum_state', $this->quorumState($meeting));
+
+                return $meeting;
+            });
 
         $nextMeeting = $visible()
             ->where('scheduled_at', '>=', now())
-            ->whereNotIn('status', ['archived'])
+            ->whereNotIn('status', ['archived', 'cancelled'])
             ->orderBy('scheduled_at')
             ->first(['id', 'title', 'scheduled_at']);
 
-        $heldQuery = $visible()->where('scheduled_at', '<', now());
+        $heldQuery = $visible()->where('scheduled_at', '<', now())->where('status', '!=', 'cancelled');
         $summary = [
             'total' => $visible()->count(),
-            'upcoming' => $visible()->where('scheduled_at', '>=', now())->whereNotIn('status', ['archived'])->count(),
+            'upcoming' => $visible()->where('scheduled_at', '>=', now())->whereNotIn('status', ['archived', 'cancelled'])->count(),
             'minutes_pending' => $visible()->whereIn('status', ['minutes_draft', 'minutes_review'])->count(),
             'held' => (clone $heldQuery)->count(),
+            // Held meetings whose quorum is known: attendance was recorded (or quorum was confirmed).
+            'held_recorded' => (clone $heldQuery)->where(fn ($q) => $q->where('quorum_met', true)->orWhereHas('attendances'))->count(),
             'held_quorum_met' => (clone $heldQuery)->where('quorum_met', true)->count(),
             'next_meeting' => $nextMeeting ? [
                 'id' => $nextMeeting->id,
@@ -174,7 +199,7 @@ class GovernanceMeetingController extends Controller
                 'search' => $validated['search'] ?? null,
             ],
             'summary' => $summary,
-            'meetingTypes' => self::MEETING_TYPES,
+            'meetingTypes' => $this->meetingTypeLabels(),
             'canCreate' => $canCreate,
             // Scheduling wizard options — only for viewers who can schedule.
             'formOptions' => $canCreate ? $this->meetingFormOptions($viewer) : null,
@@ -190,14 +215,58 @@ class GovernanceMeetingController extends Controller
     }
 
     /**
+     * Whether the viewer runs this meeting — edits it, records attendance or
+     * handles its minutes — through the same gates as those routes.
+     */
+    protected function canRunMeeting(User $viewer, GovernanceMeeting $meeting): bool
+    {
+        if (! $viewer->canDo('governance.meetings.manage')) {
+            return false;
+        }
+
+        return ($meeting->isEditable() && $viewer->can('update', $meeting))
+            || $viewer->can('manageMinutes', $meeting)
+            || $viewer->can('approveMinutes', $meeting)
+            || $viewer->can('signMinutes', $meeting);
+    }
+
+    /**
+     * What the register's Quorum column can truthfully say: nothing before a
+     * meeting (or for a cancelled one), "Not recorded" when nobody recorded
+     * attendance, otherwise whether enough members were present.
+     */
+    protected function quorumState(GovernanceMeeting $meeting): string
+    {
+        return match (true) {
+            $meeting->status === 'cancelled' => 'cancelled',
+            $meeting->scheduled_at === null || $meeting->scheduled_at->isFuture() => 'upcoming',
+            (bool) $meeting->quorum_met => 'met',
+            (int) ($meeting->attendances_count ?? $meeting->attendances()->count()) === 0 => 'not_recorded',
+            default => 'not_met',
+        };
+    }
+
+    /** @return array<string, string> meeting type → plain label, in wizard order */
+    protected function meetingTypeLabels(): array
+    {
+        return collect(StoreMeetingRequest::MEETING_TYPES)
+            ->mapWithKeys(fn (string $type) => [$type => GovernanceLabels::label('meeting_type', $type)])
+            ->all();
+    }
+
+    /**
      * Select options for the meeting wizard (the retired Create/Edit pages'
      * props). Executive sessions are only offered to viewers the store/update
-     * guard would accept.
+     * guard would accept. Quorum data lets the wizard say how many members a
+     * percentage means today, exactly as GovernanceMeeting::calculateQuorum
+     * counts them.
      *
-     * @return array{board_members: array<int, array{id: int, name: string, is_active: bool}>, committees: array<int, array{id: int, name: string, committee_type: ?string}>, can_schedule_executive: bool}
+     * @return array{board_members: array<int, array{id: int, name: string, is_active: bool, counts_for_quorum: bool}>, committees: array<int, array{id: int, name: string, committee_type: ?string, member_ids: array<int, int>}>, can_schedule_executive: bool}
      */
     protected function meetingFormOptions(User $viewer): array
     {
+        $quorumMemberIds = BoardMember::query()->active()->pluck('id')->map(fn ($id) => (int) $id)->all();
+
         return [
             'board_members' => BoardMember::with('user:id,name')->get()
                 ->filter(fn (BoardMember $member) => $member->user !== null)
@@ -205,15 +274,25 @@ class GovernanceMeetingController extends Controller
                     'id' => $member->id,
                     'name' => $member->user->name,
                     'is_active' => (bool) $member->is_active,
+                    'counts_for_quorum' => in_array((int) $member->id, $quorumMemberIds, true),
                 ])
                 ->sortBy('name')
                 ->values()
                 ->all(),
-            'committees' => BoardCommittee::query()->orderBy('name')->get(['id', 'name', 'committee_type'])
+            'committees' => BoardCommittee::query()
+                ->with(['memberships' => fn ($query) => $query->where('is_active', true)])
+                ->orderBy('name')
+                ->get(['id', 'name', 'committee_type'])
                 ->map(fn (BoardCommittee $committee) => [
                     'id' => $committee->id,
                     'name' => $committee->name,
                     'committee_type' => $committee->committee_type,
+                    'member_ids' => $committee->memberships
+                        ->pluck('board_member_id')
+                        ->map(fn ($id) => (int) $id)
+                        ->unique()
+                        ->values()
+                        ->all(),
                 ])
                 ->all(),
             'can_schedule_executive' => $this->executiveAccess->hasExecutiveAuthority($viewer),
@@ -225,7 +304,11 @@ class GovernanceMeetingController extends Controller
         $validated = $request->validate([
             'month' => 'nullable|date_format:Y-m',
             'date' => 'nullable|date_format:Y-m-d',
-            'meeting_type' => 'nullable|in:all,full_board,audit_risk,people,finance,special_general,executive_session',
+            'meeting_type' => 'nullable|in:all,'.implode(',', StoreMeetingRequest::MEETING_TYPES),
+        ], [
+            'month.date_format' => 'Choose a month from the calendar.',
+            'date.date_format' => 'Choose a day from the calendar.',
+            'meeting_type.in' => 'Choose a type of meeting from the list.',
         ]);
 
         $month = isset($validated['month'])
@@ -286,15 +369,15 @@ class GovernanceMeetingController extends Controller
             'selectedDate' => $selectedDate,
             'selectedMeetingType' => $meetingType,
             'meetingTypes' => [
-                ['value' => 'all', 'label' => 'All Types'],
-                ['value' => 'full_board', 'label' => 'Full Board'],
-                ['value' => 'audit_risk', 'label' => 'Audit & Risk'],
-                ['value' => 'people', 'label' => 'People Committee'],
-                ['value' => 'finance', 'label' => 'Finance Committee'],
-                ['value' => 'special_general', 'label' => 'Special General'],
-                ['value' => 'executive_session', 'label' => 'Executive Session'],
+                ['value' => 'all', 'label' => 'All types'],
+                ...collect($this->meetingTypeLabels())
+                    ->map(fn (string $label, string $type) => ['value' => $type, 'label' => $label])
+                    ->values()
+                    ->all(),
             ],
             'meetings' => $meetings,
+            // Only the calendar sources whose registers this viewer can open.
+            'calendarSources' => app(GovernanceCalendarQuery::class)->sourcesFor($request->user()),
             // The calendar's create seed opens the same scheduling wizard in place.
             'canCreate' => $canCreate,
             'formOptions' => $canCreate ? $this->meetingFormOptions($request->user()) : null,
@@ -409,17 +492,62 @@ class GovernanceMeetingController extends Controller
         });
 
         $quorum = $meeting->calculateQuorum();
-        $boardMembers = BoardMember::with('user')->active()->get();
-        $workflowChecklist = $this->workflowService->meetingChecklist($meeting, $viewer);
-        $meetingCockpit = $this->presenter->meetingCockpit($meeting, $quorum, $workflowChecklist, $viewer);
+
+        // Page controls pass the same gates as the routes they call, so the
+        // workspace never offers a button the server would refuse.
+        $canManageRoutes = $viewer->canDo('governance.meetings.manage');
+        $canEdit = $canManageRoutes && $meeting->isEditable() && $viewer->can('update', $meeting);
+        $canManageMinutes = $canManageRoutes && $viewer->can('manageMinutes', $meeting);
+        $canApproveMinutes = $canManageRoutes && $viewer->can('approveMinutes', $meeting);
+        $canSignMinutes = $canManageRoutes && $viewer->can('signMinutes', $meeting);
+        $canRunMeeting = $canEdit || $canManageMinutes || $canApproveMinutes || $canSignMinutes;
+
+        // The preparation checklist and readiness summary are the chair and
+        // secretary's work. Members get meters about their own preparation
+        // instead, so the admin detail never reaches their payload.
+        $workflowChecklist = $canRunMeeting
+            ? $this->workflowService->meetingChecklist($meeting, $viewer)
+            : ['counts' => ['done' => 0, 'remaining' => 0, 'blocked' => 0], 'next_step' => null, 'items' => []];
+        $meetingCockpit = $canRunMeeting
+            ? $this->presenter->meetingCockpit($meeting, $quorum, $workflowChecklist, $viewer)
+            : ['cards' => [], 'next_step' => null];
+        // The CEO report's status lives in the readiness summary; the page never reads the raw record.
+        $meeting->unsetRelation('ceoReport');
+
+        // The member's own reading receipt for the pack they were sent.
+        $packRecipientId = $visiblePack ? $this->boardPackAccess->recipientBoardMemberId($viewer, $visiblePack) : null;
+        $packReceipt = $packRecipientId !== null ? $visiblePack->getMemberReceipt($packRecipientId) : null;
+        $packReading = $visiblePack ? [
+            'sent' => $visiblePack->distributed_at !== null,
+            'is_recipient' => $packRecipientId !== null,
+            'read' => $packReceipt !== null,
+            'read_at' => $packReceipt['read_at'] ?? null,
+            'version' => (int) ($visiblePack->revision_number ?? 1),
+        ] : null;
 
         // The meeting payload needs only a linkable pack summary, never the raw model fields.
         $visiblePack?->setVisible(['id', 'distributed_at']);
 
+        $this->presentPeople($meeting, $canRunMeeting, $viewerBoardMember?->id);
+
+        $canViewRecordDetails = $viewer->canDo('governance.audit.view');
+        if ($meeting->minutes instanceof MeetingMinute) {
+            $this->presentMinutes($meeting->minutes, $canViewRecordDetails, $canApproveMinutes || $canSignMinutes);
+        }
+
+        // The attendance dialog and agenda presenter picker are the only readers.
+        $boardMembers = $canEdit
+            ? BoardMember::with('user:id,name')->active()->get()
+                ->filter(fn (BoardMember $member) => $member->user !== null)
+                ->map(fn (BoardMember $member) => [
+                    'id' => $member->id,
+                    'user' => ['id' => $member->user->id, 'name' => $member->user->name],
+                ])
+                ->values()
+            : [];
+
         $viewerCanRsvp = $viewerBoardMember !== null && $meeting->isInvited($viewerBoardMember);
         $viewerRsvp = $viewerCanRsvp ? $meeting->rsvps->firstWhere('board_member_id', $viewerBoardMember->id) : null;
-
-        $canEdit = $meeting->isEditable() && $viewer->can('update', $meeting);
 
         // The in-meeting decision-paper wizard's options go only to paper
         // authors (the same gate as the Resolutions register) — never the
@@ -432,7 +560,7 @@ class GovernanceMeetingController extends Controller
                     ->whereNotNull('approved_at')
                     ->orderBy('name')
                     ->get(['id', 'name']),
-                'committees' => \App\Domain\Governance\Models\BoardCommittee::query()
+                'committees' => BoardCommittee::query()
                     ->orderBy('name')
                     ->get(['id', 'name']),
                 'canPublishPapers' => $viewer->can('openVoting', new Resolution),
@@ -454,17 +582,116 @@ class GovernanceMeetingController extends Controller
             'boardMembers' => $boardMembers,
             'canEdit' => $canEdit,
             // Edit wizard options — only for viewers the update route accepts.
-            'formOptions' => $canEdit && $viewer->canDo('governance.meetings.manage')
-                ? $this->meetingFormOptions($viewer)
-                : null,
-            'canManageMinutes' => $viewer->can('manageMinutes', $meeting),
-            'canApproveMinutes' => $viewer->can('approveMinutes', $meeting),
-            'canSignMinutes' => $viewer->can('signMinutes', $meeting),
+            'formOptions' => $canEdit ? $this->meetingFormOptions($viewer) : null,
+            'canManageMinutes' => $canManageMinutes,
+            'canApproveMinutes' => $canApproveMinutes,
+            'canSignMinutes' => $canSignMinutes,
+            'canViewRecordDetails' => $canViewRecordDetails,
             'workflowChecklist' => $workflowChecklist,
             'meetingCockpit' => $meetingCockpit,
+            'packReading' => $packReading,
             'viewerCanRsvp' => $viewerCanRsvp,
-            'viewerRsvp' => $viewerRsvp,
+            'viewerRsvp' => $viewerRsvp ? $this->presentRsvp($viewerRsvp) : null,
         ]);
+    }
+
+    /**
+     * Names, not account records, for the people on the meeting. Apology
+     * reasons and dietary or access needs are personal: the people running
+     * the meeting see everyone's, members see only their own.
+     */
+    protected function presentPeople(GovernanceMeeting $meeting, bool $canRunMeeting, ?int $viewerBoardMemberId): void
+    {
+        $nameOnly = function (?BoardMember $member): void {
+            $member?->setVisible(['id', 'user']);
+            $member?->user?->setVisible(['id', 'name']);
+        };
+
+        $nameOnly($meeting->chair);
+        $nameOnly($meeting->secretary);
+
+        $meeting->rsvps->each(function (MeetingRsvp $rsvp) use ($nameOnly, $canRunMeeting, $viewerBoardMemberId) {
+            $nameOnly($rsvp->boardMember);
+            if (! $canRunMeeting && (int) $rsvp->board_member_id !== (int) $viewerBoardMemberId) {
+                $rsvp->makeHidden(['decline_reason', 'dietary_requirements', 'dietary_notes']);
+            }
+        });
+
+        $meeting->attendances->each(function (MeetingAttendance $attendance) use ($nameOnly, $canRunMeeting, $viewerBoardMemberId) {
+            $nameOnly($attendance->boardMember);
+            $attendance->makeHidden(['marked_by']);
+            if (! $canRunMeeting && (int) $attendance->board_member_id !== (int) $viewerBoardMemberId) {
+                $attendance->makeHidden(['apology_reason']);
+            }
+        });
+    }
+
+    /**
+     * Minutes as the workspace reads them: names instead of account records,
+     * a plain version history, and integrity codes only for people who check
+     * the record (audit access) or who need them to approve or sign the exact
+     * version they read.
+     */
+    protected function presentMinutes(MeetingMinute $minutes, bool $showRecordDetails, bool $needsVersionCheck): void
+    {
+        $history = collect($minutes->version_history ?? [])
+            ->filter(fn ($entry) => is_array($entry))
+            ->map(fn (array $entry) => array_filter([
+                'version' => isset($entry['version']) ? (int) $entry['version'] : null,
+                'event' => $entry['event'] ?? null,
+                'status' => $entry['status'] ?? null,
+                'at' => $entry['timestamp'] ?? $entry['superseded_at'] ?? $entry['archived_at']
+                    ?? $entry['updated_at'] ?? $entry['created_at'] ?? null,
+                'actor_name' => $entry['user_name'] ?? $entry['approver_user_name'] ?? $entry['signer_user_name']
+                    ?? $entry['archived_by_user_name'] ?? $entry['correction_initiated_by_name']
+                    ?? $entry['updated_by_name'] ?? $entry['created_by_name'] ?? null,
+                'note' => $entry['note'] ?? null,
+                'reason_for_correction' => $entry['reason_for_correction'] ?? null,
+                'content_blocks' => $entry['content_blocks'] ?? null,
+                'content_hash' => $showRecordDetails ? ($entry['content_hash'] ?? null) : null,
+            ], fn ($value) => $value !== null))
+            ->values()
+            ->all();
+
+        $minutes->setAttribute('version_history', $history);
+        // Ids and their account records (relations are hidden by relation name).
+        $minutes->makeHidden(['drafted_by', 'reviewed_by', 'signed_by', 'draftedBy', 'reviewedBy', 'signedBy']);
+
+        if (! $showRecordDetails && ! $needsVersionCheck) {
+            $minutes->makeHidden('content_hash');
+        }
+    }
+
+    /**
+     * The viewer's reply, with the reference the reply confirmation gives —
+     * derived from the stored reply, never made up in the browser.
+     *
+     * @return array<string, mixed>
+     */
+    protected function presentRsvp(MeetingRsvp $rsvp): array
+    {
+        return [
+            'id' => $rsvp->id,
+            'board_member_id' => $rsvp->board_member_id,
+            'response' => $rsvp->response,
+            'decline_reason' => $rsvp->decline_reason,
+            'dietary_requirements' => (bool) $rsvp->dietary_requirements,
+            'dietary_notes' => $rsvp->dietary_notes,
+            'responded_at' => $rsvp->responded_at?->toIso8601String(),
+            'receipt_id' => $this->rsvpReceiptId($rsvp),
+        ];
+    }
+
+    protected function rsvpReceiptId(MeetingRsvp $rsvp): ?string
+    {
+        return $rsvp->responded_at
+            ? sprintf(
+                'RSVP-%d-%d-%s',
+                $rsvp->governance_meeting_id,
+                $rsvp->board_member_id,
+                $rsvp->responded_at->copy()->utc()->format('YmdHis'),
+            )
+            : null;
     }
 
     /**
@@ -515,7 +742,7 @@ class GovernanceMeetingController extends Controller
         ]);
 
         return redirect()->route('governance.meetings.show', $meeting)
-            ->with('success', 'Meeting scheduled successfully.');
+            ->with('success', 'Meeting scheduled.');
     }
 
     public function update(UpdateMeetingRequest $request, GovernanceMeeting $meeting)
@@ -527,10 +754,12 @@ class GovernanceMeetingController extends Controller
             abort_unless($this->executiveAccess->hasExecutiveAuthority($request->user()), 403);
         }
 
+        $cancelling = ($validated['status'] ?? null) === 'cancelled' && $meeting->status !== 'cancelled';
+
         $meeting->update($validated);
 
         return redirect()->route('governance.meetings.show', $meeting)
-            ->with('success', 'Meeting updated successfully.');
+            ->with('success', $cancelling ? 'Meeting cancelled.' : 'Meeting details saved.');
     }
 
     public function destroy(GovernanceMeeting $meeting)
@@ -540,7 +769,7 @@ class GovernanceMeetingController extends Controller
         $meeting->delete();
 
         return redirect()->route('governance.meetings.index')
-            ->with('success', 'Meeting cancelled.');
+            ->with('success', 'Meeting removed.');
     }
 
     public function addAgendaItem(Request $request, GovernanceMeeting $meeting)
@@ -554,7 +783,7 @@ class GovernanceMeetingController extends Controller
             'duration_minutes' => 'required|integer|min:5|max:120',
             'item_type' => 'required|in:standard,decision,consent,for_info',
             'is_confidential' => 'boolean',
-        ]);
+        ], self::AGENDA_MESSAGES);
 
         if (! empty($validated['is_confidential'])) {
             abort_unless($this->executiveAccess->canManageConfidentialAgenda($request->user(), $meeting), 403);
@@ -582,7 +811,7 @@ class GovernanceMeetingController extends Controller
             'duration_minutes' => 'sometimes|integer|min:5|max:120',
             'order' => 'sometimes|integer|min:1',
             'is_confidential' => 'sometimes|boolean',
-        ]);
+        ], self::AGENDA_MESSAGES);
 
         if (! empty($validated['is_confidential'])) {
             abort_unless($this->executiveAccess->canManageConfidentialAgenda($request->user(), $meeting), 403);
@@ -612,12 +841,14 @@ class GovernanceMeetingController extends Controller
 
         $validated = $request->validate([
             'content_blocks' => 'nullable|array',
+        ], [
+            'content_blocks.array' => 'Write the minutes under the headings provided.',
         ]);
 
         try {
             $this->minuteService->storeMinutes($meeting, $validated['content_blocks'] ?? null, $request->user());
 
-            return redirect()->back()->with('success', 'Minutes drafted.');
+            return redirect()->back()->with('success', 'Draft minutes saved.');
         } catch (DomainException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -628,20 +859,26 @@ class GovernanceMeetingController extends Controller
         $this->authorize('manageMinutes', $meeting);
 
         if (! $meeting->minutes) {
-            return redirect()->back()->with('error', 'Minutes have not been created for this meeting yet.');
+            return redirect()->back()->with('error', "The minutes for this meeting haven't been started yet.");
         }
 
         if (! $meeting->minutes->canEdit()) {
+            $message = "Approved minutes can't be edited. The secretary can start a correction if something is wrong.";
+
             if ($request->wantsJson()) {
-                return response()->json(['error' => "Minutes in status '{$meeting->minutes->status}' cannot be edited in place. Approved and signed minutes are immutable."], 422);
+                return response()->json(['error' => $message], 422);
             }
 
-            return redirect()->back()->with('error', "Minutes in status '{$meeting->minutes->status}' cannot be edited in place. Approved and signed minutes are immutable. Create a correction draft to propose revisions.");
+            return redirect()->back()->with('error', $message);
         }
 
         $validated = $request->validate([
             'content_blocks' => 'required|array',
             'expected_version' => 'nullable|integer',
+        ], [
+            'content_blocks.required' => 'Write at least one section of the minutes.',
+            'content_blocks.array' => 'Write the minutes under the headings provided.',
+            'expected_version.integer' => 'Refresh the page and try again.',
         ]);
 
         try {
@@ -652,12 +889,10 @@ class GovernanceMeetingController extends Controller
                 $validated['expected_version'] ?? null
             );
 
-            return redirect()->back()->with('success', 'Minutes updated.');
+            return redirect()->back()->with('success', 'Minutes saved.');
         } catch (DomainException $e) {
             if ($request->wantsJson()) {
-                $status = str_contains($e->getMessage(), 'Stale edit') ? 409 : 422;
-
-                return response()->json(['error' => $e->getMessage()], $status);
+                return response()->json(['error' => $e->getMessage()], $e instanceof MinutesChangedByOthers ? 409 : 422);
             }
 
             return redirect()->back()->with('error', $e->getMessage());
@@ -671,7 +906,7 @@ class GovernanceMeetingController extends Controller
         try {
             $this->minuteService->submitForReview($meeting, $request->user());
 
-            return redirect()->back()->with('success', 'Minutes submitted for review.');
+            return redirect()->back()->with('success', 'Minutes sent to the chair for approval.');
         } catch (DomainException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -685,6 +920,9 @@ class GovernanceMeetingController extends Controller
             'notes' => 'nullable|string',
             'expected_version' => 'required|integer',
             'expected_hash' => 'nullable|string',
+        ], [
+            'expected_version.required' => 'Refresh the page and try again.',
+            'expected_version.integer' => 'Refresh the page and try again.',
         ]);
 
         try {
@@ -698,9 +936,8 @@ class GovernanceMeetingController extends Controller
 
             return redirect()->back()->with('success', 'Minutes approved.');
         } catch (DomainException $e) {
-            $status = str_contains($e->getMessage(), 'conflict') ? 409 : 422;
             if ($request->wantsJson()) {
-                return response()->json(['error' => $e->getMessage()], $status);
+                return response()->json(['error' => $e->getMessage()], $e instanceof MinutesChangedByOthers ? 409 : 422);
             }
 
             return redirect()->back()->with('error', $e->getMessage());
@@ -716,6 +953,13 @@ class GovernanceMeetingController extends Controller
             'attendance.*.board_member_id' => 'required|exists:board_members,id',
             'attendance.*.status' => 'required|in:present,apology,no_show,late,unrecorded',
             'attendance.*.apology_reason' => 'nullable|string',
+        ], [
+            'attendance.required' => 'Choose who was at the meeting before saving.',
+            'attendance.array' => 'Choose who was at the meeting before saving.',
+            'attendance.*.board_member_id.required' => 'Refresh the page and try again.',
+            'attendance.*.board_member_id.exists' => "Someone in the list isn't a board member any more. Refresh the page and try again.",
+            'attendance.*.status.required' => 'Choose whether each member was present.',
+            'attendance.*.status.in' => 'Choose present, arrived late, sent apologies, absent without apologies or not recorded for each member.',
         ]);
 
         foreach ($validated['attendance'] as $record) {
@@ -741,7 +985,11 @@ class GovernanceMeetingController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', 'Attendance recorded.');
+        // Keep the meeting's stored quorum in step with the attendance just
+        // recorded, so the register and reports don't report a stale result.
+        $meeting->updateQuorumStatus();
+
+        return redirect()->back()->with('success', 'Attendance saved.');
     }
 
     public function lockMeeting(Request $request, GovernanceMeeting $meeting)
@@ -754,7 +1002,7 @@ class GovernanceMeetingController extends Controller
             'locked_by' => $request->user()->id,
         ]);
 
-        return redirect()->back()->with('success', 'Meeting locked. No further edits allowed.');
+        return redirect()->back()->with('success', 'Meeting locked. Its details can no longer be changed.');
     }
 
     public function signMinutes(Request $request, GovernanceMeeting $meeting)
@@ -764,6 +1012,9 @@ class GovernanceMeetingController extends Controller
         $validated = $request->validate([
             'expected_version' => 'required|integer',
             'expected_hash' => 'nullable|string',
+        ], [
+            'expected_version.required' => 'Refresh the page and try again.',
+            'expected_version.integer' => 'Refresh the page and try again.',
         ]);
 
         try {
@@ -774,11 +1025,10 @@ class GovernanceMeetingController extends Controller
                 $validated['expected_hash'] ?? null
             );
 
-            return redirect()->back()->with('success', 'Minutes signed successfully.');
+            return redirect()->back()->with('success', 'Minutes signed.');
         } catch (DomainException $e) {
-            $status = str_contains($e->getMessage(), 'conflict') ? 409 : 422;
             if ($request->wantsJson()) {
-                return response()->json(['error' => $e->getMessage()], $status);
+                return response()->json(['error' => $e->getMessage()], $e instanceof MinutesChangedByOthers ? 409 : 422);
             }
 
             return redirect()->back()->with('error', $e->getMessage());
@@ -808,12 +1058,19 @@ class GovernanceMeetingController extends Controller
 
         $validated = $request->validate([
             'reason' => 'required|string|min:5|max:1000',
+        ], [
+            'reason.required' => 'Say what needs correcting.',
+            'reason.min' => 'Say a little more about what needs correcting.',
+            'reason.max' => 'Keep the reason to 1,000 characters.',
         ]);
 
         try {
-            $this->minuteService->createCorrection($meeting, $request->user(), $validated['reason']);
+            $minutes = $this->minuteService->createCorrection($meeting, $request->user(), $validated['reason']);
 
-            return redirect()->back()->with('success', 'Correction draft created. Prior approved version is preserved in version history.');
+            return redirect()->back()->with(
+                'success',
+                "Correction started as version {$minutes->version_number}. The approved version is kept in the version history."
+            );
         } catch (DomainException $e) {
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 422);
@@ -830,10 +1087,13 @@ class GovernanceMeetingController extends Controller
         $advanced = $meeting->autoAdvanceStatus();
 
         if (! $advanced) {
-            return redirect()->back()->with('error', 'Cannot advance meeting status. Check prerequisites.');
+            return redirect()->back()->with('error', "The meeting can't move to its next stage yet.");
         }
 
-        return redirect()->back()->with('success', 'Meeting status advanced to: '.str_replace('_', ' ', $meeting->fresh()->status));
+        return redirect()->back()->with(
+            'success',
+            'Meeting moved to: '.mb_strtolower(GovernanceLabels::label('meeting_status', $meeting->fresh()->status)).'.'
+        );
     }
 
     public function submitRsvp(Request $request, GovernanceMeeting $meeting)
@@ -847,16 +1107,22 @@ class GovernanceMeetingController extends Controller
             'notes' => 'nullable|string|max:500',
             'dietary_requirements' => 'nullable|boolean',
             'dietary_notes' => 'nullable|string|max:255',
+        ], [
+            'response.in' => "Choose whether you're attending, sending apologies or not sure yet.",
+            'status.in' => "Choose whether you're attending, sending apologies or not sure yet.",
+            'decline_reason.max' => 'Keep your reason to 500 characters.',
+            'notes.max' => 'Keep your note to 500 characters.',
+            'dietary_notes.max' => 'Keep your dietary or access needs to 255 characters.',
         ]);
 
         $viewer = $request->user();
         $boardMember = $viewer->boardMember;
         if (! $boardMember) {
-            abort(403, 'You are not a registered board member.');
+            abort(403, 'Only board members can reply to meeting invitations.');
         }
 
         if (! $meeting->isInvited($boardMember)) {
-            abort(403, 'You are not an invited member of this committee meeting.');
+            abort(403, 'Only members of this committee are invited to this meeting.');
         }
 
         $rawResponse = $validated['response'] ?? $validated['status'] ?? 'accepted';
@@ -867,9 +1133,12 @@ class GovernanceMeetingController extends Controller
             default => 'accepted',
         };
 
-        $declineReason = $validated['decline_reason'] ?? ($normalizedResponse === 'declined' ? ($validated['notes'] ?? null) : null);
-        $dietaryNotes = $validated['dietary_notes'] ?? ($normalizedResponse !== 'declined' ? ($validated['notes'] ?? null) : null);
-        $hasDietary = ! empty($validated['dietary_requirements']) || ! empty($dietaryNotes);
+        // An apology keeps its reason; attending (or not sure yet) keeps any
+        // dietary or access needs. Switching replies clears the other note.
+        $isApology = $normalizedResponse === 'declined';
+        $declineReason = $isApology ? ($validated['decline_reason'] ?? $validated['notes'] ?? null) : null;
+        $dietaryNotes = $isApology ? null : ($validated['dietary_notes'] ?? $validated['notes'] ?? null);
+        $hasDietary = ! $isApology && (! empty($validated['dietary_requirements']) || filled($dietaryNotes));
 
         $rsvp = MeetingRsvp::updateOrCreate(
             [
@@ -885,17 +1154,17 @@ class GovernanceMeetingController extends Controller
             ]
         );
 
-        $receiptId = sprintf('RSVP-%d-%d-%s', $meeting->id, $boardMember->id, now()->format('YmdHis'));
+        $receiptId = $this->rsvpReceiptId($rsvp->fresh());
 
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'RSVP recorded.',
+                'message' => 'Your reply has been recorded.',
                 'receipt_id' => $receiptId,
-                'rsvp' => $rsvp->fresh()->load('boardMember.user'),
+                'rsvp' => $this->presentRsvp($rsvp->fresh()),
             ]);
         }
 
-        return redirect()->back()->with('success', 'RSVP recorded.')->with('receipt_id', $receiptId);
+        return redirect()->back()->with('success', 'Your reply has been recorded.')->with('receipt_id', $receiptId);
     }
 }

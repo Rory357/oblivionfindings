@@ -1,4 +1,10 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
+import {
+    MeetingPaperWorkspace,
+    type PaperResolution,
+} from '@/components/governance/MeetingPaperWorkspace';
 import {
     meetingWorkspaceUrl,
     withQueryParams,
@@ -7,38 +13,19 @@ import {
 import {
     PageHeader,
     PageHeaderGlassButton,
+    PageHeaderMeterBar,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
     PageHeaderStatusChip,
     PageLayout,
+    type PageHeaderMeterTone,
 } from '@/components/page';
 import {
     TierTwoTabs,
     type GroupedProfileNavTab,
 } from '@/components/page/grouped-profile-nav';
-import { EmptyState } from '@/components/ui/empty-state';
-import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
-import {
-    formatDateLong,
-    formatDateTime,
-    formatDateTimeLong,
-    formatDurationMinutes,
-    formatTime,
-} from '@/lib/datetime';
-import { canDoGovernance } from '@/lib/governance-permissions';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,25 +35,24 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { InfoCard } from '@/components/wizard/primitives';
 import AppLayout from '@/layouts/app-layout';
+import {
+    formatDateLong,
+    formatDateTimeLong,
+    formatDurationMinutes,
+    formatTime,
+} from '@/lib/datetime';
+import {
+    agendaItemTypeLabel,
+    governanceStatus,
+    meetingTypeLabel,
+    refSuffix,
+    resolutionChip,
+} from '@/lib/governance-labels';
+import { canDoGovernance } from '@/lib/governance-permissions';
 import { cn } from '@/lib/utils';
 import {
     generate as generatePackRoute,
@@ -74,24 +60,24 @@ import {
 } from '@/routes/governance/packs';
 import { show as showResolution } from '@/routes/governance/resolutions';
 import { PageProps } from '@/types';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
     AlertTriangle,
     Archive,
     Calendar,
-    Check,
     CheckCircle,
+    CheckCircle2,
     ChevronDown,
     ChevronRight,
-    Clock,
     FileCheck,
     FileDown,
     FileText,
     History,
     ListChecks,
     Lock,
-    MapPin,
+    MessageSquare,
+    PenLine,
     Pencil,
     Plus,
     RotateCcw,
@@ -99,8 +85,9 @@ import {
     ShieldCheck,
     Users,
     Vote,
+    type LucideIcon,
 } from 'lucide-react';
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
     type AuthoritySubjectGroup,
     type AuthoritySubjects,
@@ -108,94 +95,72 @@ import {
     NewResolutionDialog,
     type UserOption,
 } from '../Resolutions/_dialogs';
+import { MeetingWizardDialog, type MeetingFormOptions } from './_dialogs';
 import {
-    MeetingPaperWorkspace,
-    type PaperResolution,
-} from '@/components/governance/MeetingPaperWorkspace';
+    attendanceMeter,
+    checklistStatusChip,
+    conflictsMeter,
+    heldMeetingPrompt,
+    isMeetingTab,
+    MEETING_TAB_LABELS,
+    meetingDayReached,
+    meetingHasHappened,
+    meetingStatusChip,
+    minutesHistoryLabel,
+    minutesStatusChip,
+    orderResolutions,
+    packMeter,
+    quorumMeter,
+    readinessVariant,
+    readResolutionLabel,
+    readWorkspaceLocation,
+    recordedName,
+    repliesMeter,
+    resolutionVoteNote,
+    votesMeter,
+    workspaceTabKeys,
+    type MeetingTab,
+    type MeterReading,
+    type MinutesHistoryEntry,
+    type PackReading,
+} from './_workspace';
 import {
-    MeetingWizardDialog,
-    meetingStatusLabel,
-    meetingStatusVariant,
-    meetingTypeLabel,
-    type MeetingFormOptions,
-} from './_dialogs';
-
-const VALID_TABS = [
-    'agenda',
-    'attendance',
-    'minutes',
-    'resolutions',
-    'workflow',
-] as const;
-type MeetingTab = (typeof VALID_TABS)[number];
-
-const isMeetingTab = (value: string | null | undefined): value is MeetingTab =>
-    Boolean(value && (VALID_TABS as readonly string[]).includes(value));
-
-function readWorkspaceLocation(url: string): {
-    tab: MeetingTab;
-    paper: string | null;
-    focus: MeetingWorkspaceFocus | null;
-} {
-    const params = new URLSearchParams(url.split('#')[0]?.split('?')[1] ?? '');
-    const tab = params.get('tab');
-    const paper = params.get('paper');
-    return {
-        tab: isMeetingTab(tab) ? tab : paper ? 'resolutions' : 'agenda',
-        paper,
-        focus: params.get('focus') === 'follow-ups' ? 'follow-ups' : null,
-    };
-}
-
-const RSVP_LABEL: Record<string, string> = {
-    accepted: 'Attending',
-    declined: 'Apology',
-    tentative: 'Tentative',
-};
-
-const rsvpVariant = (response: string): StatusVariant =>
-    response === 'accepted'
-        ? 'success'
-        : response === 'declined'
-          ? 'warning'
-          : 'info';
-
-const ATTENDANCE_VARIANT: Record<string, StatusVariant> = {
-    present: 'success',
-    apology: 'warning',
-    no_show: 'critical',
-    late: 'info',
-};
-const attendanceVariant = (status: string): StatusVariant =>
-    ATTENDANCE_VARIANT[status] ?? 'neutral';
-
-const MINUTES_VARIANT: Record<string, StatusVariant> = {
-    draft: 'warning',
-    reviewed: 'info',
-    approved: 'success',
-    signed: 'success',
-    archived: 'neutral',
-};
-const minutesVariant = (status: string): StatusVariant =>
-    MINUTES_VARIANT[status] ?? 'neutral';
-
-const CHECKLIST_VARIANT: Record<string, StatusVariant> = {
-    done: 'success',
-    in_progress: 'info',
-    todo: 'warning',
-    blocked: 'critical',
-};
-const checklistVariant = (status: string): StatusVariant =>
-    CHECKLIST_VARIANT[status] ?? 'neutral';
-
-const humanStatus = (value: string) => {
-    const text = value.replace(/_/g, ' ');
-    return text.charAt(0).toUpperCase() + text.slice(1);
-};
+    AgendaItemDialog,
+    AttendanceDialog,
+    CorrectionDialog,
+    flashErrorText,
+    MinutesEditorDialog,
+    RsvpDialog,
+    SignMinutesDialog,
+} from './_workspace-dialogs';
 
 interface BoardMemberItem {
     id: number;
     user: { id: number; name: string };
+}
+
+interface AgendaItem {
+    id: number;
+    order: number;
+    title: string;
+    description: string | null;
+    presenter: { name: string } | null;
+    duration_minutes: number;
+    item_type: string;
+    is_confidential: boolean;
+    resolution_id?: number | null;
+}
+
+interface ViewerRsvp {
+    id: number;
+    board_member_id: number;
+    response: string;
+    decline_reason: string | null;
+    dietary_requirements: boolean;
+    dietary_notes: string | null;
+    responded_at: string | null;
+    /** The reference of the stored reply (server-derived). */
+    receipt_id?: string | null;
 }
 
 interface Meeting {
@@ -215,78 +180,56 @@ interface Meeting {
     quorum_required: number;
     chair: { user: { name: string }; id: number } | null;
     secretary: { user: { name: string }; id: number } | null;
-    agenda_items: Array<{
-        id: number;
-        order: number;
-        title: string;
-        description: string | null;
-        presenter: { name: string } | null;
-        duration_minutes: number;
-        item_type: string;
-        is_confidential: boolean;
-        resolution_id?: number | null;
-    }>;
+    agenda_items: AgendaItem[];
     attendances: Array<{
         id: number;
         board_member_id: number;
-        board_member: { user: { name: string } };
+        board_member?: { user?: { name: string } | null } | null;
         status: string;
-        apology_reason: string | null;
+        /** Only sent to the people running the meeting, or for the viewer's own row. */
+        apology_reason?: string | null;
     }>;
     rsvps?: Array<{
         id: number;
         board_member_id: number;
         response: string;
-        decline_reason: string | null;
-        dietary_requirements: boolean;
-        dietary_notes: string | null;
+        /** Only sent to the people running the meeting, or for the viewer's own reply. */
+        decline_reason?: string | null;
+        dietary_requirements?: boolean;
+        dietary_notes?: string | null;
         responded_at: string | null;
-        board_member?: { user: { name: string } };
+        board_member?: { user?: { name: string } | null } | null;
     }>;
     minutes: {
         id: number;
         status: string;
         version_number: number;
-        content_blocks: Array<{ heading: string; content: string }>;
-        version_history?: Array<{
-            version?: number;
-            status?: string;
-            event?: string;
-            content_blocks?: Array<{ heading: string; content: string }>;
-            content_hash?: string;
-            updated_at?: string;
-            created_at?: string;
-            archived_at?: string;
-            superseded_at?: string;
-            note?: string;
-            reason_for_correction?: string;
-            actor_name?: string;
-            created_by_name?: string;
-            updated_by_name?: string;
-            approver_user_name?: string;
-            signer_user_name?: string;
-            timestamp?: string;
-        }> | null;
+        content_blocks: Array<{ heading: string; content: string }> | null;
+        version_history?: MinutesHistoryEntry[] | null;
+        /** Only for auditors and the people who approve or sign the minutes. */
         content_hash?: string;
         drafted_at?: string | null;
         reviewed_at?: string | null;
         signed_at?: string | null;
-        archived_at?: string | null;
         drafter_name?: string | null;
         reviewer_name?: string | null;
         signer_name?: string | null;
-        review_notes?: string | null;
     } | null;
     board_pack: {
         id: number;
         distributed_at: string | null;
     } | null;
-    resolutions: Array<{
-        id: number;
-        resolution_reference: string;
-        title: string;
-        status: string;
-    }>;
+}
+
+interface ChecklistStep {
+    key: string;
+    label: string;
+    status: string;
+    status_label?: string | null;
+    detail: string;
+    action_label: string;
+    action_url: string;
+    blocked_by: string | null;
 }
 
 interface Props extends PageProps {
@@ -295,56 +238,35 @@ interface Props extends PageProps {
     quorum: {
         present: number;
         required: number;
+        total?: number;
         met: boolean;
     };
     canEdit: boolean;
     canManageMinutes: boolean;
     canApproveMinutes: boolean;
     canSignMinutes: boolean;
+    /** Audit access: sees the minutes' record details (integrity codes). */
+    canViewRecordDetails?: boolean;
     workflowChecklist: {
-        counts: {
-            done: number;
-            remaining: number;
-            blocked: number;
-        };
-        next_step: {
-            label: string;
-            status: string;
-            detail: string;
-            action_label: string;
-            action_url: string;
-            blocked_by: string | null;
-        } | null;
-        items: Array<{
-            key: string;
-            label: string;
-            status: 'done' | 'in_progress' | 'todo' | 'blocked';
-            detail: string;
-            action_label: string;
-            action_url: string;
-            blocked_by: string | null;
-        }>;
+        counts: { done: number; remaining: number; blocked: number };
+        next_step: ChecklistStep | null;
+        items: ChecklistStep[];
     };
+    /** Manager-only readiness summary (empty for members). */
     meetingCockpit: {
         cards: Array<{
             key: string;
             title: string;
-            status: 'done' | 'in_progress' | 'todo' | 'warning';
+            status: string;
             value: string | number;
             detail: string;
             href: string;
         }>;
     };
+    /** The viewer's reading of the board pack they can see. */
+    packReading?: PackReading | null;
     viewerCanRsvp?: boolean;
-    viewerRsvp?: {
-        id: number;
-        board_member_id: number;
-        response: string;
-        decline_reason: string | null;
-        dietary_requirements: boolean;
-        dietary_notes: string | null;
-        responded_at: string | null;
-    } | null;
+    viewerRsvp?: ViewerRsvp | null;
     /** Decision-paper wizard options — empty unless the viewer authors papers. */
     users?: UserOption[];
     committees?: CommitteeOption[];
@@ -356,6 +278,69 @@ interface Props extends PageProps {
     formOptions?: MeetingFormOptions | null;
 }
 
+const TAB_ICONS: Record<MeetingTab, LucideIcon> = {
+    agenda: FileText,
+    resolutions: Vote,
+    attendance: Users,
+    minutes: Pencil,
+    workflow: ListChecks,
+};
+
+const READINESS_LINKS: Record<string, string> = {
+    ceo_report: 'Open CEO report',
+    pack_readiness: 'Open board pack',
+    quorum: 'Open attendance',
+    resolutions: 'Open resolutions',
+    minutes: 'Open minutes',
+    follow_through: 'Open actions',
+};
+
+function plural(count: number, one: string, many = `${one}s`): string {
+    return `${count} ${count === 1 ? one : many}`;
+}
+
+function lowerFirst(text: string): string {
+    return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+/** "?tab=minutes" links back into this workspace switch tabs instead of reloading. */
+function inPageTab(href: string, meetingId: number): MeetingTab | null {
+    const [path, query = ''] = href.split('?');
+    if (path !== `/governance/meetings/${meetingId}`) return null;
+    const tab = new URLSearchParams(query).get('tab');
+    return isMeetingTab(tab) ? tab : null;
+}
+
+function Meter({
+    label,
+    reading,
+    onClick,
+    href,
+    ariaLabel,
+    bar,
+}: {
+    label: string;
+    reading: MeterReading;
+    onClick?: () => void;
+    href?: string;
+    ariaLabel: string;
+    bar?: number;
+}) {
+    return (
+        <PageHeaderMeterBlock
+            label={label}
+            href={href}
+            onClick={onClick}
+            ariaLabel={ariaLabel}
+            tone={reading.tone as PageHeaderMeterTone}
+        >
+            <PageHeaderMeterBig>{reading.value}</PageHeaderMeterBig>
+            {bar !== undefined ? <PageHeaderMeterBar percent={bar} /> : null}
+            <PageHeaderMeterCaption>{reading.caption}</PageHeaderMeterCaption>
+        </PageHeaderMeterBlock>
+    );
+}
+
 export default function MeetingShow({
     auth,
     meeting,
@@ -365,7 +350,10 @@ export default function MeetingShow({
     canManageMinutes,
     canApproveMinutes,
     canSignMinutes,
+    canViewRecordDetails = false,
     workflowChecklist,
+    meetingCockpit,
+    packReading = null,
     viewerCanRsvp,
     viewerRsvp,
     users = [],
@@ -385,30 +373,21 @@ export default function MeetingShow({
         'resolutions',
         'manage',
     );
+    const canViewResolutionRecords = canDoGovernance(
+        governancePermissions,
+        'resolutions',
+        'view',
+    );
     const canOpenEdit = canEdit && formOptions !== null;
     // Retired /meetings/{id}/edit deep links arrive as ?edit=1.
     const [editOpen, setEditOpen] = useDialogDeepLink('edit', canOpenEdit);
-    const [generatingPack, setGeneratingPack] = useState(false);
-    const [packMessage, setPackMessage] = useState<string | null>(null);
-    const [agendaDialogOpen, setAgendaDialogOpen] = useState(false);
-    const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
-    const [minutesDialogOpen, setMinutesDialogOpen] = useState(false);
-    const [signDialogOpen, setSignDialogOpen] = useState(false);
-    const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
-    const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
-    const [correctionReason, setCorrectionReason] = useState('');
-    const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
-    const [selectedHistoryVersion, setSelectedHistoryVersion] = useState<number | null>(null);
-    const [historyOpen, setHistoryOpen] = useState(false);
-    const [minutesError, setMinutesError] = useState<string | null>(null);
-    const [newResolutionOpen, setNewResolutionOpen] = useState(false);
-    // The workspace location (tab + selected paper) lives in the URL so reload,
-    // back/forward and links from follow-up actions restore the same place.
-    const initialLocation = readWorkspaceLocation(page.url);
-    // The meeting-cycle checklist is the chair/secretary's preparation work;
-    // members who can't run the meeting don't get the Workflow tab or meter.
+
+    // The meeting checklist and readiness summary are the chair and
+    // secretary's work; members get meters about their own preparation.
     const canRunMeeting =
         canEdit || canManageMinutes || canApproveMinutes || canSignMinutes;
+
+    const initialLocation = readWorkspaceLocation(page.url);
     const [activeTab, setActiveTab] = useState<MeetingTab>(
         initialLocation.tab === 'workflow' && !canRunMeeting
             ? 'agenda'
@@ -420,14 +399,47 @@ export default function MeetingShow({
     const [paperFocus, setPaperFocus] = useState<MeetingWorkspaceFocus | null>(
         initialLocation.focus,
     );
-    const [lastClosedPaperId, setLastClosedPaperId] = useState<string | null>(
-        null,
-    );
+    const [lastClosedPaperId, setLastClosedPaperId] = useState<string | null>(null);
+
+    const [generatingPack, setGeneratingPack] = useState(false);
+    const [packMessage, setPackMessage] = useState<string | null>(null);
+    const [agendaDialogOpen, setAgendaDialogOpen] = useState(false);
+    const [removingItem, setRemovingItem] = useState<AgendaItem | null>(null);
+    const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
+    const [rsvpDialogOpen, setRsvpDialogOpen] = useState(false);
+    const [replySaved, setReplySaved] = useState(false);
+    const [minutesDialogOpen, setMinutesDialogOpen] = useState(false);
+    const [minutesConfirm, setMinutesConfirm] = useState<'review' | 'approve' | 'archive' | null>(null);
+    const [signDialogOpen, setSignDialogOpen] = useState(false);
+    const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
+    const [minutesError, setMinutesError] = useState<string | null>(null);
+    const [historyOpen, setHistoryOpen] = useState(false);
+    const [openVersion, setOpenVersion] = useState<number | null>(null);
+    const [newResolutionOpen, setNewResolutionOpen] = useState(false);
 
     const agendaItems = meeting.agenda_items ?? [];
     const attendances = meeting.attendances ?? [];
-    const resolutions: PaperResolution[] = propResolutions ?? meeting.resolutions ?? [];
-    const allBoardMembers = boardMembers ?? [];
+    const rsvps = meeting.rsvps ?? [];
+    // Agenda order — the same order "Next resolution" follows in a paper.
+    const resolutions = useMemo(
+        () => orderResolutions(meeting.agenda_items ?? [], propResolutions ?? []),
+        [meeting.agenda_items, propResolutions],
+    );
+    const resolutionsById = new Map(resolutions.map((resolution) => [resolution.id, resolution]));
+    const minutes = meeting.minutes;
+
+    const happened = meetingHasHappened(meeting.scheduled_at, meeting.duration_minutes);
+    const dayReached = meetingDayReached(meeting.scheduled_at);
+    const heldPrompt = canRunMeeting
+        ? heldMeetingPrompt({
+              status: meeting.status,
+              happened,
+              attendanceRecorded: attendances.length > 0,
+              minutesStarted: Boolean(minutes),
+              canRecordAttendance: canEdit,
+              canWriteMinutes: canManageMinutes,
+          })
+        : null;
 
     const replaceLocation = (patch: Record<string, string | null>) => {
         // router.replace keeps Inertia's history state intact, so browser Back
@@ -439,18 +451,18 @@ export default function MeetingShow({
         });
     };
 
-    // Re-sync when the URL changes underneath us (history navigation, a
-    // `#tab-…` meter link, or a return from a follow-up action).
+    // Re-sync when the URL changes underneath us (history navigation, or a
+    // return from a follow-up action).
     useEffect(() => {
         const location = readWorkspaceLocation(page.url);
         const hashTab = window.location.hash.replace('#tab-', '').replace('#', '');
-        setActiveTab(
+        const next =
             new URLSearchParams(page.url.split('?')[1] ?? '').get('tab') === null &&
-                !location.paper &&
-                isMeetingTab(hashTab)
+            !location.paper &&
+            isMeetingTab(hashTab)
                 ? hashTab
-                : location.tab,
-        );
+                : location.tab;
+        setActiveTab(next === 'workflow' && !canRunMeeting ? 'agenda' : next);
         setSelectedPaperId(location.paper);
         if (location.focus) {
             setPaperFocus(location.focus);
@@ -461,6 +473,7 @@ export default function MeetingShow({
                 preserveScroll: true,
             });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page.url]);
 
     const handleTabChange = (newTab: string) => {
@@ -494,130 +507,14 @@ export default function MeetingShow({
         }
     }, [lastClosedPaperId, selectedPaperId]);
 
-    // Papers in agenda order first, then any remaining resolutions.
-    const orderedPaperIds = [
-        ...agendaItems
-            .map((item) => item.resolution_id)
-            .filter((id): id is number => typeof id === 'number'),
-        ...resolutions.map((r) => r.id),
-    ].filter(
-        (id, index, all) =>
-            all.indexOf(id) === index && resolutions.some((r) => r.id === id),
-    );
-
-    // Agenda Item Form
-    const agendaForm = useForm({
-        title: '',
-        description: '',
-        presenter_id: '',
-        duration_minutes: '15',
-        item_type: 'standard',
-        is_confidential: false,
-    });
-
-    // Attendance Form - track status for each board member
-    const [attendanceRecords, setAttendanceRecords] = useState<
-        Record<number, { status: string; apology_reason: string }>
-    >(() => {
-        const initial: Record<
-            number,
-            { status: string; apology_reason: string }
-        > = {};
-        for (const member of allBoardMembers) {
-            const existing = attendances.find(
-                (a) => a.board_member_id === member.id,
-            );
-            initial[member.id] = {
-                status: existing?.status || 'unrecorded',
-                apology_reason: existing?.apology_reason || '',
-            };
-        }
-        return initial;
-    });
-    const [attendanceSubmitting, setAttendanceSubmitting] = useState(false);
-
-    // RSVP State & Form
-    const [rsvpDialogOpen, setRsvpDialogOpen] = useState(false);
-    const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
-    const [rsvpData, setRsvpData] = useState({
-        response: viewerRsvp?.response || 'accepted',
-        notes: viewerRsvp?.decline_reason || viewerRsvp?.dietary_notes || '',
-        dietary_requirements: viewerRsvp?.dietary_requirements || false,
-    });
-    const [rsvpReceipt, setRsvpReceipt] = useState<string | null>(null);
-
-    const submitRsvpForm = (e: React.FormEvent) => {
-        e.preventDefault();
-        setRsvpSubmitting(true);
-        router.post(
-            `/governance/meetings/${meeting.id}/rsvp`,
-            {
-                response: rsvpData.response,
-                decline_reason: rsvpData.response === 'declined' ? rsvpData.notes : null,
-                dietary_notes: rsvpData.response !== 'declined' ? rsvpData.notes : null,
-                dietary_requirements: rsvpData.dietary_requirements,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setRsvpSubmitting(false);
-                    setRsvpDialogOpen(false);
-                    setRsvpReceipt(`RSVP-${meeting.id}-${new Date().getTime()}`);
-                },
-                onError: () => {
-                    setRsvpSubmitting(false);
-                },
-            },
-        );
+    const openAttendanceDialog = () => {
+        handleTabChange('attendance');
+        setAttendanceDialogOpen(true);
     };
 
-    // Minutes Form - structured blocks
-    const defaultBlocks = [
-        { heading: 'Welcome & Apologies', content: '' },
-        { heading: 'Minutes of Previous Meeting', content: '' },
-        { heading: 'Matters Arising', content: '' },
-        { heading: 'General Business', content: '' },
-        { heading: 'Next Meeting', content: '' },
-    ];
-    const [minutesBlocks, setMinutesBlocks] = useState<
-        Array<{ heading: string; content: string }>
-    >(
-        meeting.minutes?.content_blocks &&
-            Array.isArray(meeting.minutes.content_blocks)
-            ? meeting.minutes.content_blocks
-            : defaultBlocks,
-    );
-    const [minutesSubmitting, setMinutesSubmitting] = useState(false);
-
-    const updateMinutesBlock = (
-        index: number,
-        field: 'heading' | 'content',
-        value: string,
-    ) => {
-        setMinutesBlocks((prev) =>
-            prev.map((block, i) =>
-                i === index ? { ...block, [field]: value } : block,
-            ),
-        );
-    };
-
-    const addMinutesBlock = () => {
-        setMinutesBlocks((prev) => [...prev, { heading: '', content: '' }]);
-    };
-
-    const removeMinutesBlock = (index: number) => {
-        setMinutesBlocks((prev) => prev.filter((_, i) => i !== index));
-    };
-
-    const getItemTypeIcon = (type: string) => {
-        switch (type) {
-            case 'decision':
-                return <Vote className="h-4 w-4 text-primary" />;
-            case 'consent':
-                return <CheckCircle className="h-4 w-4 text-status-success" />;
-            default:
-                return <FileText className="h-4 w-4 text-muted-foreground" />;
-        }
+    const openMinutesEditor = () => {
+        handleTabChange('minutes');
+        setMinutesDialogOpen(true);
     };
 
     const generatePack = async () => {
@@ -627,201 +524,44 @@ export default function MeetingShow({
             const response = await axios.post(
                 generatePackRoute.url({ meeting: meeting.id }),
             );
-            const status = response?.data?.status ?? null;
-            if (status === 'generated') {
+            if (response?.data?.status === 'generated') {
                 router.reload();
             } else {
                 setPackMessage(
-                    'Board pack generation started. Refresh in a moment to see it.',
+                    'The draft pack is being generated. Nothing is sent to members until it is distributed. Refresh the page in a minute to see it.',
                 );
             }
-        } catch (error) {
-            console.error('Failed to generate pack:', error);
-            setPackMessage(
-                'Failed to generate the board pack. Please try again.',
-            );
+        } catch {
+            setPackMessage("The draft pack couldn't be generated. Please try again.");
         } finally {
             setGeneratingPack(false);
         }
     };
 
-    const submitAgendaItem = (e: FormEvent) => {
-        e.preventDefault();
-        agendaForm.post(`/governance/meetings/${meeting.id}/agenda`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setAgendaDialogOpen(false);
-                agendaForm.reset();
-            },
-        });
-    };
-
-    const submitAttendance = async () => {
-        setAttendanceSubmitting(true);
-        const attendance = Object.entries(attendanceRecords).map(
-            ([id, record]) => ({
-                board_member_id: Number(id),
-                status: record.status,
-                apology_reason: record.apology_reason || null,
-            }),
-        );
-
-        router.post(
-            `/governance/meetings/${meeting.id}/attendance`,
-            { attendance },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setAttendanceDialogOpen(false);
-                    setAttendanceSubmitting(false);
-                },
-                onError: () => {
-                    setAttendanceSubmitting(false);
-                },
-            },
-        );
-    };
-
-    const submitMinutes = (e: FormEvent) => {
-        e.preventDefault();
-        setMinutesSubmitting(true);
-        setMinutesError(null);
-        const method = meeting.minutes ? 'put' : 'post';
-
-        router[method](
-            `/governance/meetings/${meeting.id}/minutes`,
-            {
-                content_blocks: minutesBlocks,
-                expected_version: meeting.minutes?.version_number,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setMinutesDialogOpen(false);
-                    setMinutesSubmitting(false);
-                },
-                onError: (errors) => {
-                    setMinutesSubmitting(false);
-                    if (errors.error) {
-                        setMinutesError(String(errors.error));
-                    }
-                },
-            },
-        );
-    };
-
-    const submitForReview = () => {
-        setMinutesSubmitting(true);
-        setMinutesError(null);
-        router.post(
-            `/governance/meetings/${meeting.id}/minutes/submit-for-review`,
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setReviewDialogOpen(false);
-                    setMinutesSubmitting(false);
-                },
-                onError: (errors) => {
-                    setMinutesSubmitting(false);
-                    if (errors.error) setMinutesError(String(errors.error));
-                },
-            },
-        );
-    };
-
-    const submitApproveMinutes = () => {
-        if (!meeting.minutes) return;
-        setMinutesSubmitting(true);
-        setMinutesError(null);
-        router.post(
-            `/governance/meetings/${meeting.id}/minutes/approve`,
-            {
-                expected_version: meeting.minutes.version_number,
-                expected_hash: meeting.minutes.content_hash,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setMinutesSubmitting(false);
-                },
-                onError: (errors) => {
-                    setMinutesSubmitting(false);
-                    if (errors.error) setMinutesError(String(errors.error));
-                },
-            },
-        );
-    };
-
-    const submitSignMinutes = () => {
-        if (!meeting.minutes) return;
-        setMinutesSubmitting(true);
-        setMinutesError(null);
-        router.post(
-            `/governance/meetings/${meeting.id}/sign-minutes`,
-            {
-                expected_version: meeting.minutes.version_number,
-                expected_hash: meeting.minutes.content_hash,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setSignDialogOpen(false);
-                    setMinutesSubmitting(false);
-                },
-                onError: (errors) => {
-                    setMinutesSubmitting(false);
-                    if (errors.error) setMinutesError(String(errors.error));
-                },
-            },
-        );
-    };
-
-    const submitArchiveMinutes = () => {
-        setMinutesSubmitting(true);
-        setMinutesError(null);
-        router.post(
-            `/governance/meetings/${meeting.id}/minutes/archive`,
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setArchiveDialogOpen(false);
-                    setMinutesSubmitting(false);
-                },
-                onError: (errors) => {
-                    setMinutesSubmitting(false);
-                    if (errors.error) setMinutesError(String(errors.error));
-                },
-            },
-        );
-    };
-
-    const submitCorrection = (e: FormEvent) => {
-        e.preventDefault();
-        setMinutesSubmitting(true);
-        setMinutesError(null);
-        router.post(
-            `/governance/meetings/${meeting.id}/minutes/correction`,
-            { reason: correctionReason },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setCorrectionDialogOpen(false);
-                    setCorrectionReason('');
-                    setMinutesSubmitting(false);
-                },
-                onError: (errors) => {
-                    setMinutesSubmitting(false);
-                    if (errors.error) setMinutesError(String(errors.error));
-                },
-            },
-        );
-    };
-
     const removeAgendaItem = (itemId: number) => {
         router.delete(`/governance/meetings/${meeting.id}/agenda/${itemId}`, {
             preserveScroll: true,
+        });
+    };
+
+    /** Minutes steps that need only a confirmation; problems show inline. */
+    const postMinutesStep = (
+        path: string,
+        data: Record<string, string | number | null> = {},
+    ) => {
+        setMinutesError(null);
+        router.post(`/governance/meetings/${meeting.id}/${path}`, data, {
+            preserveScroll: true,
+            onSuccess: (visited) => {
+                const error = flashErrorText(visited);
+                if (error !== null) setMinutesError(error);
+            },
+            onError: (errors) => {
+                const first = Object.values(errors ?? {}).find(Boolean);
+                setMinutesError(
+                    first ? String(first) : "That didn't work. Refresh the page and try again.",
+                );
+            },
         });
     };
 
@@ -836,51 +576,215 @@ export default function MeetingShow({
     const peopleLine = [
         meetingTypeLabel(meeting.meeting_type),
         meeting.chair?.user?.name ? `Chair: ${meeting.chair.user.name}` : null,
-        meeting.secretary?.user?.name
-            ? `Secretary: ${meeting.secretary.user.name}`
-            : null,
+        meeting.secretary?.user?.name ? `Secretary: ${meeting.secretary.user.name}` : null,
     ]
         .filter(Boolean)
         .join(' · ');
+    const statusChip = meetingStatusChip(meeting.status);
 
-    const workspaceTabs: GroupedProfileNavTab[] = [
-        {
-            key: 'agenda',
-            label: 'Agenda',
-            icon: FileText,
-            count: agendaItems.length,
-        },
-        { key: 'attendance', label: 'Attendance', icon: Users },
-        { key: 'minutes', label: 'Minutes', icon: Pencil },
-        {
-            key: 'resolutions',
-            label: 'Papers & resolutions',
-            icon: Vote,
-            count: resolutions.length,
-        },
-        ...(canRunMeeting
-            ? [
-                  {
-                      key: 'workflow' as const,
-                      label: 'Workflow',
-                      icon: ListChecks,
-                      warningCount: workflowChecklist.counts.blocked,
-                  },
-              ]
-            : []),
-    ];
+    const workspaceTabs: GroupedProfileNavTab[] = workspaceTabKeys(canRunMeeting).map((key) => ({
+        key,
+        label: MEETING_TAB_LABELS[key],
+        icon: TAB_ICONS[key],
+        count:
+            key === 'agenda'
+                ? agendaItems.length
+                : key === 'resolutions'
+                  ? resolutions.length
+                  : key === 'workflow'
+                    ? workflowChecklist.counts.remaining
+                    : undefined,
+    }));
 
     const selectedResolution = selectedPaperId
-        ? (resolutions.find((r) => String(r.id) === String(selectedPaperId)) ??
-          null)
+        ? (resolutions.find((r) => String(r.id) === String(selectedPaperId)) ?? null)
         : null;
-    const nextPaperId = selectedResolution
-        ? orderedPaperIds[orderedPaperIds.indexOf(selectedResolution.id) + 1]
-        : undefined;
-    const nextPaper =
-        nextPaperId !== undefined
-            ? (resolutions.find((r) => r.id === nextPaperId) ?? null)
-            : null;
+    const selectedIndex = selectedResolution ? resolutions.indexOf(selectedResolution) : -1;
+    const nextPaper = selectedIndex >= 0 ? (resolutions[selectedIndex + 1] ?? null) : null;
+
+    /* ---------------------------------------------------------------- */
+    /*  Header: meters and the one primary action                        */
+    /* ---------------------------------------------------------------- */
+
+    const checklistTotal =
+        workflowChecklist.counts.done + workflowChecklist.counts.remaining + workflowChecklist.counts.blocked;
+    const meters: ReactNode[] = [];
+    if (canRunMeeting && checklistTotal > 0) {
+        meters.push(
+            <Meter
+                key="workflow"
+                label="Workflow"
+                ariaLabel="Open the meeting workflow"
+                onClick={() => handleTabChange('workflow')}
+                bar={Math.round((workflowChecklist.counts.done / checklistTotal) * 100)}
+                reading={{
+                    value: `${workflowChecklist.counts.done} of ${checklistTotal}`,
+                    caption: 'Steps done',
+                    tone: 'brand',
+                }}
+            />,
+        );
+    }
+    if (viewerCanRsvp) {
+        meters.push(
+            <Meter
+                key="pack"
+                label="Board pack"
+                ariaLabel={meeting.board_pack ? 'Open the board pack' : 'Open the agenda'}
+                href={meeting.board_pack ? showPack.url({ pack: meeting.board_pack.id }) : undefined}
+                onClick={meeting.board_pack ? undefined : () => handleTabChange('agenda')}
+                reading={packMeter(packReading)}
+            />,
+            <Meter
+                key="votes"
+                label="Your votes"
+                ariaLabel="Open the resolutions"
+                onClick={() => handleTabChange('resolutions')}
+                reading={votesMeter(resolutions)}
+            />,
+            <Meter
+                key="conflicts"
+                label="Conflicts"
+                ariaLabel="Open the resolutions to declare a conflict of interest"
+                onClick={() => handleTabChange('resolutions')}
+                reading={conflictsMeter(resolutions)}
+            />,
+            <Meter
+                key="attendance"
+                label="Attendance"
+                ariaLabel="Open attendance and your reply"
+                onClick={() => handleTabChange('attendance')}
+                reading={attendanceMeter(viewerRsvp?.response, happened)}
+            />,
+        );
+    } else {
+        meters.push(
+            <Meter
+                key="agenda"
+                label="Agenda"
+                ariaLabel="Open the agenda"
+                onClick={() => handleTabChange('agenda')}
+                reading={{
+                    value: String(agendaItems.length),
+                    caption: agendaItems.length === 0 ? 'Nothing on the agenda yet' : 'Items on the agenda',
+                    tone: 'brand',
+                }}
+            />,
+            <Meter
+                key="resolutions"
+                label="Resolutions"
+                ariaLabel="Open the resolutions"
+                onClick={() => handleTabChange('resolutions')}
+                reading={{
+                    value: String(resolutions.length),
+                    caption: `${resolutions.filter((r) => r.status === 'open').length} open for voting`,
+                    tone: 'brand',
+                }}
+            />,
+            <Meter
+                key="replies"
+                label="Replies"
+                ariaLabel="Open attendance and replies"
+                onClick={() => handleTabChange('attendance')}
+                reading={repliesMeter(rsvps)}
+            />,
+        );
+    }
+    if (dayReached) {
+        meters.push(
+            <Meter
+                key="quorum"
+                label="Quorum"
+                ariaLabel="Open attendance and the quorum"
+                onClick={() => handleTabChange('attendance')}
+                reading={quorumMeter(quorum)}
+            />,
+        );
+    }
+
+    let primaryAction: ReactNode = null;
+    if (heldPrompt?.primary === 'attendance') {
+        primaryAction = (
+            <PageHeaderPrimaryButton icon={Users} onClick={openAttendanceDialog}>
+                Record attendance
+            </PageHeaderPrimaryButton>
+        );
+    } else if (heldPrompt?.primary === 'minutes') {
+        primaryAction = (
+            <PageHeaderPrimaryButton icon={PenLine} onClick={openMinutesEditor}>
+                Write the minutes
+            </PageHeaderPrimaryButton>
+        );
+    } else if (meeting.board_pack) {
+        primaryAction = (
+            <PageHeaderPrimaryButton
+                icon={FileDown}
+                onClick={() => router.visit(showPack.url({ pack: meeting.board_pack!.id }))}
+                dusk="view-pack"
+            >
+                View pack
+            </PageHeaderPrimaryButton>
+        );
+    } else if (canEdit && !happened) {
+        primaryAction = (
+            <PageHeaderPrimaryButton
+                icon={FileDown}
+                onClick={generatePack}
+                disabled={generatingPack}
+                dusk="generate-pack"
+            >
+                {generatingPack ? 'Generating…' : 'Generate draft pack'}
+            </PageHeaderPrimaryButton>
+        );
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  Checklist step actions                                           */
+    /* ---------------------------------------------------------------- */
+
+    const stepAction = (step: ChecklistStep, primary = false): ReactNode => {
+        const variant = primary ? 'default' : 'outline';
+        if (step.key === 'pack_generated' && canEdit && !meeting.board_pack && !happened) {
+            return (
+                <Button size="sm" variant={variant} onClick={generatePack} disabled={generatingPack}>
+                    {generatingPack ? 'Generating…' : 'Generate draft pack'}
+                </Button>
+            );
+        }
+        if (step.key === 'quorum' && canEdit) {
+            return (
+                <Button size="sm" variant={variant} onClick={openAttendanceDialog}>
+                    Record attendance
+                </Button>
+            );
+        }
+        if (step.key === 'minutes_drafted' && canManageMinutes && !minutes) {
+            return (
+                <Button size="sm" variant={variant} onClick={openMinutesEditor}>
+                    Write the minutes
+                </Button>
+            );
+        }
+        if (!step.action_url) return null;
+        const tab = inPageTab(step.action_url, meeting.id);
+        if (tab) {
+            return (
+                <Button size="sm" variant={variant} onClick={() => handleTabChange(tab)}>
+                    {step.action_label}
+                </Button>
+            );
+        }
+        if (step.action_url === `/governance/meetings/${meeting.id}`) return null;
+        return (
+            <Button asChild size="sm" variant={variant}>
+                <Link href={step.action_url}>{step.action_label}</Link>
+            </Button>
+        );
+    };
+
+    const minutesChip = minutes ? minutesStatusChip(minutes.status) : null;
+    const minutesLocked = Boolean(minutes && ['approved', 'signed', 'archived'].includes(minutes.status));
+    const history = minutes?.version_history ?? [];
 
     return (
         <AppLayout
@@ -889,10 +793,7 @@ export default function MeetingShow({
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Meetings', href: '/governance/meetings' },
-                {
-                    title: meeting.title,
-                    href: meetingWorkspaceUrl(meeting.id),
-                },
+                { title: meeting.title, href: meetingWorkspaceUrl(meeting.id) },
             ]}
         >
             <Head title={meeting.title} />
@@ -907,10 +808,8 @@ export default function MeetingShow({
                         titleDusk="meeting-title"
                         wrapTitle
                         titleChip={
-                            <PageHeaderStatusChip
-                                variant={meetingStatusVariant(meeting.status)}
-                            >
-                                {meetingStatusLabel(meeting.status)}
+                            <PageHeaderStatusChip variant={statusChip.variant}>
+                                {statusChip.label}
                             </PageHeaderStatusChip>
                         }
                         subline={
@@ -919,58 +818,7 @@ export default function MeetingShow({
                                 <span className="block">{peopleLine}</span>
                             </>
                         }
-                        meters={
-                            <>
-                                {canRunMeeting ? (
-                                    <PageHeaderMeterBlock
-                                        label="Workflow"
-                                        href="#tab-workflow"
-                                        ariaLabel="View the meeting workflow"
-                                        onClick={() => handleTabChange('workflow')}
-                                    >
-                                        <PageHeaderMeterBig>
-                                            {workflowChecklist.counts.done}/
-                                            {workflowChecklist.counts.done +
-                                                workflowChecklist.counts.remaining +
-                                                workflowChecklist.counts.blocked}
-                                        </PageHeaderMeterBig>
-                                        <PageHeaderMeterCaption>Tasks complete</PageHeaderMeterCaption>
-                                    </PageHeaderMeterBlock>
-                                ) : null}
-                                <PageHeaderMeterBlock
-                                    label="Quorum"
-                                    href="#tab-attendance"
-                                    ariaLabel="View attendance and quorum"
-                                    onClick={() => handleTabChange('attendance')}
-                                    tone={quorum.met ? 'success' : 'warning'}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {quorum.present}/{quorum.required}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {quorum.met ? 'Quorum met' : 'Quorum pending'}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Agenda"
-                                    href="#tab-agenda"
-                                    ariaLabel="View the agenda"
-                                    onClick={() => handleTabChange('agenda')}
-                                >
-                                    <PageHeaderMeterBig>{agendaItems.length}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Scheduled items</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Resolutions"
-                                    href="#tab-resolutions"
-                                    ariaLabel="View papers and resolutions"
-                                    onClick={() => handleTabChange('resolutions')}
-                                >
-                                    <PageHeaderMeterBig>{resolutions.length}</PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>Decisions filed</PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
-                        }
+                        meters={<>{meters}</>}
                         actions={
                             <>
                                 {canOpenEdit ? (
@@ -982,32 +830,7 @@ export default function MeetingShow({
                                         Edit meeting
                                     </PageHeaderGlassButton>
                                 ) : null}
-                                {meeting.board_pack ? (
-                                    <PageHeaderPrimaryButton
-                                        icon={FileDown}
-                                        onClick={() =>
-                                            router.visit(
-                                                showPack.url({
-                                                    pack: meeting.board_pack!.id,
-                                                }),
-                                            )
-                                        }
-                                        dusk="view-pack"
-                                    >
-                                        View pack
-                                    </PageHeaderPrimaryButton>
-                                ) : canEdit ? (
-                                    <PageHeaderPrimaryButton
-                                        icon={FileDown}
-                                        onClick={generatePack}
-                                        disabled={generatingPack}
-                                        dusk="generate-pack"
-                                    >
-                                        {generatingPack
-                                            ? 'Generating…'
-                                            : 'Generate pack'}
-                                    </PageHeaderPrimaryButton>
-                                ) : null}
+                                {primaryAction}
                             </>
                         }
                     />
@@ -1024,1366 +847,191 @@ export default function MeetingShow({
                     />
                 }
             >
-              <div className="flex flex-col gap-5">
-                {packMessage && (
-                    <div
-                        role="status"
-                        className="rounded-lg border border-status-info/30 bg-status-info-bg px-4 py-2 text-sm text-status-info"
-                    >
-                        {packMessage}
-                    </div>
-                )}
-
-                {canOpenEdit && formOptions ? (
-                    <MeetingWizardDialog
-                        isOpen={editOpen}
-                        onClose={() => setEditOpen(false)}
-                        options={formOptions}
-                        meeting={meeting}
-                    />
-                ) : null}
-
-                {canCreateResolution ? (
-                    <NewResolutionDialog
-                        isOpen={newResolutionOpen}
-                        onClose={() => setNewResolutionOpen(false)}
-                        meetings={[
-                            {
-                                id: meeting.id,
-                                title: meeting.title,
-                                scheduled_at: meeting.scheduled_at,
-                            },
-                        ]}
-                        meetingId={meeting.id}
-                        lockMeeting
-                        users={users}
-                        committees={committees}
-                        authoritySubjects={authoritySubjects}
-                        authoritySubjectGroups={authoritySubjectGroups}
-                        canPublish={canPublishPapers}
-                    />
-                ) : null}
-
-                {/* Member RSVP Callout */}
-                {viewerCanRsvp && (
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-primary/20 bg-primary/5 p-4" data-test="meeting-rsvp-banner">
-                        <div className="flex items-start gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                <CheckCircle className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-semibold text-foreground">
-                                    {viewerRsvp ? (
-                                        <>
-                                            Your RSVP:{' '}
-                                            <span className="capitalize font-bold text-primary">
-                                                {viewerRsvp.response === 'accepted' ? 'Attending' : (viewerRsvp.response === 'declined' ? 'Apologies' : 'Tentative')}
-                                            </span>
-                                        </>
-                                    ) : (
-                                        'Meeting RSVP Required'
-                                    )}
-                                </h3>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                    {viewerRsvp
-                                        ? `Recorded ${formatDateTimeLong(viewerRsvp.responded_at, 'date not recorded')}${viewerRsvp.decline_reason ? ` • Apology reason: ${viewerRsvp.decline_reason}` : ''}${viewerRsvp.dietary_notes ? ` • Dietary notes: ${viewerRsvp.dietary_notes}` : ''}`
-                                        : 'Please confirm whether you will attend this meeting or send apologies.'}
-                                </p>
-                            </div>
-                        </div>
-                        <Button
-                            size="sm"
-                            variant={viewerRsvp ? 'outline' : 'default'}
-                            onClick={() => setRsvpDialogOpen(true)}
-                            dusk="meeting-rsvp-trigger"
-                            data-test="meeting-rsvp-trigger"
+                <div className="flex flex-col gap-5">
+                    {packMessage ? (
+                        <p
+                            role="status"
+                            className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-foreground"
                         >
-                            {viewerRsvp ? 'Update RSVP' : 'Submit RSVP'}
-                        </Button>
-                    </div>
-                )}
+                            {packMessage}
+                        </p>
+                    ) : null}
 
-                {/* RSVP Dialog */}
-                <Dialog open={rsvpDialogOpen} onOpenChange={setRsvpDialogOpen}>
-                    <DialogContent className="max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Meeting RSVP</DialogTitle>
-                        </DialogHeader>
-                        <form onSubmit={submitRsvpForm} className="space-y-4 pt-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="rsvp-response">Attendance Response</Label>
-                                <Select
-                                    value={rsvpData.response}
-                                    onValueChange={(val) => setRsvpData((prev) => ({ ...prev, response: val }))}
-                                >
-                                    <SelectTrigger id="rsvp-response" data-test="rsvp-response-select">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="accepted">Attending</SelectItem>
-                                        <SelectItem value="declined">Apologies (Cannot Attend)</SelectItem>
-                                        <SelectItem value="tentative">Unsure / Tentative</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                    {heldPrompt ? (
+                        <div
+                            role="note"
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-status-warning/35 bg-status-warning-bg p-4"
+                            data-test="meeting-held-prompt"
+                        >
+                            <div className="flex min-w-0 items-start gap-3">
+                                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-status-warning" aria-hidden="true" />
+                                <div className="min-w-0">
+                                    <p className="text-section-title">{heldPrompt.title}</p>
+                                    <p className="text-subtle mt-0.5">{heldPrompt.body}</p>
+                                </div>
                             </div>
-
-                            {rsvpData.response === 'declined' && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="rsvp-decline-reason">Reason for Apology (Optional)</Label>
-                                    <Input
-                                        id="rsvp-decline-reason"
-                                        placeholder="e.g. Schedule conflict, overseas, medical"
-                                        value={rsvpData.notes}
-                                        onChange={(e) => setRsvpData((prev) => ({ ...prev, notes: e.target.value }))}
-                                        data-test="rsvp-decline-reason"
-                                    />
-                                </div>
-                            )}
-
-                            {rsvpData.response !== 'declined' && (
-                                <div className="space-y-3">
-                                    <div className="flex items-center space-x-2">
-                                        <Checkbox
-                                            id="rsvp-dietary"
-                                            checked={rsvpData.dietary_requirements}
-                                            onCheckedChange={(checked) =>
-                                                setRsvpData((prev) => ({ ...prev, dietary_requirements: !!checked }))
-                                            }
-                                        />
-                                        <Label htmlFor="rsvp-dietary" className="text-sm font-normal">
-                                            I have specific dietary or accessibility requirements
-                                        </Label>
-                                    </div>
-                                    {rsvpData.dietary_requirements && (
-                                        <Input
-                                            placeholder="Specify dietary requirements (e.g. Vegetarian, Gluten-Free)"
-                                            value={rsvpData.notes}
-                                            onChange={(e) => setRsvpData((prev) => ({ ...prev, notes: e.target.value }))}
-                                            data-test="rsvp-dietary-notes"
-                                        />
-                                    )}
-                                </div>
-                            )}
-
-                            {rsvpReceipt && (
-                                <div className="rounded border border-status-success/30 bg-status-success-bg p-3 text-xs text-status-success">
-                                    RSVP confirmed. Receipt ID: <span className="font-mono font-medium">{rsvpReceipt}</span>
-                                </div>
-                            )}
-
-                            <div className="mt-4 flex justify-end gap-2">
-                                <Button type="button" variant="outline" onClick={() => setRsvpDialogOpen(false)}>
-                                    Cancel
+                            {heldPrompt.secondary === 'minutes' ? (
+                                <Button size="sm" variant="outline" onClick={openMinutesEditor}>
+                                    <PenLine className="h-4 w-4" />
+                                    Write the minutes
                                 </Button>
-                                <Button type="submit" disabled={rsvpSubmitting} dusk="save-rsvp" data-test="save-rsvp">
-                                    {rsvpSubmitting ? 'Saving...' : 'Confirm RSVP'}
-                                </Button>
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    {viewerCanRsvp && !viewerRsvp && !happened ? (
+                        <Card
+                            className="flex-row flex-wrap items-center justify-between gap-3 p-4"
+                            data-test="meeting-rsvp-banner"
+                        >
+                            <div className="flex min-w-0 items-start gap-3">
+                                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                    <MessageSquare className="size-4" aria-hidden="true" />
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="text-section-title">Will you be at this meeting?</p>
+                                    <p className="text-subtle mt-0.5">
+                                        Let the secretary know whether you're attending or sending apologies.
+                                    </p>
+                                </div>
                             </div>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                            <Button
+                                size="sm"
+                                onClick={() => setRsvpDialogOpen(true)}
+                                dusk="meeting-rsvp-trigger"
+                                data-test="meeting-rsvp-trigger"
+                            >
+                                Reply to the invitation
+                            </Button>
+                        </Card>
+                    ) : null}
 
-                {/* Meeting Status Strip — replaces the right-rail info cards. */}
-                <MeetingStatusStrip
-                    meeting={meeting}
-                    quorum={quorum}
-                    workflowChecklist={workflowChecklist}
-                    resolutions={resolutions}
-                    attendances={attendances}
-                />
+                    {viewerRsvp && replySaved ? (
+                        <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-4">
+                            <ReplyReceipt rsvp={viewerRsvp} />
+                        </div>
+                    ) : null}
 
-                <section
-                    id="meeting-workspace-panel"
-                    role="tabpanel"
-                    aria-labelledby={`meeting-tab-${activeTab}`}
-                    className="flex flex-col gap-5"
-                >
-                        {/* ========== AGENDA TAB ========== */}
-                        {activeTab === 'agenda' && (
+                    <section
+                        id="meeting-workspace-panel"
+                        role="tabpanel"
+                        aria-labelledby={`meeting-tab-${activeTab}`}
+                        className="flex flex-col gap-5"
+                    >
+                        {/* ========== AGENDA ========== */}
+                        {activeTab === 'agenda' ? (
                             <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
+                                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
                                     <div>
-                                        <CardTitle>Agenda Items</CardTitle>
+                                        <CardTitle className="text-section-title">Agenda</CardTitle>
                                         <CardDescription>
-                                            {agendaItems.length} items
+                                            {agendaItems.length === 0
+                                                ? 'Nothing on the agenda yet'
+                                                : `${plural(agendaItems.length, 'item')} · about ${formatDurationMinutes(
+                                                      agendaItems.reduce((sum, item) => sum + (item.duration_minutes ?? 0), 0),
+                                                  )}`}
                                         </CardDescription>
                                     </div>
-                                    {canEdit && (
-                                        <Dialog
-                                            open={agendaDialogOpen}
-                                            onOpenChange={setAgendaDialogOpen}
-                                        >
-                                            <DialogTrigger asChild>
-                                                <Button size="sm">
-                                                    <Plus className="mr-1 h-4 w-4" />
-                                                    Add Item
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent
-                                                className="max-w-lg"
-                                                aria-describedby={undefined}
-                                            >
-                                                <DialogHeader>
-                                                    <DialogTitle>
-                                                        Add Agenda Item
-                                                    </DialogTitle>
-                                                </DialogHeader>
-                                                <form
-                                                    onSubmit={submitAgendaItem}
-                                                    className="space-y-4"
-                                                >
-                                                    <div>
-                                                        <Label htmlFor="agenda-title">
-                                                            Title
-                                                        </Label>
-                                                        <Input
-                                                            id="agenda-title"
-                                                            value={
-                                                                agendaForm.data
-                                                                    .title
-                                                            }
-                                                            onChange={(e) =>
-                                                                agendaForm.setData(
-                                                                    'title',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            required
-                                                        />
-                                                        {agendaForm.errors
-                                                            .title && (
-                                                            <p className="mt-1 text-sm text-status-critical">
-                                                                {
-                                                                    agendaForm
-                                                                        .errors
-                                                                        .title
-                                                                }
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <Label htmlFor="agenda-description">
-                                                            Description
-                                                        </Label>
-                                                        <Textarea
-                                                            id="agenda-description"
-                                                            value={
-                                                                agendaForm.data
-                                                                    .description
-                                                            }
-                                                            onChange={(e) =>
-                                                                agendaForm.setData(
-                                                                    'description',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            rows={3}
-                                                        />
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div>
-                                                            <Label>
-                                                                Item Type
-                                                            </Label>
-                                                            <Select
-                                                                value={
-                                                                    agendaForm
-                                                                        .data
-                                                                        .item_type
-                                                                }
-                                                                onValueChange={(
-                                                                    v,
-                                                                ) =>
-                                                                    agendaForm.setData(
-                                                                        'item_type',
-                                                                        v,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <SelectTrigger>
-                                                                    <SelectValue />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="standard">
-                                                                        Standard
-                                                                    </SelectItem>
-                                                                    <SelectItem value="decision">
-                                                                        Decision
-                                                                        Required
-                                                                    </SelectItem>
-                                                                    <SelectItem value="consent">
-                                                                        Consent
-                                                                    </SelectItem>
-                                                                    <SelectItem value="for_info">
-                                                                        For
-                                                                        Information
-                                                                    </SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                        <div>
-                                                            <Label htmlFor="agenda-duration">
-                                                                Duration (mins)
-                                                            </Label>
-                                                            <Input
-                                                                id="agenda-duration"
-                                                                type="number"
-                                                                min={5}
-                                                                max={120}
-                                                                value={
-                                                                    agendaForm
-                                                                        .data
-                                                                        .duration_minutes
-                                                                }
-                                                                onChange={(e) =>
-                                                                    agendaForm.setData(
-                                                                        'duration_minutes',
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                required
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <Label>Presenter</Label>
-                                                        <Select
-                                                            value={
-                                                                agendaForm.data
-                                                                    .presenter_id ||
-                                                                undefined
-                                                            }
-                                                            onValueChange={(
-                                                                v,
-                                                            ) =>
-                                                                agendaForm.setData(
-                                                                    'presenter_id',
-                                                                    v,
-                                                                )
-                                                            }
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Select presenter (optional)" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {allBoardMembers.map(
-                                                                    (m) => (
-                                                                        <SelectItem
-                                                                            key={
-                                                                                m
-                                                                                    .user
-                                                                                    .id
-                                                                            }
-                                                                            value={String(
-                                                                                m
-                                                                                    .user
-                                                                                    .id,
-                                                                            )}
-                                                                        >
-                                                                            {
-                                                                                m
-                                                                                    .user
-                                                                                    .name
-                                                                            }
-                                                                        </SelectItem>
-                                                                    ),
-                                                                )}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Checkbox
-                                                            id="agenda-confidential"
-                                                            checked={
-                                                                agendaForm.data
-                                                                    .is_confidential
-                                                            }
-                                                            onCheckedChange={(
-                                                                v,
-                                                            ) =>
-                                                                agendaForm.setData(
-                                                                    'is_confidential',
-                                                                    !!v,
-                                                                )
-                                                            }
-                                                        />
-                                                        <Label htmlFor="agenda-confidential">
-                                                            Confidential item
-                                                        </Label>
-                                                    </div>
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                setAgendaDialogOpen(
-                                                                    false,
-                                                                )
-                                                            }
-                                                        >
-                                                            Cancel
-                                                        </Button>
-                                                        <Button
-                                                            type="submit"
-                                                            disabled={
-                                                                agendaForm.processing
-                                                            }
-                                                        >
-                                                            {agendaForm.processing
-                                                                ? 'Adding...'
-                                                                : 'Add Item'}
-                                                        </Button>
-                                                    </div>
-                                                </form>
-                                            </DialogContent>
-                                        </Dialog>
-                                    )}
+                                    {canEdit ? (
+                                        <Button size="sm" onClick={() => setAgendaDialogOpen(true)}>
+                                            <Plus className="h-4 w-4" />
+                                            Add agenda item
+                                        </Button>
+                                    ) : null}
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="space-y-4">
-                                        {agendaItems.length === 0 && (
-                                            <EmptyState
-                                                icon={FileText}
-                                                title="No agenda items yet"
-                                                description={
-                                                    canEdit
-                                                        ? 'Add items to build the meeting agenda.'
-                                                        : 'The agenda has not been published for this meeting yet.'
-                                                }
-                                            />
-                                        )}
-                                        {agendaItems.map((item) => (
-                                            <div
-                                                key={item.id}
-                                                className={cn(
-                                                    'flex items-start gap-4 rounded-lg border p-4',
-                                                    item.is_confidential &&
-                                                        'border-primary bg-primary/10',
-                                                )}
-                                            >
-                                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted font-semibold text-muted-foreground">
-                                                    {item.order}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="mb-1 flex items-center gap-2">
-                                                        {getItemTypeIcon(
-                                                            item.item_type,
-                                                        )}
-                                                        <h4 className="font-semibold text-foreground">
-                                                            {item.title}
-                                                        </h4>
-                                                        {item.is_confidential && (
-                                                            <StatusBadge variant="warning">
-                                                                <Lock className="size-3" aria-hidden="true" />
-                                                                Confidential
-                                                            </StatusBadge>
-                                                        )}
-                                                        <Badge variant="outline">
-                                                            {humanStatus(item.item_type)}
-                                                        </Badge>
-                                                    </div>
-                                                    {item.description && (
-                                                        <p className="mb-2 text-sm text-muted-foreground">
-                                                            {item.description}
-                                                        </p>
-                                                    )}
-                                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                                        {item.presenter && (
-                                                            <span>
-                                                                Presenter:{' '}
-                                                                {
-                                                                    item
-                                                                        .presenter
-                                                                        .name
-                                                                }
-                                                            </span>
-                                                        )}
-                                                        <span>
-                                                            {
-                                                                item.duration_minutes
-                                                            }{' '}
-                                                            minutes
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    {item.resolution_id && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => openPaper(item.resolution_id!)}
-                                                            className="gap-1.5 text-xs"
-                                                        >
-                                                            <Vote className="h-3.5 w-3.5 text-primary" />
-                                                            Read paper & vote
-                                                        </Button>
-                                                    )}
-                                                    {canEdit && (
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger
-                                                            asChild
-                                                        >
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="text-status-critical hover:text-status-critical"
-                                                            >
-                                                                Remove
-                                                            </Button>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>
-                                                                    Remove
-                                                                    Agenda Item
-                                                                </AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    Are you sure
-                                                                    you want to
-                                                                    remove "
-                                                                    {item.title}
-                                                                    " from the
-                                                                    agenda? This
-                                                                    action
-                                                                    cannot be
-                                                                    undone.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>
-                                                                    Cancel
-                                                                </AlertDialogCancel>
-                                                                <AlertDialogAction
-                                                                    onClick={() =>
-                                                                        removeAgendaItem(
-                                                                            item.id,
-                                                                        )
-                                                                    }
-                                                                    className="bg-status-critical hover:bg-status-critical"
-                                                                >
-                                                                    Remove
-                                                                </AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* ========== ATTENDANCE TAB ========== */}
-                        {activeTab === 'attendance' && (
-                        <>
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <div>
-                                        <CardTitle>Attendance Record</CardTitle>
-                                        <CardDescription>
-                                            Official roll call recorded for legal quorum and minutes attribution.
-                                        </CardDescription>
-                                    </div>
-                                    {canEdit && (
-                                        <Dialog
-                                            open={attendanceDialogOpen}
-                                            onOpenChange={
-                                                setAttendanceDialogOpen
-                                            }
-                                        >
-                                            <DialogTrigger asChild>
-                                                <Button
-                                                    size="sm"
-                                                    dusk="record-attendance"
-                                                >
-                                                    <Users className="mr-1 h-4 w-4" />
-                                                    Record Attendance
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent
-                                                className="max-h-[80vh] max-w-lg overflow-y-auto"
-                                                aria-describedby={undefined}
-                                            >
-                                                <DialogHeader>
-                                                    <DialogTitle>
-                                                        Record Attendance
-                                                    </DialogTitle>
-                                                </DialogHeader>
-                                                <div className="space-y-3">
-                                                    {allBoardMembers.map(
-                                                        (member) => {
-                                                            const memberRsvp = meeting.rsvps?.find(
-                                                                (r) => r.board_member_id === member.id,
-                                                            );
-                                                            return (
-                                                                <div
-                                                                    key={member.id}
-                                                                    className="flex items-center gap-3 rounded-lg border p-3"
-                                                                >
-                                                                    <div className="min-w-0 flex-1 truncate">
-                                                                        <div className="font-medium">
-                                                                            {member.user.name}
-                                                                        </div>
-                                                                        <div className="mt-0.5">
-                                                                            {memberRsvp ? (
-                                                                                <StatusBadge
-                                                                                    size="sm"
-                                                                                    variant={rsvpVariant(memberRsvp.response)}
-                                                                                >
-                                                                                    RSVP: {RSVP_LABEL[memberRsvp.response] ?? humanStatus(memberRsvp.response)}
-                                                                                </StatusBadge>
-                                                                            ) : (
-                                                                                <span className="text-[11px] text-muted-foreground">
-                                                                                    No RSVP submitted
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                    <Select
-                                                                        value={
-                                                                            attendanceRecords[
-                                                                                member.id
-                                                                            ]?.status ||
-                                                                            'unrecorded'
-                                                                        }
-                                                                        onValueChange={(
-                                                                            v,
-                                                                        ) =>
-                                                                            setAttendanceRecords(
-                                                                                (prev) => ({
-                                                                                    ...prev,
-                                                                                    [member.id]: {
-                                                                                        ...prev[member.id],
-                                                                                        status: v,
-                                                                                    },
-                                                                                }),
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <SelectTrigger className="w-36">
-                                                                            <SelectValue />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent>
-                                                                            <SelectItem value="unrecorded">
-                                                                                Unrecorded
-                                                                            </SelectItem>
-                                                                            <SelectItem value="present">
-                                                                                Present
-                                                                            </SelectItem>
-                                                                            <SelectItem value="late">
-                                                                                Late Arrival
-                                                                            </SelectItem>
-                                                                            <SelectItem value="apology">
-                                                                                Apology
-                                                                            </SelectItem>
-                                                                            <SelectItem value="no_show">
-                                                                                No Show
-                                                                            </SelectItem>
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                    {attendanceRecords[
-                                                                        member.id
-                                                                    ]?.status ===
-                                                                        'apology' && (
-                                                                        <Input
-                                                                            placeholder="Reason"
-                                                                            className="w-40"
-                                                                            value={
-                                                                                attendanceRecords[
-                                                                                    member.id
-                                                                                ]?.apology_reason ||
-                                                                                ''
-                                                                            }
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                setAttendanceRecords(
-                                                                                    (prev) => ({
-                                                                                        ...prev,
-                                                                                        [member.id]: {
-                                                                                            ...prev[member.id],
-                                                                                            apology_reason:
-                                                                                                e.target.value,
-                                                                                        },
-                                                                                    }),
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        },
-                                                    )}
-                                                    {allBoardMembers.length ===
-                                                        0 && (
-                                                        <p className="py-4 text-center text-muted-foreground">
-                                                            No active board
-                                                            members found.
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div className="mt-4 flex justify-end gap-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        onClick={() =>
-                                                            setAttendanceDialogOpen(
-                                                                false,
-                                                            )
-                                                        }
-                                                    >
-                                                        Cancel
-                                                    </Button>
-                                                    <Button
-                                                        onClick={
-                                                            submitAttendance
-                                                        }
-                                                        disabled={
-                                                            attendanceSubmitting
-                                                        }
-                                                        dusk="save-attendance"
-                                                    >
-                                                        {attendanceSubmitting
-                                                            ? 'Saving...'
-                                                            : 'Save Attendance'}
-                                                    </Button>
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-                                    )}
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-2">
-                                        {attendances.length === 0 && (
-                                            <EmptyState
-                                                icon={Users}
-                                                title="Attendance is unrecorded"
-                                                description="Awaiting the board secretary or chair to record attendance."
-                                            />
-                                        )}
-                                        {attendances.map((attendance) => {
-                                            const memberRsvp = meeting.rsvps?.find(
-                                                (r) => r.board_member_id === attendance.board_member_id,
-                                            );
-                                            return (
-                                                <div
-                                                    key={attendance.id}
-                                                    className="flex items-center justify-between rounded-lg border p-3"
-                                                >
-                                                    <div>
-                                                        <span className="font-medium">
-                                                            {
-                                                                attendance.board_member
-                                                                    .user.name
-                                                            }
-                                                        </span>
-                                                        {memberRsvp && (
-                                                            <div className="mt-0.5">
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    RSVP: {RSVP_LABEL[memberRsvp.response] ?? humanStatus(memberRsvp.response)}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <StatusBadge
-                                                            variant={attendanceVariant(attendance.status)}
-                                                        >
-                                                            {humanStatus(attendance.status)}
-                                                        </StatusBadge>
-                                                        {attendance.apology_reason && (
-                                                            <span className="text-sm text-muted-foreground">
-                                                                (
-                                                                {
-                                                                    attendance.apology_reason
-                                                                }
-                                                                )
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* RSVP Summary Card */}
-                            <Card>
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <CardTitle>RSVP Responses</CardTitle>
-                                            <CardDescription>
-                                                Member pre-meeting intentions ({meeting.rsvps?.length || 0} response{(meeting.rsvps?.length || 0) === 1 ? '' : 's'})
-                                            </CardDescription>
-                                        </div>
-                                        {viewerCanRsvp && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => setRsvpDialogOpen(true)}
-                                            >
-                                                {viewerRsvp ? 'Update My RSVP' : 'Submit RSVP'}
-                                            </Button>
-                                        )}
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    {(!meeting.rsvps || meeting.rsvps.length === 0) ? (
-                                        <EmptyState
-                                            icon={CheckCircle}
-                                            title="No RSVP responses yet"
-                                            description="Invited members' attendance intentions appear here."
-                                        />
-                                    ) : (
-                                        <div className="divide-y divide-border">
-                                            {meeting.rsvps.map((rsvp) => (
-                                                <div
-                                                    key={rsvp.id}
-                                                    className="py-3 flex items-center justify-between"
-                                                >
-                                                    <div>
-                                                        <span className="font-medium text-sm">
-                                                            {rsvp.board_member?.user?.name || `Member #${rsvp.board_member_id}`}
-                                                        </span>
-                                                        {rsvp.decline_reason && (
-                                                            <p className="text-xs text-muted-foreground mt-0.5">
-                                                                Reason: {rsvp.decline_reason}
-                                                            </p>
-                                                        )}
-                                                        {rsvp.dietary_requirements && rsvp.dietary_notes && (
-                                                            <p className="text-xs text-muted-foreground mt-0.5">
-                                                                Dietary: {rsvp.dietary_notes}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <StatusBadge variant={rsvpVariant(rsvp.response)}>
-                                                            {RSVP_LABEL[rsvp.response] ?? humanStatus(rsvp.response)}
-                                                        </StatusBadge>
-                                                        {rsvp.responded_at && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                {formatDateLong(rsvp.responded_at)}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </>
-                        )}
-
-                        {/* ========== MINUTES TAB ========== */}
-                        {activeTab === 'minutes' && (
-                            <Card>
-                                <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <CardTitle>Meeting Minutes</CardTitle>
-                                            {meeting.minutes && (
-                                                <Badge variant="outline" className="font-mono text-xs">
-                                                    v{meeting.minutes.version_number}
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <CardDescription className="mt-1 flex flex-wrap items-center gap-2">
-                                            {meeting.minutes ? (
-                                                <>
-                                                    <span className="capitalize">{meeting.minutes.status}</span>
-                                                    {meeting.minutes.content_hash && (
-                                                        <>
-                                                            <span>&bull;</span>
-                                                            <span
-                                                                className="font-mono text-[11px] text-muted-foreground"
-                                                                title={`Full SHA-256: ${meeting.minutes.content_hash}`}
-                                                            >
-                                                                SHA-256: {meeting.minutes.content_hash.substring(0, 10)}...
-                                                            </span>
-                                                        </>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                'No minutes recorded yet'
-                                            )}
-                                        </CardDescription>
-                                    </div>
-
-                                    {/* Action Buttons */}
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        {/* Edit Draft Dialog */}
-                                        {canManageMinutes && (!meeting.minutes || meeting.minutes.status === 'draft' || meeting.minutes.status === 'reviewed') && (
-                                            <Dialog
-                                                open={minutesDialogOpen}
-                                                onOpenChange={setMinutesDialogOpen}
-                                            >
-                                                <DialogTrigger asChild>
-                                                    <Button
-                                                        size="sm"
-                                                        variant={meeting.minutes ? 'outline' : 'default'}
-                                                        dusk="edit-minutes"
-                                                    >
-                                                        {meeting.minutes ? (
-                                                            <>
-                                                                <Pencil className="mr-1 h-4 w-4" /> Edit Draft
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Plus className="mr-1 h-4 w-4" /> Draft Minutes
-                                                            </>
-                                                        )}
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto" aria-describedby={undefined}>
-                                                    <DialogHeader>
-                                                        <DialogTitle>
-                                                            {meeting.minutes ? `Edit Minutes (v${meeting.minutes.version_number})` : 'Draft Meeting Minutes'}
-                                                        </DialogTitle>
-                                                    </DialogHeader>
-                                                    <form onSubmit={submitMinutes} className="space-y-4">
-                                                        <div className="space-y-4">
-                                                            {minutesBlocks.map((block, idx) => (
-                                                                <div key={idx} className="space-y-2 rounded-lg border p-4">
-                                                                    <div className="flex items-center justify-between gap-2">
-                                                                        <Input
-                                                                            dusk={idx === 0 ? 'minutes-heading-0' : undefined}
-                                                                            value={block.heading}
-                                                                            onChange={(e) => updateMinutesBlock(idx, 'heading', e.target.value)}
-                                                                            placeholder="Section heading"
-                                                                            className="font-semibold"
-                                                                        />
-                                                                        {minutesBlocks.length > 1 && (
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                className="shrink-0 text-status-critical hover:text-status-critical"
-                                                                                onClick={() => removeMinutesBlock(idx)}
-                                                                            >
-                                                                                Remove
-                                                                            </Button>
-                                                                        )}
-                                                                    </div>
-                                                                    <Textarea
-                                                                        dusk={idx === 0 ? 'minutes-content-0' : undefined}
-                                                                        value={block.content}
-                                                                        onChange={(e) => updateMinutesBlock(idx, 'content', e.target.value)}
-                                                                        placeholder="Enter minutes for this section..."
-                                                                        rows={4}
-                                                                    />
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="w-full"
-                                                            onClick={addMinutesBlock}
-                                                        >
-                                                            <Plus className="mr-1 h-4 w-4" /> Add Section
-                                                        </Button>
-                                                        <div className="flex justify-end gap-2 pt-2">
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                onClick={() => setMinutesDialogOpen(false)}
-                                                            >
-                                                                Cancel
-                                                            </Button>
-                                                            <Button
-                                                                type="submit"
-                                                                disabled={minutesSubmitting}
-                                                                dusk="save-minutes"
-                                                            >
-                                                                {minutesSubmitting
-                                                                    ? 'Saving...'
-                                                                    : meeting.minutes
-                                                                      ? 'Save Changes'
-                                                                      : 'Create Draft'}
-                                                            </Button>
-                                                        </div>
-                                                    </form>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
-
-                                        {/* Submit for Review (Secretary/Admin when draft) */}
-                                        {meeting.minutes && meeting.minutes.status === 'draft' && canManageMinutes && (
-                                            <AlertDialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button size="sm" variant="outline" dusk="submit-review-minutes">
-                                                        <Send className="mr-1 h-4 w-4" /> Submit for Review
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Submit Minutes for Formal Review</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            Are you ready to submit these draft minutes for review? This notifies the Chair that the minutes are ready for formal board review and approval.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={submitForReview} disabled={minutesSubmitting}>
-                                                            {minutesSubmitting ? 'Submitting...' : 'Submit for Review'}
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        )}
-
-                                        {/* Approve Minutes (Chair/Admin when draft or reviewed) */}
-                                        {meeting.minutes && (meeting.minutes.status === 'draft' || meeting.minutes.status === 'reviewed') && canApproveMinutes && (
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button size="sm" dusk="approve-minutes">
-                                                        <FileCheck className="mr-1 h-4 w-4" /> Approve Minutes
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Approve Meeting Minutes</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            Approving these minutes freezes them from in-place edits and marks them approved by the Chair. The approved version will be ready for signing.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={submitApproveMinutes} disabled={minutesSubmitting}>
-                                                            {minutesSubmitting ? 'Approving...' : 'Approve Minutes'}
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        )}
-
-                                        {/* Sign Approved Version (Chair/Signatory when approved) */}
-                                        {meeting.minutes && meeting.minutes.status === 'approved' && canSignMinutes && (
-                                            <Dialog open={signDialogOpen} onOpenChange={setSignDialogOpen}>
-                                                <DialogTrigger asChild>
-                                                    <Button size="sm" dusk="sign-minutes-button">
-                                                        <ShieldCheck className="mr-1 h-4 w-4" /> Sign Approved Version
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent aria-describedby={undefined}>
-                                                    <DialogHeader>
-                                                        <DialogTitle>Sign and Certify Meeting Minutes</DialogTitle>
-                                                    </DialogHeader>
-                                                    <div className="space-y-4 py-2">
-                                                        <div className="rounded-lg border bg-muted/30 p-3 space-y-1 text-sm">
-                                                            <div className="flex justify-between">
-                                                                <span className="text-muted-foreground">Meeting:</span>
-                                                                <span className="font-medium text-foreground">{meeting.title}</span>
-                                                            </div>
-                                                            <div className="flex justify-between">
-                                                                <span className="text-muted-foreground">Minute Version:</span>
-                                                                <span className="font-mono font-medium">v{meeting.minutes.version_number}</span>
-                                                            </div>
-                                                            {meeting.minutes.content_hash && (
-                                                                <div className="flex justify-between">
-                                                                    <span className="text-muted-foreground">SHA-256 Fingerprint:</span>
-                                                                    <span className="font-mono text-xs">{meeting.minutes.content_hash.substring(0, 16)}...</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        <div className="rounded-md border border-status-info/30 bg-status-info-bg/40 p-3 text-xs text-foreground space-y-1">
-                                                            <p className="font-semibold flex items-center gap-1 text-status-info">
-                                                                <ShieldCheck className="h-4 w-4" /> Internal Attestation Notice
-                                                            </p>
-                                                            <p className="text-muted-foreground leading-relaxed">
-                                                                By signing, you confirm on behalf of the governing body that these minutes are an accurate, true, and complete record of proceedings. This attestation represents internal organizational sign-off and does not constitute a qualified external digital signature.
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex justify-end gap-2 pt-2">
-                                                        <Button type="button" variant="outline" onClick={() => setSignDialogOpen(false)}>
-                                                            Cancel
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            onClick={submitSignMinutes}
-                                                            disabled={minutesSubmitting}
-                                                            dusk="confirm-sign-minutes"
-                                                        >
-                                                            {minutesSubmitting ? 'Signing...' : 'Confirm & Sign Minutes'}
-                                                        </Button>
-                                                    </div>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
-
-                                        {/* Correction Draft (Secretary/Admin when approved or signed) */}
-                                        {meeting.minutes && (meeting.minutes.status === 'approved' || meeting.minutes.status === 'signed' || meeting.minutes.status === 'archived') && canManageMinutes && (
-                                            <Dialog open={correctionDialogOpen} onOpenChange={setCorrectionDialogOpen}>
-                                                <DialogTrigger asChild>
-                                                    <Button size="sm" variant="outline" dusk="correction-minutes-button">
-                                                        <RotateCcw className="mr-1 h-4 w-4" /> Create Correction Draft
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent aria-describedby={undefined}>
-                                                    <DialogHeader>
-                                                        <DialogTitle>Create Correction Draft</DialogTitle>
-                                                    </DialogHeader>
-                                                    <form onSubmit={submitCorrection} className="space-y-4">
-                                                        <div className="rounded-md border border-status-warning/30 bg-status-warning-bg/30 p-3 text-xs text-muted-foreground leading-relaxed">
-                                                            Approved and signed minutes cannot be modified in place. Creating a correction draft will preserve current version {meeting.minutes.version_number} immutably in version history and create version {meeting.minutes.version_number + 1} as an open draft.
-                                                        </div>
-
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="correction-reason" className="text-sm font-medium">
-                                                                Reason for Correction <span className="text-status-critical">*</span>
-                                                            </Label>
-                                                            <Textarea
-                                                                id="correction-reason"
-                                                                dusk="correction-reason-input"
-                                                                value={correctionReason}
-                                                                onChange={(e) => setCorrectionReason(e.target.value)}
-                                                                placeholder="Detail why this correction is required (e.g., typographical amendment, omitted attendee)..."
-                                                                rows={3}
-                                                                required
-                                                            />
-                                                        </div>
-
-                                                        <div className="flex justify-end gap-2 pt-2">
-                                                            <Button type="button" variant="outline" onClick={() => setCorrectionDialogOpen(false)}>
-                                                                Cancel
-                                                            </Button>
-                                                            <Button
-                                                                type="submit"
-                                                                disabled={minutesSubmitting || correctionReason.trim().length < 5}
-                                                                dusk="confirm-create-correction"
-                                                            >
-                                                                {minutesSubmitting ? 'Creating...' : 'Create Correction Draft'}
-                                                            </Button>
-                                                        </div>
-                                                    </form>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
-
-                                        {/* Archive Minutes (Chair/Admin when signed) */}
-                                        {meeting.minutes && meeting.minutes.status === 'signed' && canApproveMinutes && (
-                                            <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button size="sm" variant="outline" dusk="archive-minutes-button">
-                                                        <Archive className="mr-1 h-4 w-4" /> Archive Minutes
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Archive Signed Minutes</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            Archiving moves these signed minutes into permanent records. The signed content and full audit trail will remain readable and downloadable.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={submitArchiveMinutes} disabled={minutesSubmitting}>
-                                                            {minutesSubmitting ? 'Archiving...' : 'Archive Minutes'}
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        )}
-                                    </div>
-                                </CardHeader>
-
-                                <CardContent className="flex flex-col gap-5">
-                                    {/* Error Banner */}
-                                    {minutesError && (
-                                        <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2">
-                                                <AlertTriangle className="h-4 w-4 shrink-0" />
-                                                <span>{minutesError}</span>
-                                            </div>
-                                            <Button size="sm" variant="ghost" onClick={() => router.reload()}>
-                                                Refresh Page
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                    {meeting.minutes ? (
-                                        <>
-                                            {/* Integrity & Attribution Metadata Grid */}
-                                            <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
-                                                <div className="space-y-1">
-                                                    <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Lifecycle Status</p>
-                                                    <div className="flex items-center gap-2">
-                                                        <StatusBadge variant={minutesVariant(meeting.minutes.status)}>
-                                                            {meeting.minutes.status === 'signed' ? 'Signed & immutable' : humanStatus(meeting.minutes.status)}
-                                                        </StatusBadge>
-                                                        {meeting.minutes.status === 'signed' && <Lock className="h-3.5 w-3.5 text-status-success" />}
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-1">
-                                                    <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Drafted By</p>
-                                                    <p className="font-medium text-foreground">
-                                                        {meeting.minutes.drafter_name || 'Recorded'}
-                                                    </p>
-                                                    <p className="text-[11px] text-muted-foreground">
-                                                        {meeting.minutes.drafted_at ? formatDateTimeLong(meeting.minutes.drafted_at) : 'Date not recorded'}
-                                                    </p>
-                                                </div>
-
-                                                <div className="space-y-1">
-                                                    <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Reviewed / Approved By</p>
-                                                    <p className="font-medium text-foreground">
-                                                        {meeting.minutes.reviewer_name || (meeting.minutes.reviewed_at ? 'Legacy attribution unavailable' : 'Pending review')}
-                                                    </p>
-                                                    <p className="text-[11px] text-muted-foreground">
-                                                        {meeting.minutes.reviewed_at ? formatDateTimeLong(meeting.minutes.reviewed_at) : 'Awaiting approval'}
-                                                    </p>
-                                                </div>
-
-                                                <div className="space-y-1">
-                                                    <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Signatory Attestation</p>
-                                                    <p className="font-medium text-foreground">
-                                                        {meeting.minutes.signer_name || (meeting.minutes.signed_at ? 'Legacy attribution unavailable' : 'Unsigned')}
-                                                    </p>
-                                                    <p className="text-[11px] text-muted-foreground">
-                                                        {meeting.minutes.signed_at ? formatDateTimeLong(meeting.minutes.signed_at) : 'Unsigned'}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {/* Immutability Notice for Signed/Approved */}
-                                            {(meeting.minutes.status === 'signed' || meeting.minutes.status === 'approved') && (
-                                                <div className="flex items-center gap-2 rounded-md border border-status-success/20 bg-status-success-bg/20 px-3 py-2 text-xs text-foreground">
-                                                    <ShieldCheck className="h-4 w-4 text-status-success shrink-0" />
-                                                    <span>
-                                                        This version is locked and immutable. Direct in-place edits are prevented to protect governance record integrity.
-                                                    </span>
-                                                </div>
-                                            )}
-
-                                            {/* Minutes Content Blocks */}
-                                            {meeting.minutes.content_blocks && Array.isArray(meeting.minutes.content_blocks) && (
-                                                <div className="flex flex-col gap-5">
-                                                    {meeting.minutes.content_blocks.map((block: { heading: string; content: string }, idx: number) => (
-                                                        <Card key={idx} className="gap-2 p-4 shadow-none">
-                                                            <h3 className="text-section-title border-b pb-1.5">
-                                                                {block.heading || `Section ${idx + 1}`}
-                                                            </h3>
-                                                            <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
-                                                                {block.content || (
-                                                                    <span className="italic text-muted-foreground">No content recorded for this section.</span>
-                                                                )}
-                                                            </p>
-                                                        </Card>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* Version History Accordion */}
-                                            {meeting.minutes.version_history && meeting.minutes.version_history.length > 0 && (
-                                                <div className="rounded-lg border border-border p-4 space-y-3">
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        onClick={() => setHistoryOpen(!historyOpen)}
-                                                        aria-expanded={historyOpen}
-                                                        className="w-full justify-between px-2 text-sm font-semibold"
-                                                    >
-                                                        <span className="flex items-center gap-2">
-                                                            <History className="h-4 w-4 text-muted-foreground" />
-                                                            <span>Version history & audit trail ({meeting.minutes.version_history.length})</span>
-                                                        </span>
-                                                        {historyOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                                                    </Button>
-
-                                                    {historyOpen && (
-                                                        <div className="space-y-3 pt-2 border-t">
-                                                            {meeting.minutes.version_history.map((entry, idx) => (
-                                                                <div key={idx} className="rounded-md border bg-muted/20 p-3 space-y-2 text-xs">
-                                                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                                                        <div className="flex items-center gap-2 font-medium">
-                                                                            <Badge variant="outline" className="font-mono">
-                                                                                v{entry.version ?? idx + 1}
-                                                                            </Badge>
-                                                                            <span className="capitalize text-muted-foreground">{entry.status ?? entry.event ?? 'Snapshot'}</span>
-                                                                        </div>
-                                                                        <span className="text-muted-foreground">
-                                                                            {entry.updated_at || entry.archived_at || entry.timestamp || entry.created_at ? formatDateTimeLong(entry.updated_at || entry.archived_at || entry.timestamp || entry.created_at!) : ''}
-                                                                        </span>
-                                                                    </div>
-
-                                                                    {entry.reason_for_correction && (
-                                                                        <p className="text-muted-foreground">
-                                                                            <strong className="text-foreground">Correction reason:</strong> {entry.reason_for_correction}
-                                                                        </p>
-                                                                    )}
-
-                                                                    {entry.note && (
-                                                                        <p className="text-muted-foreground italic">{entry.note}</p>
-                                                                    )}
-
-                                                                    {entry.content_hash && (
-                                                                        <p className="font-mono text-[10px] text-muted-foreground">
-                                                                            SHA-256: {entry.content_hash}
-                                                                        </p>
-                                                                    )}
-
-                                                                    {/* Toggle viewing preserved content blocks */}
-                                                                    {entry.content_blocks && Array.isArray(entry.content_blocks) && (
-                                                                        <div className="pt-1">
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                className="h-7 text-[11px]"
-                                                                                onClick={() => setSelectedHistoryVersion(selectedHistoryVersion === (entry.version ?? idx + 1) ? null : (entry.version ?? idx + 1))}
-                                                                            >
-                                                                                {selectedHistoryVersion === (entry.version ?? idx + 1) ? 'Hide Preserved Content' : 'View Preserved Content'}
-                                                                            </Button>
-
-                                                                            {selectedHistoryVersion === (entry.version ?? idx + 1) && (
-                                                                                <div className="mt-2 space-y-2 rounded border bg-background p-3">
-                                                                                    {entry.content_blocks.map((b, bIdx) => (
-                                                                                        <div key={bIdx} className="space-y-1">
-                                                                                            <h4 className="font-semibold text-foreground">{b.heading}</h4>
-                                                                                            <p className="whitespace-pre-wrap text-muted-foreground">{b.content || '(empty)'}</p>
-                                                                                        </div>
-                                                                                    ))}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </>
-                                    ) : (
+                                    {agendaItems.length === 0 ? (
                                         <EmptyState
                                             icon={FileText}
-                                            title="No minutes recorded yet"
-                                            description="Minutes appear here once the secretary drafts them."
-                                            action={
-                                                canManageMinutes ? (
-                                                    <Button size="sm" onClick={() => setMinutesDialogOpen(true)} dusk="create-first-minutes">
-                                                        <Plus className="mr-1 h-4 w-4" /> Draft minutes now
-                                                    </Button>
-                                                ) : undefined
+                                            title="No agenda items yet"
+                                            description={
+                                                canEdit
+                                                    ? 'Add the topics for this meeting so the board pack has something in it.'
+                                                    : "The secretary hasn't added the agenda yet."
                                             }
                                         />
+                                    ) : (
+                                        <ol className="flex flex-col gap-3">
+                                            {agendaItems.map((item) => {
+                                                const paper = item.resolution_id
+                                                    ? resolutionsById.get(item.resolution_id)
+                                                    : undefined;
+                                                return (
+                                                    <li
+                                                        key={item.id}
+                                                        className={cn(
+                                                            'flex flex-wrap items-start gap-4 rounded-lg border p-4',
+                                                            item.is_confidential
+                                                                ? 'border-primary/40 bg-primary/5'
+                                                                : 'border-border',
+                                                        )}
+                                                    >
+                                                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+                                                            {item.order}
+                                                        </span>
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                {item.item_type === 'decision' ? (
+                                                                    <Vote className="size-4 text-primary" aria-hidden="true" />
+                                                                ) : item.item_type === 'consent' ? (
+                                                                    <CheckCircle className="size-4 text-muted-foreground" aria-hidden="true" />
+                                                                ) : (
+                                                                    <FileText className="size-4 text-muted-foreground" aria-hidden="true" />
+                                                                )}
+                                                                <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+                                                                {item.is_confidential ? (
+                                                                    <StatusBadge variant="warning">
+                                                                        <Lock className="size-3" aria-hidden="true" />
+                                                                        Confidential
+                                                                    </StatusBadge>
+                                                                ) : null}
+                                                                <Badge variant="outline">{agendaItemTypeLabel(item.item_type)}</Badge>
+                                                            </div>
+                                                            {item.description ? (
+                                                                <p className="text-subtle mt-1 whitespace-pre-wrap">{item.description}</p>
+                                                            ) : null}
+                                                            <p className="text-caption mt-1">
+                                                                {[
+                                                                    item.presenter ? `Presented by ${item.presenter.name}` : null,
+                                                                    formatDurationMinutes(item.duration_minutes),
+                                                                ]
+                                                                    .filter(Boolean)
+                                                                    .join(' · ')}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                                            {paper ? (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => openPaper(paper.id)}
+                                                                    data-test="agenda-open-resolution"
+                                                                >
+                                                                    <Vote className="h-4 w-4" aria-hidden="true" />
+                                                                    {readResolutionLabel(paper)}
+                                                                </Button>
+                                                            ) : null}
+                                                            {canEdit ? (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => setRemovingItem(item)}
+                                                                    aria-label={`Remove ${item.title} from the agenda`}
+                                                                >
+                                                                    Remove
+                                                                </Button>
+                                                            ) : null}
+                                                        </div>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ol>
                                     )}
                                 </CardContent>
                             </Card>
-                        )}
+                        ) : null}
 
-                        {/* ========== PAPERS & RESOLUTIONS TAB ========== */}
+                        {/* ========== RESOLUTIONS ========== */}
                         {activeTab === 'resolutions' &&
                             (selectedResolution ? (
                                 <MeetingPaperWorkspace
@@ -2395,28 +1043,37 @@ export default function MeetingShow({
                                     nextPaper={nextPaper}
                                     onOpenPaper={openPaper}
                                     focus={paperFocus}
+                                    fullRecordHref={
+                                        canViewResolutionRecords
+                                            ? showResolution.url({ resolution: selectedResolution.id })
+                                            : null
+                                    }
                                 />
                             ) : (
                                 <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between">
+                                    <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
                                         <div>
-                                            <CardTitle>Papers & resolutions</CardTitle>
+                                            <CardTitle className="text-section-title">Resolutions</CardTitle>
                                             <CardDescription>
-                                                {resolutions.length === 1
-                                                    ? '1 decision paper'
-                                                    : `${resolutions.length} decision papers`}{' '}
-                                                for this meeting
+                                                {resolutions.length === 0
+                                                    ? 'No resolutions for this meeting yet'
+                                                    : [
+                                                          plural(resolutions.length, 'resolution'),
+                                                          viewerCanRsvp
+                                                              ? votesMeter(resolutions).caption.toLowerCase()
+                                                              : null,
+                                                      ]
+                                                          .filter(Boolean)
+                                                          .join(' · ')}
                                             </CardDescription>
                                         </div>
                                         {canCreateResolution ? (
                                             <Button
                                                 size="sm"
-                                                onClick={() =>
-                                                    setNewResolutionOpen(true)
-                                                }
+                                                onClick={() => setNewResolutionOpen(true)}
                                                 dusk="new-resolution-button"
                                             >
-                                                <Plus className="mr-1 h-4 w-4" />
+                                                <Plus className="h-4 w-4" />
                                                 New resolution
                                             </Button>
                                         ) : null}
@@ -2425,373 +1082,788 @@ export default function MeetingShow({
                                         {resolutions.length === 0 ? (
                                             <EmptyState
                                                 icon={Vote}
-                                                title="No decision papers yet"
-                                                description="Resolutions tabled for this meeting appear here."
+                                                title="No resolutions yet"
+                                                description="Resolutions appear here when the secretary adds them to the agenda."
                                             />
                                         ) : (
-                                            <ul className="space-y-2">
-                                                {resolutions.map((resolution) => (
-                                                    <li
-                                                        key={resolution.id}
-                                                        id={`meeting-paper-row-${resolution.id}`}
-                                                        tabIndex={-1}
-                                                        className={cn(
-                                                            'flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                                            String(resolution.id) === lastClosedPaperId
-                                                                ? 'border-primary/40 bg-primary/5'
-                                                                : 'hover:bg-muted',
-                                                        )}
-                                                        data-test="meeting-paper-row"
-                                                    >
-                                                        <div className="min-w-0">
-                                                            <p className="font-medium text-foreground">
-                                                                {resolution.title}
-                                                            </p>
-                                                            <p className="text-sm text-muted-foreground">
-                                                                {resolution.resolution_reference}
-                                                                {resolution.my_vote
-                                                                    ? ' · You voted'
-                                                                    : resolution.status === 'open' && resolution.can_vote
-                                                                      ? ' · Your vote is open'
-                                                                      : ''}
-                                                            </p>
-                                                        </div>
-                                                        <div className="flex shrink-0 items-center gap-2">
-                                                            <StatusBadge status={resolution.status} />
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={() => openPaper(resolution.id)}
-                                                                aria-label={`Read paper ${resolution.resolution_reference}: ${resolution.title}`}
-                                                            >
-                                                                Read paper
-                                                                {resolution.status === 'open' && resolution.can_vote && !resolution.my_vote
-                                                                    ? ' & vote'
-                                                                    : ''}
-                                                                <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                                                            </Button>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                asChild
-                                                            >
-                                                                <Link
-                                                                    href={showResolution.url({
-                                                                        resolution: resolution.id,
-                                                                    })}
-                                                                    aria-label={`Open the full resolution record ${resolution.resolution_reference}`}
+                                            <ul className="flex flex-col gap-2">
+                                                {resolutions.map((resolution) => {
+                                                    const chip = resolutionChip(resolution.status, resolution.outcome);
+                                                    const note = resolutionVoteNote(resolution);
+                                                    return (
+                                                        <li
+                                                            key={resolution.id}
+                                                            id={`meeting-paper-row-${resolution.id}`}
+                                                            tabIndex={-1}
+                                                            onClick={() => openPaper(resolution.id)}
+                                                            className={cn(
+                                                                'flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-lg border p-3 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                                                String(resolution.id) === lastClosedPaperId
+                                                                    ? 'border-primary/40 bg-primary/5'
+                                                                    : 'border-border hover:bg-muted',
+                                                            )}
+                                                            data-test="meeting-paper-row"
+                                                        >
+                                                            <div className="min-w-0">
+                                                                <p className="font-medium text-foreground">{resolution.title}</p>
+                                                                <p className="text-caption">
+                                                                    {[note, refSuffix(resolution.resolution_reference)]
+                                                                        .filter(Boolean)
+                                                                        .join(' · ')}
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex shrink-0 items-center gap-2">
+                                                                <StatusBadge variant={chip.variant}>{chip.label}</StatusBadge>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        openPaper(resolution.id);
+                                                                    }}
+                                                                    aria-label={`${readResolutionLabel(resolution)}: ${resolution.title}`}
                                                                 >
-                                                                    Full record
-                                                                </Link>
-                                                            </Button>
-                                                        </div>
-                                                    </li>
-                                                ))}
+                                                                    {readResolutionLabel(resolution)}
+                                                                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                                                                </Button>
+                                                            </div>
+                                                        </li>
+                                                    );
+                                                })}
                                             </ul>
                                         )}
                                     </CardContent>
                                 </Card>
                             ))}
 
-                        {/* ========== WORKFLOW TAB ========== */}
-                        {activeTab === 'workflow' && canRunMeeting && (
-                            <Card dusk="meeting-workflow-checklist-card">
-                                <CardHeader className="pb-3">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <CardTitle>
-                                                Meeting workflow
-                                            </CardTitle>
+                        {/* ========== ATTENDANCE ========== */}
+                        {activeTab === 'attendance' ? (
+                            <>
+                                {viewerCanRsvp ? (
+                                    <Card data-test="meeting-your-reply">
+                                        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <CardTitle className="text-section-title">Your reply</CardTitle>
+                                                <CardDescription>
+                                                    {viewerRsvp
+                                                        ? 'What you told the secretary about this meeting.'
+                                                        : happened
+                                                          ? "You didn't reply to the invitation for this meeting."
+                                                          : "You haven't replied to the invitation yet."}
+                                                </CardDescription>
+                                            </div>
+                                            {!happened ? (
+                                                <Button
+                                                    size="sm"
+                                                    variant={viewerRsvp ? 'outline' : 'default'}
+                                                    onClick={() => setRsvpDialogOpen(true)}
+                                                >
+                                                    {viewerRsvp ? 'Change reply' : 'Reply to the invitation'}
+                                                </Button>
+                                            ) : null}
+                                        </CardHeader>
+                                        {viewerRsvp ? (
+                                            <CardContent className="flex flex-col gap-2">
+                                                <ReplyReceipt rsvp={viewerRsvp} />
+                                                {viewerRsvp.decline_reason ? (
+                                                    <p className="text-subtle">{`Your reason: ${viewerRsvp.decline_reason}`}</p>
+                                                ) : null}
+                                                {viewerRsvp.dietary_notes ? (
+                                                    <p className="text-subtle">{`Dietary or access needs: ${viewerRsvp.dietary_notes}`}</p>
+                                                ) : null}
+                                            </CardContent>
+                                        ) : null}
+                                    </Card>
+                                ) : null}
+
+                                <Card>
+                                    <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <CardTitle className="text-section-title">Attendance</CardTitle>
                                             <CardDescription>
-                                                Step-by-step checklist for this
-                                                meeting cycle.
+                                                {dayReached
+                                                    ? 'Who was at the meeting. The secretary or chair records this.'
+                                                    : 'Attendance is recorded at the meeting.'}
+                                            </CardDescription>
+                                        </div>
+                                        {canEdit ? (
+                                            <Button size="sm" onClick={() => setAttendanceDialogOpen(true)} dusk="record-attendance">
+                                                <Users className="h-4 w-4" />
+                                                Record attendance
+                                            </Button>
+                                        ) : null}
+                                    </CardHeader>
+                                    <CardContent className="flex flex-col gap-4">
+                                        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-3 text-sm">
+                                            {dayReached ? (
+                                                <StatusBadge variant={quorum.met ? 'success' : 'warning'}>
+                                                    {quorum.met ? 'Quorum met' : 'Quorum not met yet'}
+                                                </StatusBadge>
+                                            ) : null}
+                                            <span className="text-foreground">
+                                                {dayReached
+                                                    ? `${quorum.present} of the ${quorum.required} members needed for decisions to be valid are recorded as present.`
+                                                    : `At least ${quorum.required}${
+                                                          quorum.total !== undefined ? ` of the ${quorum.total}` : ''
+                                                      } members must be present for decisions to be valid.`}
+                                            </span>
+                                            <GovernanceTermHint term="quorum" />
+                                        </div>
+                                        {canRunMeeting && !canEdit && attendances.length === 0 && dayReached ? (
+                                            <p className="text-subtle">
+                                                {`Attendance can no longer be changed for this meeting (${statusChip.label.toLowerCase()}). An administrator can help if it still needs recording.`}
+                                            </p>
+                                        ) : null}
+                                        {attendances.length === 0 ? (
+                                            <EmptyState
+                                                icon={Users}
+                                                title={dayReached ? "Attendance hasn't been recorded" : 'Recorded on the day'}
+                                                description={
+                                                    dayReached
+                                                        ? canEdit
+                                                            ? 'Record who was present so the quorum and the minutes are right.'
+                                                            : 'The secretary or chair records who was present.'
+                                                        : 'The secretary or chair records who is present at the meeting.'
+                                                }
+                                            />
+                                        ) : (
+                                            <ul className="flex flex-col divide-y divide-border">
+                                                {attendances.map((attendance) => {
+                                                    const chip = governanceStatus('attendance_status', attendance.status);
+                                                    return (
+                                                        <li
+                                                            key={attendance.id}
+                                                            className="flex flex-wrap items-center justify-between gap-3 py-2.5"
+                                                        >
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-medium text-foreground">
+                                                                    {attendance.board_member?.user?.name ?? 'Board member'}
+                                                                </p>
+                                                                {attendance.apology_reason ? (
+                                                                    <p className="text-caption">{`Reason: ${attendance.apology_reason}`}</p>
+                                                                ) : null}
+                                                            </div>
+                                                            <StatusBadge variant={chip.variant}>{chip.label}</StatusBadge>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        )}
+                                    </CardContent>
+                                </Card>
+
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-section-title">Replies to the invitation</CardTitle>
+                                        <CardDescription>
+                                            {rsvps.length === 0
+                                                ? 'Nobody has replied yet'
+                                                : plural(rsvps.length, 'reply', 'replies')}
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {rsvps.length === 0 ? (
+                                            <EmptyState
+                                                icon={MessageSquare}
+                                                title="No replies yet"
+                                                description="Members' replies to the invitation appear here."
+                                            />
+                                        ) : (
+                                            <ul className="flex flex-col divide-y divide-border">
+                                                {rsvps.map((rsvp) => {
+                                                    const chip = governanceStatus('rsvp_response', rsvp.response);
+                                                    return (
+                                                        <li
+                                                            key={rsvp.id}
+                                                            className="flex flex-wrap items-center justify-between gap-3 py-2.5"
+                                                        >
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-medium text-foreground">
+                                                                    {rsvp.board_member?.user?.name ?? 'Board member'}
+                                                                </p>
+                                                                {rsvp.decline_reason ? (
+                                                                    <p className="text-caption">{`Reason: ${rsvp.decline_reason}`}</p>
+                                                                ) : null}
+                                                                {rsvp.dietary_notes ? (
+                                                                    <p className="text-caption">{`Dietary or access needs: ${rsvp.dietary_notes}`}</p>
+                                                                ) : null}
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <StatusBadge variant={chip.variant}>{chip.label}</StatusBadge>
+                                                                {rsvp.responded_at ? (
+                                                                    <span className="text-caption">{formatDateLong(rsvp.responded_at)}</span>
+                                                                ) : null}
+                                                            </div>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </>
+                        ) : null}
+
+                        {/* ========== MINUTES ========== */}
+                        {activeTab === 'minutes' ? (
+                            <Card>
+                                <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-section-title flex flex-wrap items-center gap-2">
+                                            Minutes
+                                            {minutesChip ? (
+                                                <StatusBadge variant={minutesChip.variant}>{minutesChip.label}</StatusBadge>
+                                            ) : null}
+                                        </CardTitle>
+                                        <CardDescription>
+                                            {minutes ? `Version ${minutes.version_number}` : 'No minutes yet'}
+                                        </CardDescription>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {canManageMinutes && (!minutes || ['draft', 'reviewed'].includes(minutes.status)) ? (
+                                            <Button
+                                                size="sm"
+                                                variant={minutes ? 'outline' : 'default'}
+                                                onClick={() => setMinutesDialogOpen(true)}
+                                                dusk="edit-minutes"
+                                            >
+                                                {minutes ? <Pencil className="h-4 w-4" /> : <PenLine className="h-4 w-4" />}
+                                                {minutes ? 'Edit draft' : 'Write the minutes'}
+                                            </Button>
+                                        ) : null}
+                                        {minutes?.status === 'draft' && canManageMinutes ? (
+                                            <Button
+                                                size="sm"
+                                                variant={canApproveMinutes ? 'outline' : 'default'}
+                                                onClick={() => setMinutesConfirm('review')}
+                                                dusk="submit-review-minutes"
+                                            >
+                                                <Send className="h-4 w-4" />
+                                                Send for approval
+                                            </Button>
+                                        ) : null}
+                                        {minutes && ['draft', 'reviewed'].includes(minutes.status) && canApproveMinutes ? (
+                                            <Button size="sm" onClick={() => setMinutesConfirm('approve')} dusk="approve-minutes">
+                                                <FileCheck className="h-4 w-4" />
+                                                Approve minutes
+                                            </Button>
+                                        ) : null}
+                                        {minutes?.status === 'approved' && canSignMinutes ? (
+                                            <Button size="sm" onClick={() => setSignDialogOpen(true)} dusk="sign-minutes-button">
+                                                <ShieldCheck className="h-4 w-4" />
+                                                Sign minutes
+                                            </Button>
+                                        ) : null}
+                                        {minutesLocked && canManageMinutes ? (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => setCorrectionDialogOpen(true)}
+                                                dusk="correction-minutes-button"
+                                            >
+                                                <RotateCcw className="h-4 w-4" />
+                                                Start a correction
+                                            </Button>
+                                        ) : null}
+                                        {minutes?.status === 'signed' && canApproveMinutes ? (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => setMinutesConfirm('archive')}
+                                                dusk="archive-minutes-button"
+                                            >
+                                                <Archive className="h-4 w-4" />
+                                                Archive minutes
+                                            </Button>
+                                        ) : null}
+                                    </div>
+                                </CardHeader>
+
+                                <CardContent className="flex flex-col gap-5">
+                                    {minutesError ? (
+                                        <div
+                                            role="alert"
+                                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                {minutesError}
+                                            </span>
+                                            <Button size="sm" variant="outline" onClick={() => router.reload()}>
+                                                Refresh page
+                                            </Button>
+                                        </div>
+                                    ) : null}
+
+                                    {minutes ? (
+                                        <>
+                                            <dl className="grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-4">
+                                                <div>
+                                                    <dt className="text-caption font-semibold">Status</dt>
+                                                    <dd className="mt-1">
+                                                        {minutesChip ? (
+                                                            <StatusBadge variant={minutesChip.variant}>{minutesChip.label}</StatusBadge>
+                                                        ) : null}
+                                                    </dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-caption font-semibold">Written by</dt>
+                                                    <dd className="mt-1 text-sm text-foreground">
+                                                        {recordedName(minutes.drafter_name) ?? 'Name not recorded'}
+                                                    </dd>
+                                                    {minutes.drafted_at ? (
+                                                        <dd className="text-caption">{formatDateTimeLong(minutes.drafted_at)}</dd>
+                                                    ) : null}
+                                                </div>
+                                                <div>
+                                                    <dt className="text-caption font-semibold">Approved by</dt>
+                                                    <dd className="mt-1 text-sm text-foreground">
+                                                        {minutes.reviewed_at
+                                                            ? (recordedName(minutes.reviewer_name) ?? 'Name not recorded')
+                                                            : 'Not approved yet'}
+                                                    </dd>
+                                                    {minutes.reviewed_at ? (
+                                                        <dd className="text-caption">{formatDateTimeLong(minutes.reviewed_at)}</dd>
+                                                    ) : null}
+                                                </div>
+                                                <div>
+                                                    <dt className="text-caption font-semibold">Signed by</dt>
+                                                    <dd className="mt-1 text-sm text-foreground">
+                                                        {minutes.signed_at
+                                                            ? (recordedName(minutes.signer_name) ?? 'Name not recorded')
+                                                            : 'Not signed yet'}
+                                                    </dd>
+                                                    {minutes.signed_at ? (
+                                                        <dd className="text-caption">{formatDateTimeLong(minutes.signed_at)}</dd>
+                                                    ) : null}
+                                                </div>
+                                            </dl>
+
+                                            {minutesLocked ? (
+                                                <InfoCard icon={Lock}>
+                                                    Approved minutes can't be edited. The secretary can start a correction if something is wrong.
+                                                </InfoCard>
+                                            ) : null}
+
+                                            {minutes.content_blocks && minutes.content_blocks.length > 0 ? (
+                                                <div className="flex flex-col gap-5">
+                                                    {minutes.content_blocks.map((block, index) => (
+                                                        <Card key={index} className="gap-2 p-4 shadow-none">
+                                                            <h3 className="text-section-title border-b border-border pb-1.5">
+                                                                {block.heading || `Section ${index + 1}`}
+                                                            </h3>
+                                                            <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+                                                                {block.content || (
+                                                                    <span className="text-muted-foreground italic">
+                                                                        Nothing written under this heading.
+                                                                    </span>
+                                                                )}
+                                                            </p>
+                                                        </Card>
+                                                    ))}
+                                                </div>
+                                            ) : null}
+
+                                            {history.length > 0 ? (
+                                                <div className="rounded-lg border border-border p-4">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        onClick={() => setHistoryOpen((open) => !open)}
+                                                        aria-expanded={historyOpen}
+                                                        className="w-full justify-between"
+                                                    >
+                                                        <span className="flex items-center gap-2">
+                                                            <History className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                                                            {`Version history (${history.length})`}
+                                                        </span>
+                                                        {historyOpen ? (
+                                                            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                                                        ) : (
+                                                            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                                                        )}
+                                                    </Button>
+                                                    {historyOpen ? (
+                                                        <ol className="mt-3 flex flex-col gap-3 border-t border-border pt-3">
+                                                            {history.map((entry, index) => {
+                                                                const blocks = entry.content_blocks ?? [];
+                                                                const isOpen = openVersion === index;
+                                                                return (
+                                                                    <li key={index} className="rounded-md border border-border p-3 text-sm">
+                                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                                            <span className="font-medium text-foreground">
+                                                                                {`${entry.version ? `Version ${entry.version}` : 'Earlier version'} · ${minutesHistoryLabel(entry)}`}
+                                                                            </span>
+                                                                            <span className="text-caption">
+                                                                                {[
+                                                                                    entry.at ? formatDateTimeLong(entry.at) : null,
+                                                                                    entry.actor_name ? `by ${entry.actor_name}` : null,
+                                                                                ]
+                                                                                    .filter(Boolean)
+                                                                                    .join(' · ')}
+                                                                            </span>
+                                                                        </div>
+                                                                        {entry.reason_for_correction ? (
+                                                                            <p className="text-subtle mt-1">
+                                                                                {`What needed correcting: ${entry.reason_for_correction}`}
+                                                                            </p>
+                                                                        ) : null}
+                                                                        {blocks.length > 0 ? (
+                                                                            <div className="mt-2">
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    aria-expanded={isOpen}
+                                                                                    onClick={() => setOpenVersion(isOpen ? null : index)}
+                                                                                >
+                                                                                    {isOpen ? 'Hide this version' : 'Show this version'}
+                                                                                </Button>
+                                                                                {isOpen ? (
+                                                                                    <Card className="mt-2 gap-2 p-3 shadow-none">
+                                                                                        {blocks.map((block, blockIndex) => (
+                                                                                            <div key={blockIndex}>
+                                                                                                <p className="font-medium text-foreground">{block.heading}</p>
+                                                                                                <p className="text-subtle whitespace-pre-wrap">
+                                                                                                    {block.content || 'Nothing written under this heading.'}
+                                                                                                </p>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </Card>
+                                                                                ) : null}
+                                                                            </div>
+                                                                        ) : null}
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ol>
+                                                    ) : null}
+                                                </div>
+                                            ) : null}
+
+                                            {canViewRecordDetails ? (
+                                                <details className="rounded-lg border border-border p-4" data-test="minutes-record-details">
+                                                    <summary className="cursor-pointer text-sm font-medium text-foreground">
+                                                        Record details
+                                                    </summary>
+                                                    <p className="text-subtle mt-2">
+                                                        For audits: integrity codes that show whether the minutes changed after each step.
+                                                    </p>
+                                                    <dl className="mt-3 flex flex-col gap-2 text-sm">
+                                                        {minutes.content_hash ? (
+                                                            <div>
+                                                                <dt className="text-caption font-semibold">
+                                                                    {`Version ${minutes.version_number} (current) · integrity code (SHA-256)`}
+                                                                </dt>
+                                                                <dd className="font-mono text-xs break-all text-foreground">{minutes.content_hash}</dd>
+                                                            </div>
+                                                        ) : null}
+                                                        {history
+                                                            .filter((entry) => entry.content_hash)
+                                                            .map((entry, index) => (
+                                                                <div key={index}>
+                                                                    <dt className="text-caption font-semibold">
+                                                                        {`${entry.version ? `Version ${entry.version}` : 'Earlier version'} · ${minutesHistoryLabel(entry)}`}
+                                                                    </dt>
+                                                                    <dd className="font-mono text-xs break-all text-foreground">{entry.content_hash}</dd>
+                                                                </div>
+                                                            ))}
+                                                    </dl>
+                                                </details>
+                                            ) : null}
+                                        </>
+                                    ) : (
+                                        <EmptyState
+                                            icon={FileText}
+                                            title="No minutes yet"
+                                            description={
+                                                happened
+                                                    ? 'The secretary writes the minutes after the meeting.'
+                                                    : 'Minutes are written after the meeting.'
+                                            }
+                                            action={
+                                                canManageMinutes ? (
+                                                    <Button size="sm" onClick={() => setMinutesDialogOpen(true)} dusk="create-first-minutes">
+                                                        <PenLine className="h-4 w-4" />
+                                                        Write the minutes
+                                                    </Button>
+                                                ) : undefined
+                                            }
+                                        />
+                                    )}
+                                </CardContent>
+                            </Card>
+                        ) : null}
+
+                        {/* ========== WORKFLOW (people running the meeting) ========== */}
+                        {activeTab === 'workflow' && canRunMeeting ? (
+                            <Card dusk="meeting-workflow-checklist-card">
+                                <CardHeader>
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <CardTitle className="text-section-title">Workflow</CardTitle>
+                                            <CardDescription>
+                                                The steps to prepare, hold and finish this meeting. Only the people running it see this.
                                             </CardDescription>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
-                                            <StatusBadge variant="success">
-                                                {workflowChecklist.counts.done}{' '}
-                                                complete
-                                            </StatusBadge>
-                                            {workflowChecklist.counts
-                                                .remaining > 0 && (
-                                                <StatusBadge variant="warning">
-                                                    {
-                                                        workflowChecklist.counts
-                                                            .remaining
-                                                    }{' '}
-                                                    remaining
+                                            <StatusBadge variant="success">{`${workflowChecklist.counts.done} done`}</StatusBadge>
+                                            <StatusBadge variant="neutral">{`${workflowChecklist.counts.remaining} to do`}</StatusBadge>
+                                            {workflowChecklist.counts.blocked > 0 ? (
+                                                <StatusBadge variant="neutral">
+                                                    {`${workflowChecklist.counts.blocked} waiting on an earlier step`}
                                                 </StatusBadge>
-                                            )}
-                                            {workflowChecklist.counts.blocked >
-                                                0 && (
-                                                <StatusBadge variant="critical">
-                                                    {
-                                                        workflowChecklist.counts
-                                                            .blocked
-                                                    }{' '}
-                                                    blocked
-                                                </StatusBadge>
-                                            )}
+                                            ) : null}
                                         </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="flex flex-col gap-5">
-                                    {workflowChecklist.next_step && (
-                                        <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
-                                            <p className="text-xs font-medium tracking-wide text-primary uppercase">
-                                                Next step
-                                            </p>
-                                            <p className="mt-1 text-base font-semibold text-foreground">
-                                                {
-                                                    workflowChecklist.next_step
-                                                        .label
-                                                }
-                                            </p>
-                                            <p className="mt-0.5 text-sm text-muted-foreground">
-                                                {
-                                                    workflowChecklist.next_step
-                                                        .detail
-                                                }
-                                            </p>
-                                            {workflowChecklist.next_step
-                                                .action_url && (
-                                                <Button
-                                                    asChild
-                                                    size="sm"
-                                                    className="mt-3"
-                                                >
-                                                    <Link
-                                                        href={
-                                                            workflowChecklist
-                                                                .next_step
-                                                                .action_url
-                                                        }
-                                                    >
-                                                        {
-                                                            workflowChecklist
-                                                                .next_step
-                                                                .action_label
-                                                        }
-                                                    </Link>
-                                                </Button>
-                                            )}
+                                    {workflowChecklist.next_step ? (
+                                        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+                                            <p className="text-caption font-semibold">Next step</p>
+                                            <p className="text-section-title mt-1">{workflowChecklist.next_step.label}</p>
+                                            <p className="text-subtle mt-0.5">{workflowChecklist.next_step.detail}</p>
+                                            <div className="mt-3">{stepAction(workflowChecklist.next_step, true)}</div>
                                         </div>
-                                    )}
+                                    ) : null}
 
-                                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                                        {workflowChecklist.items.map((item) => (
-                                            <div
-                                                key={item.key}
-                                                className="flex h-full flex-col gap-2 rounded-lg border p-4"
-                                                dusk={`workflow-item-${item.key}`}
-                                            >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <p className="leading-snug font-medium text-foreground">
-                                                        {item.label}
-                                                    </p>
-                                                    <StatusBadge
-                                                        className="shrink-0"
-                                                        variant={checklistVariant(item.status)}
-                                                        dusk={`workflow-status-${item.key}`}
-                                                    >
-                                                        {humanStatus(item.status)}
-                                                    </StatusBadge>
-                                                </div>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {item.detail}
-                                                </p>
-                                                {item.blocked_by && (
-                                                    <p className="text-xs text-status-critical italic">
-                                                        Blocked by:{' '}
-                                                        {item.blocked_by}
-                                                    </p>
-                                                )}
-                                                <div className="mt-auto pt-2">
-                                                    <Button
-                                                        size="sm"
-                                                        variant={
-                                                            item.status ===
-                                                            'done'
-                                                                ? 'ghost'
-                                                                : 'outline'
-                                                        }
-                                                        asChild
-                                                        className="w-full"
-                                                    >
-                                                        <Link
-                                                            href={
-                                                                item.action_url
-                                                            }
+                                    {meetingCockpit.cards.length > 0 ? (
+                                        <section aria-labelledby="meeting-readiness-heading" className="flex flex-col gap-3">
+                                            <h3 id="meeting-readiness-heading" className="text-section-title">
+                                                At a glance
+                                            </h3>
+                                            <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                                                {meetingCockpit.cards.map((card) => {
+                                                    const tab = inPageTab(card.href, meeting.id);
+                                                    const linkLabel = READINESS_LINKS[card.key] ?? 'Open';
+                                                    return (
+                                                        <li
+                                                            key={card.key}
+                                                            className="flex flex-col gap-2 rounded-lg border border-border p-4"
+                                                            data-test={`meeting-readiness-${card.key}`}
                                                         >
-                                                            {item.action_label}
-                                                        </Link>
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <span className="text-sm font-medium text-foreground">{card.title}</span>
+                                                                <StatusBadge variant={readinessVariant(card.status)}>
+                                                                    {String(card.value)}
+                                                                </StatusBadge>
+                                                            </div>
+                                                            <p className="text-subtle">{card.detail}</p>
+                                                            <div className="mt-auto">
+                                                                {tab ? (
+                                                                    <Button size="sm" variant="ghost" onClick={() => handleTabChange(tab)}>
+                                                                        {linkLabel}
+                                                                    </Button>
+                                                                ) : (
+                                                                    <Button asChild size="sm" variant="ghost">
+                                                                        <Link href={card.href}>{linkLabel}</Link>
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </section>
+                                    ) : null}
+
+                                    <section aria-labelledby="meeting-steps-heading" className="flex flex-col gap-3">
+                                        <h3 id="meeting-steps-heading" className="text-section-title">
+                                            Steps
+                                        </h3>
+                                        <ol className="flex flex-col divide-y divide-border rounded-lg border border-border">
+                                            {workflowChecklist.items.map((item) => {
+                                                const chip = checklistStatusChip(item.status, item.status_label);
+                                                const waiting = item.blocked_by
+                                                    ? item.blocked_by.startsWith('Waiting')
+                                                        ? `${item.blocked_by}.`
+                                                        : `Waiting because ${lowerFirst(item.blocked_by)}.`
+                                                    : null;
+                                                return (
+                                                    <li
+                                                        key={item.key}
+                                                        className="flex flex-wrap items-start justify-between gap-3 p-4"
+                                                        dusk={`workflow-item-${item.key}`}
+                                                    >
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-sm font-medium text-foreground">{item.label}</p>
+                                                            <p className="text-subtle">{item.detail}</p>
+                                                            {waiting ? <p className="text-caption mt-1">{waiting}</p> : null}
+                                                        </div>
+                                                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                                            <StatusBadge variant={chip.variant} dusk={`workflow-status-${item.key}`}>
+                                                                {chip.label}
+                                                            </StatusBadge>
+                                                            {!['done', 'not_applicable', 'blocked'].includes(item.status)
+                                                                ? stepAction(item)
+                                                                : null}
+                                                        </div>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ol>
+                                    </section>
                                 </CardContent>
                             </Card>
-                        )}
-                </section>
-              </div>
+                        ) : null}
+                    </section>
+                </div>
             </PageLayout>
+
+            {/* ========== Dialogs ========== */}
+            {canOpenEdit && formOptions ? (
+                <MeetingWizardDialog
+                    isOpen={editOpen}
+                    onClose={() => setEditOpen(false)}
+                    options={formOptions}
+                    meeting={meeting}
+                />
+            ) : null}
+
+            {canCreateResolution ? (
+                <NewResolutionDialog
+                    isOpen={newResolutionOpen}
+                    onClose={() => setNewResolutionOpen(false)}
+                    meetings={[{ id: meeting.id, title: meeting.title, scheduled_at: meeting.scheduled_at }]}
+                    meetingId={meeting.id}
+                    lockMeeting
+                    users={users}
+                    committees={committees}
+                    authoritySubjects={authoritySubjects}
+                    authoritySubjectGroups={authoritySubjectGroups}
+                    canPublish={canPublishPapers}
+                />
+            ) : null}
+
+            {viewerCanRsvp ? (
+                <RsvpDialog
+                    isOpen={rsvpDialogOpen}
+                    onClose={() => setRsvpDialogOpen(false)}
+                    onSaved={() => setReplySaved(true)}
+                    meetingId={meeting.id}
+                    meetingTitle={meeting.title}
+                    meetingWhen={formatDateTimeLong(meeting.scheduled_at)}
+                    existing={viewerRsvp ?? null}
+                />
+            ) : null}
+
+            {canEdit ? (
+                <>
+                    <AgendaItemDialog
+                        isOpen={agendaDialogOpen}
+                        onClose={() => setAgendaDialogOpen(false)}
+                        meetingId={meeting.id}
+                        presenters={boardMembers}
+                    />
+                    <AttendanceDialog
+                        isOpen={attendanceDialogOpen}
+                        onClose={() => setAttendanceDialogOpen(false)}
+                        meetingId={meeting.id}
+                        members={boardMembers}
+                        attendances={attendances}
+                        rsvps={rsvps}
+                    />
+                    <ConfirmDialog
+                        open={removingItem !== null}
+                        onClose={() => setRemovingItem(null)}
+                        onConfirm={() => {
+                            if (removingItem) removeAgendaItem(removingItem.id);
+                        }}
+                        title="Remove this agenda item?"
+                        description={`“${removingItem?.title ?? ''}” will be taken off the agenda. This can't be undone.`}
+                        confirmText="Remove item"
+                    />
+                </>
+            ) : null}
+
+            {canManageMinutes ? (
+                <MinutesEditorDialog
+                    isOpen={minutesDialogOpen}
+                    onClose={() => setMinutesDialogOpen(false)}
+                    meetingId={meeting.id}
+                    minutes={minutes ? { version_number: minutes.version_number, content_blocks: minutes.content_blocks } : null}
+                />
+            ) : null}
+
+            {minutes && canSignMinutes ? (
+                <SignMinutesDialog
+                    isOpen={signDialogOpen}
+                    onClose={() => setSignDialogOpen(false)}
+                    meetingId={meeting.id}
+                    meetingTitle={meeting.title}
+                    minutes={{ version_number: minutes.version_number, content_hash: minutes.content_hash ?? null }}
+                />
+            ) : null}
+
+            {minutes && canManageMinutes ? (
+                <CorrectionDialog
+                    isOpen={correctionDialogOpen}
+                    onClose={() => setCorrectionDialogOpen(false)}
+                    meetingId={meeting.id}
+                    versionNumber={minutes.version_number}
+                />
+            ) : null}
+
+            {minutes ? (
+                <ConfirmDialog
+                    open={minutesConfirm !== null}
+                    onClose={() => setMinutesConfirm(null)}
+                    variant="default"
+                    title={
+                        minutesConfirm === 'review'
+                            ? 'Send the minutes for approval?'
+                            : minutesConfirm === 'approve'
+                              ? 'Approve these minutes?'
+                              : 'Archive these minutes?'
+                    }
+                    description={
+                        minutesConfirm === 'review'
+                            ? `The chair will be asked to approve version ${minutes.version_number}. You can still edit the draft until it's approved.`
+                            : minutesConfirm === 'approve'
+                              ? `Version ${minutes.version_number} will be approved and can't be edited afterwards. If something is wrong later, the secretary can start a correction.`
+                              : 'The signed minutes move to the records. They stay readable, and the secretary can still start a correction.'
+                    }
+                    confirmText={
+                        minutesConfirm === 'review'
+                            ? 'Send for approval'
+                            : minutesConfirm === 'approve'
+                              ? 'Approve minutes'
+                              : 'Archive minutes'
+                    }
+                    onConfirm={() => {
+                        if (minutesConfirm === 'review') {
+                            postMinutesStep('minutes/submit-for-review');
+                        } else if (minutesConfirm === 'approve') {
+                            postMinutesStep('minutes/approve', {
+                                expected_version: minutes.version_number,
+                                expected_hash: minutes.content_hash ?? null,
+                            });
+                        } else if (minutesConfirm === 'archive') {
+                            postMinutesStep('minutes/archive');
+                        }
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }
 
-/**
- * Strip of meeting status mini-cards rendered under the hero. Surfaces
- * Chair, Secretary, CEO Report, Board Pack, Quorum, Pending Resolutions,
- * Minutes and Previous Follow-through so the board can scan the meeting
- * state in one row without scrolling.
- */
-function MeetingStatusStrip({
-    meeting,
-    quorum,
-    workflowChecklist,
-    resolutions,
-    attendances,
-}: {
-    meeting: {
-        id: number;
-        chair: { user: { name: string } } | null;
-        secretary: { user: { name: string } } | null;
-        board_pack: { distributed_at: string | null } | null;
-        minutes: { status: string } | null;
-    };
-    quorum: { present: number; required: number; met: boolean };
-    workflowChecklist: { items: Array<{ key: string; status: string }> };
-    resolutions: Array<{ status: string }>;
-    attendances: Array<{ status: string }>;
-}) {
-    const ceoStep = workflowChecklist.items.find((i) => i.key === 'ceo_report');
-    const followStep = workflowChecklist.items.find(
-        (i) => i.key === 'follow_through',
-    );
-
-    const minuteStatus = meeting.minutes?.status ?? null;
-    const minuteValue = minuteStatus
-        ? minuteStatus.charAt(0).toUpperCase() + minuteStatus.slice(1)
-        : 'Not drafted';
-
-    const packDistributed = Boolean(meeting.board_pack?.distributed_at);
-    const packPresent = Boolean(meeting.board_pack);
-    const packValue = packDistributed
-        ? 'Distributed'
-        : packPresent
-          ? 'Generated'
-          : 'Not started';
-    const pendingResolutions = resolutions.filter((r) =>
-        ['draft', 'open'].includes(r.status),
-    ).length;
-
-    const presentAttendees = attendances.filter(
-        (a) => a.status === 'present',
-    ).length;
-
-    type Tile = {
-        label: string;
-        value: string;
-        tone: 'success' | 'info' | 'warning' | 'critical' | 'muted';
-    };
-    const tiles: Tile[] = [
-        {
-            label: 'Chair',
-            value: meeting.chair?.user.name ?? 'Unassigned',
-            tone: meeting.chair ? 'info' : 'warning',
-        },
-        {
-            label: 'Secretary',
-            value: meeting.secretary?.user.name ?? 'Unassigned',
-            tone: meeting.secretary ? 'info' : 'warning',
-        },
-        {
-            label: 'CEO Report',
-            value:
-                ceoStep?.status === 'done'
-                    ? 'Submitted'
-                    : ceoStep?.status === 'blocked'
-                      ? 'Blocked'
-                      : 'Pending',
-            tone:
-                ceoStep?.status === 'done'
-                    ? 'success'
-                    : ceoStep?.status === 'blocked'
-                      ? 'critical'
-                      : 'warning',
-        },
-        {
-            label: 'Board Pack',
-            value: packValue,
-            tone: packDistributed
-                ? 'success'
-                : packPresent
-                  ? 'info'
-                  : 'warning',
-        },
-        {
-            label: 'Quorum',
-            value: `${quorum.present}/${quorum.required}`,
-            tone: quorum.met
-                ? 'success'
-                : presentAttendees > 0
-                  ? 'info'
-                  : 'warning',
-        },
-        {
-            label: 'Pending Resolutions',
-            value: String(pendingResolutions),
-            tone: pendingResolutions > 0 ? 'warning' : 'success',
-        },
-        {
-            label: 'Minutes',
-            value: minuteValue,
-            tone: ['signed', 'approved', 'archived'].includes(
-                minuteStatus ?? '',
-            )
-                ? 'success'
-                : minuteStatus
-                  ? 'info'
-                  : 'warning',
-        },
-        {
-            label: 'Previous Follow-through',
-            value: followStep?.status === 'done' ? 'Reviewed' : 'Open items',
-            tone: followStep?.status === 'done' ? 'success' : 'warning',
-        },
-    ];
-
-    const TONE_VALUE: Record<Tile['tone'], string> = {
-        success: 'text-status-success',
-        info: 'text-foreground',
-        warning: 'text-status-warning',
-        critical: 'text-status-critical',
-        muted: 'text-muted-foreground',
-    };
-
+/** "Your reply is recorded" — from the stored reply, with its server reference. */
+function ReplyReceipt({ rsvp }: { rsvp: ViewerRsvp }) {
+    const chip = governanceStatus('rsvp_response', rsvp.response);
     return (
-        <div
-            className="grid gap-5 md:grid-cols-2 lg:grid-cols-4"
-            dusk="meeting-status-strip"
-        >
-            {tiles.map((t) => (
-                <Card key={t.label}>
-                    <CardContent className="p-4">
-                        <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-                            {t.label}
-                        </p>
-                        <p
-                            className={cn(
-                                'mt-1 truncate text-sm leading-snug font-semibold',
-                                TONE_VALUE[t.tone],
-                            )}
-                            title={t.value}
-                        >
-                            {t.value}
-                        </p>
-                    </CardContent>
-                </Card>
-            ))}
+        <div className="flex flex-wrap items-center gap-2 text-sm" data-test="meeting-rsvp-receipt">
+            <CheckCircle2 className="size-4 text-status-success" aria-hidden="true" />
+            <span className="font-medium text-foreground">Your reply is recorded</span>
+            <StatusBadge variant={chip.variant}>{chip.label}</StatusBadge>
+            <span className="text-caption">
+                {[
+                    rsvp.responded_at ? formatDateTimeLong(rsvp.responded_at) : null,
+                    refSuffix(rsvp.receipt_id),
+                ]
+                    .filter(Boolean)
+                    .join(' · ')}
+            </span>
         </div>
     );
 }

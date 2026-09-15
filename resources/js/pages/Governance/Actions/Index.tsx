@@ -27,17 +27,19 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly } from '@/lib/datetime';
+import { refSuffix } from '@/lib/governance-labels';
 import { show as showAction } from '@/routes/governance/actions';
 import { PageProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import { ClipboardList, Link2, ListChecks, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
+    actionChip,
     actionPriorityLabel,
     actionPriorityVariant,
-    actionStatusLabel,
-    actionStatusVariant,
     daysUntilDue,
+    dueWording,
+    evidenceState,
     isActionOverdue,
 } from './_helpers';
 
@@ -54,6 +56,7 @@ interface ActionRow {
     source_id?: number | null;
     progress_pct?: number | null;
     evidence_required?: boolean;
+    evidence_count?: number;
 }
 
 interface Filters {
@@ -88,12 +91,12 @@ const ALL = '__all';
 
 const STATUS_OPTIONS = [
     { value: ALL, label: 'Any status' },
-    { value: 'active', label: 'All open' },
+    { value: 'active', label: 'Still to do' },
     { value: 'open', label: 'Not started' },
     { value: 'in_progress', label: 'In progress' },
     { value: 'overdue', label: 'Overdue' },
     { value: 'blocked', label: 'Blocked' },
-    { value: 'complete', label: 'Completed' },
+    { value: 'complete', label: 'Done' },
 ];
 
 const PRIORITY_OPTIONS = [
@@ -106,6 +109,7 @@ const PRIORITY_OPTIONS = [
 ];
 
 function dueCell(row: ActionRow) {
+    if (!row.due_date) return <EmptyValue />;
     if (row.status === 'complete') {
         return (
             <span className="text-muted-foreground">
@@ -124,19 +128,13 @@ function dueCell(row: ActionRow) {
                 <span
                     className={
                         overdue
-                            ? 'text-[11.5px] font-semibold text-status-critical'
+                            ? 'text-xs font-semibold text-status-critical'
                             : days <= 3
-                              ? 'text-[11.5px] font-semibold text-status-warning'
-                              : 'text-[11.5px] text-muted-foreground'
+                              ? 'text-xs font-semibold text-status-warning'
+                              : 'text-xs text-muted-foreground'
                     }
                 >
-                    {overdue
-                        ? `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`
-                        : days === 0
-                          ? 'Due today'
-                          : days > 0
-                            ? `${days} day${days === 1 ? '' : 's'} left`
-                            : 'Past due'}
+                    {dueWording(row.due_date)}
                 </span>
             ) : null}
         </span>
@@ -202,8 +200,7 @@ export default function ActionsIndex({
     const actionsFor = (row: ActionRow): MenuItem[] =>
         compactMenu([
             {
-                label:
-                    row.status === 'complete' ? 'View receipt' : 'Open action',
+                label: 'Open action',
                 icon: ClipboardList,
                 onClick: () => open(row),
             },
@@ -215,18 +212,18 @@ export default function ActionsIndex({
         <PageHeader
             icon={ListChecks}
             title="Actions"
-            subline={`Board decisions and follow-ups tracked to completion · ${summary.total_open} open`}
+            subline={`Follow-up work from board decisions — open yours to update or mark done · ${summary.total_open} still to do`}
             actions={
                 <PageHeaderSearch
                     value={search}
                     onChange={setSearch}
-                    placeholder="Search references, titles or descriptions…"
+                    placeholder="Search actions…"
                 />
             }
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Open"
+                        label="Still to do"
                         href="/governance/actions?status=active"
                     >
                         <PageHeaderMeterBig>
@@ -235,7 +232,7 @@ export default function ActionsIndex({
                         <PageHeaderMeterCaption>
                             {summary.blocked > 0
                                 ? `${summary.blocked} blocked`
-                                : 'Active actions'}
+                                : 'Not started or in progress'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
@@ -360,7 +357,7 @@ export default function ActionsIndex({
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5" dusk="actions-list-card">
                     <ListCaption
-                        title="Action register"
+                        title="Actions"
                         caption={`${items.data.length} of ${items.total ?? items.data.length} shown`}
                     />
 
@@ -375,7 +372,7 @@ export default function ActionsIndex({
                             description={
                                 hasFilters
                                     ? 'Try clearing a filter or search term.'
-                                    : 'Actions are created from carried decisions and meeting follow-ups.'
+                                    : 'Actions appear here when the board passes a resolution with follow-up work.'
                             }
                             action={
                                 hasFilters ? (
@@ -406,8 +403,8 @@ export default function ActionsIndex({
                                 icon: ClipboardList,
                                 name: row.title || row.description,
                                 subline: [
-                                    row.action_reference,
                                     sourceLabel(row.source_type),
+                                    refSuffix(row.action_reference),
                                 ]
                                     .filter(Boolean)
                                     .join(' · '),
@@ -424,23 +421,19 @@ export default function ActionsIndex({
                                     key: 'status',
                                     label: 'Status',
                                     width: '0.9fr',
-                                    cell: (row) =>
-                                        isActionOverdue(
+                                    cell: (row) => {
+                                        const chip = actionChip(
                                             row.status,
                                             row.due_date,
-                                        ) ? (
-                                            <EntityStatusChip variant="critical">
-                                                Overdue
-                                            </EntityStatusChip>
-                                        ) : (
+                                        );
+                                        return (
                                             <EntityStatusChip
-                                                variant={actionStatusVariant(
-                                                    row.status,
-                                                )}
+                                                variant={chip.variant}
                                             >
-                                                {actionStatusLabel(row.status)}
+                                                {chip.label}
                                             </EntityStatusChip>
-                                        ),
+                                        );
+                                    },
                                 },
                                 {
                                     key: 'owner',
@@ -492,13 +485,22 @@ export default function ActionsIndex({
                                 {
                                     key: 'evidence',
                                     label: 'Evidence',
-                                    width: '0.7fr',
-                                    cell: (row) =>
-                                        row.evidence_required ? (
-                                            <EntityChip>Required</EntityChip>
+                                    width: '1fr',
+                                    cell: (row) => {
+                                        const state = evidenceState(
+                                            row.evidence_required,
+                                            row.evidence_count,
+                                        );
+                                        return state.variant === 'neutral' ? (
+                                            <EntityChip>{state.label}</EntityChip>
                                         ) : (
-                                            <EmptyValue />
-                                        ),
+                                            <EntityStatusChip
+                                                variant={state.variant}
+                                            >
+                                                {state.label}
+                                            </EntityStatusChip>
+                                        );
+                                    },
                                 },
                             ]}
                         />
@@ -519,7 +521,7 @@ export default function ActionsIndex({
                     icon={ClipboardList}
                     title={
                         ctxMenu.ctx.record.title ||
-                        ctxMenu.ctx.record.action_reference
+                        ctxMenu.ctx.record.description
                     }
                     items={actionsFor(ctxMenu.ctx.record)}
                     onClose={ctxMenu.close}

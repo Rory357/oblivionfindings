@@ -2,10 +2,10 @@ import { Head, router } from '@inertiajs/react';
 import {
     BookOpen,
     CalendarClock,
-    ClipboardCheck,
     Eye,
     Plus,
     Tag,
+    UsersRound,
     X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -13,7 +13,6 @@ import { useEffect, useState } from 'react';
 import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
 import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
 import {
-    CounterPill,
     EmptyValue,
     EntityChip,
     EntityContextMenu,
@@ -35,22 +34,23 @@ import {
     PageHeaderMeterDonut,
     PageHeaderPrimaryButton,
     PageHeaderSearch,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly } from '@/lib/datetime';
+import { formatDateOnly, toDateInput } from '@/lib/datetime';
+import { governanceStatus } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
 
 import {
     POLICY_STATUS_OPTIONS,
-    POLICY_STATUS_VARIANT,
     PolicyWizardDialog,
     policyCategoryLabel,
-    policyStatusLabel,
 } from './_dialogs';
+import { PolicyViewToggle, confirmedOf, plural } from './_shared';
 
 interface Policy {
     id: number;
@@ -61,7 +61,7 @@ interface Policy {
     effective_date: string | null;
     review_date: string | null;
     requires_attestation: boolean;
-    attestations_count: number;
+    confirmation: { confirmed: number; total: number; in_effect: boolean } | null;
 }
 
 interface Filters {
@@ -69,6 +69,7 @@ interface Filters {
     category: string | null;
     status: string | null;
     review: string | null;
+    confirm: string | null;
 }
 
 interface Props extends PageProps {
@@ -84,6 +85,8 @@ interface Props extends PageProps {
         active: number;
         draft: number;
         requires_attestation: number;
+        waiting_on_members: number;
+        board_member_count: number;
         review_overdue: number;
     };
     categories: Array<{ value: string; label: string }>;
@@ -108,7 +111,8 @@ export default function PolicyIndex({
     const [wizardOpen, setWizardOpen] = useDialogDeepLink('create', canManage);
     const [search, setSearch] = useState(filters.search ?? '');
     const ctxMenu = useEntityContextMenu<Policy>();
-    const today = new Date().toISOString().split('T')[0];
+    // The NZ calendar date, not the UTC one (a day out on NZ mornings).
+    const today = toDateInput(new Date());
 
     useEffect(() => {
         setSearch(filters.search ?? '');
@@ -132,25 +136,36 @@ export default function PolicyIndex({
     }, [search]);
 
     const hasFilters = Boolean(
-        filters.search || filters.category || filters.status || filters.review,
+        filters.search ||
+            filters.category ||
+            filters.status ||
+            filters.review ||
+            filters.confirm,
     );
     const clearFilters = () =>
         router.get('/governance/policies', {}, { preserveScroll: true });
 
-    const closeWizard = () => setWizardOpen(false);
-
     const openPolicy = (policy: Policy) =>
         router.visit(`/governance/policies/${policy.id}`);
+
+    const reviewOverdue = (policy: Policy) =>
+        Boolean(
+            policy.status === 'active' &&
+                policy.review_date &&
+                policy.review_date < today,
+        );
 
     const actionsFor = (policy: Policy): MenuItem[] =>
         compactMenu([
             { label: 'Open policy', icon: Eye, onClick: () => openPolicy(policy) },
-            policy.requires_attestation &&
-                policy.status === 'active' && {
-                    label: 'Attestations',
-                    icon: ClipboardCheck,
+            canManage &&
+                policy.confirmation !== null && {
+                    label: 'Who has confirmed',
+                    icon: UsersRound,
                     onClick: () =>
-                        router.visit('/governance/policies/attestations'),
+                        router.visit(
+                            `/governance/policies/${policy.id}#confirmations`,
+                        ),
                 },
         ]);
 
@@ -169,22 +184,23 @@ export default function PolicyIndex({
         {
             key: 'status',
             label: 'Status',
-            width: '0.8fr',
-            cell: (p) => (
-                <EntityStatusChip
-                    variant={POLICY_STATUS_VARIANT[p.status] ?? 'neutral'}
-                >
-                    {policyStatusLabel(p.status)}
-                </EntityStatusChip>
-            ),
+            width: '0.9fr',
+            cell: (p) => {
+                const chip = governanceStatus('policy_status', p.status);
+                return (
+                    <EntityStatusChip variant={chip.variant}>
+                        {chip.label}
+                    </EntityStatusChip>
+                );
+            },
         },
         {
             key: 'version',
             label: 'Version',
-            width: '0.5fr',
+            width: '0.6fr',
             cell: (p) => (
                 <span className="text-muted-foreground tabular-nums">
-                    v{p.version}
+                    Version {p.version}
                 </span>
             ),
         },
@@ -194,29 +210,50 @@ export default function PolicyIndex({
             width: '0.9fr',
             cell: (p) =>
                 p.review_date ? (
-                    <span
-                        className={
-                            p.status === 'active' && p.review_date < today
-                                ? 'font-semibold text-status-critical'
-                                : undefined
-                        }
-                    >
-                        {formatDateOnly(p.review_date)}
-                    </span>
+                    reviewOverdue(p) ? (
+                        <EntityStatusChip variant="critical">
+                            Overdue · {formatDateOnly(p.review_date)}
+                        </EntityStatusChip>
+                    ) : (
+                        formatDateOnly(p.review_date)
+                    )
                 ) : (
                     <EmptyValue />
                 ),
         },
         {
-            key: 'attestations',
-            label: 'Attestations',
-            width: '0.8fr',
+            key: 'confirmed',
+            label: 'Read and confirmed',
+            width: '1fr',
             cell: (p) =>
-                p.requires_attestation ? (
-                    <CounterPill tone="neutral">{p.attestations_count}</CounterPill>
+                p.confirmation ? (
+                    p.confirmation.in_effect ? (
+                        <EntityStatusChip
+                            variant={
+                                p.confirmation.total > 0 &&
+                                p.confirmation.confirmed >= p.confirmation.total
+                                    ? 'success'
+                                    : 'warning'
+                            }
+                        >
+                            Confirmed:{' '}
+                            {confirmedOf(
+                                p.confirmation.confirmed,
+                                p.confirmation.total,
+                            )}
+                        </EntityStatusChip>
+                    ) : (
+                        <span className="text-xs text-muted-foreground">
+                            Not in effect yet
+                        </span>
+                    )
+                ) : p.requires_attestation ? (
+                    <span className="text-xs text-muted-foreground">
+                        Once approved
+                    </span>
                 ) : (
                     <span className="text-xs text-muted-foreground">
-                        Not required
+                        Not needed
                     </span>
                 ),
         },
@@ -225,14 +262,29 @@ export default function PolicyIndex({
     const header = (
         <PageHeader
             icon={BookOpen}
-            title="Governance policies"
-            subline="Board policies, review schedule and member attestation"
+            title="Policies"
+            titleChip={
+                summary.total === 0 ? (
+                    <PageHeaderStatusChip variant="neutral">
+                        No policies yet
+                    </PageHeaderStatusChip>
+                ) : summary.review_overdue > 0 ? (
+                    <PageHeaderStatusChip variant="critical">
+                        {plural(summary.review_overdue, 'review')} overdue
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="success">
+                        Reviews up to date
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={`Rules the board has approved — read and confirm them here · ${plural(summary.total, 'policy', 'policies')}`}
             actions={
                 <>
                     <PageHeaderSearch
                         value={search}
                         onChange={setSearch}
-                        placeholder="Search policies by title or code…"
+                        placeholder="Search policies…"
                     />
                     {canManage ? (
                         <PageHeaderPrimaryButton
@@ -257,20 +309,14 @@ export default function PolicyIndex({
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Active"
+                        label="Approved"
                         value={summary.active}
-                        ariaLabel="View active policies"
+                        ariaLabel="View approved policies"
                         href="/governance/policies?status=active"
                     >
                         <PageHeaderMeterDonut
                             percent={activePercent}
-                            caption={
-                                <>
-                                    {summary.active} of {summary.total}
-                                    <br />
-                                    in effect
-                                </>
-                            }
+                            caption={`${summary.active} of ${summary.total} policies`}
                         />
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
@@ -280,24 +326,27 @@ export default function PolicyIndex({
                     >
                         <PageHeaderMeterBig>{summary.draft}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            awaiting approval
+                            not approved yet
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Attestation"
-                        ariaLabel="View policy attestations"
-                        href="/governance/policies/attestations"
+                        label="Waiting on members"
+                        tone={summary.waiting_on_members > 0 ? 'warning' : 'brand'}
+                        ariaLabel="View policies board members still need to confirm"
+                        href="/governance/policies?confirm=waiting"
                     >
                         <PageHeaderMeterBig>
-                            {summary.requires_attestation}
+                            {summary.waiting_on_members}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            active policies need sign-off
+                            {summary.waiting_on_members === 1
+                                ? 'policy not confirmed by everyone'
+                                : 'policies not confirmed by everyone'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Review overdue"
-                        tone={summary.review_overdue > 0 ? 'critical' : 'success'}
+                        tone={summary.review_overdue > 0 ? 'critical' : 'brand'}
                         ariaLabel="View policies overdue for review"
                         href="/governance/policies?review=overdue"
                     >
@@ -312,6 +361,7 @@ export default function PolicyIndex({
             }
             filters={
                 <>
+                    <PolicyViewToggle value="policies" />
                     <PageHeaderFilterSelect
                         icon={Tag}
                         label="All categories"
@@ -336,6 +386,11 @@ export default function PolicyIndex({
                         checked={filters.review === 'overdue'}
                         onChange={(on) => go({ review: on ? 'overdue' : null })}
                     />
+                    <PageHeaderFilterCheck
+                        label="Waiting on members"
+                        checked={filters.confirm === 'waiting'}
+                        onChange={(on) => go({ confirm: on ? 'waiting' : null })}
+                    />
                 </>
             }
             rail={<GovernanceSectionRail />}
@@ -351,11 +406,11 @@ export default function PolicyIndex({
                 { title: 'Policies', href: '/governance/policies' },
             ]}
         >
-            <Head title="Governance policies" />
+            <Head title="Policies" />
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
                     <ListCaption
-                        title="Policy library"
+                        title={hasFilters ? 'Matching policies' : 'All policies'}
                         caption={`${policies.data.length} of ${policies.total} shown`}
                         right={
                             hasFilters ? (
@@ -363,7 +418,6 @@ export default function PolicyIndex({
                                     variant="outline"
                                     size="sm"
                                     onClick={clearFilters}
-                                    className="text-xs text-muted-foreground"
                                 >
                                     <X className="h-3.5 w-3.5" />
                                     Clear filters
@@ -384,8 +438,8 @@ export default function PolicyIndex({
                                 hasFilters
                                     ? 'Try clearing a filter or search term.'
                                     : canManage
-                                      ? 'Create the first board policy to start the library.'
-                                      : 'Board policies will appear here once they are published.'
+                                      ? 'Write the first board policy to start the library.'
+                                      : 'Board policies appear here once the board approves them.'
                             }
                             action={
                                 hasFilters ? (
@@ -414,18 +468,22 @@ export default function PolicyIndex({
                             rowKey={(p) => p.id}
                             identityLabel="Policy"
                             identity={(p) => ({
-                                icon: p.review_date && p.review_date < today && p.status === 'active'
-                                    ? CalendarClock
-                                    : BookOpen,
+                                icon: reviewOverdue(p) ? CalendarClock : BookOpen,
                                 name: p.title,
-                                subline: `${policyCategoryLabel(p.category)} · effective ${formatDateOnly(p.effective_date)}`,
+                                linkLabel: `Open ${p.title}`,
+                                subline: p.effective_date
+                                    ? `${policyCategoryLabel(p.category)} · In effect from ${formatDateOnly(p.effective_date)}`
+                                    : `${policyCategoryLabel(p.category)} · No date set`,
                             })}
                             columns={columns}
                             actionsFor={actionsFor}
                             hrefFor={(p) => `/governance/policies/${p.id}`}
                             onOpen={openPolicy}
                             onRowContextMenu={(e, p) => ctxMenu.open(e, p)}
-                            mutedFor={(p) => p.status === 'archived'}
+                            mutedFor={(p) =>
+                                p.status === 'archived' || p.status === 'superseded'
+                            }
+                            minWidth={820}
                         />
                     )}
 
@@ -449,7 +507,10 @@ export default function PolicyIndex({
             ) : null}
 
             {canManage ? (
-                <PolicyWizardDialog open={wizardOpen} onClose={closeWizard} />
+                <PolicyWizardDialog
+                    open={wizardOpen}
+                    onClose={() => setWizardOpen(false)}
+                />
             ) : null}
         </AppLayout>
     );

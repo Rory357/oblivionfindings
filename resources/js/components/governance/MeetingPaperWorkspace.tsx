@@ -172,6 +172,8 @@ interface Props {
     onOpenPaper?: (paperId: number) => void;
     /** Where to land when the workspace opens (e.g. back from an action). */
     focus?: MeetingWorkspaceFocus | null;
+    /** The resolution's full record page, when the viewer may open it. */
+    fullRecordHref?: string | null;
 }
 
 export function MeetingPaperWorkspace({
@@ -182,6 +184,7 @@ export function MeetingPaperWorkspace({
     nextPaper = null,
     onOpenPaper,
     focus = null,
+    fullRecordHref = null,
 }: Props) {
     const rootRef = useRef<HTMLDivElement>(null);
     const followUpsRef = useRef<HTMLDivElement>(null);
@@ -269,6 +272,18 @@ export function MeetingPaperWorkspace({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge variant={chip.variant}>{chip.label}</StatusBadge>
+                    {fullRecordHref ? (
+                        <Button asChild variant="ghost" size="sm">
+                            <Link
+                                href={fullRecordHref}
+                                aria-label={`Open the full record of ${resolution.title}`}
+                                data-test="meeting-paper-full-record"
+                            >
+                                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                                Full record
+                            </Link>
+                        </Button>
+                    ) : null}
                     {nextPaper && onOpenPaper ? (
                         <Button
                             variant="outline"

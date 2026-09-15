@@ -17,12 +17,14 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DiscardDraftDialog } from '@/components/governance/DiscardDraftDialog';
+import { pageHasFlashError } from '@/components/governance/governance-dialog-deep-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
     Field,
     FieldErr,
+    InfoCard,
     SelectInput,
     TilePicker,
 } from '@/components/wizard/primitives';
@@ -35,52 +37,111 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { formatDateOnly, toDateInput } from '@/lib/datetime';
+import { evaluationTypeLabel as sharedEvaluationTypeLabel } from '@/lib/governance-labels';
 
 export const EVALUATION_TYPES = [
     {
         key: 'board',
-        label: 'Full board',
-        description: 'Whole-of-board effectiveness',
+        label: sharedEvaluationTypeLabel('board'),
+        description: 'How well the board works as a whole',
         icon: Users,
     },
     {
         key: 'committee',
-        label: 'Committee',
-        description: 'A board committee’s performance',
+        label: sharedEvaluationTypeLabel('committee'),
+        description: 'How well a board committee is working',
         icon: UsersRound,
     },
     {
         key: 'chair',
-        label: 'Chair',
-        description: 'Leadership of the chair',
+        label: sharedEvaluationTypeLabel('chair'),
+        description: 'How the chair leads the board',
         icon: Crown,
     },
     {
         key: 'individual',
-        label: 'Individual',
-        description: 'Individual member reflection',
+        label: sharedEvaluationTypeLabel('individual'),
+        description: 'Each member reflects on their own contribution',
         icon: UserRound,
     },
 ] as const;
 
 export function evaluationTypeLabel(type: string | null | undefined): string {
-    return (
-        EVALUATION_TYPES.find((t) => t.key === type)?.label ??
-        (type ? type.replace(/_/g, ' ') : '—')
-    );
+    return type ? sharedEvaluationTypeLabel(type) : 'Not set';
 }
 
 export const QUESTION_TYPES = [
-    { value: 'rating', label: 'Rating (1–5)' },
-    { value: 'text', label: 'Free text' },
-    { value: 'yes_no', label: 'Yes / No' },
+    { value: 'rating', label: 'Rating from 1 to 5' },
+    { value: 'text', label: 'Written answer' },
+    { value: 'yes_no', label: 'Yes or no' },
 ];
+
+/** The words beside a 1–5 rating, so members know which end is which. */
+export const RATING_ANCHORS: Record<number, string> = {
+    1: 'Strongly disagree',
+    2: 'Disagree',
+    3: 'Neutral',
+    4: 'Agree',
+    5: 'Strongly agree',
+};
+
+/** "Choose a rating from 1 to 5." — the same words the server sends back. */
+export function answerRequiredMessage(type: string): string {
+    if (type === 'rating') return 'Choose a rating from 1 to 5.';
+    if (type === 'yes_no') return 'Choose Yes or No.';
+    return 'Answer this question.';
+}
+
+/**
+ * Checked before a response is sent: one message per unanswered question,
+ * keyed `answers.N` like the server's validation errors.
+ */
+export function unansweredQuestionErrors(
+    questions: { type: string; required?: boolean }[],
+    answers: Record<string, string | undefined>,
+): Record<string, string> {
+    const errors: Record<string, string> = {};
+    questions.forEach((question, index) => {
+        if (question.required === false) return;
+        if ((answers[String(index)] ?? '').trim() !== '') return;
+        errors[`answers.${index}`] = answerRequiredMessage(question.type);
+    });
+    return errors;
+}
+
+/** An existing draft to edit with the same wizard. */
+export interface EvaluationWizardRecord {
+    id: number;
+    title: string;
+    evaluation_type: string;
+    board_committee_id?: number | null;
+    period_start: string;
+    period_end: string;
+    due_date: string;
+    questions: { text: string; type: string }[];
+}
+
+export interface CommitteeOption {
+    id: number;
+    name: string;
+}
+
+/** "Committee — Finance and audit committee" when a committee is named. */
+export function evaluationSubject(
+    type: string | null | undefined,
+    committeeName?: string | null,
+): string {
+    const label = evaluationTypeLabel(type);
+    return type === 'committee' && committeeName ? `${label} — ${committeeName}` : label;
+}
 
 type QuestionType = 'rating' | 'text' | 'yes_no';
 
 interface EvaluationForm {
     title: string;
     evaluation_type: string;
+    /** Only for committee evaluations; '' until chosen. */
+    board_committee_id: string;
     period_start: string;
     period_end: string;
     due_date: string;
@@ -93,13 +154,13 @@ const STEPS: readonly (WizardStep & { key: StepKey })[] = [
     {
         key: 'details',
         label: 'Details',
-        blurb: 'Title & who is evaluated',
+        blurb: 'Title and who is evaluated',
         icon: Star,
     },
     {
         key: 'period',
         label: 'Period',
-        blurb: 'Review period & due date',
+        blurb: 'Period covered and due date',
         icon: CalendarRange,
     },
     {
@@ -111,13 +172,14 @@ const STEPS: readonly (WizardStep & { key: StepKey })[] = [
     {
         key: 'review',
         label: 'Review',
-        blurb: 'Check before creating',
+        blurb: 'Check before saving',
         icon: ClipboardCheck,
     },
 ];
 
 function stepForField(field: string): StepKey {
-    if (field === 'title' || field === 'evaluation_type') return 'details';
+    if (field === 'title' || field === 'evaluation_type' || field === 'board_committee_id')
+        return 'details';
     if (field.startsWith('questions')) return 'questions';
     return 'period';
 }
@@ -130,6 +192,9 @@ function validateStep(key: StepKey, data: EvaluationForm): Record<string, string
     const errors: Record<string, string> = {};
     if (key === 'details' && !data.title.trim()) {
         errors.title = 'Give the evaluation a title.';
+    }
+    if (key === 'details' && data.evaluation_type === 'committee' && !data.board_committee_id) {
+        errors.board_committee_id = 'Choose which committee is being evaluated.';
     }
     if (key === 'period') {
         if (!data.period_start) errors.period_start = 'Set the period start.';
@@ -158,21 +223,54 @@ function validateStep(key: StepKey, data: EvaluationForm): Record<string, string
 export function EvaluationWizardDialog({
     open,
     onClose,
+    evaluation = null,
+    committees = [],
 }: {
     open: boolean;
     onClose: () => void;
+    /** Present = edit this draft (prefilled); absent = create. */
+    evaluation?: EvaluationWizardRecord | null;
+    /** Committees a committee evaluation can be about. */
+    committees?: CommitteeOption[];
 }) {
-    return open ? <EvaluationWizardBody onClose={onClose} /> : null;
+    return open ? (
+        <EvaluationWizardBody
+            onClose={onClose}
+            evaluation={evaluation}
+            committees={committees}
+        />
+    ) : null;
 }
 
-function EvaluationWizardBody({ onClose }: { onClose: () => void }) {
+function asQuestionType(type: string): QuestionType {
+    return type === 'text' || type === 'yes_no' ? type : 'rating';
+}
+
+function EvaluationWizardBody({
+    onClose,
+    evaluation,
+    committees,
+}: {
+    onClose: () => void;
+    evaluation: EvaluationWizardRecord | null;
+    committees: CommitteeOption[];
+}) {
+    const isEdit = evaluation !== null;
     const form = useForm<EvaluationForm>({
-        title: '',
-        evaluation_type: 'board',
-        period_start: '',
-        period_end: '',
-        due_date: '',
-        questions: [{ text: '', type: 'rating' }],
+        title: evaluation?.title ?? '',
+        evaluation_type: evaluation?.evaluation_type ?? 'board',
+        board_committee_id: evaluation?.board_committee_id
+            ? String(evaluation.board_committee_id)
+            : '',
+        period_start: evaluation?.period_start ?? '',
+        period_end: evaluation?.period_end ?? '',
+        due_date: evaluation?.due_date ?? '',
+        questions: evaluation?.questions.length
+            ? evaluation.questions.map((q) => ({
+                  text: q.text,
+                  type: asQuestionType(q.type),
+              }))
+            : [{ text: '', type: 'rating' }],
     });
     const { data, setData, processing } = form;
     const [stepIndex, setStepIndex] = useState(0);
@@ -239,20 +337,22 @@ function EvaluationWizardBody({ onClose }: { onClose: () => void }) {
             return;
         }
         setClientErrors({});
-        form.post('/governance/evaluations', {
+        const options = {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: (page) => {
-                const flash = page.props.flash as
-                    | { error?: string | null }
-                    | undefined;
-                if (!flash?.error) setDone(true);
+            onSuccess: (page: unknown) => {
+                if (!pageHasFlashError(page)) setDone(true);
             },
-            onError: (errors) => {
+            onError: (errors: Record<string, string>) => {
                 const first = Object.keys(errors)[0];
                 if (first) goTo(stepForField(first));
             },
-        });
+        };
+        if (isEdit && evaluation) {
+            form.put(`/governance/evaluations/${evaluation.id}`, options);
+            return;
+        }
+        form.post('/governance/evaluations', options);
     };
 
     const isReview = current.key === 'review';
@@ -262,11 +362,15 @@ function EvaluationWizardBody({ onClose }: { onClose: () => void }) {
             <WizardShell
                 open
                 onClose={requestClose}
-                title="New board evaluation"
-                description="Set up a board, committee, chair or individual evaluation with its period and questions."
+                title={isEdit ? 'Edit board evaluation' : 'New board evaluation'}
+                description={
+                    isEdit
+                        ? 'Change the details or questions while the evaluation is still a draft.'
+                        : 'Set up an evaluation of the board, a committee, the chair or individual members, with its period and questions.'
+                }
                 railIcon={Star}
-                railTitle="New evaluation"
-                railSub="Board & members"
+                railTitle={isEdit ? 'Edit evaluation' : 'New evaluation'}
+                railSub="Board and members"
                 steps={STEPS}
                 stepIndex={stepIndex}
                 onStepClick={setStepIndex}
@@ -274,8 +378,8 @@ function EvaluationWizardBody({ onClose }: { onClose: () => void }) {
                 success={
                     done ? (
                         <WizardSuccessPane
-                            title="Evaluation created"
-                            blurb={`“${data.title}” is saved as a draft. Launch it when members should respond.`}
+                            title={isEdit ? 'Evaluation saved' : 'Evaluation created'}
+                            blurb={`“${data.title}” is saved as a draft. Open it for responses when members should answer.`}
                             actions={<Button onClick={onClose}>Done</Button>}
                         />
                     ) : undefined
@@ -311,7 +415,7 @@ function EvaluationWizardBody({ onClose }: { onClose: () => void }) {
                                 ) : (
                                     <Check className="h-4 w-4" />
                                 )}
-                                Create evaluation
+                                {isEdit ? 'Save evaluation' : 'Create evaluation'}
                             </Button>
                         ) : (
                             <Button type="button" onClick={next}>
@@ -348,6 +452,32 @@ function EvaluationWizardBody({ onClose }: { onClose: () => void }) {
                                     }))}
                                 />
                             </Field>
+                            {data.evaluation_type === 'committee' ? (
+                                <Field
+                                    label="Which committee?"
+                                    required
+                                    error={err('board_committee_id')}
+                                >
+                                    {committees.length > 0 ? (
+                                        <SelectInput
+                                            ariaLabel="Which committee?"
+                                            placeholder="Choose a committee"
+                                            value={data.board_committee_id}
+                                            onChange={(v) => setData('board_committee_id', v)}
+                                            options={committees.map((c) => ({
+                                                value: String(c.id),
+                                                label: c.name,
+                                            }))}
+                                        />
+                                    ) : (
+                                        <InfoCard icon={UsersRound} tone="warn">
+                                            No committees are set up yet. Choose another
+                                            kind of evaluation, or ask an administrator to
+                                            add the committee.
+                                        </InfoCard>
+                                    )}
+                                </Field>
+                            ) : null}
                         </div>
                     ) : null}
 
@@ -485,8 +615,13 @@ function EvaluationWizardBody({ onClose }: { onClose: () => void }) {
                             >
                                 <ReviewRow label="Title" value={data.title} />
                                 <ReviewRow
-                                    label="Type"
-                                    value={evaluationTypeLabel(data.evaluation_type)}
+                                    label="Who is evaluated"
+                                    value={evaluationSubject(
+                                        data.evaluation_type,
+                                        committees.find(
+                                            (c) => String(c.id) === data.board_committee_id,
+                                        )?.name,
+                                    )}
                                 />
                             </ReviewCard>
                             <ReviewCard
@@ -530,13 +665,19 @@ function EvaluationWizardBody({ onClose }: { onClose: () => void }) {
                 </WizardStepPane>
             </WizardShell>
 
-            <ConfirmDialog
+            <DiscardDraftDialog
                 open={confirmClose}
-                onClose={() => setConfirmClose(false)}
-                onConfirm={onClose}
-                title="Discard this draft?"
-                description="The evaluation details and questions entered so far will be lost."
-                confirmText="Discard"
+                mode={isEdit ? 'edit' : 'create'}
+                onKeepEditing={() => setConfirmClose(false)}
+                onDiscard={() => {
+                    setConfirmClose(false);
+                    onClose();
+                }}
+                description={
+                    isEdit
+                        ? 'Your changes to the details and questions will be lost. The saved draft stays as it was.'
+                        : 'The evaluation details and questions entered so far will be lost.'
+                }
             />
         </>
     );

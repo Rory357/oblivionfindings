@@ -1,8 +1,8 @@
-import { useForm } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import {
     Award,
     BarChart3,
-    BookOpen,
+    FileQuestion,
     FileStack,
     FolderOpen,
     Landmark,
@@ -24,7 +24,7 @@ import {
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Field, TilePicker } from '@/components/wizard/primitives';
+import { Field, InfoCard, TilePicker } from '@/components/wizard/primitives';
 
 /** Document types as stored in governance_documents.document_type. */
 export const DOCUMENT_TYPE_ICONS: Record<
@@ -33,21 +33,21 @@ export const DOCUMENT_TYPE_ICONS: Record<
 > = {
     constitution: Landmark,
     terms_of_reference: ScrollText,
-    policy: BookOpen,
     procedure: ListChecks,
     template: FileStack,
     report: BarChart3,
     certificate: Award,
+    other: FileQuestion,
 };
 
 const DOCUMENT_TYPE_BLURBS: Record<string, string> = {
     constitution: 'Trust deed, constitution or charter',
-    terms_of_reference: 'Committee and board terms',
-    policy: 'Board policy documents',
-    procedure: 'Operating procedures',
-    template: 'Reusable board templates',
-    report: 'Reports and papers',
+    terms_of_reference: 'What the board and its committees do',
+    procedure: 'How something is done, step by step',
+    template: 'Forms and templates the board reuses',
+    report: 'Reports and papers kept for reference',
     certificate: 'Registrations and certificates',
+    other: 'Anything else the board refers to',
 };
 
 export function documentTypeIcon(type: string | null | undefined) {
@@ -96,7 +96,7 @@ function UploadDocumentBody({
 }) {
     const form = useForm<UploadForm>({
         title: '',
-        category: categories[0]?.value ?? 'policy',
+        category: categories[0]?.value ?? 'constitution',
         description: '',
         file: null,
     });
@@ -124,18 +124,28 @@ function UploadDocumentBody({
                     Upload document
                 </DialogTitle>
                 <DialogDescription>
-                    Add a board document to the governance library. Files are
-                    stored privately and downloaded through access checks.
+                    Only people with access to board documents can open this
+                    file.
                 </DialogDescription>
             </DialogHeader>
 
             <div className="mt-4 grid gap-4">
+                <InfoCard icon={FolderOpen}>
+                    Policies the board approves go in{' '}
+                    <Link
+                        href="/governance/policies"
+                        className="font-medium text-primary underline-offset-2 hover:underline"
+                    >
+                        Policies
+                    </Link>
+                    , where members read and confirm them.
+                </InfoCard>
                 <Field label="Title" required error={form.errors.title}>
                     <Input
                         id="document-title"
                         value={form.data.title}
                         onChange={(e) => form.setData('title', e.target.value)}
-                        placeholder="e.g. Trust Deed (amended 2025)"
+                        placeholder="e.g. Trust deed (amended 2025)"
                     />
                 </Field>
                 <Field label="Document type" required error={form.errors.category}>
@@ -159,7 +169,7 @@ function UploadDocumentBody({
                         onChange={(e) =>
                             form.setData('description', e.target.value)
                         }
-                        placeholder="What the document is and when the board relies on it."
+                        placeholder="What the document is and when the board uses it."
                     />
                 </Field>
                 <Field label="File" required error={form.errors.file}>
@@ -172,8 +182,8 @@ function UploadDocumentBody({
                         <FileDropzone
                             id="document-file"
                             multiple={false}
-                            title="Drag & drop the document here"
-                            hint="Up to 20 MB"
+                            title="Drag and drop the document here"
+                            hint="PDF, Word, spreadsheet, presentation, text or image · up to 20 MB"
                             onFiles={(files) =>
                                 form.setData('file', files[0] ?? null)
                             }

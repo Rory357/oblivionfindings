@@ -1,3 +1,4 @@
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
 import {
     PageHeader,
     PageHeaderGlassButton,
@@ -25,6 +26,12 @@ import {
     formatDateOnly,
     formatDateTimeLong,
 } from '@/lib/datetime';
+import {
+    actionSourceLabel,
+    governanceStatus,
+    refSuffix,
+    resolutionOutcomeLabel,
+} from '@/lib/governance-labels';
 import { unblock as unblockAction } from '@/routes/governance/actions';
 import { PageProps } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
@@ -40,6 +47,7 @@ import {
     Flag,
     Gauge,
     Lock,
+    Paperclip,
     PauseCircle,
     Play,
     UserRound,
@@ -54,18 +62,21 @@ import {
     type AssigneeOption,
 } from './_dialogs';
 import {
-    actionPriorityLabel,
-    actionPriorityVariant,
-    actionStatusLabel,
-    actionStatusVariant,
+    ActionEvidencePanel,
+    type ActionEvidenceFile,
+    type EarlierEvidenceFile,
+} from './_evidence';
+import {
+    actionChip,
     dueDateOnly,
+    dueWording,
+    evidenceState,
     isActionOverdue,
 } from './_helpers';
 
 interface UserRef {
     id: number;
     name: string;
-    email?: string | null;
 }
 
 interface ActionItem {
@@ -79,7 +90,8 @@ interface ActionItem {
     source_type: string | null;
     source_id: number | null;
     evidence_required: boolean;
-    evidence_attachments?: string[] | null;
+    evidence?: ActionEvidenceFile[];
+    legacy_evidence?: EarlierEvidenceFile[];
     completion_notes?: string | null;
     completion_receipt?: string | null;
     completed_at?: string | null;
@@ -90,6 +102,7 @@ interface ActionItem {
     blocked_reason?: string | null;
     escalated_at?: string | null;
     escalation_reason?: string | null;
+    escalated_automatically?: boolean;
     assigned_to?: UserRef | null;
     completed_by?: UserRef | null;
     created_by?: UserRef | null;
@@ -125,29 +138,29 @@ function scrollToSection(id: string) {
 
 function returnLabel(path: string): string {
     if (path.startsWith('/governance/meetings/')) return 'Back to meeting';
-    if (path.startsWith('/governance/my-work')) return 'Back to My Work';
-    if (path.startsWith('/governance/resolutions/')) return 'Back to paper';
+    if (path.startsWith('/governance/my-work')) return 'Back to My work';
+    if (path.startsWith('/governance/resolutions/')) return 'Back to resolution';
     if (path.startsWith('/governance/dashboard')) return 'Back to Governance';
     return 'Back';
 }
 
 function Section({
+    id,
     icon: Icon,
     title,
     description,
     action,
-    className,
     children,
 }: {
+    id?: string;
     icon?: typeof FileText;
     title: string;
     description?: ReactNode;
     action?: ReactNode;
-    className?: string;
     children: ReactNode;
 }) {
     return (
-        <Card className={className}>
+        <Card id={id} className="scroll-mt-5">
             <CardHeader>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -191,12 +204,18 @@ export default function ActionItemShow({
     const [copiedReceipt, setCopiedReceipt] = useState(false);
     const [unblocking, setUnblocking] = useState(false);
 
+    const title = action.title?.trim() || 'Action';
     const isCompleted = action.status === 'complete';
     const isBlocked = action.status === 'blocked';
     const progress = action.progress_pct ?? 0;
     const dueDate = dueDateOnly(action.due_date);
     const isOverdue = isActionOverdue(action.status, action.due_date);
-    const evidenceCount = action.evidence_attachments?.length ?? 0;
+    const chip = actionChip(action.status, action.due_date);
+    const priority = governanceStatus('priority', action.priority);
+    const evidenceFiles = action.evidence ?? [];
+    const earlierFiles = action.legacy_evidence ?? [];
+    const evidenceCount = evidenceFiles.length + earlierFiles.length;
+    const evidence = evidenceState(action.evidence_required, evidenceCount);
     const canAct = can_update && !isCompleted;
     const close = () => setDialog(null);
 
@@ -216,43 +235,33 @@ export default function ActionItemShow({
         );
     };
 
-    const sourceHref =
-        source_details && !source_details.is_restricted
-            ? source_details.url
-            : undefined;
+    const source =
+        source_details && !source_details.is_restricted ? source_details : null;
+    const sourceHref = source?.url;
+    const sourceKindLabel = source_details
+        ? actionSourceLabel(source_details.type)
+        : action.source_type
+          ? actionSourceLabel(action.source_type)
+          : 'Added directly';
 
     const header = (
         <PageHeader
             variant="profile"
             backHref={return_to ?? '/governance/actions'}
             icon={ClipboardList}
-            title={action.title || action.action_reference}
+            title={title}
             titleDusk="action-heading"
             wrapTitle
             titleChip={
-                <>
-                    <PageHeaderStatusChip
-                        variant={actionStatusVariant(action.status)}
-                    >
-                        {actionStatusLabel(action.status)}
-                    </PageHeaderStatusChip>
-                    <PageHeaderStatusChip
-                        variant={actionPriorityVariant(action.priority)}
-                    >
-                        {actionPriorityLabel(action.priority)} priority
-                    </PageHeaderStatusChip>
-                    {isOverdue ? (
-                        <PageHeaderStatusChip variant="critical">
-                            Overdue
-                        </PageHeaderStatusChip>
-                    ) : null}
-                </>
+                <PageHeaderStatusChip variant={chip.variant}>
+                    {chip.label}
+                </PageHeaderStatusChip>
             }
             subline={[
-                action.action_reference,
-                `Assigned to ${action.assigned_to?.name ?? 'nobody'}`,
-                `Due ${formatDateOnly(dueDate)}`,
-                action.version_number ? `v${action.version_number}` : null,
+                `Owner: ${action.assigned_to?.name ?? 'nobody yet'}`,
+                dueDate ? `Due ${formatDateOnly(dueDate)}` : null,
+                `${priority.label} priority`,
+                refSuffix(action.action_reference),
             ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -267,20 +276,12 @@ export default function ActionItemShow({
                         </PageHeaderGlassButton>
                     ) : null}
                     {canAct ? (
-                        <PageHeaderGlassButton
-                            icon={Gauge}
-                            onClick={() => setDialog('progress')}
-                        >
-                            Update progress
-                        </PageHeaderGlassButton>
-                    ) : null}
-                    {canAct ? (
                         <PageHeaderPrimaryButton
                             icon={CheckCircle}
                             onClick={() => setDialog('complete')}
                             dusk="complete-action-button"
                         >
-                            Complete action
+                            Mark as done
                         </PageHeaderPrimaryButton>
                     ) : null}
                 </>
@@ -291,19 +292,15 @@ export default function ActionItemShow({
                         label="Progress"
                         value={`${progress}%`}
                         tone={isCompleted ? 'success' : 'brand'}
-                        onClick={
-                            canAct
-                                ? () => setDialog('progress')
-                                : () => scrollToSection('progress')
-                        }
-                        ariaLabel={canAct ? 'Update progress' : 'View progress'}
+                        onClick={() => scrollToSection('progress')}
+                        ariaLabel="View progress"
                     >
                         <PageHeaderMeterBar percent={progress} />
                         <PageHeaderMeterCaption>
                             {isCompleted
-                                ? 'Signed off'
+                                ? 'Done'
                                 : action.progress_notes
-                                  ? 'Latest update recorded'
+                                  ? 'Latest update saved'
                                   : 'No update yet'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
@@ -314,7 +311,7 @@ export default function ActionItemShow({
                         ariaLabel={
                             isOverdue
                                 ? 'View overdue actions'
-                                : 'View open actions'
+                                : 'View actions still to do'
                         }
                     >
                         <PageHeaderMeterBig>
@@ -322,63 +319,40 @@ export default function ActionItemShow({
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
                             {isCompleted
-                                ? 'Target completion'
-                                : isOverdue
-                                  ? 'Past its due date'
-                                  : 'Target completion'}
+                                ? 'Due date'
+                                : (dueWording(action.due_date) ?? 'Due date')}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Evidence"
-                        tone={
-                            action.evidence_required &&
-                            evidenceCount === 0 &&
-                            !isCompleted
-                                ? 'warning'
-                                : 'brand'
-                        }
-                        onClick={
-                            canAct
-                                ? () => setDialog('complete')
-                                : () => scrollToSection('completion')
-                        }
-                        ariaLabel={
-                            canAct
-                                ? 'Add completion evidence'
-                                : 'View completion evidence'
-                        }
+                        tone={evidence.variant === 'warning' && !isCompleted ? 'warning' : 'brand'}
+                        onClick={() => scrollToSection('evidence')}
+                        ariaLabel="View evidence"
                     >
                         <PageHeaderMeterBig>{evidenceCount}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {action.evidence_required
-                                ? 'Evidence required to complete'
-                                : 'Evidence optional'}
+                            {evidence.label}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Source"
+                        label="Came from"
                         href={sourceHref ?? '/governance/actions'}
                         ariaLabel={
                             sourceHref
-                                ? 'Open the originating record'
-                                : 'View the action register'
+                                ? `Open the ${sourceKindLabel.toLowerCase()} this action came from`
+                                : 'View all actions'
                         }
                     >
                         <PageHeaderMeterBig>
                             {source_details?.is_restricted
-                                ? 'Restricted'
-                                : source_details?.type === 'resolution'
-                                  ? (source_details.reference ?? 'Resolution')
-                                  : source_details?.type === 'meeting'
-                                    ? 'Meeting'
-                                    : action.source_type
-                                      ? 'Linked record'
-                                      : 'Stand-alone'}
+                                ? 'Private record'
+                                : sourceKindLabel}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {source_details && !source_details.is_restricted
-                                ? (source_details.title ?? 'Originating record')
-                                : 'Originating record'}
+                            {source?.title ??
+                                (source_details?.is_restricted
+                                    ? "You can't open it"
+                                    : 'Not linked to a meeting or resolution')}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
@@ -393,25 +367,24 @@ export default function ActionItemShow({
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Actions', href: '/governance/actions' },
                 {
-                    title: action.action_reference,
+                    title,
                     href: `/governance/actions/${action.id}`,
                 },
             ]}
         >
-            <Head title={`Action ${action.action_reference}`} />
+            <Head title={`${title} — Actions`} />
 
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
                     {isBlocked ? (
                         <Section
                             icon={AlertCircle}
-                            title="Action blocked"
+                            title="Blocked"
                             description={
                                 action.blocked_at
-                                    ? `Flagged ${formatDateTimeLong(action.blocked_at)}`
+                                    ? `Marked as blocked on ${formatDateTimeLong(action.blocked_at)}`
                                     : undefined
                             }
-                            className="border-status-critical/40"
                         >
                             <p className="text-sm whitespace-pre-line">
                                 {action.blocked_reason}
@@ -422,46 +395,51 @@ export default function ActionItemShow({
                     {action.escalated_at ? (
                         <Section
                             icon={Flag}
-                            title="Escalated to governance"
-                            description={`Escalated by ${action.escalated_by?.name ?? 'the system'} on ${formatDateTimeLong(action.escalated_at)}`}
-                            className="border-status-warning/40"
+                            title="Raised with the board"
+                            description={
+                                action.escalated_automatically
+                                    ? `Escalated automatically because it was overdue · ${formatDateTimeLong(action.escalated_at)}`
+                                    : action.escalated_by
+                                      ? `Raised by ${action.escalated_by.name} on ${formatDateTimeLong(action.escalated_at)}`
+                                      : `Raised on ${formatDateTimeLong(action.escalated_at)}`
+                            }
                         >
-                            <p className="text-sm whitespace-pre-line">
-                                {action.escalation_reason}
-                            </p>
+                            {action.escalated_automatically ? (
+                                <p className="text-subtle">
+                                    The due date passed while the work was still
+                                    open, so the app raised it with the board and
+                                    told the owner.
+                                </p>
+                            ) : (
+                                <p className="text-sm whitespace-pre-line">
+                                    {action.escalation_reason}
+                                </p>
+                            )}
                         </Section>
                     ) : null}
 
                     <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
                         <div className="flex flex-col gap-5 lg:col-span-2">
-                            <Section
-                                icon={FileText}
-                                title="Deliverable & scope"
-                            >
+                            <Section icon={FileText} title="What needs doing">
                                 <div className="flex flex-col gap-4">
                                     <p className="leading-relaxed whitespace-pre-line">
                                         {action.description}
                                     </p>
                                     <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2">
-                                        <Fact label="Created by">
+                                        <Fact label="Added by">
                                             {action.created_by?.name ?? (
                                                 <span className="text-muted-foreground">
                                                     —
                                                 </span>
                                             )}
                                         </Fact>
-                                        <Fact label="Evidence requirement">
-                                            <StatusBadge
-                                                variant={
-                                                    action.evidence_required
-                                                        ? 'warning'
-                                                        : 'neutral'
-                                                }
-                                            >
+                                        <Fact label="Evidence needed">
+                                            <span className="inline-flex items-center gap-1">
                                                 {action.evidence_required
-                                                    ? 'Evidence required'
-                                                    : 'Standard verification'}
-                                            </StatusBadge>
+                                                    ? 'Yes'
+                                                    : 'No'}
+                                                <GovernanceTermHint term="evidence" />
+                                            </span>
                                         </Fact>
                                     </div>
                                 </div>
@@ -469,65 +447,63 @@ export default function ActionItemShow({
 
                             <Section
                                 icon={ClipboardList}
-                                title="Originating source"
-                                description="The governance paper or meeting that created this accountable follow-up."
+                                title="Where this came from"
                             >
                                 {source_details?.is_restricted ? (
                                     <p className="text-subtle flex items-center gap-2.5">
                                         <Lock className="size-4 shrink-0" />
-                                        This source record is restricted to its
-                                        authorised audience.
+                                        This action came from a record only its
+                                        own audience can open.
                                     </p>
-                                ) : source_details ? (
+                                ) : source ? (
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                         <div className="min-w-0">
                                             <div className="flex flex-wrap items-center gap-1.5">
                                                 <StatusBadge variant="neutral">
-                                                    {source_details.type ===
-                                                    'resolution'
-                                                        ? (source_details.reference ??
-                                                          'Resolution')
-                                                        : 'Meeting'}
+                                                    {actionSourceLabel(
+                                                        source.type,
+                                                    )}
                                                 </StatusBadge>
-                                                {source_details.outcome ? (
+                                                {source.outcome ? (
                                                     <StatusBadge
                                                         variant={
-                                                            source_details.outcome ===
-                                                            'carried'
-                                                                ? 'success'
-                                                                : source_details.outcome ===
-                                                                    'defeated'
-                                                                  ? 'critical'
-                                                                  : 'warning'
+                                                            governanceStatus(
+                                                                'resolution_outcome',
+                                                                source.outcome,
+                                                            ).variant
                                                         }
                                                     >
-                                                        {source_details.outcome.replace(
-                                                            /_/g,
-                                                            ' ',
+                                                        {resolutionOutcomeLabel(
+                                                            source.outcome,
                                                         )}
                                                     </StatusBadge>
                                                 ) : null}
                                             </div>
                                             <p className="mt-1 text-sm font-medium">
-                                                {source_details.title}
+                                                {source.title}
                                             </p>
-                                            {source_details.scheduled_at ? (
-                                                <p className="text-caption">
-                                                    Scheduled{' '}
-                                                    {formatDateLong(
-                                                        source_details.scheduled_at,
-                                                    )}
-                                                </p>
-                                            ) : null}
+                                            <p className="text-caption">
+                                                {[
+                                                    source.scheduled_at
+                                                        ? `Meeting on ${formatDateLong(source.scheduled_at)}`
+                                                        : null,
+                                                    refSuffix(source.reference),
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(' · ')}
+                                            </p>
                                         </div>
-                                        {source_details.url ? (
+                                        {source.url ? (
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 asChild
                                             >
-                                                <Link href={source_details.url}>
-                                                    View source{' '}
+                                                <Link href={source.url}>
+                                                    Open{' '}
+                                                    {actionSourceLabel(
+                                                        source.type,
+                                                    ).toLowerCase()}
                                                     <ExternalLink className="h-3.5 w-3.5" />
                                                 </Link>
                                             </Button>
@@ -536,239 +512,219 @@ export default function ActionItemShow({
                                 ) : (
                                     <p className="text-subtle">
                                         {action.source_type
-                                            ? 'Linked to a governance record that has no detail view here.'
-                                            : 'A stand-alone action, not bound to a meeting or resolution.'}
+                                            ? `Added from: ${actionSourceLabel(action.source_type)}.`
+                                            : 'This action was added directly, not from a meeting or resolution.'}
                                     </p>
                                 )}
                             </Section>
 
-                            <div id="completion">
-                                <Section
-                                    icon={CheckCircle}
-                                    title="Completion & verification"
-                                    description={
-                                        isCompleted
-                                            ? 'Audited sign-off with completion notes and a durable receipt.'
-                                            : 'Completion needs substantive notes and any required evidence.'
-                                    }
-                                    className={
-                                        isCompleted
-                                            ? 'border-status-success/40'
-                                            : undefined
-                                    }
-                                    action={
-                                        isCompleted ? (
-                                            <StatusBadge variant="success">
-                                                Completed
-                                            </StatusBadge>
-                                        ) : null
-                                    }
-                                >
-                                    {isCompleted ? (
-                                        <div className="flex flex-col gap-4">
-                                            {action.completion_receipt ? (
-                                                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2.5">
-                                                    <div className="min-w-0">
-                                                        <p className="text-caption">
-                                                            Completion receipt
-                                                        </p>
-                                                        <p className="truncate font-mono text-sm font-semibold">
-                                                            {
-                                                                action.completion_receipt
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={copyReceipt}
-                                                    >
-                                                        {copiedReceipt ? (
-                                                            <Check className="h-3.5 w-3.5 text-status-success" />
-                                                        ) : (
-                                                            <Copy className="h-3.5 w-3.5" />
-                                                        )}
-                                                        {copiedReceipt
-                                                            ? 'Copied'
-                                                            : 'Copy'}
-                                                    </Button>
-                                                </div>
-                                            ) : null}
-                                            <div className="grid gap-4 sm:grid-cols-2">
-                                                <Fact label="Completed">
-                                                    {action.completed_at
-                                                        ? formatDateTimeLong(
-                                                              action.completed_at,
-                                                          )
-                                                        : '—'}
-                                                </Fact>
-                                                <Fact label="Completed by">
-                                                    {action.completed_by
-                                                        ?.name ?? '—'}
-                                                </Fact>
-                                            </div>
-                                            {action.completion_notes ? (
-                                                <Fact label="Completion notes">
-                                                    <p className="font-normal whitespace-pre-line">
+                            <Section
+                                id="evidence"
+                                icon={Paperclip}
+                                title="Evidence"
+                                action={
+                                    <StatusBadge variant={evidence.variant}>
+                                        {evidence.label}
+                                    </StatusBadge>
+                                }
+                            >
+                                <ActionEvidencePanel
+                                    actionId={action.id}
+                                    evidence={evidenceFiles}
+                                    earlierEvidence={earlierFiles}
+                                    canUpload={canAct}
+                                    required={action.evidence_required}
+                                />
+                            </Section>
+
+                            <Section
+                                id="completion"
+                                icon={CheckCircle}
+                                title={isCompleted ? 'Done — receipt' : 'Marking it as done'}
+                                action={
+                                    isCompleted ? (
+                                        <StatusBadge variant="success">
+                                            Done
+                                        </StatusBadge>
+                                    ) : null
+                                }
+                            >
+                                {isCompleted ? (
+                                    <div className="flex flex-col gap-4">
+                                        {action.completion_receipt ? (
+                                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2.5">
+                                                <div className="min-w-0">
+                                                    <p className="text-caption">
+                                                        Receipt
+                                                    </p>
+                                                    <p className="truncate font-mono text-sm">
                                                         {
-                                                            action.completion_notes
+                                                            action.completion_receipt
                                                         }
                                                     </p>
-                                                </Fact>
-                                            ) : null}
-                                            {evidenceCount > 0 ? (
-                                                <Fact
-                                                    label={`Evidence (${evidenceCount})`}
-                                                >
-                                                    <ul className="mt-1 flex flex-col gap-1">
-                                                        {action.evidence_attachments!.map(
-                                                            (file) => (
-                                                                <li
-                                                                    key={file}
-                                                                    className="flex items-center gap-2 font-mono text-xs font-normal"
-                                                                >
-                                                                    <FileText className="size-3.5 shrink-0 text-muted-foreground" />
-                                                                    <span className="truncate">
-                                                                        {file}
-                                                                    </span>
-                                                                </li>
-                                                            ),
-                                                        )}
-                                                    </ul>
-                                                </Fact>
-                                            ) : null}
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-start gap-3">
-                                            <p className="text-subtle">
-                                                Setting progress to 100% does
-                                                not close an action. When the
-                                                deliverable is done, sign it off
-                                                with notes
-                                                {action.evidence_required
-                                                    ? ' and evidence'
-                                                    : ''}
-                                                .
-                                            </p>
-                                            {canAct ? (
+                                                </div>
                                                 <Button
-                                                    onClick={() =>
-                                                        setDialog('complete')
-                                                    }
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={copyReceipt}
                                                 >
-                                                    <CheckCircle className="h-4 w-4" />{' '}
-                                                    Complete action
+                                                    {copiedReceipt ? (
+                                                        <Check className="h-3.5 w-3.5 text-status-success" />
+                                                    ) : (
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                    )}
+                                                    {copiedReceipt
+                                                        ? 'Copied'
+                                                        : 'Copy receipt'}
                                                 </Button>
-                                            ) : null}
-                                        </div>
-                                    )}
-                                </Section>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-5">
-                            <div id="progress">
-                                <Section icon={Gauge} title="Progress">
-                                    <div className="flex flex-col gap-4">
-                                        <div>
-                                            <div className="mb-1.5 flex items-center justify-between text-sm">
-                                                <span className="text-muted-foreground">
-                                                    Deliverable progress
-                                                </span>
-                                                <span className="font-semibold tabular-nums">
-                                                    {progress}%
-                                                </span>
                                             </div>
-                                            <Progress
-                                                value={progress}
-                                                role="progressbar"
-                                                aria-valuenow={progress}
-                                                aria-valuemin={0}
-                                                aria-valuemax={100}
-                                                aria-label="Deliverable progress"
-                                            />
+                                        ) : null}
+                                        <div className="grid gap-4 sm:grid-cols-2">
+                                            <Fact label="Done on">
+                                                {action.completed_at
+                                                    ? formatDateTimeLong(
+                                                          action.completed_at,
+                                                      )
+                                                    : '—'}
+                                            </Fact>
+                                            <Fact label="Marked as done by">
+                                                {action.completed_by?.name ??
+                                                    '—'}
+                                            </Fact>
                                         </div>
-                                        {action.progress_notes ? (
-                                            <Fact label="Latest update">
+                                        {action.completion_notes ? (
+                                            <Fact label="What was done">
                                                 <p className="font-normal whitespace-pre-line">
-                                                    {action.progress_notes}
+                                                    {action.completion_notes}
                                                 </p>
                                             </Fact>
                                         ) : null}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-start gap-3">
+                                        <p className="text-subtle">
+                                            When the work is finished, mark it
+                                            done — progress alone doesn&apos;t
+                                            close it.
+                                            {action.evidence_required
+                                                ? ' This action also needs evidence.'
+                                                : ''}
+                                        </p>
                                         {canAct ? (
-                                            <div className="flex flex-col gap-2">
+                                            <Button
+                                                onClick={() =>
+                                                    setDialog('complete')
+                                                }
+                                            >
+                                                <CheckCircle className="h-4 w-4" />
+                                                Mark as done
+                                            </Button>
+                                        ) : !can_update ? (
+                                            <p className="text-caption">
+                                                Only the owner or someone who
+                                                manages actions can mark it as
+                                                done.
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                )}
+                            </Section>
+                        </div>
+
+                        <div className="flex flex-col gap-5">
+                            <Section id="progress" icon={Gauge} title="Progress">
+                                <div className="flex flex-col gap-4">
+                                    <div>
+                                        <div className="mb-1.5 flex items-center justify-between text-sm">
+                                            <span className="text-muted-foreground">
+                                                How far along
+                                            </span>
+                                            <span className="font-semibold tabular-nums">
+                                                {progress}%
+                                            </span>
+                                        </div>
+                                        <Progress
+                                            value={progress}
+                                            role="progressbar"
+                                            aria-valuenow={progress}
+                                            aria-valuemin={0}
+                                            aria-valuemax={100}
+                                            aria-label="How far along"
+                                        />
+                                    </div>
+                                    {action.progress_notes ? (
+                                        <Fact label="Latest update">
+                                            <p className="font-normal whitespace-pre-line">
+                                                {action.progress_notes}
+                                            </p>
+                                        </Fact>
+                                    ) : null}
+                                    {canAct ? (
+                                        <div className="flex flex-col gap-2">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() =>
+                                                    setDialog('progress')
+                                                }
+                                            >
+                                                <Gauge className="h-4 w-4" />
+                                                Update progress
+                                            </Button>
+                                            {isBlocked ? (
                                                 <Button
-                                                    onClick={() =>
-                                                        setDialog('progress')
-                                                    }
+                                                    variant="outline"
+                                                    onClick={unblock}
+                                                    disabled={unblocking}
                                                 >
-                                                    <Gauge className="h-4 w-4" />{' '}
-                                                    Update progress
+                                                    <Play className="h-4 w-4" />
+                                                    {unblocking
+                                                        ? 'Removing blocker…'
+                                                        : 'Remove blocker'}
                                                 </Button>
-                                                {isBlocked ? (
-                                                    <Button
-                                                        variant="outline"
-                                                        onClick={unblock}
-                                                        disabled={unblocking}
-                                                    >
-                                                        <Play className="h-4 w-4 text-status-success" />
-                                                        {unblocking
-                                                            ? 'Removing blocker…'
-                                                            : 'Remove blocker'}
-                                                    </Button>
-                                                ) : (
-                                                    <Button
-                                                        variant="outline"
-                                                        onClick={() =>
-                                                            setDialog('block')
-                                                        }
-                                                    >
-                                                        <PauseCircle className="h-4 w-4 text-status-warning" />
-                                                        Mark as blocked
-                                                    </Button>
-                                                )}
+                                            ) : (
                                                 <Button
                                                     variant="outline"
                                                     onClick={() =>
-                                                        setDialog('escalate')
+                                                        setDialog('block')
                                                     }
                                                 >
-                                                    <Flag className="h-4 w-4 text-status-critical" />
-                                                    Escalate
+                                                    <PauseCircle className="h-4 w-4" />
+                                                    Mark as blocked
                                                 </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    onClick={() =>
-                                                        setDialog('reassign')
-                                                    }
-                                                >
-                                                    <UserRound className="h-4 w-4" />{' '}
-                                                    Reassign owner
-                                                </Button>
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                </Section>
-                            </div>
+                                            )}
+                                            <Button
+                                                variant="outline"
+                                                onClick={() =>
+                                                    setDialog('escalate')
+                                                }
+                                            >
+                                                <Flag className="h-4 w-4" />
+                                                Raise with the board
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    setDialog('reassign')
+                                                }
+                                            >
+                                                <UserRound className="h-4 w-4" />
+                                                Change owner
+                                            </Button>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </Section>
 
-                            <Section
-                                icon={UserRound}
-                                title="Assignment & timing"
-                            >
+                            <Section icon={UserRound} title="Owner and due date">
                                 <div className="flex flex-col gap-4">
                                     <Fact label="Owner">
                                         {action.assigned_to?.name ?? (
                                             <span className="text-muted-foreground">
-                                                Unassigned
+                                                Nobody yet
                                             </span>
                                         )}
-                                        {action.assigned_to?.email ? (
-                                            <span className="text-caption block font-normal">
-                                                {action.assigned_to.email}
-                                            </span>
-                                        ) : null}
                                     </Fact>
-                                    <Fact label="Target completion">
+                                    <Fact label="Due">
                                         <span
                                             className={
                                                 isOverdue
@@ -777,8 +733,15 @@ export default function ActionItemShow({
                                             }
                                         >
                                             {formatDateOnly(dueDate)}
-                                            {isOverdue ? ' · overdue' : ''}
+                                            {isOverdue
+                                                ? ` · ${dueWording(action.due_date)}`
+                                                : ''}
                                         </span>
+                                    </Fact>
+                                    <Fact label="Priority">
+                                        <StatusBadge variant={priority.variant}>
+                                            {priority.label}
+                                        </StatusBadge>
                                     </Fact>
                                 </div>
                             </Section>

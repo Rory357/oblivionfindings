@@ -206,6 +206,7 @@ export const GOVERNANCE_LABELS = {
         minutes_signed: 'Minutes signed',
         archived: 'Archived',
         cancelled: 'Cancelled',
+        pack_draft: 'Board pack being prepared',
     },
     rsvp_response: {
         accepted: 'Attending',
@@ -235,6 +236,8 @@ export const GOVERNANCE_LABELS = {
         approved: 'Approved',
         signed: 'Signed',
         locked: 'Final version',
+        reviewed: 'Sent for approval',
+        archived: 'Archived',
     },
     board_pack_status: {
         draft: 'Draft',
@@ -332,16 +335,19 @@ export const GOVERNANCE_LABELS = {
 
     /* ── Compliance, care quality, Te Tiriti ─────────────────────────────── */
     compliance_framework: {
-        charities: 'Charities Act (Charities Services)',
-        nga_paerewa: 'Ngā Paerewa Health and Disability Services Standard',
-        hdsa_safety: 'Health and Disability Services (Safety) Act',
+        charities: 'Charities Act 2005 (Charities Services)',
+        nga_paerewa:
+            'Ngā Paerewa Health and Disability Services Standard (NZS 8134:2021)',
+        code_of_rights: 'Code of Rights (Health and Disability Commissioner)',
+        hdsa_safety: 'Health and Disability Services (Safety) Act 2001',
         privacy_act: 'Privacy Act 2020',
-        hip_code: 'Health Information Privacy Code',
+        hip_code: 'Health Information Privacy Code 2020',
         hswa: 'Health and Safety at Work Act 2015',
-        employment: 'Employment law',
-        funding_moh: 'Health NZ funding contract',
-        funding_msd: 'Ministry of Social Development funding contract',
-        funding_acc: 'ACC funding contract',
+        employment: 'Employment Relations Act 2000',
+        funding_moh: 'Health New Zealand funding',
+        funding_dss: 'Disability Support Services funding',
+        funding_msd: 'Ministry of Social Development funding',
+        funding_acc: 'ACC funding',
     },
     compliance_status: {
         not_due: 'Not due yet',
@@ -383,17 +389,19 @@ export const GOVERNANCE_LABELS = {
     // Māori advisor confirms them (GOV audit §3.12).
     te_tiriti_principle: {
         partnership: 'Partnership',
-        participation: 'Participation',
-        protection: 'Protection',
+        tino_rangatiratanga: 'Tino rangatiratanga',
+        active_protection: 'Active protection',
         equity: 'Equity',
-        options: 'Options',
+        options: 'Options (Kōwhiringa)',
+        participation: 'Tino rangatiratanga',
+        protection: 'Active protection',
     },
     te_tiriti_status: {
         not_started: 'Not started',
         in_progress: 'In progress',
-        ongoing: 'Ongoing',
-        implemented: 'In place',
-        achieved: 'Achieved',
+        ongoing: 'Part of everyday practice',
+        implemented: 'Done',
+        achieved: 'Done',
         embedded: 'Part of everyday practice',
     },
 
@@ -436,6 +444,7 @@ export const GOVERNANCE_LABELS = {
         report: 'Report',
         certificate: 'Certificate or registration',
         minutes: 'Minutes',
+        other: 'Other',
     },
 
     /* ── Board finance ───────────────────────────────────────────────────── */
@@ -691,6 +700,20 @@ export const GOVERNANCE_LABELS = {
         role_changed: 'changed a board role',
         policy_updated: 'updated a policy',
         key_person_changed: 'changed a key person',
+        'action.escalated': 'raised an action with the board',
+        'action.evidence_added': 'added evidence to an action',
+        'action.evidence_removed': 'removed evidence from an action',
+        'resolution.published': 'shared a resolution with members',
+        'budget.returned_to_drafting': 'returned a budget to drafting',
+        'risk.accepted': 'recorded the board accepting a risk',
+        'risk.closed': 'closed a risk',
+        'risk_treatment.completed': 'marked a risk action as done',
+        'risk_treatment.due_date_changed':
+            'changed the due date of a risk action',
+        'policy.approved': 'approved a policy',
+        'compliance.updated': 'updated a requirement',
+        'compliance.evidence_downloaded':
+            'downloaded evidence for a requirement',
     },
 } as const satisfies Record<string, Record<string, string>>;
 
@@ -971,6 +994,7 @@ export const GOVERNANCE_STATUS_VARIANTS = {
         minutes_signed: S,
         archived: N,
         cancelled: N,
+        pack_draft: I,
     },
     rsvp_response: {
         accepted: S,
@@ -994,6 +1018,8 @@ export const GOVERNANCE_STATUS_VARIANTS = {
         approved: S,
         signed: S,
         locked: S,
+        reviewed: W,
+        archived: N,
     },
     board_pack_status: {
         draft: N,
@@ -1041,8 +1067,8 @@ export const GOVERNANCE_STATUS_VARIANTS = {
     te_tiriti_status: {
         not_started: N,
         in_progress: I,
-        ongoing: I,
-        implemented: I,
+        ongoing: S,
+        implemented: S,
         achieved: S,
         embedded: S,
     },

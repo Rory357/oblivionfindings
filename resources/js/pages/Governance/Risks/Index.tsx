@@ -28,7 +28,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
-import { riskScoreLevel } from '@/lib/governance-status';
+import { refSuffix } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { ExternalLink, Plus, ShieldAlert, X } from 'lucide-react';
@@ -42,10 +42,11 @@ import {
 import {
     RISK_SEVERITY_FILTERS,
     RISK_STATUS_FILTERS,
+    RiskScoreExplainer,
     RiskViewToggle,
+    riskBandLabel,
     riskLevelVariant,
-    riskStatusLabel,
-    riskStatusVariant,
+    riskStatusChip,
 } from './_shared';
 
 interface Risk {
@@ -53,9 +54,13 @@ interface Risk {
     risk_reference: string;
     title: string;
     category: string;
+    category_label: string;
+    inherent_score: number;
     residual_score: number;
+    appetite_threshold: number;
     status: string;
     within_appetite: boolean;
+    accepted_until: string | null;
     risk_owner: { name: string } | null;
     treatments_count: number;
 }
@@ -64,7 +69,10 @@ interface Filters {
     category?: string;
     status?: string;
     severity?: string;
+    score?: string;
     above_appetite?: string;
+    likelihood?: string;
+    impact?: string;
     search?: string;
 }
 
@@ -76,16 +84,16 @@ interface Props extends PageProps {
         last_page?: number;
     };
     categories: Array<{ value: string; label: string }>;
-    summary: Record<
-        string,
-        {
-            total: number;
-            critical: number;
-            high: number;
-            above_appetite: number;
-        }
-    >;
+    summary: {
+        current: number;
+        critical: number;
+        high: number;
+        above_limit: number;
+        accepted: number;
+        closed: number;
+    };
     filters: Filters;
+    committees: Array<{ id: number; name: string; type: string }>;
     canCreate?: boolean;
     formOptions?: RiskFormOptions | null;
 }
@@ -103,6 +111,7 @@ export default function RiskIndex({
     categories,
     summary,
     filters,
+    committees = [],
     canCreate = false,
     formOptions = null,
 }: Props) {
@@ -137,20 +146,8 @@ export default function RiskIndex({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
 
-    const totals = Object.values(summary).reduce(
-        (acc, cat) => ({
-            total: acc.total + cat.total,
-            critical: acc.critical + cat.critical,
-            high: acc.high + cat.high,
-            above_appetite: acc.above_appetite + cat.above_appetite,
-        }),
-        { total: 0, critical: 0, high: 0, above_appetite: 0 },
-    );
     const abovePct =
-        totals.total > 0 ? (totals.above_appetite / totals.total) * 100 : 0;
-
-    const categoryLabel = (value: string) =>
-        categories.find((c) => c.value === value)?.label ?? value;
+        summary.current > 0 ? (summary.above_limit / summary.current) * 100 : 0;
 
     const hasFilters = Object.keys(cleanFilters(filters)).length > 0;
     const shown = risks.data.length;
@@ -170,30 +167,34 @@ export default function RiskIndex({
             icon={ShieldAlert}
             title="Risk register"
             titleChip={
-                totals.above_appetite > 0 ? (
+                summary.above_limit > 0 ? (
                     <PageHeaderStatusChip variant="critical">
-                        {totals.above_appetite} above appetite
+                        {summary.above_limit} above the board&apos;s limit
+                    </PageHeaderStatusChip>
+                ) : summary.current === 0 ? (
+                    <PageHeaderStatusChip variant="neutral">
+                        No open risks
                     </PageHeaderStatusChip>
                 ) : (
                     <PageHeaderStatusChip variant="success">
-                        Within appetite
+                        None above the board&apos;s limit
                     </PageHeaderStatusChip>
                 )
             }
-            subline={`Enterprise risks, residual scores and treatments · ${totals.total} active · ${categories.length} categories`}
+            subline={`Risks the board watches, how serious they are and what is being done · ${summary.current} open or accepted`}
             actions={
                 <>
                     <PageHeaderSearch
                         value={search}
                         onChange={setSearch}
-                        placeholder="Search risks or references…"
+                        placeholder="Search risks…"
                     />
                     {canCreate && formOptions ? (
                         <PageHeaderPrimaryButton
                             icon={Plus}
                             onClick={() => setWizardOpen(true)}
                         >
-                            Register risk
+                            Add risk
                         </PageHeaderPrimaryButton>
                     ) : null}
                 </>
@@ -201,50 +202,59 @@ export default function RiskIndex({
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Active risks"
-                        ariaLabel="View all risks"
+                        label="On the register"
+                        ariaLabel="View open and accepted risks"
                         href="/governance/risks"
                     >
-                        <PageHeaderMeterBig>{totals.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{summary.current}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            across {categories.length} categories
+                            open or accepted by the board
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Critical"
                         ariaLabel="View critical risks"
                         href="/governance/risks?severity=critical"
-                        tone={totals.critical > 0 ? 'critical' : 'brand'}
+                        tone={summary.critical > 0 ? 'critical' : 'brand'}
                     >
-                        <PageHeaderMeterBig>
-                            {totals.critical}
-                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{summary.critical}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Residual score 20+
+                            after controls, 20–25
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="High"
                         ariaLabel="View high risks"
                         href="/governance/risks?severity=high"
-                        tone={totals.high > 0 ? 'warning' : 'brand'}
+                        tone={summary.high > 0 ? 'warning' : 'brand'}
                     >
-                        <PageHeaderMeterBig>{totals.high}</PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{summary.high}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            Residual score 15–19
+                            after controls, 15–19
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Above appetite"
-                        ariaLabel="View risks above appetite"
-                        value={totals.above_appetite}
+                        label="Above the board's limit"
+                        ariaLabel="View risks above the board's limit"
+                        value={summary.above_limit}
                         href="/governance/risks?above_appetite=1"
-                        tone={totals.above_appetite > 0 ? 'critical' : 'brand'}
+                        tone={summary.above_limit > 0 ? 'critical' : 'brand'}
                     >
                         <PageHeaderMeterDonut
                             percent={abovePct}
-                            caption={`${totals.above_appetite} of ${totals.total} active risks`}
+                            caption={`${summary.above_limit} of ${summary.current} need action or board acceptance`}
                         />
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Accepted by the board"
+                        ariaLabel="View risks the board has accepted"
+                        href="/governance/risks?status=accepted"
+                        tone={summary.accepted > 0 ? 'success' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>{summary.accepted}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            accepted for a set time
+                        </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
             }
@@ -252,10 +262,10 @@ export default function RiskIndex({
                 <>
                     <RiskViewToggle value="register" />
                     <PageHeaderFilterSelect
-                        label="Category"
+                        label="All kinds of risk"
                         value={filters.category ?? 'all'}
                         options={[
-                            { value: 'all', label: 'All categories' },
+                            { value: 'all', label: 'All kinds of risk' },
                             ...categories,
                         ]}
                         onChange={(v) =>
@@ -263,33 +273,62 @@ export default function RiskIndex({
                         }
                     />
                     <PageHeaderFilterSelect
-                        label="Status"
-                        value={filters.status ?? 'all'}
+                        label="Open and accepted"
+                        value={filters.status ?? 'current'}
+                        allValue="current"
                         options={RISK_STATUS_FILTERS}
                         onChange={(v) =>
-                            go({ status: v === 'all' ? undefined : v })
+                            go({ status: v === 'current' ? undefined : v })
                         }
                     />
                     <PageHeaderFilterSelect
-                        label="Severity"
+                        label="Any level"
                         value={filters.severity ?? 'all'}
                         options={RISK_SEVERITY_FILTERS}
                         onChange={(v) =>
-                            go({ severity: v === 'all' ? undefined : v })
+                            go({
+                                severity: v === 'all' ? undefined : v,
+                                score: undefined,
+                            })
                         }
                     />
                     <PageHeaderFilterCheck
-                        label="Above appetite"
+                        label="Above the board's limit"
                         checked={filters.above_appetite === '1'}
                         onChange={(checked) =>
                             go({ above_appetite: checked ? '1' : undefined })
                         }
                     />
+                    {committees.length > 0 ? (
+                        <PageHeaderFilterSelect
+                            label="Committee view"
+                            value="all"
+                            options={[
+                                { value: 'all', label: 'Committee view' },
+                                ...committees.map((committee) => ({
+                                    value: String(committee.id),
+                                    label: committee.name,
+                                })),
+                            ]}
+                            onChange={(v) => {
+                                if (v !== 'all') {
+                                    router.visit(`/governance/risks/committee/${v}`);
+                                }
+                            }}
+                        />
+                    ) : null}
                 </>
             }
             rail={<GovernanceSectionRail />}
         />
     );
+
+    const scoreFilterNote =
+        filters.likelihood && filters.impact
+            ? `Likelihood ${filters.likelihood} × impact ${filters.impact}`
+            : filters.severity && filters.score === 'before'
+              ? 'Levels use the score before controls'
+              : null;
 
     return (
         <AppLayout
@@ -304,8 +343,15 @@ export default function RiskIndex({
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
                     <ListCaption
-                        title={hasFilters ? 'Matching risks' : 'All risks'}
-                        caption={`${shown} of ${total} shown · highest residual score first`}
+                        title={hasFilters ? 'Matching risks' : 'Open and accepted risks'}
+                        caption={[
+                            `${shown} of ${total} shown`,
+                            'highest risk after controls first',
+                            scoreFilterNote,
+                        ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        right={<RiskScoreExplainer />}
                     />
 
                     {risks.data.length === 0 ? (
@@ -314,14 +360,14 @@ export default function RiskIndex({
                             title={
                                 hasFilters
                                     ? 'No risks match your filters'
-                                    : 'No risks registered yet'
+                                    : 'No open risks on the register'
                             }
                             description={
                                 hasFilters
                                     ? 'Try clearing a filter or search term.'
                                     : canCreate
-                                      ? 'Register the first enterprise risk to start tracking residual scores and treatments.'
-                                      : 'Risks registered by the risk lead will appear here.'
+                                      ? 'Add the first risk the board should keep an eye on.'
+                                      : 'Risks added by the risk lead appear here.'
                             }
                             action={
                                 hasFilters ? (
@@ -351,61 +397,75 @@ export default function RiskIndex({
                                 icon: riskCategoryIcon(risk.category),
                                 name: risk.title,
                                 linkLabel: `Open ${risk.title}`,
-                                subline: `${risk.risk_reference} · ${categoryLabel(risk.category)}`,
+                                subline: `${risk.category_label} · ${refSuffix(risk.risk_reference)}`,
                             })}
                             hrefFor={(risk) => `/governance/risks/${risk.id}`}
                             onOpen={(risk) =>
                                 router.visit(`/governance/risks/${risk.id}`)
                             }
+                            minWidth={900}
                             columns={[
                                 {
-                                    key: 'residual',
-                                    label: 'Residual',
-                                    width: '1fr',
+                                    key: 'scores',
+                                    label: 'Before → after controls',
+                                    width: '1.2fr',
                                     cell: (risk) => (
                                         <EntityStatusChip
                                             variant={riskLevelVariant(
                                                 risk.residual_score,
                                             )}
                                         >
-                                            {risk.residual_score} ·{' '}
-                                            {riskScoreLevel(risk.residual_score)}
+                                            <span
+                                                aria-label={`Risk before controls ${risk.inherent_score}, after controls ${risk.residual_score} (${riskBandLabel(risk.residual_score)})`}
+                                            >
+                                                {risk.inherent_score} →{' '}
+                                                {risk.residual_score} ·{' '}
+                                                {riskBandLabel(risk.residual_score)}
+                                            </span>
                                         </EntityStatusChip>
                                     ),
                                 },
                                 {
-                                    key: 'appetite',
-                                    label: 'Appetite',
-                                    width: '1fr',
+                                    key: 'limit',
+                                    label: "The board's limit",
+                                    width: '0.9fr',
                                     cell: (risk) =>
                                         risk.within_appetite ? (
                                             <EntityStatusChip variant="success">
-                                                Within
+                                                Within ({risk.appetite_threshold})
                                             </EntityStatusChip>
                                         ) : (
-                                            <EntityStatusChip variant="critical">
-                                                Above
+                                            <EntityStatusChip
+                                                variant={
+                                                    risk.status === 'accepted'
+                                                        ? 'warning'
+                                                        : 'critical'
+                                                }
+                                            >
+                                                Above ({risk.appetite_threshold})
                                             </EntityStatusChip>
                                         ),
                                 },
                                 {
                                     key: 'status',
                                     label: 'Status',
-                                    width: '1fr',
-                                    cell: (risk) => (
-                                        <EntityStatusChip
-                                            variant={riskStatusVariant(
-                                                risk.status,
-                                            )}
-                                        >
-                                            {riskStatusLabel(risk.status)}
-                                        </EntityStatusChip>
-                                    ),
+                                    width: '1.3fr',
+                                    cell: (risk) => {
+                                        const chip = riskStatusChip({
+                                            ...risk,
+                                            within_appetite: true,
+                                        });
+                                        return (
+                                            <EntityStatusChip variant={chip.variant}>
+                                                {chip.label}
+                                            </EntityStatusChip>
+                                        );
+                                    },
                                 },
                                 {
                                     key: 'owner',
                                     label: 'Owner',
-                                    width: '1.2fr',
+                                    width: '1.1fr',
                                     cell: (risk) => (
                                         <PersonCell
                                             name={risk.risk_owner?.name}
@@ -414,8 +474,8 @@ export default function RiskIndex({
                                 },
                                 {
                                     key: 'treatments',
-                                    label: 'Treatments',
-                                    width: '0.8fr',
+                                    label: 'Actions',
+                                    width: '0.6fr',
                                     align: 'center',
                                     cell: (risk) => (
                                         <CounterPill tone="neutral">
@@ -428,6 +488,7 @@ export default function RiskIndex({
                             onRowContextMenu={(e, risk) =>
                                 ctxMenu.open(e, risk)
                             }
+                            mutedFor={(risk) => risk.status === 'closed'}
                         />
                     )}
 
