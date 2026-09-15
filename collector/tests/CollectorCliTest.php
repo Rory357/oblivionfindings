@@ -157,6 +157,82 @@ it('binds transport evidence to opaque collector and identity-generation referen
     }
 });
 
+it('persists portable relative identity paths and resolves them for runtime commands', function () {
+    $directory = collectorTempDirectory('enrol-portable-identity');
+    $identityPath = $directory.'/collector.identity.json';
+    $collectorId = '2df1d87c-2d04-4e57-80ab-8a15f39c944d';
+    $certificatePair = collectorCertificatePair('oblivion-collector-'.$collectorId);
+    $certificate = openssl_x509_read($certificatePair['certificate']);
+    $fingerprint = $certificate === false ? false : openssl_x509_fingerprint($certificate, 'sha256');
+    $output = '';
+    $previousToken = getenv('OBLIVION_COLLECTOR_ENROLMENT_TOKEN');
+    putenv('OBLIVION_COLLECTOR_ENROLMENT_TOKEN=one-time-enrolment-token');
+
+    try {
+        if (! is_string($fingerprint)) {
+            throw new RuntimeException('Collector test certificate fingerprint generation failed.');
+        }
+        $application = new CollectorApplication(
+            enrolmentTransport: fn (
+                string $_centralUrl,
+                string $_tlsPin,
+                string $_token,
+                string $_collectorId,
+                string $_publicKey,
+            ): array => [
+                'site_id' => 9,
+                'central_signing_public_key' => base64_encode(collectorPublicKey()),
+                'client_certificate' => $certificatePair['certificate'],
+                'client_private_key' => $certificatePair['private_key'],
+                'client_certificate_fingerprint' => strtolower($fingerprint),
+                'acknowledged_source_sequence' => 0,
+            ],
+            transportEvidenceTransport: fn (
+                string $_collectorId,
+                string $_expectedState,
+                int $_samples,
+                string $_signingKeyReference,
+                string $_identityGenerationReference,
+            ): array => ['state' => 'response_contract_matched'],
+            output: function (string $message, mixed $_stream) use (&$output): void {
+                $output .= $message;
+            },
+        );
+
+        $enrol = $application->run([
+            'oblivion-collector',
+            'enrol',
+            "--identity={$identityPath}",
+            "--collector-id={$collectorId}",
+            '--central-url=https://central.example.test',
+            '--tls-public-key-pin=sha256//'.base64_encode(str_repeat("\x21", 32)),
+            "--state-directory={$directory}",
+        ]);
+        $identity = json_decode((string) file_get_contents($identityPath), true, 16, JSON_THROW_ON_ERROR);
+        $verify = $application->run([
+            'oblivion-collector',
+            'verify-transport',
+            "--identity={$identityPath}",
+            '--expect=active',
+            '--samples=1',
+        ]);
+
+        expect($enrol)->toBe(0)
+            ->and($output)->toContain('enrolment: complete')
+            ->and($identity['state_directory'])->toBe('.')
+            ->and($identity['client_certificate_file'])->toBe('collector.crt.pem')
+            ->and($identity['client_private_key_file'])->toBe('collector.key.pem')
+            ->and($directory.'/collector.crt.pem')->toBeFile()
+            ->and($verify)->toBe(0)
+            ->and($output)->toContain('"state":"response_contract_matched"');
+    } finally {
+        $previousToken === false
+            ? putenv('OBLIVION_COLLECTOR_ENROLMENT_TOKEN')
+            : putenv('OBLIVION_COLLECTOR_ENROLMENT_TOKEN='.$previousToken);
+        removeCollectorDirectory($directory);
+    }
+});
+
 it('rejects a fingerprint-valid but misbound mTLS identity before persisting enrolment', function (
     string $certificateCommonName,
     bool $useDifferentPrivateKey,

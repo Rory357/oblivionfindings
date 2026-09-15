@@ -47,6 +47,7 @@ final class CollectorApplication
                 'version' => $this->version(),
                 'doctor' => $this->doctor($options),
                 'enrol' => $this->enrol($options),
+                'heartbeat' => $this->heartbeat($options),
                 'run' => $this->collect($options),
                 'verify-transport' => $this->verifyTransport($options),
                 default => $this->usage(),
@@ -101,12 +102,11 @@ final class CollectorApplication
     /** @param array<string, string|bool> $options */
     private function enrol(array $options): int
     {
-        $identityPath = $this->requiredString($options, 'identity');
+        $identityPath = $this->resolveWorkingPath($this->requiredString($options, 'identity'));
         $collectorId = $this->requiredString($options, 'collector-id');
         $centralUrl = $this->requiredString($options, 'central-url');
         $tlsPin = $this->requiredString($options, 'tls-public-key-pin');
-        $stateDirectory = $this->requiredString($options, 'state-directory');
-        $stateDirectory = $this->stateDirectory(['state_directory' => $stateDirectory], $identityPath);
+        $stateDirectory = $this->resolveWorkingPath($this->requiredString($options, 'state-directory'));
         $token = $this->enrolmentToken($options);
         $keyPair = sodium_crypto_sign_keypair();
         $publicKey = sodium_crypto_sign_publickey($keyPair);
@@ -138,11 +138,20 @@ final class CollectorApplication
         $actualFingerprint = $certificate === false ? false : openssl_x509_fingerprint($certificate, 'sha256');
         $parsedCertificate = $certificate === false ? false : openssl_x509_parse($certificate, false);
         $now = time();
-        if ($certificate === false || $privateKey === false || ! is_string($actualFingerprint)
+        $subject = is_array($parsedCertificate) ? ($parsedCertificate['subject'] ?? null) : null;
+        $commonName = is_array($subject) ? ($subject['CN'] ?? $subject['commonName'] ?? null) : null;
+        if (is_array($commonName)) {
+            $commonName = $commonName[0] ?? null;
+        }
+        $normalisedFingerprint = is_string($actualFingerprint)
+            ? strtolower(str_replace(':', '', $actualFingerprint))
+            : false;
+        if ($certificate === false || $privateKey === false || ! is_string($normalisedFingerprint)
+            || preg_match('/\A[a-f0-9]{64}\z/', $normalisedFingerprint) !== 1
             || ! is_array($parsedCertificate)
             || ! openssl_x509_check_private_key($certificate, $privateKey)
-            || ! hash_equals($certificateFingerprint, strtolower($actualFingerprint))
-            || ($parsedCertificate['subject']['CN'] ?? null) !== 'oblivion-collector-'.$collectorId
+            || ! hash_equals($certificateFingerprint, $normalisedFingerprint)
+            || $commonName !== 'oblivion-collector-'.$collectorId
             || ! is_int($parsedCertificate['validFrom_time_t'] ?? null)
             || ! is_int($parsedCertificate['validTo_time_t'] ?? null)
             || $now < $parsedCertificate['validFrom_time_t']
@@ -164,13 +173,48 @@ final class CollectorApplication
             'tls_public_key_pin' => $tlsPin,
             'central_signing_public_key' => $centralSigningKey,
             'request_signing_secret_key' => base64_encode($secretKey),
-            'state_directory' => $stateDirectory,
-            'client_certificate_file' => $certificatePath,
-            'client_private_key_file' => $privateKeyPath,
+            'state_directory' => $this->portableIdentityPath($stateDirectory, $identityPath),
+            'client_certificate_file' => $this->portableIdentityPath($certificatePath, $identityPath),
+            'client_private_key_file' => $this->portableIdentityPath($privateKeyPath, $identityPath),
             'client_certificate_fingerprint' => $certificateFingerprint,
         ]);
         sodium_memzero($secretKey);
         $this->write("enrolment: complete\n");
+
+        return 0;
+    }
+
+    /** @param array<string, string|bool> $options */
+    private function heartbeat(array $options): int
+    {
+        $identityPath = $this->requiredPath($options, 'identity');
+        $identity = $this->identity($identityPath, requireRuntime: true);
+        $stateDirectory = $this->stateDirectory($identity, $identityPath);
+        $checkpoint = new CheckpointFile($stateDirectory.DIRECTORY_SEPARATOR.'checkpoint.json');
+        $secretKey = base64_decode($identity['request_signing_secret_key'], true);
+        if (! is_string($secretKey) || strlen($secretKey) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) {
+            throw new RuntimeException('Collector request signing key is invalid.');
+        }
+        $central = new HttpsCentralApi(
+            $identity['central_url'],
+            $identity['tls_public_key_pin'],
+            $secretKey,
+            $identity['client_certificate_file'],
+            $identity['client_private_key_file'],
+        );
+        $spool = new EncryptedSpool($stateDirectory, $checkpoint);
+        try {
+            (new HeartbeatReporter($central, $identity['collector_id'], $spool))->report([
+                'checks_executed' => 0,
+                'discovery_targets_executed' => 0,
+                'commands_executed' => 0,
+                'config_sequence' => $checkpoint->read()['config_sequence'],
+                'upload_state' => 'deferred',
+            ]);
+        } finally {
+            sodium_memzero($secretKey);
+        }
+        $this->write("heartbeat: complete\n");
 
         return 0;
     }
@@ -457,10 +501,21 @@ final class CollectorApplication
             || ! is_string($identity['tls_public_key_pin'] ?? null)
             || ! is_string($identity['request_signing_secret_key'] ?? null)
             || ! is_string($identity['client_certificate_file'] ?? null)
-            || ! is_file($identity['client_certificate_file'])
-            || ! is_string($identity['client_private_key_file'] ?? null)
-            || ! is_file($identity['client_private_key_file']))) {
+            || ! is_string($identity['client_private_key_file'] ?? null))) {
             throw new RuntimeException('Collector runtime identity is incomplete.');
+        }
+        if ($requireRuntime) {
+            $identity['client_certificate_file'] = $this->resolvedIdentityPath(
+                $identity['client_certificate_file'],
+                $path,
+            );
+            $identity['client_private_key_file'] = $this->resolvedIdentityPath(
+                $identity['client_private_key_file'],
+                $path,
+            );
+            if (! is_file($identity['client_certificate_file']) || ! is_file($identity['client_private_key_file'])) {
+                throw new RuntimeException('Collector runtime identity is incomplete.');
+            }
         }
 
         return $identity;
@@ -469,12 +524,64 @@ final class CollectorApplication
     /** @param array<string, mixed> $identity */
     private function stateDirectory(array $identity, string $identityPath): string
     {
-        $path = $identity['state_directory'];
-        if (! preg_match('~^(?:[A-Za-z]:[\\\\/]|[\\\\/])~', $path)) {
-            $path = dirname($identityPath).DIRECTORY_SEPARATOR.$path;
+        if (! is_string($identity['state_directory'] ?? null) || trim($identity['state_directory']) === '') {
+            throw new RuntimeException('Collector state directory is invalid.');
+        }
+
+        return $this->resolvedIdentityPath($identity['state_directory'], $identityPath);
+    }
+
+    private function resolveWorkingPath(string $path): string
+    {
+        $path = trim($path);
+        if ($path === '') {
+            throw new RuntimeException('Collector path is invalid.');
+        }
+        if ($this->isAbsolutePath($path)) {
+            return $path;
+        }
+        $cwd = getcwd();
+        if (! is_string($cwd) || $cwd === '') {
+            throw new RuntimeException('Collector working directory is unavailable.');
+        }
+
+        return $cwd.DIRECTORY_SEPARATOR.str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
+    }
+
+    private function portableIdentityPath(string $path, string $identityPath): string
+    {
+        $identityDirectory = $this->normalisedDirectory(dirname($identityPath));
+        $normalised = $this->normalisedDirectory($path);
+        if ($normalised === $identityDirectory) {
+            return '.';
+        }
+        $prefix = $identityDirectory.DIRECTORY_SEPARATOR;
+        if (str_starts_with($normalised, $prefix)) {
+            return str_replace('\\', '/', substr($normalised, strlen($prefix)));
         }
 
         return $path;
+    }
+
+    private function resolvedIdentityPath(string $path, string $identityPath): string
+    {
+        if ($this->isAbsolutePath($path)) {
+            return $path;
+        }
+
+        return dirname($identityPath).DIRECTORY_SEPARATOR.str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
+    }
+
+    private function isAbsolutePath(string $path): bool
+    {
+        return preg_match('~^(?:[A-Za-z]:[\\\\/]|[\\\\/])~', $path) === 1;
+    }
+
+    private function normalisedDirectory(string $path): string
+    {
+        $real = realpath($path);
+
+        return rtrim(is_string($real) ? $real : str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path), '\\/');
     }
 
     /** @param array<string, mixed> $identity */
@@ -546,7 +653,7 @@ final class CollectorApplication
 
     private function usage(): int
     {
-        $this->write("Usage: oblivion-collector enrol|run|doctor|verify-transport|version [--name=value]\n", STDERR);
+        $this->write("Usage: oblivion-collector enrol|heartbeat|run|doctor|verify-transport|version [--name=value]\n", STDERR);
 
         return 64;
     }
