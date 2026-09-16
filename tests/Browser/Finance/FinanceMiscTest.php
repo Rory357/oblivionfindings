@@ -13,13 +13,13 @@ test('finance vendors index loads', function () {
     });
 });
 
-test('finance vendors create page loads', function () {
+test('finance vendors create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/vendors/create')
-            ->waitForText('Vendor', 10)
-            ->assertSee('Vendor');
+            ->waitForText('Vendors', 10)
+            ->assertSee('Vendors');
     });
 });
 
@@ -33,13 +33,13 @@ test('finance purchase orders index loads', function () {
     });
 });
 
-test('finance purchase orders create page loads', function () {
+test('finance purchase orders create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/purchase-orders/create')
-            ->waitForText('Purchase Order', 10)
-            ->assertSee('Purchase Order');
+            ->waitForText('Purchase orders', 10)
+            ->assertSee('Purchase orders');
     });
 });
 
@@ -233,52 +233,52 @@ test('finance audit exports page loads', function () {
     });
 });
 
-test('finance audit exports create page loads', function () {
+test('finance audit exports create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/audit-exports/create')
-            ->waitForText('Audit', 10)
+            ->waitForText('Audit exports', 10)
             ->assertPathBeginsWith('/finance');
     });
 });
 
-test('finance cash flow forecast create page loads', function () {
+test('finance cash flow forecast create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/cash-flow-forecast/create')
-            ->waitForText('Cash Flow', 10)
+            ->waitForText('Cash-flow forecast', 10)
             ->assertPathBeginsWith('/finance');
     });
 });
 
-test('finance credit notes create page loads', function () {
+test('finance credit notes create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/credit-notes/create')
-            ->waitForText('Credit Note', 10)
+            ->waitForText('Credit notes', 10)
             ->assertPathBeginsWith('/finance');
     });
 });
 
-test('finance currencies create page loads', function () {
+test('finance currencies create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/currencies/create')
-            ->waitForText('Currency', 10)
+            ->waitForText('Currencies', 10)
             ->assertPathBeginsWith('/finance');
     });
 });
 
-test('finance donor funds create page loads', function () {
+test('finance donor funds create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/donor-funds/create')
-            ->waitForText('Donor Fund', 10)
+            ->waitForText('Donor funds', 10)
             ->assertPathBeginsWith('/finance');
     });
 });
@@ -293,12 +293,12 @@ test('finance eftpos batches page loads', function () {
     });
 });
 
-test('finance fixed assets create page loads', function () {
+test('finance fixed assets create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/fixed-assets/create')
-            ->waitForText('Fixed Asset', 10)
+            ->waitForText('Fixed assets', 10)
             ->assertPathBeginsWith('/finance');
     });
 });
@@ -333,22 +333,22 @@ test('finance GST returns prepare page loads', function () {
     });
 });
 
-test('finance payment runs create page loads', function () {
+test('finance payment runs create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/payment-runs/create')
-            ->waitForText('Payment Run', 10)
+            ->waitForText('Payment runs', 10)
             ->assertPathBeginsWith('/finance');
     });
 });
 
-test('finance petty cash create page loads', function () {
+test('finance petty cash create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/petty-cash/create')
-            ->waitForText('Petty Cash', 10)
+            ->waitForText('Petty cash', 10)
             ->assertPathBeginsWith('/finance');
     });
 });

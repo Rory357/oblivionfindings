@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ArrowRight,
     BookOpen,
@@ -185,6 +185,16 @@ interface Props extends PageProps {
     orgName?: string;
 }
 
+type FinanceAbilities = {
+    finance?: {
+        dashboard?: boolean;
+        ap?: { view?: boolean };
+        bank?: { view?: boolean };
+        ledger?: { view?: boolean };
+        reports?: { view?: boolean };
+    };
+};
+
 type Period = 'month' | 'quarter' | 'fy';
 type Modal = null | 'journal' | 'bill' | 'invoice' | 'receipt';
 
@@ -280,6 +290,18 @@ export default function FinanceDashboard({
     const [siteFilter, setSiteFilter] = useState<string>(ALL);
     const [funderFilter, setFunderFilter] = useState<string>(ALL);
     const [search, setSearch] = useState('');
+
+    // A meter links to the list its number came from, but those lists live
+    // behind their own permissions — a viewer holding only finance.dashboard
+    // can read this page and would land on a 403. An unreachable destination
+    // is dropped, so the block still shows its number without pretending to
+    // be a way in.
+    const can = usePage<{ auth?: { can?: FinanceAbilities } }>().props.auth?.can;
+    const canReports = Boolean(can?.finance?.reports?.view);
+    const canBills = Boolean(can?.finance?.ap?.view);
+    const canCash = Boolean(can?.finance?.bank?.view || can?.finance?.dashboard);
+    const canLedger = Boolean(can?.finance?.ledger?.view);
+    const linkIf = (allowed: boolean, href: string) => (allowed ? href : undefined);
 
     const billCtx = useEntityContextMenu<UpcomingBill>();
     const claimCtx = useEntityContextMenu<FundingClaim>();
@@ -790,7 +812,7 @@ export default function FinanceDashboard({
                 <>
                     <PageHeaderMeterBlock
                         label="Revenue"
-                        href="/finance/reports/profit-loss"
+                        href={linkIf(canReports, '/finance/reports/profit-loss')}
                         ariaLabel="View the profit and loss report"
                     >
                         <PageHeaderMeterBig>
@@ -816,7 +838,7 @@ export default function FinanceDashboard({
                     <PageHeaderMeterBlock
                         label="Net profit"
                         tone={netProfit >= 0 ? 'success' : 'critical'}
-                        href="/finance/reports/profit-loss"
+                        href={linkIf(canReports, '/finance/reports/profit-loss')}
                         ariaLabel="View net profit in the profit and loss report"
                     >
                         <PageHeaderMeterBig>
@@ -839,7 +861,7 @@ export default function FinanceDashboard({
 
                     <PageHeaderMeterBlock
                         label="Cash"
-                        href="/finance/cash-position"
+                        href={linkIf(canCash, '/finance/cash-position')}
                         ariaLabel="View the cash position"
                     >
                         <PageHeaderMeterBig>
@@ -857,7 +879,7 @@ export default function FinanceDashboard({
                         tone={
                             arAging && arAging.over60 > 0 ? 'warning' : 'brand'
                         }
-                        href="/finance/reports/aged-receivables"
+                        href={linkIf(canReports, '/finance/reports/aged-receivables')}
                         ariaLabel="View aged receivables"
                     >
                         <PageHeaderMeterBig>
@@ -873,7 +895,7 @@ export default function FinanceDashboard({
                     <PageHeaderMeterBlock
                         label="Bills due ≤ 7 days"
                         tone={billsDueCount > 0 ? 'critical' : 'success'}
-                        href="/finance/bills"
+                        href={linkIf(canBills, '/finance/bills')}
                         ariaLabel="View bills falling due"
                     >
                         <PageHeaderMeterBig>
@@ -888,7 +910,7 @@ export default function FinanceDashboard({
                     <PageHeaderMeterBlock
                         label="Funding utilisation"
                         value="target 90%"
-                        href="/finance/reports/funding-stream-summary"
+                        href={linkIf(canReports, '/finance/reports/funding-stream-summary')}
                         ariaLabel="View the funding stream summary"
                     >
                         <PageHeaderMeterBig>
@@ -1262,12 +1284,14 @@ export default function FinanceDashboard({
                                 title="Upcoming bills due · next 7 days"
                                 caption={`${bills.length} of ${upcomingBillsDue.length} shown`}
                                 right={
-                                    <Button asChild variant="outline" size="sm">
-                                        <Link href="/finance/bills">
-                                            All bills
-                                            <ArrowRight className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
+                                    canBills ? (
+                                        <Button asChild variant="outline" size="sm">
+                                            <Link href="/finance/bills">
+                                                All bills
+                                                <ArrowRight className="h-3.5 w-3.5" />
+                                            </Link>
+                                        </Button>
+                                    ) : null
                                 }
                             />
                             {bills.length === 0 ? (
@@ -1314,12 +1338,14 @@ export default function FinanceDashboard({
                                 title="Funding claims"
                                 caption={`${claims.length} of ${fundingClaims.length} shown`}
                                 right={
-                                    <Button asChild variant="outline" size="sm">
-                                        <Link href="/finance/reports/funding-stream-summary">
-                                            All claims
-                                            <ArrowRight className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
+                                    canReports ? (
+                                        <Button asChild variant="outline" size="sm">
+                                            <Link href="/finance/reports/funding-stream-summary">
+                                                All claims
+                                                <ArrowRight className="h-3.5 w-3.5" />
+                                            </Link>
+                                        </Button>
+                                    ) : null
                                 }
                             />
                             {claims.length === 0 ? (
@@ -1369,12 +1395,14 @@ export default function FinanceDashboard({
                             title="Recent journals"
                             caption={`${journals.length} of ${recentJournals.length} shown`}
                             right={
-                                <Button asChild variant="outline" size="sm">
-                                    <Link href="/finance/journals">
-                                        All journals
-                                        <ArrowRight className="h-3.5 w-3.5" />
-                                    </Link>
-                                </Button>
+                                canLedger ? (
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link href="/finance/journals">
+                                            All journals
+                                            <ArrowRight className="h-3.5 w-3.5" />
+                                        </Link>
+                                    </Button>
+                                ) : null
                             }
                         />
                         {journals.length === 0 ? (

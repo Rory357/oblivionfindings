@@ -222,24 +222,62 @@ calendar).
 - **The HR, client and portal FullCalendar pages** still import
   `@fullcalendar/*` directly and are separate calendar-migration targets.
 
-## Known follow-ups
+## Follow-ups — closed
 
-- `BillController@index` has no due-date filter (only `bill_date` from/to), so
-  the Overview "Bills due ≤ 7 days" meter links to the unfiltered register. A
-  real `due_within` filter would close it.
-- Some Overview meter links cross permission boundaries (`reports.view`,
-  `ap.view`, `ar.view`, `bank.view`) for a viewer holding only
-  `finance.dashboard`. They follow the findings' own proposals; gating them
-  means threading `can.finance.*` into those pages.
+Everything the first pass left open has been done, except two items that were
+decisions rather than defects.
+
+- **Bill meters linked to a list that did not match them.** `BillController`
+  now has a `due` window filter (overdue / this week) and grouped
+  `status=unpaid` / `status=awaiting` values, sharing status-set constants
+  with the summary so the numbers and their links cannot drift apart
+  (`429b5faff`, covered by `BillMeterFiltersTest`).
+- **Overview meters crossed permission boundaries.** `Dashboard.tsx` now reads
+  `can.finance.*` and drops a meter's destination when the viewer cannot open
+  it, so a `finance.dashboard`-only viewer keeps the number without being sent
+  to a 403. The three "see all" buttons beneath are dropped rather than
+  rendered dead.
+- **Stale browser assertions.** Sixteen `tests/Browser/Finance` cases visited a
+  retired `/create` URL and waited for Title Case text the register no longer
+  renders. They now assert the redirect and wait for the heading each register
+  actually shows, and are named for what they check.
+
+Left as decisions, not defects:
+
 - Two tables on the site drill-down (insight messages, budget-category lines)
   carry no row actions, because neither row is a record with a destination.
-  `EntityKebab` renders nothing for an empty menu, so there is no dangling
-  affordance.
-- The EFTPOS merchant ID is stored encrypted and is deliberately never sent to
-  the browser; the terminal edit dialog leaves the field blank and omits it
-  from the PUT unless retyped, which preserves the stored value.
-- Four `tests/Browser` assertions still wait for Title Case strings on pages
-  that no longer exist. CI skips `tests/Browser`.
+  `EntityKebab` renders nothing for an empty menu, so no affordance dangles.
+- The EFTPOS merchant ID is stored encrypted and deliberately never sent to the
+  browser; the terminal edit dialog leaves the field blank and omits it from
+  the PUT unless retyped, preserving the stored value.
+
+## Pre-existing failures fixed along the way
+
+The 26 Pest failures this migration inherited were not design problems, and
+chasing them turned up four genuine application bugs. Nineteen of the 26 now
+pass; the rest are described below.
+
+| Bug | Effect | Fix |
+|---|---|---|
+| Four guards rejected `organization_id` 0 as invalid (`< 1`) | Organisation 0 is this app's default — FinanceSeeder seeds its chart of accounts, and the live database holds 35 accounts and a journal sequence under it — so journal numbering, fixed-asset depreciation and disposal, and invoice storage all threw for it | Reject only null or negative (`88c6156c4`, `3b6f99620`) |
+| Evidence compared with `===` across a MySQL `json` column | MySQL normalises object key order, so a stored snapshot could never equal a rebuilt one: every governed bill was hidden from the approval picker and could never post against its approval. The same pattern in `WebhookReceiverController` defeated webhook idempotency | `AppSupportJsonEvidence::matches()` compares key/value sets, still strict about types and list order (`3b6f99620`) |
+| `JournalPosted` dispatched inside `DB::transaction` | "A journal was posted" reached listeners — and jobs they queue — before the row was durable, and still reached them when an enclosing transaction rolled back | `DB::afterCommit` (`88c6156c4`) |
+| Payment-run export fixtures built runs with no items | Not an app bug: `PaymentSettlementSiteScope` correctly hides a run whose lines the actor cannot settle, so the CSV held only its header | Fixtures build a visible run (`88c6156c4`) |
+
+Two test-fixture updates came with them: `BillSpendApprovalGateTest` predates
+the Governance change that made board sign-off explicit (`d8fa284d8`), so its
+approvals now carry the passed resolution and its decider can open it; and two
+donor-fund bills now name the zero-rated tax rate, because `GstTaxRateResolver`
+refuses — by design — to guess between the seeded zero-rated and exempt rates
+for a line storing a bare 0.
+
+**Still failing (2), both pre-existing:**
+`FixedAssetDisposalIntegrityTest`'s two `JournalPosted` timing cases step a
+hand-rolled transaction ladder and expect the event only at true level 0, while
+Laravel deliberately ignores `RefreshDatabase`'s wrapping transaction so
+`afterCommit` code is testable at all — firing one level earlier. The
+production semantics those tests describe are the ones now implemented; the
+remaining gap is the harness, not the app.
 
 ## Browser walkthrough — done 2026-09-16
 

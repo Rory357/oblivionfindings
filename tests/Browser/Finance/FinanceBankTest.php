@@ -13,13 +13,13 @@ test('finance bank accounts index loads', function () {
     });
 });
 
-test('finance bank accounts create page loads', function () {
+test('finance bank accounts create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/bank-accounts/create')
-            ->waitForText('Bank Account', 10)
-            ->assertSee('Bank Account');
+            ->waitForText('Bank accounts', 10)
+            ->assertSee('Bank accounts');
     });
 });
 
@@ -53,12 +53,12 @@ test('finance bank transactions page loads', function () {
     });
 });
 
-test('finance bank reconciliation create page loads', function () {
+test('finance bank reconciliation create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/bank-reconciliation/create')
-            ->waitForText('Reconciliation', 10)
+            ->waitForText('Bank reconciliation', 10)
             ->assertPathBeginsWith('/finance');
     });
 });
