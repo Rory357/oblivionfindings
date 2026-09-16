@@ -127,6 +127,16 @@ export default [
         // "Page headers" — so a new finance page can't quietly go back to it.
         // Widen this to the whole app once the remaining modules are assessed.
         files: ['resources/js/pages/finance/**/*.{ts,tsx}'],
+        // Consolidation and Intercompany are quarantined by
+        // RejectUnsupportedConsolidation — they 404 for everyone — so the
+        // 2026-09-16 migration deliberately left them on the old page top
+        // (audit decision D9) rather than spend the work on dead surfaces.
+        // If they are ever un-quarantined they must be migrated or deleted;
+        // until then they are the only finance pages exempt from the ban.
+        ignores: [
+            'resources/js/pages/finance/Consolidation/**',
+            'resources/js/pages/finance/Intercompany/**',
+        ],
         rules: {
             'no-restricted-imports': [
                 'error',
