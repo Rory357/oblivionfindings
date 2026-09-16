@@ -594,6 +594,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::post('/petty-cash/{fund}/transaction', [PettyCashController::class, 'storeTransaction'])
         ->name('petty-cash.transaction')
         ->middleware('permission:finance.petty_cash.manage');
+    // Receipts live on the private disk and are streamed through this authorised
+    // route (ServesPrivateAttachments) — never a public /storage URL.
+    Route::get('/petty-cash/{fund}/transactions/{transaction}/receipt', [PettyCashController::class, 'receipt'])
+        ->name('petty-cash.receipt')
+        ->middleware('permission:finance.petty_cash.view');
 
     // ── FX Revaluations ──────────────────────────────────────────────────
     Route::middleware('permission:finance.ledger.manage')->group(function () {

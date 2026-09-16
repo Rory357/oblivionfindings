@@ -1,22 +1,48 @@
 import type { AccountOption } from '@/components/finance';
 import {
-    BankingTabsFooter,
+    FinanceSectionRail,
     PettyCashFundDialog,
     formatMoney,
-    useRowContextMenu,
-    type RowCtxItem,
     type UserOption,
 } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import {
+    EntityCard,
+    EntityCardGrid,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterCheck,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyList } from '@/components/ui/empty-state';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps, type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import { Coins, Download, Eye, Plus, Wallet } from 'lucide-react';
-import { useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import {
+    AlertCircle,
+    Coins,
+    Download,
+    Eye,
+    Plus,
+    User,
+    Wallet,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 interface Fund {
     id: number;
@@ -36,8 +62,10 @@ interface Props extends PageProps {
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
-    { title: 'Petty Cash', href: '/finance/petty-cash' },
+    { title: 'Banking', href: '/finance/banking' },
+    { title: 'Petty cash', href: '/finance/petty-cash' },
 ];
 
 export default function PettyCashIndex({
@@ -47,186 +75,321 @@ export default function PettyCashIndex({
     users = [],
 }: Props) {
     const [createOpen, setCreateOpen] = useState(false);
-    const activeCount = funds.filter((f) => f.is_active).length;
-    const totalFloat = funds.reduce((s, f) => s + f.float_amount, 0);
-    const totalBalance = funds.reduce((s, f) => s + f.current_balance, 0);
+    const [search, setSearch] = useState('');
+    const [includeClosed, setIncludeClosed] = useState(true);
+    const ctxMenu = useEntityContextMenu<Fund>();
 
-    // Right-click row menu — mirrors the card's existing navigation (Open).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (fund: Fund): RowCtxItem[] => [
-        {
-            kind: 'item',
-            label: 'Open',
-            icon: Eye,
-            onSelect: () => router.visit(`/finance/petty-cash/${fund.id}`),
-        },
-    ];
+    const activeCount = funds.filter((fund) => fund.is_active).length;
+    const totalFloat = funds.reduce((sum, fund) => sum + fund.float_amount, 0);
+    const totalBalance = funds.reduce(
+        (sum, fund) => sum + fund.current_balance,
+        0,
+    );
+    const shortFunds = funds.filter(
+        (fund) => fund.current_balance - fund.float_amount < 0,
+    ).length;
+
+    const actionsFor = (fund: Fund): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Open fund',
+                icon: Eye,
+                onClick: () => router.visit(`/finance/petty-cash/${fund.id}`),
+            },
+            canManage
+                ? {
+                      label: 'Record a transaction',
+                      icon: Coins,
+                      onClick: () =>
+                          router.visit(
+                              `/finance/petty-cash/${fund.id}?record=1`,
+                          ),
+                  }
+                : null,
+        ]);
+
+    const term = search.trim().toLowerCase();
+    const visible = useMemo(
+        () =>
+            funds.filter((fund) => {
+                if (!includeClosed && !fund.is_active) return false;
+                if (!term) return true;
+                return [fund.name, fund.custodian_name ?? '']
+                    .join(' ')
+                    .toLowerCase()
+                    .includes(term);
+            }),
+        [funds, includeClosed, term],
+    );
+
+    const clearFilters = () => {
+        setSearch('');
+        setIncludeClosed(true);
+    };
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={Coins}
+            title="Petty cash"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={shortFunds > 0 ? 'warning' : 'success'}
+                >
+                    {shortFunds > 0
+                        ? `${shortFunds} short of float`
+                        : 'All floats intact'}
+                </PageHeaderStatusChip>
+            }
+            subline={`Banking · ${funds.length} funds · ${activeCount} active`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search funds, custodians…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={() => {
+                            window.location.href =
+                                '/finance/petty-cash/export';
+                        }}
+                    >
+                        Export CSV
+                    </PageHeaderGlassButton>
+                    {canManage && (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                        >
+                            New fund
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Cash on hand"
+                        tone={totalBalance >= 0 ? 'success' : 'critical'}
+                        href="/finance/cash-position"
+                        ariaLabel="View the cash position"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(totalBalance)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Across {funds.length} funds
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Total float"
+                        href="/finance/petty-cash"
+                        ariaLabel="View every petty cash fund"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(totalFloat)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Authorised across every fund
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Active funds"
+                        onClick={() => setIncludeClosed(false)}
+                        ariaLabel="Show only active funds"
+                    >
+                        <PageHeaderMeterBig>{activeCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {funds.length - activeCount} closed
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Short of float"
+                        tone={shortFunds > 0 ? 'warning' : 'brand'}
+                        href="/finance/petty-cash"
+                        ariaLabel="View petty cash funds"
+                    >
+                        <PageHeaderMeterBig>{shortFunds}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Funds spending below their float
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterCheck
+                    label="Include closed"
+                    checked={includeClosed}
+                    onChange={setIncludeClosed}
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Petty Cash" />
+            <Head title="Petty cash" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Coins}
-                        title="Petty Cash Funds"
-                        description="Manage petty cash floats and transactions"
-                        stats={[
-                            { label: 'Funds', value: funds.length },
-                            { label: 'Active', value: activeCount },
-                            {
-                                label: 'Total float',
-                                value: formatMoney(totalFloat),
-                            },
-                            {
-                                label: 'Total balance',
-                                value: formatMoney(totalBalance),
-                            },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button size="sm" variant="outline" asChild>
-                                    <a href="/finance/petty-cash/export">
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Export CSV
-                                    </a>
-                                </Button>
-                                {canManage && (
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {funds.length === 0 ? (
+                        <EmptyList
+                            icon={Wallet}
+                            itemName="petty cash fund"
+                            title="No petty cash funds yet"
+                            description="Create a fund to track a float, its custodian and every note that leaves the tin."
+                            action={
+                                canManage ? (
                                     <Button
                                         size="sm"
                                         onClick={() => setCreateOpen(true)}
                                     >
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        New Fund
+                                        New fund
                                     </Button>
-                                )}
-                            </div>
-                        }
-                        footer={<BankingTabsFooter active="petty-cash" />}
-                    />
-                }
-            >
-                {funds.length === 0 ? (
-                    <Card>
-                        <CardContent className="p-0">
-                            <EmptyList
-                                icon={Wallet}
-                                itemName="petty cash fund"
-                                title="No petty cash funds yet"
-                                description="Create your first fund to get started."
-                                className="border-0"
-                                action={
-                                    canManage ? (
-                                        <Button
-                                            size="sm"
-                                            onClick={() => setCreateOpen(true)}
-                                        >
-                                            New fund
-                                        </Button>
-                                    ) : undefined
-                                }
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <>
+                            <ListCaption
+                                title="Petty cash funds"
+                                caption={`${visible.length} of ${funds.length} shown`}
                             />
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {funds.map((fund) => {
-                            const variance =
-                                fund.current_balance - fund.float_amount;
-                            return (
-                                <Link
-                                    key={fund.id}
-                                    href={`/finance/petty-cash/${fund.id}`}
-                                >
-                                    <Card
-                                        className="transition-shadow hover:shadow-md"
-                                        onContextMenu={rowMenu.open(
-                                            rowMenuItems(fund),
-                                        )}
-                                    >
-                                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                            <CardTitle className="text-lg">
-                                                {fund.name}
-                                            </CardTitle>
-                                            {fund.is_active ? (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="border-status-success/30 text-status-success"
-                                                >
-                                                    Active
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="secondary">
-                                                    Inactive
-                                                </Badge>
-                                            )}
-                                        </CardHeader>
-                                        <CardContent className="space-y-3">
-                                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                                <div>
-                                                    <p className="text-muted-foreground">
-                                                        Float
-                                                    </p>
-                                                    <p className="font-semibold">
-                                                        {formatMoney(
-                                                            fund.float_amount,
-                                                        )}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-muted-foreground">
-                                                        Current Balance
-                                                    </p>
-                                                    <p className="font-semibold">
-                                                        {formatMoney(
-                                                            fund.current_balance,
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            {variance !== 0 && (
-                                                <div className="text-sm">
-                                                    <span className="text-muted-foreground">
-                                                        Variance:{' '}
-                                                    </span>
-                                                    <span
-                                                        className={
-                                                            variance < 0
-                                                                ? 'font-medium text-destructive'
-                                                                : 'text-status-success'
-                                                        }
-                                                    >
-                                                        {formatMoney(variance)}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {fund.custodian_name && (
-                                                <div className="text-sm">
-                                                    <span className="text-muted-foreground">
-                                                        Custodian:{' '}
-                                                    </span>
-                                                    <span>
-                                                        {fund.custodian_name}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {fund.gl_account_name && (
-                                                <div className="text-sm text-muted-foreground">
-                                                    GL: {fund.gl_account_name}
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                </Link>
-                            );
-                        })}
-                    </div>
-                )}
+
+                            {visible.length === 0 ? (
+                                <EmptySearch
+                                    onClear={clearFilters}
+                                    title="No funds match your filters"
+                                />
+                            ) : (
+                                <EntityCardGrid>
+                                    {visible.map((fund) => {
+                                        const variance =
+                                            fund.current_balance -
+                                            fund.float_amount;
+
+                                        return (
+                                            <EntityCard
+                                                key={fund.id}
+                                                meridian={
+                                                    !fund.is_active
+                                                        ? 'warning'
+                                                        : variance < 0
+                                                          ? 'warning'
+                                                          : 'success'
+                                                }
+                                                icon={Wallet}
+                                                name={fund.name}
+                                                subline={
+                                                    fund.custodian_name ??
+                                                    'No custodian assigned'
+                                                }
+                                                sublineIcon={User}
+                                                href={`/finance/petty-cash/${fund.id}`}
+                                                onOpen={() =>
+                                                    router.visit(
+                                                        `/finance/petty-cash/${fund.id}`,
+                                                    )
+                                                }
+                                                onContextMenu={(event) =>
+                                                    ctxMenu.open(event, fund)
+                                                }
+                                                actions={actionsFor(fund)}
+                                                muted={!fund.is_active}
+                                                chips={
+                                                    <>
+                                                        <EntityStatusChip
+                                                            variant={
+                                                                fund.is_active
+                                                                    ? 'success'
+                                                                    : 'neutral'
+                                                            }
+                                                        >
+                                                            {fund.is_active
+                                                                ? 'Active'
+                                                                : 'Closed'}
+                                                        </EntityStatusChip>
+                                                        <EntityChip>
+                                                            Float{' '}
+                                                            {formatMoney(
+                                                                fund.float_amount,
+                                                            )}
+                                                        </EntityChip>
+                                                    </>
+                                                }
+                                                metric={{
+                                                    label: 'Current balance',
+                                                    value: formatMoney(
+                                                        fund.current_balance,
+                                                    ),
+                                                    percent:
+                                                        fund.float_amount > 0
+                                                            ? Math.min(
+                                                                  100,
+                                                                  Math.max(
+                                                                      0,
+                                                                      Math.round(
+                                                                          (fund.current_balance /
+                                                                              fund.float_amount) *
+                                                                              100,
+                                                                      ),
+                                                                  ),
+                                                              )
+                                                            : null,
+                                                    tone:
+                                                        variance < 0
+                                                            ? 'warning'
+                                                            : 'success',
+                                                }}
+                                                alerts={
+                                                    variance !== 0 ? (
+                                                        <EntityStatusChip
+                                                            variant={
+                                                                variance < 0
+                                                                    ? 'warning'
+                                                                    : 'info'
+                                                            }
+                                                            icon={AlertCircle}
+                                                        >
+                                                            {formatMoney(
+                                                                variance,
+                                                            )}{' '}
+                                                            against float
+                                                        </EntityStatusChip>
+                                                    ) : undefined
+                                                }
+                                                footer={{
+                                                    personIcon: Coins,
+                                                    primary:
+                                                        fund.gl_account_name ??
+                                                        'No GL account linked',
+                                                    secondary:
+                                                        'Petty cash asset account',
+                                                }}
+                                                openLabel="Open"
+                                            />
+                                        );
+                                    })}
+                                </EntityCardGrid>
+                            )}
+                        </>
+                    )}
+                </div>
             </PageLayout>
 
-            {rowMenu.element}
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={Wallet}
+                    title={ctxMenu.ctx.record.name}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
 
             {canManage && (
                 <PettyCashFundDialog

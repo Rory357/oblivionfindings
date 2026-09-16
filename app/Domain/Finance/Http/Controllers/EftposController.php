@@ -35,6 +35,13 @@ class EftposController extends Controller
                 'name' => $terminal->name,
                 'location' => $terminal->location,
                 'provider' => $terminal->provider,
+                // The edit dialog prefills from these — the update route existed
+                // with no UI, so nothing used to carry them to the page. The
+                // merchant ID is deliberately NOT sent: it is stored encrypted,
+                // and the dialog only posts it when someone types a new one.
+                'has_merchant_id' => filled($terminal->merchant_id),
+                'bank_account_id' => $terminal->bank_account_id,
+                'gl_account_id' => $terminal->gl_account_id,
                 'bank_account_name' => $terminal->bankAccount?->name,
                 'gl_account_name' => $terminal->glAccount ? $terminal->glAccount->code.' - '.$terminal->glAccount->name : null,
                 'is_active' => $terminal->is_active,
@@ -126,6 +133,16 @@ class EftposController extends Controller
             $query->where('batch_date', '<=', $request->input('date_to'));
         }
 
+        // Totals over the whole filtered set — the header must never present a
+        // single page's arithmetic as the figure for the filter.
+        $summary = [
+            'batches' => (int) (clone $query)->count(),
+            'settlement' => (float) (clone $query)->sum('settlement_amount'),
+            'fees' => (float) (clone $query)->sum('fees'),
+            'transactions' => (int) (clone $query)->sum('total_transactions'),
+            'unreconciled' => (int) (clone $query)->where('status', '!=', 'reconciled')->count(),
+        ];
+
         $batches = $query->orderByDesc('batch_date')
             ->paginate(25)
             ->through(fn (FinEftposBatch $batch) => [
@@ -164,6 +181,7 @@ class EftposController extends Controller
             'batches' => $batches,
             'terminals' => $terminals,
             'unmatchedBankTransactions' => $unmatchedBankTransactions,
+            'summary' => $summary,
             'filters' => $request->only(['status', 'terminal_id', 'date_from', 'date_to']),
         ]);
     }

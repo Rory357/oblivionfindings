@@ -1,30 +1,52 @@
-import { BankingTabsFooter } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import {
+    ConfirmDialog,
+    FinanceSectionRail,
+    FinanceTierTwoNav,
+} from '@/components/finance';
+import {
+    EntityContextMenu,
+    EntityTable,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterCheck,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps, type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { CreditCard, Plus, Smartphone } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import {
+    CreditCard,
+    Landmark,
+    Layers,
+    Pencil,
+    Plus,
+    Power,
+    Smartphone,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+import {
+    EFTPOS_PROVIDERS,
+    TerminalDialog,
+    eftposProviderLabel,
+    type EditableTerminal,
+} from './_dialogs';
 
 interface Terminal {
     id: number;
@@ -32,6 +54,9 @@ interface Terminal {
     name: string;
     location: string | null;
     provider: string;
+    has_merchant_id: boolean;
+    bank_account_id: number | null;
+    gl_account_id: number | null;
     bank_account_name: string | null;
     gl_account_name: string | null;
     is_active: boolean;
@@ -55,16 +80,13 @@ interface Props extends PageProps {
     glAccounts: GlAccount[];
 }
 
-const providerLabels: Record<string, string> = {
-    paymark: 'Paymark',
-    worldline: 'Worldline',
-    eftpos_nz: 'EFTPOS NZ',
-    windcave: 'Windcave',
-};
+const ALL = '__all';
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
-    { title: 'EFTPOS', href: '/finance/eftpos/batches' },
+    { title: 'Banking', href: '/finance/banking' },
+    { title: 'EFTPOS', href: '/finance/eftpos/terminals' },
     { title: 'Terminals', href: '/finance/eftpos/terminals' },
 ];
 
@@ -73,335 +95,402 @@ export default function EftposTerminals({
     bankAccounts,
     glAccounts,
 }: Props) {
-    const [showForm, setShowForm] = useState(false);
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editTerminal, setEditTerminal] = useState<EditableTerminal | null>(
+        null,
+    );
+    const [serviceTarget, setServiceTarget] = useState<Terminal | null>(null);
+    const [updatingService, setUpdatingService] = useState(false);
+    const [search, setSearch] = useState('');
+    const [provider, setProvider] = useState(ALL);
+    const [includeRetired, setIncludeRetired] = useState(true);
+    const ctxMenu = useEntityContextMenu<Terminal>();
 
-    const { data, setData, post, processing, errors, reset } = useForm({
-        terminal_id: '',
-        name: '',
-        location: '',
-        provider: 'paymark',
-        merchant_id: '',
-        bank_account_id: '',
-        gl_account_id: '',
+    const activeCount = terminals.filter(
+        (terminal) => terminal.is_active,
+    ).length;
+    const totalBatches = terminals.reduce(
+        (sum, terminal) => sum + terminal.batch_count,
+        0,
+    );
+
+    const toEditable = (terminal: Terminal): EditableTerminal => ({
+        id: terminal.id,
+        terminal_id: terminal.terminal_id,
+        name: terminal.name,
+        location: terminal.location,
+        provider: terminal.provider,
+        has_merchant_id: terminal.has_merchant_id,
+        bank_account_id: terminal.bank_account_id,
+        gl_account_id: terminal.gl_account_id,
+        is_active: terminal.is_active,
     });
 
-    const handleSubmit = (e: FormEvent) => {
-        e.preventDefault();
-        post('/finance/eftpos/terminals', {
-            onSuccess: () => {
-                reset();
-                setShowForm(false);
+    // The service toggle reuses the same update route the dialog posts to; the
+    // merchant ID is deliberately absent so the stored value is left alone.
+    const confirmServiceChange = () => {
+        if (!serviceTarget) return;
+        router.put(
+            `/finance/eftpos/terminals/${serviceTarget.id}`,
+            {
+                name: serviceTarget.name,
+                location: serviceTarget.location,
+                provider: serviceTarget.provider,
+                bank_account_id: serviceTarget.bank_account_id,
+                gl_account_id: serviceTarget.gl_account_id,
+                is_active: !serviceTarget.is_active,
             },
-        });
+            {
+                preserveScroll: true,
+                onStart: () => setUpdatingService(true),
+                onFinish: () => setUpdatingService(false),
+                onSuccess: () => setServiceTarget(null),
+            },
+        );
     };
 
-    const activeCount = terminals.filter((t) => t.is_active).length;
-    const totalBatches = terminals.reduce((sum, t) => sum + t.batch_count, 0);
+    const actionsFor = (terminal: Terminal): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Edit terminal',
+                icon: Pencil,
+                onClick: () => setEditTerminal(toEditable(terminal)),
+            },
+            {
+                label: 'View batches',
+                icon: Layers,
+                onClick: () =>
+                    router.visit(
+                        `/finance/eftpos/batches?terminal_id=${terminal.id}`,
+                    ),
+            },
+            terminal.bank_account_id
+                ? {
+                      label: 'Open settlement account',
+                      icon: Landmark,
+                      onClick: () =>
+                          router.visit(
+                              `/finance/bank-accounts/${terminal.bank_account_id}`,
+                          ),
+                  }
+                : null,
+            { separator: true },
+            {
+                label: terminal.is_active
+                    ? 'Take out of service'
+                    : 'Put back in service',
+                icon: Power,
+                danger: terminal.is_active,
+                onClick: () => setServiceTarget(terminal),
+            },
+        ]);
+
+    const term = search.trim().toLowerCase();
+    const visible = useMemo(
+        () =>
+            terminals.filter((terminal) => {
+                if (!includeRetired && !terminal.is_active) return false;
+                if (provider !== ALL && terminal.provider !== provider)
+                    return false;
+                if (!term) return true;
+                return [
+                    terminal.name,
+                    terminal.terminal_id,
+                    terminal.location ?? '',
+                    eftposProviderLabel(terminal.provider),
+                ]
+                    .join(' ')
+                    .toLowerCase()
+                    .includes(term);
+            }),
+        [terminals, includeRetired, provider, term],
+    );
+
+    const clearFilters = () => {
+        setSearch('');
+        setProvider(ALL);
+        setIncludeRetired(true);
+    };
+
+    const columns: EntityTableColumn<Terminal>[] = [
+        {
+            key: 'provider',
+            label: 'Provider',
+            width: '0.8fr',
+            cell: (terminal) => eftposProviderLabel(terminal.provider),
+        },
+        {
+            key: 'settlement',
+            label: 'Settlement account',
+            width: '1.1fr',
+            cell: (terminal) =>
+                terminal.bank_account_name ?? (
+                    <span className="text-muted-foreground">Not linked</span>
+                ),
+        },
+        {
+            key: 'gl',
+            label: 'GL clearing account',
+            width: '1.2fr',
+            cell: (terminal) =>
+                terminal.gl_account_name ?? (
+                    <span className="text-muted-foreground">Not linked</span>
+                ),
+        },
+        {
+            key: 'batches',
+            label: 'Batches',
+            width: '0.6fr',
+            align: 'right',
+            cell: (terminal) => (
+                <span className="tabular-nums">{terminal.batch_count}</span>
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '0.8fr',
+            cell: (terminal) => (
+                <StatusBadge status={terminal.is_active ? 'active' : 'inactive'} />
+            ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={Smartphone}
+            title="EFTPOS terminals"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={activeCount > 0 ? 'success' : 'warning'}
+                >
+                    {activeCount} in service
+                </PageHeaderStatusChip>
+            }
+            subline={`Banking · ${terminals.length} terminals · ${totalBatches} batches taken`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search terminals, locations…"
+                    />
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() => setCreateOpen(true)}
+                    >
+                        Add terminal
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Terminals"
+                        href="/finance/eftpos/terminals"
+                        ariaLabel="View every terminal"
+                    >
+                        <PageHeaderMeterBig>
+                            {terminals.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Registered devices
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="In service"
+                        tone="success"
+                        onClick={() => setIncludeRetired(false)}
+                        ariaLabel="Show only terminals in service"
+                    >
+                        <PageHeaderMeterBig>{activeCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {terminals.length - activeCount} out of service
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Batches"
+                        href="/finance/eftpos/batches"
+                        ariaLabel="View EFTPOS batches"
+                    >
+                        <PageHeaderMeterBig>{totalBatches}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Taken across every terminal
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Unlinked"
+                        tone={
+                            terminals.some(
+                                (terminal) => !terminal.bank_account_id,
+                            )
+                                ? 'warning'
+                                : 'brand'
+                        }
+                        href="/finance/bank-accounts"
+                        ariaLabel="View bank accounts"
+                    >
+                        <PageHeaderMeterBig>
+                            {
+                                terminals.filter(
+                                    (terminal) => !terminal.bank_account_id,
+                                ).length
+                            }
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Terminals with no settlement account
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Provider"
+                        value={provider}
+                        allValue={ALL}
+                        options={[
+                            { value: ALL, label: 'Any provider' },
+                            ...EFTPOS_PROVIDERS,
+                        ]}
+                        onChange={setProvider}
+                    />
+                    <PageHeaderFilterCheck
+                        label="Include out of service"
+                        checked={includeRetired}
+                        onChange={setIncludeRetired}
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="EFTPOS Terminals" />
+            <Head title="EFTPOS terminals" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Smartphone}
-                        title="EFTPOS Terminals"
-                        description="Configure and manage EFTPOS terminal devices."
-                        stats={[
-                            { label: 'Total', value: terminals.length },
-                            { label: 'Active', value: activeCount },
-                            { label: 'Batches', value: totalBatches },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button
-                                    asChild
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Link href="/finance/eftpos/batches">
-                                        View Batches
-                                    </Link>
-                                </Button>
+            <PageLayout hero={header} tabs={<FinanceTierTwoNav />}>
+                <div className="flex flex-col gap-5">
+                    {terminals.length === 0 ? (
+                        <EmptyList
+                            icon={CreditCard}
+                            itemName="EFTPOS terminal"
+                            title="No EFTPOS terminals yet"
+                            description="Add a terminal to start tracking the card takings it batches and settles."
+                            action={
                                 <Button
                                     size="sm"
-                                    onClick={() => setShowForm(!showForm)}
+                                    onClick={() => setCreateOpen(true)}
                                 >
-                                    <Plus className="mr-1 h-4 w-4" />
-                                    Add Terminal
+                                    Add terminal
                                 </Button>
-                            </div>
-                        }
-                        footer={<BankingTabsFooter active="eftpos" />}
-                    />
-                }
-            >
-                {showForm && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Add EFTPOS Terminal</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <form
-                                onSubmit={handleSubmit}
-                                className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-                            >
-                                <div>
-                                    <Label htmlFor="terminal_id">
-                                        Terminal ID
-                                    </Label>
-                                    <Input
-                                        id="terminal_id"
-                                        value={data.terminal_id}
-                                        onChange={(e) =>
-                                            setData(
-                                                'terminal_id',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="e.g. T001234"
-                                    />
-                                    {errors.terminal_id && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {errors.terminal_id}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="name">Name</Label>
-                                    <Input
-                                        id="name"
-                                        value={data.name}
-                                        onChange={(e) =>
-                                            setData('name', e.target.value)
-                                        }
-                                        placeholder="e.g. Front Desk Terminal"
-                                    />
-                                    {errors.name && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {errors.name}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="location">Location</Label>
-                                    <Input
-                                        id="location"
-                                        value={data.location}
-                                        onChange={(e) =>
-                                            setData('location', e.target.value)
-                                        }
-                                        placeholder="e.g. Main Office"
-                                    />
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="provider">Provider</Label>
-                                    <Select
-                                        value={data.provider}
-                                        onValueChange={(val) =>
-                                            setData('provider', val)
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="paymark">
-                                                Paymark
-                                            </SelectItem>
-                                            <SelectItem value="worldline">
-                                                Worldline
-                                            </SelectItem>
-                                            <SelectItem value="eftpos_nz">
-                                                EFTPOS NZ
-                                            </SelectItem>
-                                            <SelectItem value="windcave">
-                                                Windcave
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="merchant_id">
-                                        Merchant ID
-                                    </Label>
-                                    <Input
-                                        id="merchant_id"
-                                        value={data.merchant_id}
-                                        onChange={(e) =>
-                                            setData(
-                                                'merchant_id',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="Encrypted merchant ID"
-                                    />
-                                    {errors.merchant_id && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {errors.merchant_id}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="bank_account_id">
-                                        Settlement Account
-                                    </Label>
-                                    <Select
-                                        value={data.bank_account_id}
-                                        onValueChange={(val) =>
-                                            setData('bank_account_id', val)
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select account" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {bankAccounts.map((acc) => (
-                                                <SelectItem
-                                                    key={acc.id}
-                                                    value={String(acc.id)}
-                                                >
-                                                    {acc.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="gl_account_id">
-                                        GL Clearing Account
-                                    </Label>
-                                    <Select
-                                        value={data.gl_account_id}
-                                        onValueChange={(val) =>
-                                            setData('gl_account_id', val)
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select GL account" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {glAccounts.map((acc) => (
-                                                <SelectItem
-                                                    key={acc.id}
-                                                    value={String(acc.id)}
-                                                >
-                                                    {acc.code} - {acc.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-3">
-                                    <Button type="submit" disabled={processing}>
-                                        {processing
-                                            ? 'Adding...'
-                                            : 'Add Terminal'}
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setShowForm(false)}
-                                    >
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {terminals.length === 0 ? (
-                    <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-12">
-                            <CreditCard className="mb-4 h-12 w-12 text-muted-foreground" />
-                            <p className="text-lg font-medium text-muted-foreground">
-                                No EFTPOS terminals configured.
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                Add your first terminal to start tracking EFTPOS
-                                batches.
-                            </p>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <Card>
-                        <CardContent className="p-0">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Terminal ID</TableHead>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Location</TableHead>
-                                        <TableHead>Provider</TableHead>
-                                        <TableHead>
-                                            Settlement Account
-                                        </TableHead>
-                                        <TableHead>GL Account</TableHead>
-                                        <TableHead>Batches</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {terminals.map((terminal) => (
-                                        <TableRow key={terminal.id}>
-                                            <TableCell className="font-mono text-sm">
-                                                {terminal.terminal_id}
-                                            </TableCell>
-                                            <TableCell className="font-medium">
-                                                {terminal.name}
-                                            </TableCell>
-                                            <TableCell>
-                                                {terminal.location ?? '-'}
-                                            </TableCell>
-                                            <TableCell>
-                                                {providerLabels[
-                                                    terminal.provider
-                                                ] ?? terminal.provider}
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                                {terminal.bank_account_name ??
-                                                    '-'}
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                                {terminal.gl_account_name ??
-                                                    '-'}
-                                            </TableCell>
-                                            <TableCell>
-                                                {terminal.batch_count}
-                                            </TableCell>
-                                            <TableCell>
-                                                {terminal.is_active ? (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="border-status-success/30 text-status-success"
-                                                    >
-                                                        Active
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="secondary">
-                                                        Inactive
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                )}
+                            }
+                        />
+                    ) : (
+                        <>
+                            <ListCaption
+                                title="Terminals"
+                                caption={`${visible.length} of ${terminals.length} shown`}
+                            />
+                            {visible.length === 0 ? (
+                                <EmptySearch
+                                    onClear={clearFilters}
+                                    title="No terminals match your filters"
+                                />
+                            ) : (
+                                <EntityTable
+                                    rows={visible}
+                                    rowKey={(terminal) => terminal.id}
+                                    identityLabel="Terminal"
+                                    identity={(terminal) => ({
+                                        icon: CreditCard,
+                                        name: terminal.name,
+                                        subline: [
+                                            terminal.terminal_id,
+                                            terminal.location,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' · '),
+                                    })}
+                                    columns={columns}
+                                    actionsFor={actionsFor}
+                                    onRowContextMenu={ctxMenu.open}
+                                    mutedFor={(terminal) => !terminal.is_active}
+                                    minWidth={1080}
+                                />
+                            )}
+                        </>
+                    )}
+                </div>
             </PageLayout>
+
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={CreditCard}
+                    title={ctxMenu.ctx.record.name}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
+
+            <TerminalDialog
+                open={createOpen}
+                onClose={() => setCreateOpen(false)}
+                bankAccounts={bankAccounts}
+                glAccounts={glAccounts}
+            />
+
+            {editTerminal ? (
+                <TerminalDialog
+                    key={editTerminal.id}
+                    open
+                    terminal={editTerminal}
+                    onClose={() => setEditTerminal(null)}
+                    bankAccounts={bankAccounts}
+                    glAccounts={glAccounts}
+                />
+            ) : null}
+
+            <ConfirmDialog
+                open={!!serviceTarget}
+                onClose={() => setServiceTarget(null)}
+                title={
+                    serviceTarget?.is_active
+                        ? 'Take this terminal out of service?'
+                        : 'Put this terminal back in service?'
+                }
+                description={
+                    serviceTarget?.is_active ? (
+                        <>
+                            <span className="font-medium text-foreground">
+                                {serviceTarget?.name}
+                            </span>{' '}
+                            stops accepting new batches and drops out of the
+                            terminal filter. Its existing batches stay on
+                            record.
+                        </>
+                    ) : (
+                        <>
+                            <span className="font-medium text-foreground">
+                                {serviceTarget?.name}
+                            </span>{' '}
+                            starts accepting batches again.
+                        </>
+                    )
+                }
+                confirmText={
+                    serviceTarget?.is_active
+                        ? 'Take out of service'
+                        : 'Put in service'
+                }
+                variant={serviceTarget?.is_active ? 'destructive' : 'default'}
+                processing={updatingService}
+                onConfirm={confirmServiceChange}
+            />
         </AppLayout>
     );
 }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
+use App\Domain\Finance\Models\FinBankTransaction;
 use App\Domain\Finance\Models\FinMatchRule;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -35,6 +36,10 @@ class MatchRuleController extends Controller
 
         return Inertia::render('finance/match-rules/Index', [
             'rules' => $rules,
+            // The header's fourth meter — the workload these rules run against.
+            'unreconciledTransactions' => (int) FinBankTransaction::forOrganization($orgId)
+                ->unreconciled()
+                ->count(),
         ]);
     }
 

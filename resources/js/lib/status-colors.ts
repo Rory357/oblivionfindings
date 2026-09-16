@@ -120,6 +120,11 @@ export const statusColors: Record<string, string> = {
     // of the bank settlement workflow.
     inactive: NEUTRAL,
     exported: INFO,
+    // WP6 (banking): bank-feed sync outcomes and the payment-matching lifecycle.
+    success: SUCCESS,
+    suggested: WARNING,
+    confirmed: SUCCESS,
+    auto_confirmed: INFO,
 };
 
 export function getStatusColor(status: string): string {

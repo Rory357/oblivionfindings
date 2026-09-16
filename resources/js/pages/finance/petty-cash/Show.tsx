@@ -1,31 +1,30 @@
-import { formatMoney } from '@/components/finance/money';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import { FinanceSectionRail, formatMoney } from '@/components/finance';
+import {
+    EntityTable,
+    ListCaption,
+    compactMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { EmptyList } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps, type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
-import { Receipt } from 'lucide-react';
-import { FormEvent } from 'react';
+import { Head } from '@inertiajs/react';
+import { Coins, Plus, Receipt, Wallet } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { PettyCashTransactionDialog, pettyCashType } from './_dialogs';
 
 interface FundDetails {
     id: number;
@@ -45,7 +44,8 @@ interface Transaction {
     description: string | null;
     amount: number;
     account_name: string | null;
-    receipt_path: string | null;
+    has_receipt: boolean;
+    receipt_url: string | null;
     created_by: string | null;
     running_balance: number | null;
 }
@@ -62,6 +62,7 @@ interface Props extends PageProps {
         transactions: Transaction[];
     };
     expenseAccounts: Account[];
+    canManage: boolean;
 }
 
 const formatDate = (date: string) =>
@@ -71,344 +72,288 @@ const formatDate = (date: string) =>
         year: 'numeric',
     });
 
-const typeConfig: Record<string, { label: string; className: string }> = {
-    top_up: {
-        label: 'Top Up',
-        className: 'bg-status-success-bg text-status-success',
-    },
-    expense: {
-        label: 'Expense',
-        className: 'bg-status-critical-bg text-status-critical',
-    },
-    adjustment: {
-        label: 'Adjustment',
-        className: 'bg-status-info-bg text-status-info',
-    },
-};
-
-export default function PettyCashShow({ summary, expenseAccounts }: Props) {
+export default function PettyCashShow({
+    summary,
+    expenseAccounts,
+    canManage = false,
+}: Props) {
     const { fund, transactions } = summary;
+    const [recordOpen, setRecordOpen] = useState(false);
+
+    // The fund cards link here with ?record=1 to open the dialog straight away.
+    useEffect(() => {
+        if (
+            canManage &&
+            new URLSearchParams(window.location.search).get('record')
+        ) {
+            setRecordOpen(true);
+        }
+    }, [canManage]);
 
     const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
         { title: 'Finance', href: '/finance' },
-        { title: 'Petty Cash', href: '/finance/petty-cash' },
+        { title: 'Banking', href: '/finance/banking' },
+        { title: 'Petty cash', href: '/finance/petty-cash' },
         { title: fund.name, href: `/finance/petty-cash/${fund.id}` },
     ];
 
-    const { data, setData, post, processing, errors, reset } = useForm({
-        transaction_date: new Date().toISOString().split('T')[0],
-        type: 'expense',
-        amount: '',
-        description: '',
-        account_id: '',
-        receipt_path: '',
-    });
+    const receiptCount = transactions.filter(
+        (transaction) => transaction.has_receipt,
+    ).length;
 
-    const handleSubmit = (e: FormEvent) => {
-        e.preventDefault();
-        post(`/finance/petty-cash/${fund.id}/transaction`, {
-            onSuccess: () => reset(),
-        });
-    };
+    const actionsFor = (transaction: Transaction): MenuItem[] =>
+        compactMenu([
+            transaction.receipt_url
+                ? {
+                      label: 'Open receipt',
+                      icon: Receipt,
+                      onClick: () =>
+                          window.open(transaction.receipt_url!, '_blank'),
+                  }
+                : null,
+        ]);
+
+    const columns: EntityTableColumn<Transaction>[] = [
+        {
+            key: 'type',
+            label: 'Type',
+            width: '0.7fr',
+            cell: (transaction) => {
+                const type = pettyCashType(transaction.type);
+                return (
+                    <StatusBadge variant={type.variant} label={type.label} />
+                );
+            },
+        },
+        {
+            key: 'account',
+            label: 'Account',
+            width: '1.2fr',
+            cell: (transaction) =>
+                transaction.account_name ?? (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+        {
+            key: 'amount',
+            label: 'Amount',
+            width: '0.8fr',
+            align: 'right',
+            cell: (transaction) => (
+                <span
+                    className={`font-medium tabular-nums ${
+                        transaction.type === 'expense'
+                            ? 'text-status-critical'
+                            : 'text-status-success'
+                    }`}
+                >
+                    {transaction.type === 'expense' ? '−' : '+'}
+                    {formatMoney(transaction.amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'balance',
+            label: 'Balance',
+            width: '0.8fr',
+            align: 'right',
+            cell: (transaction) =>
+                transaction.running_balance !== null ? (
+                    <span className="tabular-nums">
+                        {formatMoney(transaction.running_balance)}
+                    </span>
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+        {
+            key: 'receipt',
+            label: 'Receipt',
+            width: '0.7fr',
+            cell: (transaction) =>
+                transaction.receipt_url ? (
+                    <a
+                        href={transaction.receipt_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                    >
+                        <Receipt className="size-3.5" />
+                        View
+                    </a>
+                ) : (
+                    <span className="text-muted-foreground">None</span>
+                ),
+        },
+        {
+            key: 'by',
+            label: 'Recorded by',
+            width: '0.9fr',
+            cell: (transaction) =>
+                transaction.created_by ?? (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            icon={Wallet}
+            backHref="/finance/petty-cash"
+            title={fund.name}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={fund.is_active ? 'success' : 'neutral'}
+                >
+                    {fund.is_active ? 'Active' : 'Closed'}
+                </PageHeaderStatusChip>
+            }
+            subline={[
+                fund.custodian_name
+                    ? `Custodian ${fund.custodian_name}`
+                    : 'No custodian assigned',
+                fund.gl_account_name ?? 'No GL account linked',
+                `${transactions.length} recent transactions`,
+            ].join(' · ')}
+            actions={
+                canManage ? (
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() => setRecordOpen(true)}
+                    >
+                        Record transaction
+                    </PageHeaderPrimaryButton>
+                ) : undefined
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Current balance"
+                        tone={fund.current_balance >= 0 ? 'success' : 'critical'}
+                        href="/finance/cash-position"
+                        ariaLabel="View the cash position"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(fund.current_balance)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Cash that should be in the tin
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Float"
+                        href="/finance/petty-cash"
+                        ariaLabel="View every petty cash fund"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(fund.float_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Authorised float for this fund
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Variance"
+                        tone={
+                            fund.variance < 0
+                                ? 'warning'
+                                : fund.variance > 0
+                                  ? 'brand'
+                                  : 'success'
+                        }
+                        href={`/finance/petty-cash/${fund.id}`}
+                        ariaLabel="View this fund's transactions"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(fund.variance)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Balance against the float
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Receipts attached"
+                        tone={
+                            receiptCount < transactions.length
+                                ? 'warning'
+                                : 'brand'
+                        }
+                        href={`/finance/petty-cash/${fund.id}`}
+                        ariaLabel="View this fund's transactions"
+                    >
+                        <PageHeaderMeterBig>
+                            {receiptCount}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            of {transactions.length} recent transactions
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Petty Cash - ${fund.name}`} />
+            <Head title={`Petty cash — ${fund.name}`} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/petty-cash"
-                        title={
-                            <span className="flex flex-wrap items-center gap-3">
-                                {fund.name}
-                                {fund.is_active ? (
-                                    <StatusBadge
-                                        variant="success"
-                                        label="Active"
-                                    />
-                                ) : (
-                                    <StatusBadge
-                                        variant="neutral"
-                                        label="Inactive"
-                                    />
-                                )}
-                            </span>
-                        }
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Transactions"
+                        caption={`${transactions.length} most recent`}
                     />
-                }
-            >
-                {/* Fund Details */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">
-                                Float Amount
-                            </p>
-                            <p className="text-xl font-bold">
-                                {formatMoney(fund.float_amount)}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">
-                                Current Balance
-                            </p>
-                            <p className="text-xl font-bold">
-                                {formatMoney(fund.current_balance)}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">
-                                Variance
-                            </p>
-                            <p
-                                className={`text-xl font-bold ${fund.variance < 0 ? 'text-destructive' : fund.variance > 0 ? 'text-status-success' : ''}`}
-                            >
-                                {formatMoney(fund.variance)}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">
-                                Custodian
-                            </p>
-                            <p className="text-xl font-bold">
-                                {fund.custodian_name ?? '-'}
-                            </p>
-                            {fund.gl_account_name && (
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    GL: {fund.gl_account_name}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
 
-                {/* Add Transaction Form */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Record Transaction</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form
-                            onSubmit={handleSubmit}
-                            className="flex flex-wrap items-end gap-4"
-                        >
-                            <div className="w-36">
-                                <Label htmlFor="transaction_date">Date</Label>
-                                <Input
-                                    id="transaction_date"
-                                    type="date"
-                                    value={data.transaction_date}
-                                    onChange={(e) =>
-                                        setData(
-                                            'transaction_date',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-
-                            <div className="w-36">
-                                <Label htmlFor="type">Type</Label>
-                                <Select
-                                    value={data.type}
-                                    onValueChange={(val) =>
-                                        setData('type', val)
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="expense">
-                                            Expense
-                                        </SelectItem>
-                                        <SelectItem value="top_up">
-                                            Top Up
-                                        </SelectItem>
-                                        <SelectItem value="adjustment">
-                                            Adjustment
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="w-28">
-                                <Label htmlFor="amount">Amount</Label>
-                                <Input
-                                    id="amount"
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    value={data.amount}
-                                    onChange={(e) =>
-                                        setData('amount', e.target.value)
-                                    }
-                                    placeholder="0.00"
-                                />
-                            </div>
-
-                            <div className="min-w-[200px] flex-1">
-                                <Label htmlFor="description">Description</Label>
-                                <Input
-                                    id="description"
-                                    value={data.description}
-                                    onChange={(e) =>
-                                        setData('description', e.target.value)
-                                    }
-                                    placeholder="What was this for?"
-                                />
-                            </div>
-
-                            {data.type === 'expense' && (
-                                <div className="w-56">
-                                    <Label htmlFor="account_id">
-                                        Expense Account
-                                    </Label>
-                                    <Select
-                                        value={data.account_id}
-                                        onValueChange={(val) =>
-                                            setData('account_id', val)
-                                        }
+                    {transactions.length === 0 ? (
+                        <EmptyList
+                            icon={Coins}
+                            itemName="transaction"
+                            title="No transactions yet"
+                            description="Record the first expense, top-up or adjustment against this float."
+                            action={
+                                canManage ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setRecordOpen(true)}
                                     >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select account" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {expenseAccounts.map((account) => (
-                                                <SelectItem
-                                                    key={account.id}
-                                                    value={String(account.id)}
-                                                >
-                                                    {account.code} -{' '}
-                                                    {account.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-
-                            <Button type="submit" disabled={processing}>
-                                {processing ? 'Saving...' : 'Add'}
-                            </Button>
-                        </form>
-                        {(errors.amount ||
-                            errors.transaction_date ||
-                            (errors as Record<string, string>).transaction) && (
-                            <p className="mt-2 text-sm text-destructive">
-                                {errors.amount ||
-                                    errors.transaction_date ||
-                                    (errors as Record<string, string>)
-                                        .transaction}
-                            </p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Transactions Table */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Transactions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {transactions.length === 0 ? (
-                            <p className="text-muted-foreground">
-                                No transactions recorded yet.
-                            </p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead>Account</TableHead>
-                                        <TableHead className="text-right">
-                                            Amount
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Balance
-                                        </TableHead>
-                                        <TableHead>Receipt</TableHead>
-                                        <TableHead>By</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {transactions.map((txn) => {
-                                        const config = typeConfig[txn.type] ?? {
-                                            label: txn.type,
-                                            className:
-                                                'bg-muted text-foreground',
-                                        };
-                                        return (
-                                            <TableRow key={txn.id}>
-                                                <TableCell>
-                                                    {formatDate(
-                                                        txn.transaction_date,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        className={
-                                                            config.className
-                                                        }
-                                                        variant="outline"
-                                                    >
-                                                        {config.label}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="max-w-[200px] truncate">
-                                                    {txn.description ?? '-'}
-                                                </TableCell>
-                                                <TableCell className="text-sm">
-                                                    {txn.account_name ?? '-'}
-                                                </TableCell>
-                                                <TableCell
-                                                    className={`text-right font-medium ${txn.type === 'expense' ? 'text-destructive' : 'text-status-success'}`}
-                                                >
-                                                    {txn.type === 'expense'
-                                                        ? '-'
-                                                        : '+'}
-                                                    {formatMoney(txn.amount)}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {txn.running_balance !==
-                                                    null
-                                                        ? formatMoney(
-                                                              txn.running_balance,
-                                                          )
-                                                        : '-'}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {txn.receipt_path ? (
-                                                        <Receipt className="h-4 w-4 text-status-success" />
-                                                    ) : (
-                                                        <span className="text-muted-foreground">
-                                                            -
-                                                        </span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-sm">
-                                                    {txn.created_by ?? '-'}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
+                                        Record transaction
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={transactions}
+                            rowKey={(transaction) => transaction.id}
+                            identityLabel="Transaction"
+                            identity={(transaction) => ({
+                                icon: Coins,
+                                name:
+                                    transaction.description ||
+                                    pettyCashType(transaction.type).label,
+                                subline: formatDate(
+                                    transaction.transaction_date,
+                                ),
+                            })}
+                            columns={columns}
+                            actionsFor={actionsFor}
+                            minWidth={1080}
+                        />
+                    )}
+                </div>
             </PageLayout>
+
+            {canManage && (
+                <PettyCashTransactionDialog
+                    open={recordOpen}
+                    onClose={() => setRecordOpen(false)}
+                    fundId={fund.id}
+                    expenseAccounts={expenseAccounts}
+                />
+            )}
         </AppLayout>
     );
 }

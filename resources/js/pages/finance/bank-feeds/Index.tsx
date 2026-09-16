@@ -1,40 +1,46 @@
-import { BankingTabsFooter, ConfirmDialog } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog, FinanceSectionRail } from '@/components/finance';
+import {
+    EntityCard,
+    EntityCardGrid,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertCircle,
     FileText,
+    Landmark,
     Plus,
-    Radio,
     RefreshCw,
     Rss,
     Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+
+import { BANK_FEED_PROVIDERS, ConnectFeedDialog, providerLabel } from './_dialogs';
 
 interface BankAccount {
     id: number;
@@ -69,40 +75,34 @@ interface Props {
     csvImportUrl: string;
 }
 
-const providerLabels: Record<string, string> = {
-    asb: 'ASB',
-    anz: 'ANZ',
-    westpac: 'Westpac',
-    bnz: 'BNZ',
-};
+const ALL = '__all';
 
-const statusVariant = (
-    status: string | null,
-): 'default' | 'destructive' | 'secondary' | 'outline' => {
+const SYNC_OPTIONS = [
+    { value: ALL, label: 'Any sync state' },
+    { value: 'success', label: 'Last sync succeeded' },
+    { value: 'failed', label: 'Last sync failed' },
+    { value: 'pending', label: 'Never synced' },
+];
+
+const syncLabel = (status: string | null) => {
     switch (status) {
         case 'success':
-            return 'default';
+            return 'Sync succeeded';
         case 'failed':
-            return 'destructive';
+            return 'Sync failed';
         case 'pending':
-            return 'secondary';
-        default:
-            return 'outline';
-    }
-};
-
-const statusLabel = (status: string | null): string => {
-    switch (status) {
-        case 'success':
-            return 'Success';
-        case 'failed':
-            return 'Failed';
-        case 'pending':
-            return 'Pending';
+            return 'Awaiting first sync';
         default:
             return 'Never synced';
     }
 };
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Banking', href: '/finance/banking' },
+    { title: 'Bank feeds', href: '/finance/bank-feeds' },
+];
 
 export default function BankFeedsIndex({
     feeds,
@@ -113,42 +113,33 @@ export default function BankFeedsIndex({
     providerSetupMessage,
     csvImportUrl,
 }: Props) {
-    const [showAddDialog, setShowAddDialog] = useState(false);
-    const [syncing, setSyncing] = useState<number | null>(null);
+    const [connectOpen, setConnectOpen] = useState(false);
     const [syncingAll, setSyncingAll] = useState(false);
     const [disconnectTarget, setDisconnectTarget] = useState<BankFeed | null>(
         null,
     );
     const [disconnecting, setDisconnecting] = useState(false);
-
-    const form = useForm({
-        bank_account_id: '',
-        provider: '',
-        sync_from_date: '',
-    });
+    const [search, setSearch] = useState('');
+    const [provider, setProvider] = useState(ALL);
+    const [syncState, setSyncState] = useState(ALL);
+    const ctxMenu = useEntityContextMenu<BankFeed>();
 
     const availableAccounts = bankAccounts.filter(
         (account) => !existingAccountIds.includes(account.id),
     );
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        form.post('/finance/bank-feeds', {
-            onSuccess: () => {
-                setShowAddDialog(false);
-                form.reset();
-            },
-        });
-    };
+    const activeFeeds = feeds.filter((feed) => feed.is_active).length;
+    const failedFeeds = feeds.filter(
+        (feed) => feed.last_sync_status === 'failed',
+    ).length;
+    const connectedAccounts = new Set(feeds.map((feed) => feed.bank_account_id))
+        .size;
 
-    const handleSync = (feedId: number) => {
-        setSyncing(feedId);
+    const handleSync = (feed: BankFeed) => {
         router.post(
-            `/finance/bank-feeds/${feedId}/sync`,
+            `/finance/bank-feeds/${feed.id}/sync`,
             {},
-            {
-                onFinish: () => setSyncing(null),
-            },
+            { preserveScroll: true },
         );
     };
 
@@ -157,9 +148,7 @@ export default function BankFeedsIndex({
         router.post(
             '/finance/bank-feeds/sync-all',
             {},
-            {
-                onFinish: () => setSyncingAll(false),
-            },
+            { onFinish: () => setSyncingAll(false) },
         );
     };
 
@@ -172,397 +161,368 @@ export default function BankFeedsIndex({
         });
     };
 
-    const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Bank Feeds', href: '/finance/bank-feeds' },
-    ];
+    const actionsFor = (feed: BankFeed): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Sync logs',
+                icon: FileText,
+                onClick: () =>
+                    router.visit(`/finance/bank-feeds/${feed.id}/logs`),
+            },
+            providerSetupEnabled
+                ? {
+                      label: 'Sync now',
+                      icon: RefreshCw,
+                      onClick: () => handleSync(feed),
+                  }
+                : null,
+            {
+                label: 'Open bank account',
+                icon: Landmark,
+                onClick: () =>
+                    router.visit(
+                        `/finance/bank-accounts/${feed.bank_account_id}`,
+                    ),
+            },
+            { separator: true },
+            {
+                label: 'Disconnect feed',
+                icon: Trash2,
+                danger: true,
+                onClick: () => setDisconnectTarget(feed),
+            },
+        ]);
 
-    const activeFeeds = feeds.filter((f) => f.is_active).length;
-    const failedFeeds = feeds.filter(
-        (f) => f.last_sync_status === 'failed',
-    ).length;
+    const term = search.trim().toLowerCase();
+    const visible = useMemo(
+        () =>
+            feeds.filter((feed) => {
+                if (provider !== ALL && feed.provider !== provider)
+                    return false;
+                if (syncState !== ALL) {
+                    const state = feed.last_sync_status ?? 'pending';
+                    if (state !== syncState) return false;
+                }
+                if (!term) return true;
+                return [
+                    feed.bank_account_name,
+                    feed.bank_name,
+                    providerLabel(feed.provider),
+                ]
+                    .join(' ')
+                    .toLowerCase()
+                    .includes(term);
+            }),
+        [feeds, provider, syncState, term],
+    );
+
+    const clearFilters = () => {
+        setSearch('');
+        setProvider(ALL);
+        setSyncState(ALL);
+    };
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={Rss}
+            title="Bank feeds"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={failedFeeds > 0 ? 'critical' : 'success'}
+                >
+                    {failedFeeds > 0
+                        ? `${failedFeeds} failing`
+                        : 'All feeds healthy'}
+                </PageHeaderStatusChip>
+            }
+            subline={`Banking · ${feeds.length} feeds · ${activeFeeds} active`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search feeds, banks…"
+                    />
+                    {csvImportSupported && (
+                        <PageHeaderGlassButton
+                            icon={FileText}
+                            onClick={() => router.visit(csvImportUrl)}
+                        >
+                            CSV import
+                        </PageHeaderGlassButton>
+                    )}
+                    {feeds.length > 0 && (
+                        <PageHeaderGlassButton
+                            icon={RefreshCw}
+                            onClick={handleSyncAll}
+                            disabled={syncingAll || !providerSetupEnabled}
+                        >
+                            {syncingAll ? 'Syncing…' : 'Sync all'}
+                        </PageHeaderGlassButton>
+                    )}
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() => setConnectOpen(true)}
+                        disabled={
+                            availableAccounts.length === 0 ||
+                            !providerSetupEnabled
+                        }
+                    >
+                        Connect feed
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Feeds"
+                        href="/finance/bank-feeds"
+                        ariaLabel="View every bank feed"
+                    >
+                        <PageHeaderMeterBig>{feeds.length}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Connected to this organisation
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Active"
+                        tone="success"
+                        onClick={() => {
+                            setSyncState(ALL);
+                            setProvider(ALL);
+                            setSearch('');
+                        }}
+                        ariaLabel="Show every feed"
+                    >
+                        <PageHeaderMeterBig>{activeFeeds}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {feeds.length - activeFeeds} paused
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Failing"
+                        tone={failedFeeds > 0 ? 'critical' : 'brand'}
+                        onClick={() => setSyncState('failed')}
+                        ariaLabel="Show feeds whose last sync failed"
+                    >
+                        <PageHeaderMeterBig>{failedFeeds}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Last sync ended in an error
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Bank accounts fed"
+                        href="/finance/bank-accounts"
+                        ariaLabel="View bank accounts"
+                    >
+                        <PageHeaderMeterBig>
+                            {connectedAccounts}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            of {bankAccounts.length} active accounts
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Provider"
+                        value={provider}
+                        allValue={ALL}
+                        options={[
+                            { value: ALL, label: 'Any provider' },
+                            ...BANK_FEED_PROVIDERS,
+                        ]}
+                        onChange={setProvider}
+                    />
+                    <PageHeaderFilterSelect
+                        label="Sync state"
+                        value={syncState}
+                        allValue={ALL}
+                        options={SYNC_OPTIONS}
+                        onChange={setSyncState}
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Bank Feeds" />
+            <Head title="Bank feeds" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Rss}
-                        title="Bank Feeds"
-                        description="Automated bank transaction imports from NZ banks"
-                        stats={[
-                            { label: 'Feeds', value: feeds.length },
-                            { label: 'Active', value: activeFeeds },
-                            { label: 'Failed', value: failedFeeds },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                {feeds.length > 0 && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={handleSyncAll}
-                                        disabled={
-                                            syncingAll || !providerSetupEnabled
-                                        }
-                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    >
-                                        <RefreshCw
-                                            className={`mr-1.5 h-4 w-4 ${syncingAll ? 'animate-spin' : ''}`}
-                                        />
-                                        Sync All
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {!providerSetupEnabled && (
+                        <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>
+                                Bank provider setup unavailable
+                            </AlertTitle>
+                            <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <span>{providerSetupMessage}</span>
+                                {csvImportSupported && (
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link href={csvImportUrl}>
+                                            <FileText className="mr-1 h-4 w-4" />
+                                            CSV import
+                                        </Link>
                                     </Button>
                                 )}
-                                <Dialog
-                                    open={showAddDialog}
-                                    onOpenChange={setShowAddDialog}
-                                >
-                                    <DialogTrigger asChild>
-                                        <Button
-                                            size="sm"
-                                            disabled={
-                                                availableAccounts.length ===
-                                                    0 || !providerSetupEnabled
-                                            }
-                                        >
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            Add Bank Feed
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <form onSubmit={handleSubmit}>
-                                            <DialogHeader>
-                                                <DialogTitle>
-                                                    Connect Bank Feed
-                                                </DialogTitle>
-                                                <DialogDescription>
-                                                    Set up an automated bank
-                                                    feed connection for a bank
-                                                    account.
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <div className="space-y-4 py-4">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="bank_account_id">
-                                                        Bank Account
-                                                    </Label>
-                                                    <Select
-                                                        value={
-                                                            form.data
-                                                                .bank_account_id
-                                                        }
-                                                        onValueChange={(
-                                                            value,
-                                                        ) =>
-                                                            form.setData(
-                                                                'bank_account_id',
-                                                                value,
-                                                            )
-                                                        }
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select a bank account" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {availableAccounts.map(
-                                                                (account) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            account.id
-                                                                        }
-                                                                        value={String(
-                                                                            account.id,
-                                                                        )}
-                                                                    >
-                                                                        {
-                                                                            account.name
-                                                                        }{' '}
-                                                                        (
-                                                                        {
-                                                                            account.bank_name
-                                                                        }
-                                                                        )
-                                                                    </SelectItem>
-                                                                ),
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    {form.errors
-                                                        .bank_account_id && (
-                                                        <p className="text-sm text-destructive">
-                                                            {
-                                                                form.errors
-                                                                    .bank_account_id
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
+                            </AlertDescription>
+                        </Alert>
+                    )}
 
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="provider">
-                                                        Bank Provider
-                                                    </Label>
-                                                    <Select
-                                                        value={
-                                                            form.data.provider
-                                                        }
-                                                        onValueChange={(
-                                                            value,
-                                                        ) =>
-                                                            form.setData(
-                                                                'provider',
-                                                                value,
-                                                            )
-                                                        }
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select provider" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="asb">
-                                                                ASB
-                                                            </SelectItem>
-                                                            <SelectItem value="anz">
-                                                                ANZ
-                                                            </SelectItem>
-                                                            <SelectItem value="westpac">
-                                                                Westpac
-                                                            </SelectItem>
-                                                            <SelectItem value="bnz">
-                                                                BNZ
-                                                            </SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    {form.errors.provider && (
-                                                        <p className="text-sm text-destructive">
-                                                            {
-                                                                form.errors
-                                                                    .provider
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
-
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="sync_from_date">
-                                                        Sync From Date
-                                                        (optional)
-                                                    </Label>
-                                                    <Input
-                                                        type="date"
-                                                        id="sync_from_date"
-                                                        value={
-                                                            form.data
-                                                                .sync_from_date
-                                                        }
-                                                        onChange={(e) =>
-                                                            form.setData(
-                                                                'sync_from_date',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Leave blank to sync the
-                                                        last 30 days by default.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <DialogFooter>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setShowAddDialog(false)
-                                                    }
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={form.processing}
-                                                >
-                                                    Connect Feed
-                                                </Button>
-                                            </DialogFooter>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                        }
-                        footer={<BankingTabsFooter active="feeds" />}
-                    />
-                }
-            >
-                {!providerSetupEnabled && (
-                    <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Bank provider setup unavailable</AlertTitle>
-                        <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <span>{providerSetupMessage}</span>
-                            {csvImportSupported && (
-                                <Button asChild variant="outline" size="sm">
-                                    <Link href={csvImportUrl}>
-                                        <FileText className="mr-1 h-4 w-4" />
-                                        CSV import
-                                    </Link>
-                                </Button>
-                            )}
-                        </AlertDescription>
-                    </Alert>
-                )}
-
-                {feeds.length === 0 ? (
-                    <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                            <Radio className="mb-4 h-12 w-12 text-muted-foreground/40" />
-                            <h3 className="mb-1 text-lg font-medium text-foreground">
-                                No bank feeds
-                            </h3>
-                            <p className="mb-4 text-muted-foreground">
-                                {providerSetupEnabled
-                                    ? 'Connect a bank feed to automatically import transactions from your NZ bank.'
-                                    : 'CSV import is the supported bank transaction import path.'}
-                            </p>
-                            {providerSetupEnabled ? (
-                                <Button
-                                    onClick={() => setShowAddDialog(true)}
-                                    disabled={availableAccounts.length === 0}
-                                >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add Bank Feed
-                                </Button>
-                            ) : (
-                                csvImportSupported && (
-                                    <Button asChild>
+                    {syncingAll ? (
+                        <LoadingState message="Syncing every active bank feed…" />
+                    ) : feeds.length === 0 ? (
+                        <EmptyList
+                            icon={Rss}
+                            itemName="bank feed"
+                            title="No bank feeds yet"
+                            description={
+                                providerSetupEnabled
+                                    ? 'Connect a feed to import transactions from an NZ bank automatically.'
+                                    : 'CSV import is the supported way to bring bank transactions in.'
+                            }
+                            action={
+                                providerSetupEnabled ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setConnectOpen(true)}
+                                        disabled={
+                                            availableAccounts.length === 0
+                                        }
+                                    >
+                                        Connect feed
+                                    </Button>
+                                ) : csvImportSupported ? (
+                                    <Button asChild size="sm">
                                         <Link href={csvImportUrl}>
-                                            <FileText className="mr-2 h-4 w-4" />
                                             Open CSV import
                                         </Link>
                                     </Button>
-                                )
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <>
+                            <ListCaption
+                                title="Bank feeds"
+                                caption={`${visible.length} of ${feeds.length} shown`}
+                            />
+
+                            {visible.length === 0 ? (
+                                <EmptySearch
+                                    onClear={clearFilters}
+                                    title="No bank feeds match your filters"
+                                />
+                            ) : (
+                                <EntityCardGrid>
+                                    {visible.map((feed) => (
+                                        <EntityCard
+                                            key={feed.id}
+                                            meridian={
+                                                feed.last_sync_status ===
+                                                'failed'
+                                                    ? 'critical'
+                                                    : !feed.is_active ||
+                                                        feed.last_sync_status !==
+                                                            'success'
+                                                      ? 'warning'
+                                                      : 'success'
+                                            }
+                                            icon={Rss}
+                                            name={feed.bank_account_name}
+                                            subline={`${providerLabel(feed.provider)} · ${feed.bank_name}`}
+                                            sublineIcon={Landmark}
+                                            href={`/finance/bank-feeds/${feed.id}/logs`}
+                                            onContextMenu={(event) =>
+                                                ctxMenu.open(event, feed)
+                                            }
+                                            actions={actionsFor(feed)}
+                                            muted={!feed.is_active}
+                                            chips={
+                                                <>
+                                                    <EntityStatusChip
+                                                        variant={
+                                                            feed.last_sync_status ===
+                                                            'success'
+                                                                ? 'success'
+                                                                : feed.last_sync_status ===
+                                                                    'failed'
+                                                                  ? 'critical'
+                                                                  : 'warning'
+                                                        }
+                                                    >
+                                                        {syncLabel(
+                                                            feed.last_sync_status,
+                                                        )}
+                                                    </EntityStatusChip>
+                                                    {!feed.is_active ? (
+                                                        <EntityStatusChip variant="neutral">
+                                                            Paused
+                                                        </EntityStatusChip>
+                                                    ) : null}
+                                                    <EntityChip>
+                                                        {feed.logs_count} sync
+                                                        {feed.logs_count === 1
+                                                            ? ''
+                                                            : 's'}
+                                                    </EntityChip>
+                                                </>
+                                            }
+                                            alerts={
+                                                feed.last_error &&
+                                                feed.last_sync_status ===
+                                                    'failed' ? (
+                                                    <EntityStatusChip
+                                                        variant="critical"
+                                                        icon={AlertCircle}
+                                                    >
+                                                        {feed.last_error}
+                                                    </EntityStatusChip>
+                                                ) : undefined
+                                            }
+                                            footer={{
+                                                personIcon: RefreshCw,
+                                                primary: feed.last_sync_at
+                                                    ? `Last sync ${feed.last_sync_at}`
+                                                    : 'Never synced',
+                                                secondary:
+                                                    feed.consent_expires_at
+                                                        ? `Consent expires ${feed.consent_expires_at}`
+                                                        : 'No consent expiry recorded',
+                                            }}
+                                            openLabel="Logs"
+                                        />
+                                    ))}
+                                </EntityCardGrid>
                             )}
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="space-y-4">
-                        {feeds.map((feed) => (
-                            <Card key={feed.id}>
-                                <CardHeader className="pb-3">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div>
-                                                <CardTitle className="text-lg">
-                                                    {feed.bank_account_name}
-                                                </CardTitle>
-                                                <p className="mt-0.5 text-sm text-muted-foreground">
-                                                    {providerLabels[
-                                                        feed.provider
-                                                    ] || feed.provider}{' '}
-                                                    &middot; {feed.bank_name}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Badge
-                                                variant={
-                                                    feed.is_active
-                                                        ? 'default'
-                                                        : 'secondary'
-                                                }
-                                            >
-                                                {feed.is_active
-                                                    ? 'Active'
-                                                    : 'Inactive'}
-                                            </Badge>
-                                            <Badge
-                                                variant={statusVariant(
-                                                    feed.last_sync_status,
-                                                )}
-                                            >
-                                                {statusLabel(
-                                                    feed.last_sync_status,
-                                                )}
-                                            </Badge>
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                                            <span>
-                                                Last sync:{' '}
-                                                {feed.last_sync_at || 'Never'}
-                                            </span>
-                                            {feed.consent_expires_at && (
-                                                <span>
-                                                    Consent expires:{' '}
-                                                    {feed.consent_expires_at}
-                                                </span>
-                                            )}
-                                            <span>
-                                                Sync logs: {feed.logs_count}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                asChild
-                                            >
-                                                <Link
-                                                    href={`/finance/bank-feeds/${feed.id}/logs`}
-                                                >
-                                                    <FileText className="mr-1 h-4 w-4" />
-                                                    Logs
-                                                </Link>
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() =>
-                                                    handleSync(feed.id)
-                                                }
-                                                disabled={
-                                                    syncing === feed.id ||
-                                                    !providerSetupEnabled
-                                                }
-                                            >
-                                                <RefreshCw
-                                                    className={`mr-1 h-4 w-4 ${syncing === feed.id ? 'animate-spin' : ''}`}
-                                                />
-                                                Sync
-                                            </Button>
-                                            <Button
-                                                variant="destructive"
-                                                size="sm"
-                                                onClick={() =>
-                                                    setDisconnectTarget(feed)
-                                                }
-                                            >
-                                                <Trash2 className="mr-1 h-4 w-4" />
-                                                Disconnect
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    {feed.last_error &&
-                                        feed.last_sync_status === 'failed' && (
-                                            <div className="mt-3 flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-destructive">
-                                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                                                <span className="text-sm">
-                                                    {feed.last_error}
-                                                </span>
-                                            </div>
-                                        )}
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+                        </>
+                    )}
+                </div>
             </PageLayout>
+
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={Rss}
+                    title={ctxMenu.ctx.record.bank_account_name}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
+
+            <ConnectFeedDialog
+                open={connectOpen}
+                onClose={() => setConnectOpen(false)}
+                availableAccounts={availableAccounts}
+            />
 
             <ConfirmDialog
                 open={!!disconnectTarget}
@@ -574,8 +534,7 @@ export default function BankFeedsIndex({
                         <span className="font-medium text-foreground">
                             {disconnectTarget?.bank_account_name}
                         </span>
-                        . Transactions will stop importing until you reconnect
-                        it.
+                        . Transactions stop importing until you reconnect it.
                     </>
                 }
                 confirmText="Disconnect feed"
