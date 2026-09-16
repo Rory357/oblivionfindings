@@ -176,10 +176,7 @@ class FinInvoice extends Model
 
     private static function validatedStorageContextId(?int $orgId): int
     {
-        // Organisation 0 is a real organisation here — see the note on
-        // JournalPostingService::lockJournalSequence(). Only an unknown (null)
-        // or negative context is invalid.
-        if ($orgId === null || $orgId < 0) {
+        if ($orgId === null || $orgId < 1) {
             throw new InvalidArgumentException('A valid invoice storage context is required.');
         }
 

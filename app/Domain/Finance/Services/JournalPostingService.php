@@ -312,10 +312,16 @@ class JournalPostingService
         if (DB::transactionLevel() < 1) {
             throw new RuntimeException('The journal sequence mutex must be acquired inside a database transaction.');
         }
-        // Organisation 0 is a real organisation here, not a sentinel: this app
-        // is single-tenant, FinanceSeeder seeds the default chart of accounts
-        // under org 0, and there is no organizations table to make 0 invalid.
-        // Only an unknown (null) or negative organisation is rejected.
+        // Organisation 0 is a real organisation for JOURNAL NUMBERING, not a
+        // sentinel: this app is single-tenant, FinanceSeeder seeds the default
+        // chart of accounts under org 0, the live ledger holds accounts and a
+        // sequence row there, and the operational GL capture paths (groceries,
+        // fuel, maintenance, leave provisions) post as org 0. Rejecting it here
+        // made those postings throw. Only an unknown (null) or negative
+        // organisation is refused.
+        //
+        // Bulk operations deliberately differ: FixedAssetService::runDepreciation
+        // still treats 0 as absent, so an unset id cannot depreciate a ledger.
         if ($organizationId === null || $organizationId < 0) {
             throw new InvalidArgumentException('An organisation is required to allocate a journal number.');
         }
