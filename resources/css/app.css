@@ -357,7 +357,7 @@
     --src-policies-bg: oklch(96% 0.05 70);
     --src-policies-ln: oklch(86% 0.09 70);
     /* Finance → Calendar sources: money in (invoices due), money out (bills
-       due), payment runs and GST deadlines. Hues are spaced away from the
+       due), payment runs, GST deadlines, payroll runs and period closes. Hues are spaced away from the
        nearest existing source so the finance four stay distinct beside them
        (165 vs obligations 150, 40 vs policies 65/damage 52, 280 vs decisions
        310/compliance 290, 225 vs asset 235/vendor 205). An overdue entry still
@@ -374,6 +374,12 @@
     --src-gst-due: oklch(49% 0.15 225);
     --src-gst-due-bg: oklch(96% 0.035 225);
     --src-gst-due-ln: oklch(87% 0.06 225);
+    --src-payroll: oklch(51% 0.17 330);
+    --src-payroll-bg: oklch(96% 0.04 330);
+    --src-payroll-ln: oklch(88% 0.07 330);
+    --src-period-close: oklch(50% 0.13 105);
+    --src-period-close-bg: oklch(96% 0.05 105);
+    --src-period-close-ln: oklch(86% 0.09 105);
     /* External busy (two-way sync, pull-only) — deliberately desaturated slate so it
        reads as "not ours / blocked" against the chromatic obligation sources. */
     --src-external: oklch(46% 0.03 265);

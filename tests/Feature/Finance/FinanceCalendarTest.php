@@ -119,6 +119,70 @@ it('filters the feed by source', function () {
     expect(collect($items)->pluck('source')->unique()->all())->toBe(['invoice_due']);
 });
 
+it('maps obligations to the shared CalendarItem shape with money detail in desc', function () {
+    Carbon::setTestNow('2026-06-10');
+
+    FinInvoice::factory()->create([
+        'organization_id' => 1, 'due_date' => '2026-06-15', 'status' => 'sent',
+        'total_amount' => 1234.5, 'client_name' => 'Acme Trust', 'invoice_number' => 'INV-00041',
+    ]);
+    FinBill::factory()->create([
+        'organization_id' => 1, 'due_date' => '2026-06-05', 'status' => 'approved',
+        'total_amount' => 500, 'amount_paid' => 0, 'bill_number' => 'BILL-202606-041',
+    ]);
+
+    $payload = app(FinanceCalendarAggregator::class)->itemsPayload(
+        1,
+        Carbon::parse('2026-06-01'),
+        Carbon::parse('2026-06-30'),
+    );
+
+    $bySource = collect($payload['events'])->keyBy('source');
+
+    expect(array_keys($bySource->all()))->toBe(['bill-due', 'invoice-due'])
+        ->and($bySource['invoice-due']['group'])->toBe('auto')
+        ->and($bySource['invoice-due']['allDay'])->toBeTrue()
+        ->and($bySource['invoice-due']['editable'])->toBeFalse()
+        ->and($bySource['invoice-due']['end'])->toBeNull()
+        ->and($bySource['invoice-due']['owner'])->toBeNull()
+        ->and($bySource['invoice-due']['site'])->toBeNull()
+        ->and($bySource['invoice-due']['ref'])->toBe('INV-00041')
+        ->and($bySource['invoice-due']['desc'])->toBe('$1,234.50 · Money in · Acme Trust')
+        // An overdue entry keeps its overdue status whatever its source, so the
+        // shared calendar parts can render it critical.
+        ->and($bySource['bill-due']['status'])->toBe('overdue');
+
+    expect($payload['totals'])->toMatchArray([
+        'total' => 2,
+        'overdue' => 1,
+        'invoice-due' => 1,
+        'bill-due' => 1,
+        'gst-due' => 0,
+    ]);
+});
+
+it('accepts a source filter in either the dashed or the underscored form', function () {
+    Carbon::setTestNow('2026-06-10');
+
+    FinInvoice::factory()->create([
+        'organization_id' => 1, 'due_date' => '2026-06-15', 'status' => 'sent',
+        'total_amount' => 100, 'invoice_number' => 'INV-00051', 'client_name' => 'A',
+    ]);
+    FinBill::factory()->create([
+        'organization_id' => 1, 'due_date' => '2026-06-20', 'status' => 'approved',
+        'total_amount' => 500, 'amount_paid' => 0, 'bill_number' => 'BILL-202606-051',
+    ]);
+
+    $aggregator = app(FinanceCalendarAggregator::class);
+    $start = Carbon::parse('2026-06-01');
+    $end = Carbon::parse('2026-06-30');
+
+    foreach ([['invoice-due'], ['invoice_due']] as $filter) {
+        $items = $aggregator->itemsForRange(1, $start, $end, ['sources' => $filter]);
+        expect(collect($items)->pluck('source')->unique()->all())->toBe(['invoice_due']);
+    }
+});
+
 it('feeds events as JSON to a finance.dashboard user and 403s others', function () {
     Carbon::setTestNow('2026-06-10');
     $permission = Permission::firstOrCreate(['key' => 'finance.dashboard'], ['description' => 'finance.dashboard']);
@@ -133,9 +197,18 @@ it('feeds events as JSON to a finance.dashboard user and 403s others', function 
     $this->actingAs($user)
         ->getJson(route('finance.calendar.events', ['start' => '2026-06-01', 'end' => '2026-06-30']))
         ->assertOk()
-        ->assertJsonPath('events.0.source', 'invoice_due')
-        ->assertJsonPath('events.0.direction', 'inflow')
-        ->assertJsonFragment(['sources' => ['invoice_due', 'bill_due', 'payment_run', 'gst_due', 'payroll', 'period_close']]);
+        // The shared SiteCalendar shape: dashed source slugs (they become
+        // --src-* tokens), all-day read-only entries, money detail in desc.
+        ->assertJsonPath('events.0.source', 'invoice-due')
+        ->assertJsonPath('events.0.group', 'auto')
+        ->assertJsonPath('events.0.allDay', true)
+        ->assertJsonPath('events.0.editable', false)
+        ->assertJsonPath('events.0.end', null)
+        ->assertJsonPath('events.0.status', 'due')
+        ->assertJsonPath('events.0.link', '/finance/invoices/'.FinInvoice::query()->value('id'))
+        ->assertJsonPath('totals.invoice-due', 1)
+        ->assertJsonPath('totals.overdue', 0)
+        ->assertJsonPath('totals.total', 1);
 
     $other = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
     $this->actingAs($other)
@@ -153,8 +226,9 @@ it('renders the calendar page shell for a finance.dashboard user and 403s others
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('finance/Calendar')
-            ->has('eventsUrl')
-            ->where('sources', ['invoice_due', 'bill_due', 'payment_run', 'gst_due', 'payroll', 'period_close']),
+            ->where('sources.0.key', 'invoice-due')
+            ->where('sources.0.label', 'Invoices due')
+            ->where('initialSources', ['invoice-due', 'bill-due', 'payment-run', 'payroll', 'period-close']),
         );
 
     $other = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);

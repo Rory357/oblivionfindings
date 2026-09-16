@@ -49,7 +49,7 @@ lucide-react icons, Recharts.
 | Live | `live` / `live-bg` | In-progress/running things (distinct from info) |
 | Category | `category-ops/hr/compliance/incidents/governance/sites/fleet/finance` (+ `-bg`) | Module-level tinting, hue-rotated from brand |
 | Charts | `--chart-1`…`--chart-5` | Recharts fills — `fill="var(--chart-1)"` |
-| Calendar sources | `--src-event/inspection/compliance/…` (+ `-bg`, `-ln`); Governance calendar: `--src-meetings/decisions/obligations/policies`; Finance calendar: `--src-invoice-due/bill-due/payment-run/gst-due` | Shared SiteCalendar sources only (Sites + Governance + Finance adapters) |
+| Calendar sources | `--src-event/inspection/compliance/…` (+ `-bg`, `-ln`); Governance calendar: `--src-meetings/decisions/obligations/policies`; Finance calendar: `--src-invoice-due/bill-due/payment-run/gst-due/payroll/period-close` | Shared SiteCalendar sources only (Sites + Governance + Finance adapters) |
 | Sidebar | `sidebar-*` | The app sidebar only |
 
 Status → **always** `<StatusBadge>` (`components/ui/status-badge.tsx`) or

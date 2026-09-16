@@ -142,7 +142,7 @@ sources stay distinguishable. The module sets:
 |---|---|
 | Sites / operations | `event`, `inspection`, `compliance`, `credential`, `checklist`, `hazard`, `vendor`, `asset`, `meal`, `damage`, `emergency`, `drill`, `respite`, `participation`, `ppe`, `medication` |
 | Governance | `meetings`, `decisions`, `obligations`, `policies` |
-| Finance | `invoice-due`, `bill-due`, `payment-run`, `gst-due` |
+| Finance | `invoice-due`, `bill-due`, `payment-run`, `gst-due`, `payroll`, `period-close` |
 | Shared | `external` (two-way sync busy — desaturated on purpose) |
 
 A source colour never signals urgency: an entry whose `status` is

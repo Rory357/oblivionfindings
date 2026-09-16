@@ -94,6 +94,39 @@ class FinanceCalendarAggregator
     }
 
     /**
+     * The feed the shared SiteCalendar consumes: obligations mapped to the
+     * normalised {@see CalendarItem} shape, plus per-source totals for the
+     * header meters (server-authoritative, like the Governance calendar).
+     *
+     * @param  array{sources?:string[]|null}  $filters
+     * @return array{events: array<int, array<string, mixed>>, totals: array<string, int>}
+     */
+    public function itemsPayload(?int $orgId, Carbon $start, Carbon $end, array $filters = []): array
+    {
+        $items = $this->itemsForRange($orgId, $start, $end, $filters);
+
+        $totals = ['total' => count($items), 'overdue' => 0];
+        foreach ($this->sourceSlugs() as $slug) {
+            $totals[$slug] = 0;
+        }
+
+        foreach ($items as $item) {
+            $totals[FinanceCalendarItem::sourceSlug($item->source)]++;
+            if ($item->status === 'overdue') {
+                $totals['overdue']++;
+            }
+        }
+
+        return [
+            'events' => array_map(
+                fn (FinanceCalendarItem $item) => $item->toCalendarItem(),
+                $items,
+            ),
+            'totals' => $totals,
+        ];
+    }
+
+    /**
      * The source keys this aggregator can emit (for the legend/filter UI).
      *
      * @return string[]
@@ -104,10 +137,30 @@ class FinanceCalendarAggregator
     }
 
     /**
-     * @param  string[]|null  $sources  null = all sources enabled.
+     * The same sources in the dashed wire format the calendar UI uses.
+     *
+     * @return string[]
+     */
+    public function sourceSlugs(): array
+    {
+        return array_map(FinanceCalendarItem::sourceSlug(...), $this->sources());
+    }
+
+    /**
+     * @param  string[]|null  $sources  null = all sources enabled. Accepts both
+     *                                  the provider keys and their dashed slugs.
      */
     private function sourceEnabled(string $key, ?array $sources): bool
     {
-        return $sources === null || in_array($key, $sources, true);
+        if ($sources === null) {
+            return true;
+        }
+
+        $normalised = array_map(
+            fn (string $source) => FinanceCalendarItem::providerKey(trim($source)),
+            $sources,
+        );
+
+        return in_array($key, $normalised, true);
     }
 }
