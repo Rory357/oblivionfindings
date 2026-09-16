@@ -130,7 +130,13 @@ class JournalPostingService
                 'total_amount' => $totalDebits,
             ]);
 
-            event(new JournalPosted($journal));
+            // Announce the posting only once it is durable. Dispatched inside
+            // the transaction, a listener (or a queued job it fires) could act
+            // on a journal that a later rollback erased — and the event still
+            // reached them. DB::afterCommit defers to the OUTERMOST commit, so
+            // a caller that wraps posting in its own transaction is covered
+            // too; with no transaction open it runs immediately.
+            DB::afterCommit(fn () => event(new JournalPosted($journal)));
 
             return $journal->refresh();
         });

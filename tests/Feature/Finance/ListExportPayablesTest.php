@@ -3,9 +3,11 @@
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinCreditNote;
 use App\Domain\Finance\Models\FinPaymentRun;
+use App\Domain\Finance\Models\FinPaymentRunItem;
 use App\Domain\Finance\Models\FinPurchaseOrder;
 use App\Domain\Finance\Models\FinVendor;
 use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 
 /**
@@ -103,11 +105,40 @@ it('403s the purchase orders export without finance.ap.view', function () {
     $this->actingAs($user)->get(route('finance.purchase-orders.export'))->assertForbidden();
 });
 
+/**
+ * A payment run the export can return. PaymentSettlementSiteScope hides any run
+ * that has no items, or whose items sit outside the actor's Site scope — a run
+ * is only visible when every line is one the actor may settle — so a bare
+ * factory run is correctly invisible and would leave the CSV empty.
+ */
+function apVisiblePaymentRun(Site $site, array $attributes = []): FinPaymentRun
+{
+    $run = FinPaymentRun::factory()->create(array_merge([
+        'organization_id' => 1,
+        'status' => 'completed',
+    ], $attributes));
+
+    FinPaymentRunItem::create([
+        'payment_run_id' => $run->id,
+        'site_id' => $site->id,
+        'vendor_id' => FinVendor::factory()->create(['organization_id' => 1])->id,
+        'amount' => '100.00',
+        'status' => 'pending',
+    ]);
+
+    return $run;
+}
+
 // ── Payment Runs ─────────────────────────────────────────────────────────
 it('streams payment runs as CSV with a header and one row per run', function () {
-    FinPaymentRun::factory()->count(3)->create(['organization_id' => 1, 'status' => 'completed']);
+    $site = Site::factory()->create();
+    $user = apExportUser();
+    ensureCanonicalHrStaffProfile($user, $site);
+    foreach (range(1, 3) as $ignored) {
+        apVisiblePaymentRun($site);
+    }
 
-    $response = $this->actingAs(apExportUser())->get(route('finance.payment-runs.export'));
+    $response = $this->actingAs($user)->get(route('finance.payment-runs.export'));
 
     $response->assertOk();
     expect($response->headers->get('content-type'))->toContain('text/csv');
@@ -118,10 +149,13 @@ it('streams payment runs as CSV with a header and one row per run', function () 
 });
 
 it('honours the status filter in the payment runs export', function () {
-    FinPaymentRun::factory()->create(['organization_id' => 1, 'status' => 'completed', 'run_number' => 'PAY-DONE-1']);
-    FinPaymentRun::factory()->create(['organization_id' => 1, 'status' => 'draft', 'run_number' => 'PAY-DRAFT-1']);
+    $site = Site::factory()->create();
+    $user = apExportUser();
+    ensureCanonicalHrStaffProfile($user, $site);
+    apVisiblePaymentRun($site, ['status' => 'completed', 'run_number' => 'PAY-DONE-1']);
+    apVisiblePaymentRun($site, ['status' => 'draft', 'run_number' => 'PAY-DRAFT-1']);
 
-    $csv = apStreamed($this->actingAs(apExportUser())->get(route('finance.payment-runs.export', ['status' => 'completed'])));
+    $csv = apStreamed($this->actingAs($user)->get(route('finance.payment-runs.export', ['status' => 'completed'])));
 
     expect($csv)->toContain('PAY-DONE-1')
         ->and($csv)->not->toContain('PAY-DRAFT-1');
