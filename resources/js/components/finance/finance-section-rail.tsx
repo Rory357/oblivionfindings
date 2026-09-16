@@ -1,4 +1,4 @@
-import { router, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 
 import { PageHeaderRail } from '@/components/page';
 import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
@@ -64,6 +64,10 @@ export function FinanceTierTwoNav() {
 
     const active = financeTierTwoForUrl(match.tab, page.url);
 
+    // Each sibling is its own route, so the strip renders real links — a
+    // middle-click or "open in new tab" works, and Inertia handles the plain
+    // click. `TierTwoTabs` only falls back to a <button> when a tab has no
+    // href, so a tab with an href MUST return an element from renderLink.
     return (
         <TierTwoTabs
             tabs={siblings.map((sibling) => ({
@@ -74,14 +78,21 @@ export function FinanceTierTwoNav() {
             }))}
             activeTab={active?.key ?? siblings[0].key}
             onTab={(key) => {
-                const target = siblings.find(
-                    (sibling) => sibling.key === key,
-                );
+                const target = siblings.find((sibling) => sibling.key === key);
                 if (target && key !== active?.key) router.visit(target.href);
             }}
             testIdPrefix="finance"
             ariaLabel={`${match.tab.label} views`}
-            renderLink={() => null}
+            renderLink={(tab, className, inner, accessibility) => (
+                <Link
+                    key={tab.key}
+                    href={tab.href!}
+                    className={className}
+                    {...accessibility}
+                >
+                    {inner}
+                </Link>
+            )}
         />
     );
 }
