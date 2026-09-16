@@ -476,20 +476,22 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
             </PageLayout>
 
             <ConfirmDialog
+                variant="default"
                 open={confirmAction === 'approve'}
-                onOpenChange={(open) => !open && setConfirmAction(null)}
+                onClose={() => setConfirmAction(null)}
                 title="Approve payment run?"
                 description="This approves the payment run so an immutable bank file can be prepared. No bill is paid until a separate bank-accepted settlement."
-                confirmLabel="Approve run"
+                confirmText="Approve run"
                 processing={approving}
                 onConfirm={handleApprove}
             />
             <ConfirmDialog
+                variant="default"
                 open={confirmAction === 'process'}
-                onOpenChange={(open) => !open && setConfirmAction(null)}
+                onClose={() => setConfirmAction(null)}
                 title="Prepare bank file?"
                 description="This prepares the payment instruction only. It does not pay bills or post the bank journal."
-                confirmLabel="Prepare file"
+                confirmText="Prepare file"
                 processing={processingRun}
                 onConfirm={handleProcess}
             />

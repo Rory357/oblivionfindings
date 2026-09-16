@@ -1,16 +1,6 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SettingsTabsFooter } from '@/components/finance/settings-hub';
 import { PageHero, PageLayout } from '@/components/page';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -251,6 +241,8 @@ function CreateIntegrationDialog() {
 function IntegrationCard({ integration }: { integration: Integration }) {
     const [syncing, setSyncing] = useState(false);
     const [testing, setTesting] = useState(false);
+    const [disconnectOpen, setDisconnectOpen] = useState(false);
+    const [disconnecting, setDisconnecting] = useState(false);
 
     function handleSync() {
         setSyncing(true);
@@ -275,7 +267,13 @@ function IntegrationCard({ integration }: { integration: Integration }) {
     }
 
     function handleDisconnect() {
-        router.delete(`/finance/integrations/${integration.id}`);
+        setDisconnecting(true);
+        router.delete(`/finance/integrations/${integration.id}`, {
+            onFinish: () => {
+                setDisconnecting(false);
+                setDisconnectOpen(false);
+            },
+        });
     }
 
     return (
@@ -467,46 +465,29 @@ function IntegrationCard({ integration }: { integration: Integration }) {
                     </Button>
 
                     <div className="ml-auto">
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive"
-                                >
-                                    <Trash2 className="mr-1 h-3 w-3" />
-                                    Disconnect
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                        Disconnect{' '}
-                                        {providerLabels[integration.provider]}?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        This will remove the integration
-                                        connection. Your local data will not be
-                                        affected, but synchronisation will stop.
-                                        You can reconnect later.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>
-                                        Cancel
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction
-                                        onClick={handleDisconnect}
-                                        className="bg-destructive text-destructive-foreground"
-                                    >
-                                        Disconnect
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={() => setDisconnectOpen(true)}
+                        >
+                            <Trash2 className="mr-1 h-3 w-3" />
+                            Disconnect
+                        </Button>
                     </div>
                 </div>
             </CardContent>
+
+            <ConfirmDialog
+                variant="destructive"
+                open={disconnectOpen}
+                onClose={() => setDisconnectOpen(false)}
+                title={`Disconnect ${providerLabels[integration.provider]}?`}
+                description="This removes the integration connection. Your local data is not affected, but synchronisation stops. You can reconnect later."
+                confirmText="Disconnect"
+                processing={disconnecting}
+                onConfirm={handleDisconnect}
+            />
         </Card>
     );
 }

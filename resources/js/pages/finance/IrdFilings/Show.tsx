@@ -442,11 +442,12 @@ export default function IrdFilingShow({ filing }: PageProps) {
             </PageLayout>
 
             <ConfirmDialog
+                variant="default"
                 open={confirmSubmit}
-                onOpenChange={setConfirmSubmit}
+                onClose={() => setConfirmSubmit(false)}
                 title="Submit filing to IRD?"
                 description="This transmits the filing data to Inland Revenue. Only simulated submissions are made unless a live IRD gateway is configured."
-                confirmLabel="Submit to IRD"
+                confirmText="Submit to IRD"
                 processing={submitting}
                 onConfirm={handleSubmit}
             />

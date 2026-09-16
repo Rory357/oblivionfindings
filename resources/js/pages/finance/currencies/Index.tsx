@@ -642,7 +642,7 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
 
             <ConfirmDialog
                 open={!!deleteTarget}
-                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                onClose={() => setDeleteTarget(null)}
                 title="Delete currency?"
                 description={
                     <>
@@ -653,7 +653,7 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                         . This can&rsquo;t be undone.
                     </>
                 }
-                confirmLabel="Delete currency"
+                confirmText="Delete currency"
                 variant="destructive"
                 processing={deleting}
                 onConfirm={confirmDelete}

@@ -664,7 +664,7 @@ export default function ConsolidationShow({
 
             <ConfirmDialog
                 open={!!removeTarget}
-                onOpenChange={(open) => !open && setRemoveTarget(null)}
+                onClose={() => setRemoveTarget(null)}
                 title="Remove entity from group?"
                 description={
                     <>
@@ -676,7 +676,7 @@ export default function ConsolidationShow({
                         no longer be included in future runs.
                     </>
                 }
-                confirmLabel="Remove entity"
+                confirmText="Remove entity"
                 variant="destructive"
                 processing={removing}
                 onConfirm={confirmRemoveEntity}

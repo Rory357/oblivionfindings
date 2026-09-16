@@ -15,6 +15,11 @@ import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useStableValue } from '@/hooks/use-stable-value';
 import { cn, resolveUrl } from '@/lib/utils';
 import {
+    FINANCE_SECTIONS,
+    financeHubContainsUrl,
+    visibleSectionTabs as visibleFinanceSectionTabs,
+} from '@/lib/finance-sections';
+import {
     GOVERNANCE_SECTION_GROUP_LABELS,
     GOVERNANCE_SECTIONS,
     governanceHubContainsUrl,
@@ -312,6 +317,11 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
 
     // A Governance hub entry stays lit on every register in its rail.
     if (governanceHubContainsUrl(normalizedItemPath, normalizedCurrentPath)) {
+        return 2000 + item.length;
+    }
+
+    // Likewise a Finance hub entry, on every view (and record) in its rail.
+    if (financeHubContainsUrl(normalizedItemPath, normalizedCurrentPath)) {
         return 2000 + item.length;
     }
 
@@ -789,12 +799,12 @@ function buildIconNavItems({
     }
 
     // Finance
+    // Any visible hub view opens the module — a treasurer with only
+    // finance.reports.view can reach /finance/reports, so they get the entry.
     if (
-        can?.finance?.dashboard ||
-        can?.finance?.ledger?.view ||
-        can?.finance?.ap?.view ||
-        can?.finance?.ar?.view ||
-        can?.finance?.ar?.manage
+        FINANCE_SECTIONS.some(
+            (section) => visibleFinanceSectionTabs(section, can).length > 0,
+        )
     ) {
         items.push({
             id: 'finance',
@@ -1966,153 +1976,30 @@ function buildGovernanceSubPanelGroups({
     return [...groups, ...hubGroups];
 }
 
+/**
+ * Finance sub-panel: ONE entry per hub from `lib/finance-sections.ts`
+ * (anti-pattern "One sidebar link per register", corrected 2026-09-16). A hub
+ * is shown when the viewer can open at least one of its views, and its entry
+ * points at the first such view so the link never lands on a 403. The hub's
+ * other views are the connected rail in the page header, and `matchScore`
+ * keeps the entry lit across all of them via `financeHubContainsUrl`.
+ */
 function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
-    const overview: NavItem[] = [];
-    // Overview hub — Summary · Executive · By site · Cash position are tabs at /finance.
-    overview.push({
-        title: 'Overview',
-        href: '/finance',
-        icon: LayoutDashboard,
-    });
+    const items: NavItem[] = [];
 
-    if (can?.finance?.dashboard) {
-        // Obligation calendar — invoice/bill due dates, payment runs, GST deadlines.
-        overview.push({
-            title: 'Calendar',
-            href: '/finance/calendar',
-            icon: CalendarDays,
-        });
+    for (const section of FINANCE_SECTIONS) {
+        const visible = visibleFinanceSectionTabs(section, can);
+        if (visible.length === 0) continue;
+        // The hub landing URL when its own first view is reachable, otherwise
+        // straight to the first view this viewer can open.
+        const href =
+            visible[0].href === section.tabs[0].href
+                ? section.href
+                : visible[0].href;
+        items.push({ title: section.label, href, icon: section.icon });
     }
 
-    if (
-        can?.finance?.ledger?.view ||
-        can?.finance?.ledger?.manage ||
-        can?.finance?.admin ||
-        can?.finance?.assets?.view
-    ) {
-        // General Ledger hub — chart of accounts, journals, cost centres, fiscal
-        // periods, currencies, FX revaluations and fixed assets are now tabs here.
-        overview.push({
-            title: 'General Ledger',
-            href: '/finance/ledger',
-            icon: BookOpen,
-        });
-    }
-
-    const ap: NavItem[] = [];
-    if (can?.finance?.ap?.view) {
-        // Purchases & Payables hub — bills, purchase orders, vendors, credit notes
-        // and payment runs are now tabs here.
-        ap.push({
-            title: 'Payables',
-            href: '/finance/payables',
-            icon: Receipt,
-        });
-    }
-
-    const ar: NavItem[] = [];
-    if (can?.finance?.ar?.view) {
-        ar.push({
-            title: 'Billing',
-            href: '/finance/billing',
-            icon: DollarSign,
-        });
-        // Sales & Receivables hub — invoices, quotes, recurring charges, billing,
-        // aged AR, statements, price books and allocations are now tabs here.
-        ar.push({
-            title: 'Receivables',
-            href: '/finance/receivables',
-            icon: DollarSign,
-        });
-        ar.push({
-            title: 'Invoices',
-            href: '/finance/invoices',
-            icon: FileText,
-        });
-        ar.push({
-            title: 'Price Books',
-            href: '/finance/price-books',
-            icon: BookOpen,
-        });
-        ar.push({
-            title: 'Quotes',
-            href: '/finance/quotes',
-            icon: FileText,
-        });
-        ar.push({
-            title: 'Recurring Charges',
-            href: '/finance/recurring-charges',
-            icon: Receipt,
-        });
-    }
-
-    const banking: NavItem[] = [];
-    if (
-        can?.finance?.bank?.view ||
-        can?.finance?.bank?.manage ||
-        can?.finance?.pettyCash?.view
-    ) {
-        // Banking & Cash hub — accounts, transactions, reconciliation, matching,
-        // feeds, EFTPOS, petty cash and match rules are now tabs here.
-        banking.push({
-            title: 'Banking',
-            href: '/finance/banking',
-            icon: Landmark,
-        });
-    }
-
-    const other: NavItem[] = [];
-    // Tax & Compliance hub — GST returns, IRD filings and audit exports are
-    // tabs here. The unsupported consolidation surface remains quarantined.
-    if (
-        can?.finance?.tax?.view ||
-        can?.finance?.tax?.manage ||
-        can?.finance?.reports?.view
-    ) {
-        other.push({
-            title: 'Tax & Compliance',
-            href: '/finance/tax',
-            icon: Receipt,
-        });
-    }
-    // Petty Cash is now a tab in the Banking & Cash hub (see `banking` above).
-    if (can?.finance?.reports?.view)
-        other.push({
-            title: 'Donor Funds',
-            href: '/finance/donor-funds',
-            icon: Heart,
-        });
-
-    const reports: NavItem[] = [];
-    if (can?.finance?.reports?.view) {
-        // Reports & Planning hub — P&L, balance sheet, trial balance, cash flow,
-        // aged AR/AP, funding summary, budget vs actuals and cash-flow forecast
-        // are now tabs here.
-        reports.push({
-            title: 'Reports',
-            href: '/finance/reports',
-            icon: BarChart3,
-        });
-    }
-
-    if (can?.finance?.admin) {
-        // Settings hub — accounting integrations (Xero/MYOB) and funding streams
-        // are now tabs here. (Fiscal periods, cost centres, currencies live in the
-        // Ledger hub; match rules in the Banking hub — not duplicated here.)
-        other.push({
-            title: 'Settings',
-            href: '/finance/settings',
-            icon: Settings,
-        });
-    }
-
-    const groups: SubPanelGroup[] = [{ label: 'Finance', items: overview }];
-    if (ap.length) groups.push({ label: 'Accounts Payable', items: ap });
-    if (ar.length) groups.push({ label: 'Accounts Receivable', items: ar });
-    if (banking.length) groups.push({ label: 'Banking', items: banking });
-    if (other.length) groups.push({ label: 'Other', items: other });
-    if (reports.length) groups.push({ label: 'Reports', items: reports });
-    return groups;
+    return items.length > 0 ? [{ label: 'Finance', items }] : [];
 }
 
 function buildSystemSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {

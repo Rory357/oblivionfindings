@@ -9,6 +9,7 @@ use App\Domain\Finance\Models\FinBankTransaction;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinCostCentre;
 use App\Domain\Finance\Models\FinCreditNote;
+use App\Domain\Finance\Models\FinDonorFund;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinFixedAsset;
 use App\Domain\Finance\Models\FinGstReturn;
@@ -32,8 +33,8 @@ use Illuminate\Database\Eloquent\Model;
  * Row counts for the finance hub tab strips — the count badge next to each tab.
  *
  * Shared once per finance request by {@see HandleInertiaRequests}
- * as `financeHubCounts`, keyed hub → tab id → count; every `*TabsFooter` reads its own
- * hub's slice and sets `badge` per tab. Only LIST tabs are counted — report / dashboard
+ * as `financeHubCounts`, keyed hub → tab id → count; <FinanceSectionRail> reads its own
+ * hub's slice and sets the counter per tab. Only LIST tabs are counted — report / dashboard
  * / workspace tabs (aged-AR, statements, reconciliation, matching, consolidation, and the
  * Overview / Reports / Settings hubs) have no list to size, so they carry no badge.
  *
@@ -43,7 +44,7 @@ use Illuminate\Database\Eloquent\Model;
  * individually guarded (try/catch → 0) so a missing table or model quirk yields no badge
  * for that one tab rather than 500-ing every finance page — this runs in middleware.
  *
- * Keep the tab ids here in lockstep with the `*_TABS` arrays in components/finance/*-hub.tsx.
+ * Keep the tab ids here in lockstep with the tab keys in resources/js/lib/finance-sections.ts.
  */
 class FinanceHubCountsService
 {
@@ -72,7 +73,6 @@ class FinanceHubCountsService
                 'accounts' => $this->count(FinBankAccount::class),
                 'transactions' => $this->count(FinBankTransaction::class),
                 'petty-cash' => $this->count(FinPettyCashFund::class),
-                'match-rules' => $this->count(FinMatchRule::class),
             ],
             'ledger' => [
                 'accounts' => $this->count(FinAccount::class),
@@ -85,6 +85,14 @@ class FinanceHubCountsService
                 'gst-returns' => $this->count(FinGstReturn::class),
                 'ird-filings' => $this->count(FinIrdFiling::class),
                 'audit-exports' => $this->count(FinAuditExport::class),
+                'donor-funds' => $this->count(FinDonorFund::class),
+            ],
+            'settings' => [
+                // Match rules moved from the Banking rail to Settings with the
+                // 2026-09-16 design migration — they are configuration, not a
+                // banking view. The permission gate (finance.bank.manage) is
+                // unchanged.
+                'match-rules' => $this->count(FinMatchRule::class),
             ],
         ];
     }

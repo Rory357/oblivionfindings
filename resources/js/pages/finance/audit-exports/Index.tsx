@@ -383,7 +383,7 @@ export default function AuditExportsIndex({
 
             <ConfirmDialog
                 open={!!deleteTarget}
-                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                onClose={() => setDeleteTarget(null)}
                 title="Delete audit export?"
                 description={
                     <>
@@ -394,7 +394,7 @@ export default function AuditExportsIndex({
                         and its generated file. This can&rsquo;t be undone.
                     </>
                 }
-                confirmLabel="Delete export"
+                confirmText="Delete export"
                 variant="destructive"
                 processing={deleting}
                 onConfirm={confirmDelete}

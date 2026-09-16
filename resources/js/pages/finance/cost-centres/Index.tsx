@@ -408,7 +408,7 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
 
             <ConfirmDialog
                 open={!!deleteTarget}
-                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                onClose={() => setDeleteTarget(null)}
                 title="Delete cost centre?"
                 description={
                     <>
@@ -419,7 +419,7 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
                         . This can&rsquo;t be undone.
                     </>
                 }
-                confirmLabel="Delete cost centre"
+                confirmText="Delete cost centre"
                 variant="destructive"
                 processing={deleting}
                 onConfirm={confirmDelete}

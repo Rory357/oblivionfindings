@@ -272,7 +272,7 @@ export default function FundingStreamsIndex({
 
             <ConfirmDialog
                 open={!!deleteTarget}
-                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                onClose={() => setDeleteTarget(null)}
                 title="Delete funding stream?"
                 description={
                     <>
@@ -283,7 +283,7 @@ export default function FundingStreamsIndex({
                         . This can&rsquo;t be undone.
                     </>
                 }
-                confirmLabel="Delete funding stream"
+                confirmText="Delete funding stream"
                 variant="destructive"
                 processing={deleting}
                 onConfirm={confirmDelete}

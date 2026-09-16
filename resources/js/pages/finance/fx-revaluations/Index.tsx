@@ -327,8 +327,9 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
             </PageLayout>
 
             <ConfirmDialog
+                variant="default"
                 open={!!postTarget}
-                onOpenChange={(open) => !open && setPostTarget(null)}
+                onClose={() => setPostTarget(null)}
                 title="Post revaluation to the General Ledger?"
                 description={
                     <>
@@ -342,7 +343,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                         gain/loss. Once posted it can&rsquo;t be undone.
                     </>
                 }
-                confirmLabel="Post to GL"
+                confirmText="Post to GL"
                 processing={posting}
                 onConfirm={confirmPost}
             />

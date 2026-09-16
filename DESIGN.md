@@ -49,7 +49,7 @@ lucide-react icons, Recharts.
 | Live | `live` / `live-bg` | In-progress/running things (distinct from info) |
 | Category | `category-ops/hr/compliance/incidents/governance/sites/fleet/finance` (+ `-bg`) | Module-level tinting, hue-rotated from brand |
 | Charts | `--chart-1`…`--chart-5` | Recharts fills — `fill="var(--chart-1)"` |
-| Calendar sources | `--src-event/inspection/compliance/…` (+ `-bg`, `-ln`); Governance calendar: `--src-meetings/decisions/obligations/policies` | Shared SiteCalendar sources only (Sites + Governance adapters) |
+| Calendar sources | `--src-event/inspection/compliance/…` (+ `-bg`, `-ln`); Governance calendar: `--src-meetings/decisions/obligations/policies`; Finance calendar: `--src-invoice-due/bill-due/payment-run/gst-due` | Shared SiteCalendar sources only (Sites + Governance + Finance adapters) |
 | Sidebar | `sidebar-*` | The app sidebar only |
 
 Status → **always** `<StatusBadge>` (`components/ui/status-badge.tsx`) or
@@ -509,6 +509,23 @@ before.
   remembered across mounts (`persistScrollTop`/`readStoredScrollTop` in
   `app-sidebar.tsx`) and restored in a layout effect; any new scrollable
   chrome that survives a visit needs the same treatment.
+- **Browser `prompt()` / `confirm()` as a form** (corrected 2026-09-16,
+  Finance) — collecting a reference, a reason or any other evidence through
+  a chain of `window.prompt()` calls. There is no validation, no labels, no
+  cancel semantics past the first step, and the sequence aborts silently
+  half-way. Evidence and references are collected in a dialog with real
+  fields and validation; the gate itself is
+  `components/confirm-dialog.tsx`.
+- **Hero numbers repeated as body KPI cards** (corrected 2026-09-16,
+  Finance) — the same figures rendered in the header meter row and again in
+  a card grid below it (and, on one page, a third time in a table footer).
+  A number lives once, in the meter row, where it links to the list it
+  came from. Residual in-body stats use `components/ops-stat-card.tsx`.
+- **Page-local counts labelled as totals** (corrected 2026-09-16, Finance)
+  — meter or stat blocks reading "Posted (this page)" / "Active (this
+  page)", counted from the current page of a paginated list. Either the
+  controller returns the real total for the current filter, or the block
+  goes; a label that admits the number is wrong is not a fix.
 
 ## Conformance sweep (run on request)
 

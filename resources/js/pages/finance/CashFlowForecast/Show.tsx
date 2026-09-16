@@ -689,7 +689,7 @@ export default function CashFlowForecastShow({
 
             <ConfirmDialog
                 open={deleteOpen}
-                onOpenChange={setDeleteOpen}
+                onClose={() => setDeleteOpen(false)}
                 title="Delete forecast?"
                 description={
                     <>
@@ -700,7 +700,7 @@ export default function CashFlowForecastShow({
                         and its scenarios. This can&rsquo;t be undone.
                     </>
                 }
-                confirmLabel="Delete forecast"
+                confirmText="Delete forecast"
                 variant="destructive"
                 processing={deleting}
                 onConfirm={confirmDelete}

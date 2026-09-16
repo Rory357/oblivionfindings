@@ -415,7 +415,7 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
 
             <ConfirmDialog
                 open={!!closeTarget}
-                onOpenChange={(open) => !open && setCloseTarget(null)}
+                onClose={() => setCloseTarget(null)}
                 title="Close fiscal period?"
                 description={
                     <>
@@ -433,7 +433,7 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                         period is fully reconciled first.
                     </>
                 }
-                confirmLabel="Close period"
+                confirmText="Close period"
                 variant="destructive"
                 processing={closingId === closeTarget?.id}
                 onConfirm={handleClose}

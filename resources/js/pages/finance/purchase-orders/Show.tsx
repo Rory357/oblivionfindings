@@ -366,20 +366,22 @@ export default function PurchaseOrderShow() {
             </PageLayout>
 
             <ConfirmDialog
+                variant="default"
                 open={confirmAction === 'approve'}
-                onOpenChange={(open) => !open && setConfirmAction(null)}
+                onClose={() => setConfirmAction(null)}
                 title="Approve purchase order?"
                 description={`This approves ${po.po_number} so it can be received and converted to a bill.`}
-                confirmLabel="Approve PO"
+                confirmText="Approve PO"
                 processing={processing}
                 onConfirm={handleApprove}
             />
             <ConfirmDialog
+                variant="default"
                 open={confirmAction === 'convert'}
-                onOpenChange={(open) => !open && setConfirmAction(null)}
+                onClose={() => setConfirmAction(null)}
                 title="Convert to bill?"
                 description={`This creates a draft supplier bill from ${po.po_number}. You can review and edit the bill before approving it.`}
-                confirmLabel="Convert to bill"
+                confirmText="Convert to bill"
                 processing={processing}
                 onConfirm={handleConvertToBill}
             />

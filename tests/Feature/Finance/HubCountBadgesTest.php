@@ -13,7 +13,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 /**
  * Finance hub tab count badges (C3d). Every finance page shares `financeHubCounts`
- * (hub → tab id → row count) so each *TabsFooter renders a count beside its tabs.
+ * (hub → tab id → row count) so <FinanceSectionRail> renders a count beside its tabs.
  * The prop is finance-route-scoped and lazy; the service counts every hub's lists,
  * guarding each count so one bad table never 500s the finance chrome.
  */
@@ -37,7 +37,8 @@ it('shares finance hub counts on a finance page, keyed by hub and tab', function
             ->has('financeHubCounts.payables')
             ->has('financeHubCounts.banking')
             ->has('financeHubCounts.ledger')
-            ->has('financeHubCounts.tax'));
+            ->has('financeHubCounts.tax')
+            ->has('financeHubCounts.settings'));
 });
 
 it('counts the one application finance list', function () {
@@ -46,7 +47,7 @@ it('counts the one application finance list', function () {
     $counts = (new FinanceHubCountsService)->forApplication();
 
     expect($counts['receivables']['invoices'])->toBe(5)
-        ->and($counts)->toHaveKeys(['receivables', 'payables', 'banking', 'ledger', 'tax']);
+        ->and($counts)->toHaveKeys(['receivables', 'payables', 'banking', 'ledger', 'tax', 'settings']);
 });
 
 it('shares the open job count for the current employee Sites', function () {

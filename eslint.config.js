@@ -122,6 +122,40 @@ export default [
         },
     },
     {
+        // Finance is migrated to the Event Horizon header (audit
+        // 2026-09-16). PageHero is the superseded page top — DESIGN.md
+        // "Page headers" — so a new finance page can't quietly go back to it.
+        // Widen this to the whole app once the remaining modules are assessed.
+        files: ['resources/js/pages/finance/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    paths: [
+                        {
+                            name: '@/components/page/page-hero',
+                            message:
+                                'Finance pages use <PageHeader> (@/components/page), not the superseded PageHero. See DESIGN.md "Page headers".',
+                        },
+                        {
+                            name: '@/components/finance/finance-hero',
+                            message:
+                                'FinanceHero is deleted. Use <PageHeader> from @/components/page. See DESIGN.md "Page headers".',
+                        },
+                    ],
+                    patterns: [
+                        {
+                            group: ['@/components/page'],
+                            importNames: ['PageHero'],
+                            message:
+                                'Finance pages use <PageHeader> (@/components/page), not the superseded PageHero. See DESIGN.md "Page headers".',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
         ignores: [
             'vendor',
             'collector/vendor/**',

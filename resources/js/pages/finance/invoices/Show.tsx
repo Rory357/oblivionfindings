@@ -465,20 +465,22 @@ export default function InvoiceShow({ auth, invoice }: Props) {
             </PageLayout>
 
             <ConfirmDialog
+                variant="default"
                 open={sendOpen}
-                onOpenChange={setSendOpen}
+                onClose={() => setSendOpen(false)}
                 title="Send invoice?"
                 description={`This marks ${invoice.invoice_number} as sent and records the send date. The client can then be issued the invoice.`}
-                confirmLabel="Send invoice"
+                confirmText="Send invoice"
                 processing={sending}
                 onConfirm={confirmSend}
             />
             <ConfirmDialog
+                variant="default"
                 open={markPaidOpen}
-                onOpenChange={setMarkPaidOpen}
+                onClose={() => setMarkPaidOpen(false)}
                 title="Mark invoice as paid?"
                 description={`This records ${invoice.invoice_number} as fully paid and posts the receipt to the general ledger. This can't be undone.`}
-                confirmLabel="Mark as paid"
+                confirmText="Mark as paid"
                 processing={markingPaid}
                 onConfirm={confirmMarkPaid}
             />

@@ -476,7 +476,7 @@ export default function BillShow({ auth, bill }: Props) {
 
             <ConfirmDialog
                 open={cancelOpen}
-                onOpenChange={setCancelOpen}
+                onClose={() => setCancelOpen(false)}
                 title="Cancel this bill?"
                 description={
                     <>
@@ -487,8 +487,8 @@ export default function BillShow({ auth, bill }: Props) {
                         . A cancelled bill can&rsquo;t be approved or paid.
                     </>
                 }
-                confirmLabel="Cancel bill"
-                cancelLabel="Keep bill"
+                confirmText="Cancel bill"
+                cancelText="Keep bill"
                 variant="destructive"
                 processing={cancelling}
                 onConfirm={confirmCancel}

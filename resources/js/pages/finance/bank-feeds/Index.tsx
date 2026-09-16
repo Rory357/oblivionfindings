@@ -566,7 +566,7 @@ export default function BankFeedsIndex({
 
             <ConfirmDialog
                 open={!!disconnectTarget}
-                onOpenChange={(open) => !open && setDisconnectTarget(null)}
+                onClose={() => setDisconnectTarget(null)}
                 title="Disconnect bank feed?"
                 description={
                     <>
@@ -578,7 +578,7 @@ export default function BankFeedsIndex({
                         it.
                     </>
                 }
-                confirmLabel="Disconnect feed"
+                confirmText="Disconnect feed"
                 variant="destructive"
                 processing={disconnecting}
                 onConfirm={confirmDisconnect}

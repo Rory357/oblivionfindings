@@ -8,12 +8,15 @@ export * from './audit-export-dialog';
 export * from './bank-account-dialog';
 export * from './banking-hub';
 export * from './cash-flow-forecast-dialog';
-export * from './confirm-dialog';
 export * from './credit-note-dialog';
 export * from './donor-fund-dialog';
 export * from './donor-fund-transaction-dialog';
-export * from './finance-hero';
 export * from './finance-tabs';
+export {
+    FinanceSectionRail,
+    FinanceTierTwoNav,
+    sectionRailLabel,
+} from './finance-section-rail';
 export * from './fixed-asset-dialog';
 export * from './fixed-asset-dispose-dialog';
 export * from './funding-stream-dialog';
@@ -37,13 +40,14 @@ export * from './reports-hub';
 export * from './tax-hub';
 export * from './wizard';
 
-// Reuse HR's legible StatusBadge (already covers paid/posted/overdue/approved/…)
-// rather than forking a second status pill.
+// The app's one confirmation dialog and one status pill (DESIGN.md) — finance
+// used to carry forks of both.
+export { ConfirmDialog } from '@/components/confirm-dialog';
 export {
     StatusBadge,
-    statusTone,
-    type StatusTone,
-} from '@/components/hr/status-badge';
+    type StatusBadgeProps,
+    type StatusVariant,
+} from '@/components/ui/status-badge';
 
 // Reuse HR's generic row context-menu hook (portal, cursor-positioned, token-
 // styled, keyboard-navigable) for right-click actions on finance list rows — the

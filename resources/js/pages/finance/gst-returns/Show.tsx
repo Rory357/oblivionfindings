@@ -552,18 +552,20 @@ export default function GstReturnShow({
             </PageLayout>
 
             <ConfirmDialog
+                variant="default"
                 open={amendOpen}
-                onOpenChange={setAmendOpen}
+                onClose={() => setAmendOpen(false)}
                 title="Prepare a GST amendment?"
                 description="This creates a new draft revision from the latest source evidence. The filed return remains unchanged and auditable."
-                confirmLabel="Prepare amendment"
+                confirmText="Prepare amendment"
                 processing={amending}
                 onConfirm={confirmAmendment}
             />
 
             <ConfirmDialog
+                variant="default"
                 open={fileOpen}
-                onOpenChange={setFileOpen}
+                onClose={() => setFileOpen(false)}
                 title="Mark GST return as filed?"
                 description={
                     <>
@@ -575,7 +577,7 @@ export default function GstReturnShow({
                         undone.
                     </>
                 }
-                confirmLabel="Mark as filed"
+                confirmText="Mark as filed"
                 processing={filing}
                 onConfirm={confirmFile}
             />

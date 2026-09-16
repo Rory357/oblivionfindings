@@ -45,7 +45,6 @@ import {
     StatusBadge,
     formatMoney,
     formatMoneyCompact,
-    type StatusTone,
 } from '@/components/finance';
 import { FinanceHubsBar } from '@/components/finance/finance-hubs-bar';
 import {
@@ -216,15 +215,6 @@ const formatDate = (date: string) =>
         month: 'short',
         year: 'numeric',
     });
-
-// Funding-claim status → badge tone.
-const CLAIM_TONE: Record<string, StatusTone> = {
-    paid: 'success',
-    approved: 'success',
-    submitted: 'warning',
-    draft: 'neutral',
-    rejected: 'critical',
-};
 
 function computeTrend(data: MonthlyData[]): { percent: number } | null {
     if (data.length < 2) return null;
@@ -1305,11 +1295,6 @@ export default function FinanceDashboard({
                                                         <StatusBadge
                                                             status={
                                                                 claim.status
-                                                            }
-                                                            tone={
-                                                                CLAIM_TONE[
-                                                                    claim.status
-                                                                ] ?? 'neutral'
                                                             }
                                                         />
                                                     </TableCell>

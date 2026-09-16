@@ -558,7 +558,7 @@ export default function MatchRulesIndex({ rules }: PageProps) {
 
             <ConfirmDialog
                 open={!!deleteTarget}
-                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                onClose={() => setDeleteTarget(null)}
                 title="Delete match rule?"
                 description={
                     <>
@@ -570,7 +570,7 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                         by this rule.
                     </>
                 }
-                confirmLabel="Delete rule"
+                confirmText="Delete rule"
                 variant="destructive"
                 processing={deleting}
                 onConfirm={confirmDelete}

@@ -590,8 +590,9 @@ export default function FixedAssetShow({
 
             {canManage && (
                 <ConfirmDialog
+                    variant="default"
                     open={capitaliseOpen}
-                    onOpenChange={setCapitaliseOpen}
+                    onClose={() => setCapitaliseOpen(false)}
                     title="Post acquisition journal"
                     description={
                         <>
@@ -609,7 +610,7 @@ export default function FixedAssetShow({
                             once.
                         </>
                     }
-                    confirmLabel="Post acquisition"
+                    confirmText="Post acquisition"
                     onConfirm={() =>
                         router.post(
                             `/finance/fixed-assets/${asset.id}/capitalise`,

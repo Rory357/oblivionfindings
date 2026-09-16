@@ -131,6 +131,23 @@ accent, muted-foreground) for the styling.
 5. **Dark mode is automatic.** Semantic tokens have light + dark
    variants; you don't need `dark:bg-*` pairs if you use the token.
 
+## Calendar source tokens
+
+Every shared `SiteCalendar` source has a fixed triple in `app.css` —
+`--src-<key>` (mark), `--src-<key>-bg` (fill) and `--src-<key>-ln` (line).
+Hues are fixed (not brand-derived) and deliberately spaced so adjacent
+sources stay distinguishable. The module sets:
+
+| Module | Sources |
+|---|---|
+| Sites / operations | `event`, `inspection`, `compliance`, `credential`, `checklist`, `hazard`, `vendor`, `asset`, `meal`, `damage`, `emergency`, `drill`, `respite`, `participation`, `ppe`, `medication` |
+| Governance | `meetings`, `decisions`, `obligations`, `policies` |
+| Finance | `invoice-due`, `bill-due`, `payment-run`, `gst-due` |
+| Shared | `external` (two-way sync busy — desaturated on purpose) |
+
+A source colour never signals urgency: an entry whose `status` is
+`overdue` renders critical regardless of its source.
+
 ## Adding a new token
 
 Edit [`resources/css/app.css`](../resources/css/app.css):
