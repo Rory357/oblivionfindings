@@ -131,7 +131,10 @@ function SectionRail({
                 key: tab.key,
                 label: tab.label,
                 icon: tab.icon,
-                count: counts?.[tab.key],
+                // An empty register carries no badge, so the rail reads clean
+                // and the page's own empty state does the talking.
+                // PageHeaderRail renders any non-null count, including 0.
+                count: counts?.[tab.key] || undefined,
             }))}
         />
     );

@@ -241,16 +241,49 @@ calendar).
 - Four `tests/Browser` assertions still wait for Title Case strings on pages
   that no longer exist. CI skips `tests/Browser`.
 
-## Browser walkthrough
+## Browser walkthrough — done 2026-09-16
 
-As Demo Admin on `oblivionfindings.test`, per hub:
+Run as Demo Admin against the migrated worktree (a PHP dev server on
+`127.0.0.1:8766` with production assets built, because this worktree is not a
+Herd site). Verified live:
 
-1. The sidebar shows eight Finance entries and the right one stays lit on a
-   register, a record and a tier-2 sibling.
-2. The rail's active tab sits flush with the page ground and the Find chip is
-   present.
-3. Breadcrumbs start at Home and every crumb resolves (no `#`).
-4. Filters are inside the header; changing one re-queries.
-5. Every list row opens from both the kebab and a right-click, with the same
-   items.
-6. Dark mode and a narrow viewport: no horizontal page scroll.
+| Check | Result |
+|---|---|
+| Eight Finance sidebar entries, exactly one lit | ✅ after `429b5faff` — see below |
+| Rail flush with the page ground, Find chip present | ✅ Overview, Payables, Receivables, Banking, Reports, Settings |
+| Rail overflows to "More" rather than wrapping | ✅ Receivables (7 views), Banking (7), and at 375px |
+| Tier-2 strips render and navigate | ✅ Aged AR (Ageing/Statements), EFTPOS (Terminals/Batches), Reports (P&L/Balance sheet/Trial balance/Cash flow) |
+| Home-rooted breadcrumbs, every crumb resolving | ✅ incl. 5-level trails, e.g. Home › Finance › Reports › Statements › Balance sheet |
+| Filters inside the header | ✅ bills (status/vendor/date), statements (payer/as-at), EFTPOS (status/terminal/date), reports (as-at) |
+| Meter blocks link to the list they counted | ✅ after `429b5faff` — see below |
+| Kebab and right-click share one menu | ✅ bills row: Open bill · Open vendor |
+| Empty states, not bare text | ✅ EFTPOS batches, client statements |
+| Dark mode | ✅ balance sheet: ground, cards, text and status badge all invert via tokens |
+| Narrow viewport (375px) | ✅ `scrollWidth === clientWidth` — no horizontal page scroll |
+| Calendar on the shared Site Calendar | ✅ date anchor, Month/Week/Day/Agenda/Timeline, six source pills, glass back link, no create affordance |
+| Match rules served from the Settings rail (D2) | ✅ crumbs, sidebar entry and rail all agree |
+
+### Two defects the static sweep could not see, found here and fixed
+
+Both in `429b5faff`, both with regression tests:
+
+1. **Two sidebar entries lit at once.** The sidebar lights every item whose
+   match score is positive — there is no single winner — and Overview sits at
+   `/finance`, a prefix of every other finance URL, so the generic
+   "starts with" rule lit Overview on top of the real hub on all 88 pages.
+2. **Three bill meters linked to the same list.** Unpaid, Overdue and Due this
+   week all pointed at `?status=approved`: three different numbers, one list,
+   none agreeing with the meter above it. The controller had computed the
+   figures correctly but had no filters to match them.
+
+A third, smaller one in `4d7fb0c05`: the rail printed a literal `0` badge on
+empty registers. The audit had recorded that `PageHeaderRail` already hides a
+zero count (citing `page-header.tsx:1202`); that line is the *overflow* pill,
+and the per-tab counter renders any non-null value. The finance rail now maps
+`0` to no badge, restoring the behaviour the old `tabCountBadge` had.
+
+### Not covered here
+
+Donor-fund and petty-cash record pages, the reconcile workbench and the
+settlement-evidence dialog need seeded records this demo database does not
+have; their controllers and dialogs are covered by the Pest suite instead.

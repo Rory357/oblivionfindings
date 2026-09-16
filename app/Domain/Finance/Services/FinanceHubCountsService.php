@@ -39,7 +39,7 @@ use Illuminate\Database\Eloquent\Model;
  * Overview / Reports / Settings hubs) have no list to size, so they carry no badge.
  *
  * A count is the total application-wide rows in that list (all statuses) — i.e. exactly
- * how many rows the tab's list holds. Zero is returned as 0; the footer omits the badge for 0
+ * how many rows the tab's list holds. Zero is returned as 0; <FinanceSectionRail> omits the badge for 0
  * so an empty list reads clean (and its page shows the EmptyState). Every count is
  * individually guarded (try/catch → 0) so a missing table or model quirk yields no badge
  * for that one tab rather than 500-ing every finance page — this runs in middleware.
