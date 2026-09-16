@@ -29,6 +29,16 @@ export type SpendApprovalOption = {
     category?: string | null;
 };
 
+/** A cost centre or funding stream a bill line can be attributed to. */
+export type BillAttributionOption = { id: number; code: string; name: string };
+/** An approved purchase order this bill can be raised against. */
+export type BillPurchaseOrderOption = {
+    id: number;
+    po_number: string;
+    vendor_id: number | string | null;
+    total_amount?: number | string | null;
+};
+
 /** An existing draft bill to prefill the wizard with (edit mode). */
 export type EditableBillLine = {
     description: string;
@@ -36,6 +46,8 @@ export type EditableBillLine = {
     unit_price: string | number;
     account_id: number | string | null;
     gst_rate: string | number; // backend stores a FRACTION (0.15); prefilled back to a percentage
+    cost_centre_id?: number | string | null;
+    funding_stream_id?: number | string | null;
 };
 export type EditableBill = {
     id: number;
@@ -45,6 +57,7 @@ export type EditableBill = {
     due_date: string;
     notes: string | null;
     spend_approval_id?: number | string | null;
+    purchase_order_id?: number | string | null;
     lines: EditableBillLine[];
 };
 
@@ -54,6 +67,8 @@ type LineForm = {
     unit_price: string;
     account_id: string;
     gst_rate: string; // percentage: '15' standard, '0' zero-rated
+    cost_centre_id: string;
+    funding_stream_id: string;
 };
 
 /** Map a stored line (gst_rate as a fraction) back into the form's percentage shape. */
@@ -63,6 +78,9 @@ const lineFromBill = (l: EditableBillLine): LineForm => ({
     unit_price: String(l.unit_price ?? ''),
     account_id: l.account_id != null ? String(l.account_id) : '',
     gst_rate: String(Math.round(Number(l.gst_rate ?? 0.15) * 100)),
+    cost_centre_id: l.cost_centre_id != null ? String(l.cost_centre_id) : '',
+    funding_stream_id:
+        l.funding_stream_id != null ? String(l.funding_stream_id) : '',
 });
 
 const emptyLine = (): LineForm => ({
@@ -71,7 +89,13 @@ const emptyLine = (): LineForm => ({
     unit_price: '',
     account_id: '',
     gst_rate: '15',
+    cost_centre_id: '',
+    funding_stream_id: '',
 });
+
+// Radix SelectItem cannot take an empty-string value, so every optional select
+// clears through a sentinel that maps back to '' on change.
+const NO_VALUE = '__none';
 
 const STEPS: readonly WizardStep[] = [
     {
@@ -120,6 +144,9 @@ export function NewBillDialog({
     vendors,
     accounts,
     spendApprovals = [],
+    purchaseOrders = [],
+    costCentres = [],
+    fundingStreams = [],
     bill,
 }: {
     open: boolean;
@@ -128,6 +155,12 @@ export function NewBillDialog({
     accounts: AccountOption[];
     /** Approved governance spend approvals available to link (optional). */
     spendApprovals?: SpendApprovalOption[];
+    /** Approved purchase orders this bill can be raised against (optional). */
+    purchaseOrders?: BillPurchaseOrderOption[];
+    /** Active cost centres a line can be attributed to (optional). */
+    costCentres?: BillAttributionOption[];
+    /** Active funding streams a line can be attributed to (optional). */
+    fundingStreams?: BillAttributionOption[];
     /** When provided, the wizard opens in EDIT mode (prefilled, PUTs the update). */
     bill?: EditableBill | null;
 }) {
@@ -142,6 +175,7 @@ export function NewBillDialog({
         due_date: string;
         notes: string;
         spend_approval_id: string;
+        purchase_order_id: string;
         lines: LineForm[];
     }>(
         bill
@@ -155,6 +189,10 @@ export function NewBillDialog({
                       bill.spend_approval_id != null
                           ? String(bill.spend_approval_id)
                           : '',
+                  purchase_order_id:
+                      bill.purchase_order_id != null
+                          ? String(bill.purchase_order_id)
+                          : '',
                   lines: bill.lines.length
                       ? bill.lines.map(lineFromBill)
                       : [emptyLine()],
@@ -166,6 +204,7 @@ export function NewBillDialog({
                   due_date: plusDays(30),
                   notes: '',
                   spend_approval_id: '',
+                  purchase_order_id: '',
                   lines: [emptyLine()],
               },
     );
@@ -179,15 +218,26 @@ export function NewBillDialog({
         value: String(a.id),
         label: `${a.code} · ${a.name}`,
     }));
+    const costCentreOptions = [
+        { value: NO_VALUE, label: 'None' },
+        ...costCentres.map((c) => ({
+            value: String(c.id),
+            label: `${c.code} · ${c.name}`,
+        })),
+    ];
+    const fundingStreamOptions = [
+        { value: NO_VALUE, label: 'None' },
+        ...fundingStreams.map((f) => ({
+            value: String(f.id),
+            label: `${f.code} · ${f.name}`,
+        })),
+    ];
     const gstOptions = [
         { value: '15', label: 'GST 15%' },
         { value: '0', label: 'Zero-rated 0%' },
     ];
-    // Radix SelectItem cannot take an empty-string value, so the "clear" row uses
-    // a sentinel that maps back to '' on change.
-    const NO_APPROVAL = '__none';
     const spendApprovalOptions = [
-        { value: NO_APPROVAL, label: 'No spend approval' },
+        { value: NO_VALUE, label: 'No spend approval' },
         ...spendApprovals.map((s) => ({
             value: String(s.id),
             label: `${s.reference ? `${s.reference} · ` : ''}${s.title ?? 'Spend approval'} · ${money(s.amount)}`,
@@ -195,6 +245,26 @@ export function NewBillDialog({
     ];
     const selectedApproval = spendApprovals.find(
         (s) => String(s.id) === data.spend_approval_id,
+    );
+    // Only POs for the chosen vendor can be billed — a PO already picked for a
+    // different vendor is cleared when the vendor changes.
+    const vendorPurchaseOrders = data.vendor_id
+        ? purchaseOrders.filter(
+              (p) => String(p.vendor_id ?? '') === data.vendor_id,
+          )
+        : purchaseOrders;
+    const purchaseOrderOptions = [
+        { value: NO_VALUE, label: 'No purchase order' },
+        ...vendorPurchaseOrders.map((p) => ({
+            value: String(p.id),
+            label:
+                p.total_amount != null
+                    ? `${p.po_number} · ${money(p.total_amount)}`
+                    : p.po_number,
+        })),
+    ];
+    const selectedPurchaseOrder = purchaseOrders.find(
+        (p) => String(p.id) === data.purchase_order_id,
     );
 
     const totals = useMemo(() => {
@@ -242,6 +312,23 @@ export function NewBillDialog({
     };
 
     const submit = () => {
+        // Drop empty optional ids so the nullable rules pass.
+        form.transform((d) => ({
+            ...d,
+            notes: d.notes || null,
+            vendor_reference: d.vendor_reference || null,
+            spend_approval_id: d.spend_approval_id || null,
+            purchase_order_id: d.purchase_order_id || null,
+            lines: d.lines.map((l) => ({
+                description: l.description,
+                quantity: l.quantity,
+                unit_price: l.unit_price,
+                gst_rate: l.gst_rate,
+                account_id: l.account_id,
+                cost_centre_id: l.cost_centre_id || null,
+                funding_stream_id: l.funding_stream_id || null,
+            })),
+        }));
         const opts = {
             preserveScroll: true,
             onSuccess: () => close(),
@@ -344,7 +431,18 @@ export function NewBillDialog({
                         >
                             <SelectInput
                                 value={data.vendor_id}
-                                onChange={(v) => setData('vendor_id', v)}
+                                onChange={(v) =>
+                                    setData((d) => ({
+                                        ...d,
+                                        vendor_id: v,
+                                        // A PO belongs to one vendor — switching
+                                        // vendors can't keep the old link.
+                                        purchase_order_id:
+                                            d.vendor_id === v
+                                                ? d.purchase_order_id
+                                                : '',
+                                    }))
+                                }
                                 placeholder="Select vendor"
                                 options={vendorOptions}
                             />
@@ -401,6 +499,33 @@ export function NewBillDialog({
                                 }
                             />
                         </Field>
+                        {purchaseOrders.length > 0 && (
+                            <Field
+                                label="Purchase order"
+                                span
+                                hint="optional — bill against an approved PO"
+                                error={errors.purchase_order_id}
+                            >
+                                <SelectInput
+                                    value={data.purchase_order_id}
+                                    onChange={(v) =>
+                                        setData(
+                                            'purchase_order_id',
+                                            v === NO_VALUE ? '' : v,
+                                        )
+                                    }
+                                    placeholder="No purchase order"
+                                    options={purchaseOrderOptions}
+                                />
+                                {data.vendor_id &&
+                                vendorPurchaseOrders.length === 0 ? (
+                                    <p className="mt-1 text-[12px] text-muted-foreground">
+                                        This vendor has no approved purchase
+                                        orders to bill against.
+                                    </p>
+                                ) : null}
+                            </Field>
+                        )}
                         {spendApprovals.length > 0 && (
                             <Field
                                 label="Spend approval"
@@ -413,7 +538,7 @@ export function NewBillDialog({
                                     onChange={(v) =>
                                         setData(
                                             'spend_approval_id',
-                                            v === NO_APPROVAL ? '' : v,
+                                            v === NO_VALUE ? '' : v,
                                         )
                                     }
                                     placeholder="No spend approval"
@@ -542,6 +667,54 @@ export function NewBillDialog({
                                                 {money(net)}
                                             </div>
                                         </Field>
+                                        {costCentres.length > 0 && (
+                                            <Field
+                                                label="Cost centre"
+                                                hint="optional"
+                                            >
+                                                <SelectInput
+                                                    value={line.cost_centre_id}
+                                                    onChange={(v) =>
+                                                        updateLine(
+                                                            i,
+                                                            'cost_centre_id',
+                                                            v === NO_VALUE
+                                                                ? ''
+                                                                : v,
+                                                        )
+                                                    }
+                                                    placeholder="None"
+                                                    options={costCentreOptions}
+                                                    ariaLabel={`Line ${i + 1} cost centre`}
+                                                />
+                                            </Field>
+                                        )}
+                                        {fundingStreams.length > 0 && (
+                                            <Field
+                                                label="Funding stream"
+                                                hint="optional"
+                                            >
+                                                <SelectInput
+                                                    value={
+                                                        line.funding_stream_id
+                                                    }
+                                                    onChange={(v) =>
+                                                        updateLine(
+                                                            i,
+                                                            'funding_stream_id',
+                                                            v === NO_VALUE
+                                                                ? ''
+                                                                : v,
+                                                        )
+                                                    }
+                                                    placeholder="None"
+                                                    options={
+                                                        fundingStreamOptions
+                                                    }
+                                                    ariaLabel={`Line ${i + 1} funding stream`}
+                                                />
+                                            </Field>
+                                        )}
                                     </div>
                                     <div className="mt-2 flex justify-end">
                                         <Button
@@ -616,6 +789,12 @@ export function NewBillDialog({
                         )}
                         <ReviewRow label="Bill date" value={data.bill_date} />
                         <ReviewRow label="Due date" value={data.due_date} />
+                        {selectedPurchaseOrder && (
+                            <ReviewRow
+                                label="Purchase order"
+                                value={selectedPurchaseOrder.po_number}
+                            />
+                        )}
                         {selectedApproval && (
                             <ReviewRow
                                 label="Spend approval"

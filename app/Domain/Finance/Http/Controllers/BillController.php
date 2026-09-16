@@ -9,7 +9,6 @@ use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinCostCentre;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinPurchaseOrder;
-use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Services\AccountsPayableService;
 use App\Http\Controllers\Controller;
@@ -32,7 +31,7 @@ class BillController extends Controller
             ->with([
                 'vendor:id,name',
                 // Lines power the in-place Edit modal's prefill for draft bills.
-                'lines:id,bill_id,description,quantity,unit_price,gst_rate,account_id',
+                'lines:id,bill_id,description,quantity,unit_price,gst_rate,account_id,cost_centre_id,funding_stream_id',
             ])
             ->orderBy('bill_date', 'desc');
 
@@ -67,11 +66,22 @@ class BillController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        // Whole-register figures for the header meter row — never the current
+        // page of results (DESIGN.md "Page-local counts labelled as totals").
         $allBills = FinBill::forOrganization($orgId)->get();
+        $unpaid = $allBills->whereIn('status', ['approved', 'partially_paid']);
+        $overdue = $unpaid->filter(fn ($b) => $b->due_date < now());
+        $dueThisWeek = $unpaid->filter(fn ($b) => $b->due_date >= now() && $b->due_date <= now()->addDays(7));
+        $awaiting = $allBills->whereIn('status', ['draft', 'awaiting_approval']);
         $summary = [
-            'total_unpaid' => $allBills->whereIn('status', ['approved', 'partially_paid'])->sum(fn ($b) => $b->total_amount - $b->amount_paid),
-            'total_overdue' => $allBills->whereIn('status', ['approved', 'partially_paid'])->filter(fn ($b) => $b->due_date < now())->sum(fn ($b) => $b->total_amount - $b->amount_paid),
-            'due_this_week' => $allBills->whereIn('status', ['approved', 'partially_paid'])->filter(fn ($b) => $b->due_date >= now() && $b->due_date <= now()->addDays(7))->sum(fn ($b) => $b->total_amount - $b->amount_paid),
+            'total_unpaid' => $unpaid->sum(fn ($b) => $b->total_amount - $b->amount_paid),
+            'unpaid_count' => $unpaid->count(),
+            'total_overdue' => $overdue->sum(fn ($b) => $b->total_amount - $b->amount_paid),
+            'overdue_count' => $overdue->count(),
+            'due_this_week' => $dueThisWeek->sum(fn ($b) => $b->total_amount - $b->amount_paid),
+            'due_this_week_count' => $dueThisWeek->count(),
+            'awaiting_total' => $awaiting->sum(fn ($b) => $b->total_amount),
+            'awaiting_count' => $awaiting->count(),
         ];
 
         $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
@@ -94,7 +104,25 @@ class BillController extends Controller
             // the bill modal (for the spend-approval gate). Governance-owned; the
             // link is one-directional (a bill points at one, never creates one).
             'spendApprovals' => $canManage ? $this->linkableSpendApprovals($request) : [],
+            // Reference data the bill modal needs for full field parity with the
+            // retired routed Create/Edit pages.
+            'purchaseOrders' => $canManage ? $this->billablePurchaseOrders($orgId) : [],
+            'costCentres' => $canManage
+                ? FinCostCentre::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name'])
+                : [],
+            'fundingStreams' => $canManage
+                ? FinFundingStream::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name'])
+                : [],
         ]);
+    }
+
+    /** Approved purchase orders a bill can be raised against, shaped for the modal. */
+    private function billablePurchaseOrders(int $orgId)
+    {
+        return FinPurchaseOrder::forOrganization($orgId)
+            ->withStatus('approved')
+            ->orderByDesc('order_date')
+            ->get(['id', 'po_number', 'vendor_id', 'total_amount']);
     }
 
     /**
@@ -161,53 +189,8 @@ class BillController extends Controller
         );
     }
 
-    public function create(Request $request)
-    {
-        $this->authorize('create', FinBill::class);
-
-        $orgId = $request->user()->organization_id;
-
-        $vendors = FinVendor::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'payment_terms_days', 'default_expense_account_id']);
-
-        $accounts = FinAccount::forOrganization($orgId)
-            ->active()
-            ->whereIn('type', ['expense', 'asset'])
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'type']);
-
-        $costCentres = FinCostCentre::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'code', 'name']);
-
-        $fundingStreams = FinFundingStream::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'code', 'name']);
-
-        $taxRates = FinTaxRate::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'rate']);
-
-        $purchaseOrders = FinPurchaseOrder::forOrganization($orgId)
-            ->withStatus('approved')
-            ->with('lines.account:id,code,name', 'vendor:id,name')
-            ->orderBy('order_date', 'desc')
-            ->get(['id', 'po_number', 'vendor_id', 'total_amount']);
-
-        return Inertia::render('finance/bills/Create', [
-            'vendors' => $vendors,
-            'accounts' => $accounts,
-            'costCentres' => $costCentres,
-            'fundingStreams' => $fundingStreams,
-            'taxRates' => $taxRates,
-            'purchaseOrders' => $purchaseOrders,
-        ]);
-    }
+    // Create and edit are WizardShell modals on the index/show pages; the
+    // retired full-page URLs redirect to the list (routes/finance.php).
 
     public function store(StoreBillRequest $request)
     {
@@ -240,64 +223,29 @@ class BillController extends Controller
             },
         ]);
 
+        $orgId = $request->user()->organization_id;
+        $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
+
         return Inertia::render('finance/bills/Show', [
             'bill' => $bill,
-        ]);
-    }
-
-    public function edit(Request $request, FinBill $bill)
-    {
-        $this->authorize('update', $bill);
-
-        if ($bill->status !== 'draft') {
-            return redirect()->route('finance.bills.show', $bill)
-                ->with('error', 'Only draft bills can be edited.');
-        }
-
-        $orgId = $request->user()->organization_id;
-
-        $bill->load('lines');
-
-        $vendors = FinVendor::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'payment_terms_days', 'default_expense_account_id']);
-
-        $accounts = FinAccount::forOrganization($orgId)
-            ->active()
-            ->whereIn('type', ['expense', 'asset'])
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'type']);
-
-        $costCentres = FinCostCentre::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'code', 'name']);
-
-        $fundingStreams = FinFundingStream::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'code', 'name']);
-
-        $taxRates = FinTaxRate::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'rate']);
-
-        $purchaseOrders = FinPurchaseOrder::forOrganization($orgId)
-            ->withStatus('approved')
-            ->with('lines.account:id,code,name', 'vendor:id,name')
-            ->orderBy('order_date', 'desc')
-            ->get(['id', 'po_number', 'vendor_id', 'total_amount']);
-
-        return Inertia::render('finance/bills/Edit', [
-            'bill' => $bill,
-            'vendors' => $vendors,
-            'accounts' => $accounts,
-            'costCentres' => $costCentres,
-            'fundingStreams' => $fundingStreams,
-            'taxRates' => $taxRates,
-            'purchaseOrders' => $purchaseOrders,
+            'canManage' => $canManage,
+            // Reference data for the Edit Bill modal (draft bills only).
+            'vendors' => $canManage
+                ? FinVendor::forOrganization($orgId)->active()->orderBy('name')
+                    ->get(['id', 'name', 'payment_terms_days', 'default_expense_account_id'])
+                : [],
+            'accounts' => $canManage
+                ? FinAccount::forOrganization($orgId)->active()->whereIn('type', ['expense', 'asset'])
+                    ->orderBy('code')->get(['id', 'code', 'name'])
+                : [],
+            'costCentres' => $canManage
+                ? FinCostCentre::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name'])
+                : [],
+            'fundingStreams' => $canManage
+                ? FinFundingStream::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name'])
+                : [],
+            'purchaseOrders' => $canManage ? $this->billablePurchaseOrders($orgId) : [],
+            'spendApprovals' => $canManage ? $this->linkableSpendApprovals($request) : [],
         ]);
     }
 

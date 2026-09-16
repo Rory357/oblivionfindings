@@ -1,27 +1,43 @@
-import { ConfirmDialog, formatMoney } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { StatusBadge } from '@/components/ui/status-badge';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    ConfirmDialog,
+    FinanceSectionRail,
+    NewBillDialog,
+    formatMoney,
+    type AccountOption,
+    type SpendApprovalOption,
+} from '@/components/finance';
+import type {
+    BillAttributionOption,
+    BillPurchaseOrderOption,
+    EditableBill,
+} from '@/components/finance/new-bill-dialog';
+import {
+    EntityTable,
+    ListCaption,
+    type EntityTableColumn,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
-import { PageProps } from '@/types';
+import { PageProps, type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Banknote,
     CheckCircle,
-    Edit,
     FileText,
+    Pencil,
+    Receipt,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -34,6 +50,9 @@ interface BillLine {
     gst_rate: string;
     gst_amount: string;
     line_total: string;
+    account_id: number | null;
+    cost_centre_id: number | null;
+    funding_stream_id: number | null;
     account: { id: number; code: string; name: string } | null;
     cost_centre: { id: number; code: string; name: string } | null;
     funding_stream: { id: number; code: string; name: string } | null;
@@ -49,6 +68,7 @@ interface PaymentAllocation {
 interface Bill {
     id: number;
     bill_number: string;
+    vendor_id: number;
     vendor_reference: string | null;
     vendor: { id: number; name: string } | null;
     status: string;
@@ -59,6 +79,8 @@ interface Bill {
     total_amount: string;
     amount_paid: string;
     notes: string | null;
+    spend_approval_id: number | null;
+    purchase_order_id: number | null;
     approved_by: { id: number; name: string } | null;
     approved_at: string | null;
     journal: {
@@ -74,7 +96,32 @@ interface Bill {
 
 interface Props extends PageProps {
     bill: Bill;
+    canManage: boolean;
+    vendors: { id: number; name: string }[];
+    accounts: AccountOption[];
+    costCentres: BillAttributionOption[];
+    fundingStreams: BillAttributionOption[];
+    purchaseOrders: BillPurchaseOrderOption[];
+    spendApprovals: SpendApprovalOption[];
 }
+
+const STATUS_LABELS: Record<string, string> = {
+    draft: 'Draft',
+    awaiting_approval: 'Awaiting approval',
+    approved: 'Approved',
+    partially_paid: 'Partially paid',
+    paid: 'Paid',
+    cancelled: 'Cancelled',
+};
+
+const CHIP_VARIANTS: Record<string, StatusVariant> = {
+    draft: 'neutral',
+    awaiting_approval: 'warning',
+    approved: 'info',
+    partially_paid: 'warning',
+    paid: 'success',
+    cancelled: 'neutral',
+};
 
 const formatDate = (date: string | null) =>
     date
@@ -83,7 +130,7 @@ const formatDate = (date: string | null) =>
               month: 'short',
               year: 'numeric',
           })
-        : '-';
+        : '—';
 
 const formatDateTime = (date: string | null) =>
     date
@@ -94,389 +141,474 @@ const formatDateTime = (date: string | null) =>
               hour: '2-digit',
               minute: '2-digit',
           })
-        : '-';
+        : '—';
 
-export default function BillShow({ auth, bill }: Props) {
+function DetailRow({
+    label,
+    children,
+}: {
+    label: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div>
+            <dt className="text-caption">{label}</dt>
+            <dd className="mt-1 text-sm">{children}</dd>
+        </div>
+    );
+}
+
+export default function BillShow({
+    bill,
+    canManage,
+    vendors,
+    accounts,
+    costCentres,
+    fundingStreams,
+    purchaseOrders,
+    spendApprovals,
+}: Props) {
     const isOverdue =
         bill.status !== 'paid' &&
         bill.status !== 'cancelled' &&
         new Date(bill.due_date) < new Date();
     const isDraft = bill.status === 'draft';
     const canCancel =
-        bill.status === 'draft' || bill.status === 'awaiting_approval';
+        canManage &&
+        (bill.status === 'draft' || bill.status === 'awaiting_approval');
     const amountDue = Number(bill.total_amount) - Number(bill.amount_paid);
 
-    const [cancelOpen, setCancelOpen] = useState(false);
-    const [cancelling, setCancelling] = useState(false);
+    const [confirmAction, setConfirmAction] = useState<
+        'approve' | 'cancel' | null
+    >(null);
+    const [processing, setProcessing] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
 
-    const handleApprove = () => {
-        router.post(`/finance/bills/${bill.id}/approve`);
-    };
-
-    const confirmCancel = () => {
+    const post = (action: 'approve' | 'cancel') =>
         router.post(
-            `/finance/bills/${bill.id}/cancel`,
+            `/finance/bills/${bill.id}/${action}`,
             {},
             {
-                onStart: () => setCancelling(true),
-                onFinish: () => setCancelling(false),
-                onSuccess: () => setCancelOpen(false),
+                onStart: () => setProcessing(true),
+                onFinish: () => setProcessing(false),
+                onSuccess: () => setConfirmAction(null),
             },
         );
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Payables', href: '/finance/payables' },
+        { title: 'Bills', href: '/finance/bills' },
+        { title: bill.bill_number, href: `/finance/bills/${bill.id}` },
+    ];
+
+    const lineColumns: EntityTableColumn<BillLine>[] = [
+        {
+            key: 'qty',
+            label: 'Qty',
+            width: '70px',
+            align: 'right',
+            cell: (l) => (
+                <span className="tabular-nums">
+                    {Number(l.quantity).toFixed(2)}
+                </span>
+            ),
+        },
+        {
+            key: 'unit',
+            label: 'Unit price',
+            width: '1fr',
+            align: 'right',
+            cell: (l) => (
+                <span className="tabular-nums">
+                    {formatMoney(l.unit_price)}
+                </span>
+            ),
+        },
+        {
+            key: 'account',
+            label: 'Account',
+            width: '1.5fr',
+            cell: (l) => (
+                <span className="truncate text-muted-foreground">
+                    {l.account
+                        ? `${l.account.code} · ${l.account.name}`
+                        : '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'cost_centre',
+            label: 'Cost centre',
+            width: '1.3fr',
+            cell: (l) => (
+                <span className="truncate text-muted-foreground">
+                    {l.cost_centre
+                        ? `${l.cost_centre.code} · ${l.cost_centre.name}`
+                        : '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'funding_stream',
+            label: 'Funding stream',
+            width: '1.3fr',
+            cell: (l) => (
+                <span className="truncate text-muted-foreground">
+                    {l.funding_stream
+                        ? `${l.funding_stream.code} · ${l.funding_stream.name}`
+                        : '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'gst',
+            label: 'GST',
+            width: '1fr',
+            align: 'right',
+            cell: (l) => (
+                <span className="tabular-nums text-muted-foreground">
+                    {formatMoney(l.gst_amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'total',
+            label: 'Line total',
+            width: '1.1fr',
+            align: 'right',
+            cell: (l) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(l.line_total)}
+                </span>
+            ),
+        },
+    ];
+
+    const paymentColumns: EntityTableColumn<PaymentAllocation>[] = [
+        {
+            key: 'amount',
+            label: 'Amount',
+            width: '1fr',
+            align: 'right',
+            cell: (p) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(p.amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'notes',
+            label: 'Notes',
+            width: '2.4fr',
+            cell: (p) => (
+                <span className="truncate text-muted-foreground">
+                    {p.notes ?? '—'}
+                </span>
+            ),
+        },
+    ];
+
+    const editableBill: EditableBill = {
+        id: bill.id,
+        vendor_id: bill.vendor_id,
+        vendor_reference: bill.vendor_reference,
+        bill_date: bill.bill_date,
+        due_date: bill.due_date,
+        notes: bill.notes,
+        spend_approval_id: bill.spend_approval_id,
+        purchase_order_id: bill.purchase_order_id,
+        lines: bill.lines.map((l) => ({
+            description: l.description,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            account_id: l.account_id,
+            gst_rate: l.gst_rate,
+            cost_centre_id: l.cost_centre_id,
+            funding_stream_id: l.funding_stream_id,
+        })),
     };
 
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/finance/bills"
+            icon={Receipt}
+            title={bill.bill_number}
+            titleChip={
+                isOverdue ? (
+                    <PageHeaderStatusChip
+                        variant="critical"
+                        icon={AlertTriangle}
+                    >
+                        Overdue
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip
+                        variant={CHIP_VARIANTS[bill.status] ?? 'neutral'}
+                    >
+                        {STATUS_LABELS[bill.status] ?? bill.status}
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={[
+                bill.vendor?.name ?? 'No vendor',
+                bill.vendor_reference ? `Ref ${bill.vendor_reference}` : null,
+                `Due ${formatDate(bill.due_date)}`,
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                <>
+                    {canManage && isDraft && (
+                        <PageHeaderGlassButton
+                            icon={Pencil}
+                            onClick={() => setEditOpen(true)}
+                        >
+                            Edit
+                        </PageHeaderGlassButton>
+                    )}
+                    {canCancel && (
+                        <PageHeaderGlassButton
+                            icon={XCircle}
+                            onClick={() => setConfirmAction('cancel')}
+                        >
+                            Cancel bill
+                        </PageHeaderGlassButton>
+                    )}
+                    {canManage && isDraft && (
+                        <PageHeaderPrimaryButton
+                            icon={CheckCircle}
+                            onClick={() => setConfirmAction('approve')}
+                        >
+                            Approve
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Total"
+                        href={`/finance/bills/${bill.id}`}
+                        ariaLabel="View this bill's total"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(bill.total_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {formatMoney(bill.subtotal)} plus GST
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Amount due"
+                        tone={amountDue > 0 ? 'critical' : 'success'}
+                        href={`/finance/bills?vendor_id=${bill.vendor_id}`}
+                        ariaLabel="View this vendor's outstanding bills"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(amountDue)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {formatMoney(bill.amount_paid)} paid so far
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="GST"
+                        href={`/finance/bills/${bill.id}`}
+                        ariaLabel="View this bill's GST"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(bill.gst_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {bill.lines.length} line
+                            {bill.lines.length === 1 ? '' : 's'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Payments"
+                        href="/finance/payment-runs"
+                        ariaLabel="View payment runs"
+                    >
+                        <PageHeaderMeterBig>
+                            {bill.payment_allocations?.length ?? 0}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Allocations against this bill
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
-        <AppLayout
-            user={auth.user}
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance' },
-                { title: 'Bills', href: '/finance/bills' },
-                { title: bill.bill_number, href: `/finance/bills/${bill.id}` },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Bill ${bill.bill_number}`} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/bills"
-                        title={
-                            <span className="flex flex-wrap items-center gap-3">
-                                {bill.bill_number}
-                                <StatusBadge status={bill.status} />
-                                {isOverdue && (
-                                    <Badge className="bg-status-critical-bg text-status-critical">
-                                        <AlertTriangle className="mr-1 h-3 w-3" />
-                                        Overdue
-                                    </Badge>
-                                )}
-                            </span>
-                        }
-                        description={
-                            <>
-                                {bill.vendor?.name ?? 'Unknown vendor'}
-                                {bill.vendor_reference && (
-                                    <span> - Ref: {bill.vendor_reference}</span>
-                                )}
-                            </>
-                        }
-                        actions={
-                            <>
-                                {isDraft && (
-                                    <>
-                                        <Button variant="outline" asChild>
-                                            <Link
-                                                href={`/finance/bills/${bill.id}/edit`}
-                                            >
-                                                <Edit className="mr-2 h-4 w-4" />
-                                                Edit
-                                            </Link>
-                                        </Button>
-                                        <Button onClick={handleApprove}>
-                                            <CheckCircle className="mr-2 h-4 w-4" />
-                                            Approve
-                                        </Button>
-                                    </>
-                                )}
-                                {canCancel && (
-                                    <Button
-                                        variant="destructive"
-                                        onClick={() => setCancelOpen(true)}
-                                    >
-                                        <XCircle className="mr-2 h-4 w-4" />
-                                        Cancel
-                                    </Button>
-                                )}
-                            </>
-                        }
-                    />
-                }
-            >
-                <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    {/* Bill Info */}
+            <PageLayout hero={header}>
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">
-                                Bill Details
+                            <CardTitle className="text-section-title">
+                                Bill details
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-3 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    Bill Date
-                                </span>
-                                <span className="font-medium">
+                        <CardContent>
+                            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <DetailRow label="Bill date">
                                     {formatDate(bill.bill_date)}
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    Due Date
-                                </span>
-                                <span
-                                    className={cn(
-                                        'font-medium',
-                                        isOverdue && 'text-status-critical',
-                                    )}
-                                >
+                                </DetailRow>
+                                <DetailRow label="Due date">
                                     {formatDate(bill.due_date)}
-                                </span>
-                            </div>
-                            {bill.purchase_order && (
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">
-                                        Purchase Order
-                                    </span>
-                                    <Link
-                                        href={`/finance/purchase-orders/${bill.purchase_order.id}`}
-                                        className="font-medium text-status-info hover:underline"
-                                    >
-                                        {bill.purchase_order.po_number}
-                                    </Link>
-                                </div>
-                            )}
-                            {bill.approved_by && (
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">
-                                        Approved By
-                                    </span>
-                                    <span className="font-medium">
+                                </DetailRow>
+                                <DetailRow label="Vendor">
+                                    {bill.vendor ? (
+                                        <Link
+                                            href={`/finance/vendors/${bill.vendor.id}`}
+                                            className="text-primary hover:underline"
+                                        >
+                                            {bill.vendor.name}
+                                        </Link>
+                                    ) : (
+                                        '—'
+                                    )}
+                                </DetailRow>
+                                <DetailRow label="Purchase order">
+                                    {bill.purchase_order ? (
+                                        <Link
+                                            href={`/finance/purchase-orders/${bill.purchase_order.id}`}
+                                            className="text-primary hover:underline"
+                                        >
+                                            {bill.purchase_order.po_number}
+                                        </Link>
+                                    ) : (
+                                        '—'
+                                    )}
+                                </DetailRow>
+                                {bill.approved_by && (
+                                    <DetailRow label="Approved by">
                                         {bill.approved_by.name}
-                                    </span>
-                                </div>
-                            )}
-                            {bill.approved_at && (
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">
-                                        Approved At
-                                    </span>
-                                    <span className="font-medium">
-                                        {formatDateTime(bill.approved_at)}
-                                    </span>
-                                </div>
-                            )}
-                            {bill.notes && (
-                                <div className="border-t pt-2">
-                                    <span className="mb-1 block text-muted-foreground">
-                                        Notes
-                                    </span>
-                                    <p className="whitespace-pre-wrap text-foreground">
-                                        {bill.notes}
-                                    </p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Amounts */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Amounts</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    Subtotal
-                                </span>
-                                <span>{formatMoney(bill.subtotal)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    GST
-                                </span>
-                                <span>{formatMoney(bill.gst_amount)}</span>
-                            </div>
-                            <Separator />
-                            <div className="flex justify-between font-bold">
-                                <span>Total</span>
-                                <span>{formatMoney(bill.total_amount)}</span>
-                            </div>
-                            <div className="flex justify-between text-status-success">
-                                <span>Paid</span>
-                                <span>{formatMoney(bill.amount_paid)}</span>
-                            </div>
-                            <Separator />
-                            <div
-                                className={cn(
-                                    'flex justify-between font-bold',
-                                    amountDue > 0
-                                        ? 'text-status-critical'
-                                        : 'text-status-success',
+                                        {bill.approved_at
+                                            ? ` · ${formatDateTime(bill.approved_at)}`
+                                            : ''}
+                                    </DetailRow>
                                 )}
-                            >
-                                <span>Amount Due</span>
-                                <span>{formatMoney(amountDue)}</span>
-                            </div>
+                                {bill.notes && (
+                                    <div className="sm:col-span-2">
+                                        <dt className="text-caption">Notes</dt>
+                                        <dd className="mt-1 text-sm whitespace-pre-wrap">
+                                            {bill.notes}
+                                        </dd>
+                                    </div>
+                                )}
+                            </dl>
                         </CardContent>
                     </Card>
 
-                    {/* GL Journal */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">
-                                GL Journal
+                            <CardTitle className="text-section-title">
+                                Ledger journal
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {bill.journal ? (
-                                <div className="space-y-3 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">
-                                            Journal #
-                                        </span>
+                                <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <DetailRow label="Journal">
                                         <Link
                                             href={`/finance/journals/${bill.journal.id}`}
-                                            className="font-medium text-status-info hover:underline"
+                                            className="text-primary hover:underline"
                                         >
                                             {bill.journal.journal_number}
                                         </Link>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">
-                                            Status
-                                        </span>
-                                        <Badge className="bg-status-success-bg text-status-success">
-                                            {bill.journal.status}
-                                        </Badge>
-                                    </div>
-                                    {bill.journal.posted_at && (
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">
-                                                Posted
-                                            </span>
-                                            <span className="font-medium">
-                                                {formatDateTime(
-                                                    bill.journal.posted_at,
-                                                )}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
+                                    </DetailRow>
+                                    <DetailRow label="Status">
+                                        <StatusBadge
+                                            status={bill.journal.status}
+                                            className="rounded-[8px] font-semibold"
+                                        />
+                                    </DetailRow>
+                                    <DetailRow label="Posted">
+                                        {formatDateTime(bill.journal.posted_at)}
+                                    </DetailRow>
+                                </dl>
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
-                                    <FileText className="mb-2 h-8 w-8" />
-                                    <p className="text-sm">
-                                        No journal posted yet
-                                    </p>
-                                </div>
+                                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <FileText className="size-4" />
+                                    No journal posted yet — approving this bill
+                                    posts one to the ledger.
+                                </p>
                             )}
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Line Items */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle>Line Items</CardTitle>
-                    </CardHeader>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Description</TableHead>
-                                <TableHead className="text-right">
-                                    Qty
-                                </TableHead>
-                                <TableHead className="text-right">
-                                    Unit Price
-                                </TableHead>
-                                <TableHead className="text-right">
-                                    GST %
-                                </TableHead>
-                                <TableHead>Account</TableHead>
-                                <TableHead>Cost Centre</TableHead>
-                                <TableHead>Funding Stream</TableHead>
-                                <TableHead className="text-right">
-                                    GST
-                                </TableHead>
-                                <TableHead className="text-right">
-                                    Total
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {bill.lines.map((line) => (
-                                <TableRow key={line.id}>
-                                    <TableCell>{line.description}</TableCell>
-                                    <TableCell className="text-right">
-                                        {Number(line.quantity).toFixed(2)}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {formatMoney(line.unit_price)}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {Number(line.gst_rate).toFixed(2)}%
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {line.account
-                                            ? `${line.account.code} - ${line.account.name}`
-                                            : '-'}
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {line.cost_centre
-                                            ? `${line.cost_centre.code} - ${line.cost_centre.name}`
-                                            : '-'}
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {line.funding_stream
-                                            ? `${line.funding_stream.code} - ${line.funding_stream.name}`
-                                            : '-'}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {formatMoney(line.gst_amount)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-medium">
-                                        {formatMoney(line.line_total)}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </Card>
+                <ListCaption
+                    title="Line items"
+                    caption={`${bill.lines.length} line${bill.lines.length === 1 ? '' : 's'} · ${formatMoney(bill.total_amount)} total`}
+                />
+                <EntityTable
+                    rows={bill.lines}
+                    rowKey={(l) => l.id}
+                    identityLabel="Description"
+                    identity={(l) => ({ icon: FileText, name: l.description })}
+                    columns={lineColumns}
+                    actionsFor={() => []}
+                    minWidth={1280}
+                />
 
-                {/* Payment History */}
                 {bill.payment_allocations &&
                     bill.payment_allocations.length > 0 && (
-                        <Card className="mb-6">
-                            <CardHeader>
-                                <CardTitle>Payment History</CardTitle>
-                            </CardHeader>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead className="text-right">
-                                            Amount
-                                        </TableHead>
-                                        <TableHead>Notes</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {bill.payment_allocations.map((payment) => (
-                                        <TableRow key={payment.id}>
-                                            <TableCell>
-                                                {formatDate(
-                                                    payment.payment_date,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right font-medium">
-                                                {formatMoney(payment.amount)}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {payment.notes ?? '-'}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </Card>
+                        <>
+                            <ListCaption
+                                title="Payment history"
+                                caption={`${formatMoney(bill.amount_paid)} paid across ${bill.payment_allocations.length} allocation${bill.payment_allocations.length === 1 ? '' : 's'}`}
+                            />
+                            <EntityTable
+                                rows={bill.payment_allocations}
+                                rowKey={(p) => p.id}
+                                identityLabel="Payment date"
+                                identity={(p) => ({
+                                    icon: Banknote,
+                                    name: formatDate(p.payment_date),
+                                })}
+                                columns={paymentColumns}
+                                actionsFor={() => []}
+                                minWidth={760}
+                            />
+                        </>
                     )}
             </PageLayout>
 
             <ConfirmDialog
-                open={cancelOpen}
-                onClose={() => setCancelOpen(false)}
+                variant="default"
+                open={confirmAction === 'approve'}
+                onClose={() => setConfirmAction(null)}
+                title="Approve this bill?"
+                description={
+                    <>
+                        This approves{' '}
+                        <span className="font-medium text-foreground">
+                            {bill.bill_number}
+                        </span>{' '}
+                        for {formatMoney(bill.total_amount)} and{' '}
+                        <span className="font-medium text-foreground">
+                            posts a journal to the ledger
+                        </span>
+                        . The bill can then be paid in a payment run.
+                    </>
+                }
+                confirmText="Approve bill"
+                processing={processing}
+                onConfirm={() => post('approve')}
+            />
+            <ConfirmDialog
+                open={confirmAction === 'cancel'}
+                onClose={() => setConfirmAction(null)}
                 title="Cancel this bill?"
                 description={
                     <>
@@ -490,9 +622,23 @@ export default function BillShow({ auth, bill }: Props) {
                 confirmText="Cancel bill"
                 cancelText="Keep bill"
                 variant="destructive"
-                processing={cancelling}
-                onConfirm={confirmCancel}
+                processing={processing}
+                onConfirm={() => post('cancel')}
             />
+
+            {canManage && isDraft && editOpen && (
+                <NewBillDialog
+                    open
+                    bill={editableBill}
+                    onClose={() => setEditOpen(false)}
+                    vendors={vendors}
+                    accounts={accounts}
+                    spendApprovals={spendApprovals}
+                    purchaseOrders={purchaseOrders}
+                    costCentres={costCentres}
+                    fundingStreams={fundingStreams}
+                />
+            )}
         </AppLayout>
     );
 }

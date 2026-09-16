@@ -1,20 +1,41 @@
-import { formatMoney } from '@/components/finance/money';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    FinanceSectionRail,
+    NewVendorDialog,
+    formatMoney,
+    type AccountOption,
+} from '@/components/finance';
+import type { EditableVendor } from '@/components/finance/new-vendor-dialog';
+import {
+    EntityTable,
+    ListCaption,
+    type EntityTableColumn,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyList } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type PageProps } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { DollarSign, Edit, FileText, ShoppingCart, Users } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    Building2,
+    FileText,
+    Pencil,
+    Receipt,
+    ShoppingCart,
+    Users,
+} from 'lucide-react';
+import { useState } from 'react';
 
 interface Contact {
     id: number;
@@ -40,6 +61,7 @@ interface Vendor {
     region: string | null;
     postal_code: string | null;
     payment_terms_days: number | null;
+    default_expense_account_id: number | null;
     is_active: boolean;
     notes: string | null;
     contacts: Contact[];
@@ -69,40 +91,19 @@ interface Props extends PageProps {
     purchaseOrders: PurchaseOrder[];
     totalOutstanding: number;
     totalPaidYtd: number;
+    billsCount: number;
+    openBillsCount: number;
+    purchaseOrdersCount: number;
+    canManage: boolean;
+    expenseAccounts: AccountOption[];
 }
 
-const vendorTypeLabels: Record<string, string> = {
+const VENDOR_TYPE_LABELS: Record<string, string> = {
     supplier: 'Supplier',
     contractor: 'Contractor',
     utility: 'Utility',
     government: 'Government',
     other: 'Other',
-};
-
-const vendorTypeColors: Record<string, string> = {
-    supplier: 'bg-status-info-bg text-status-info',
-    contractor: 'bg-primary/10 text-primary',
-    utility: 'bg-status-warning-bg text-status-warning',
-    government: 'bg-status-info-bg text-status-info',
-    other: 'bg-muted text-foreground',
-};
-
-const billStatusColors: Record<string, string> = {
-    draft: 'bg-muted text-foreground',
-    pending: 'bg-status-warning-bg text-status-warning',
-    approved: 'bg-status-info-bg text-status-info',
-    paid: 'bg-status-success-bg text-status-success',
-    overdue: 'bg-status-critical-bg text-status-critical',
-    cancelled: 'bg-muted text-muted-foreground',
-};
-
-const poStatusColors: Record<string, string> = {
-    draft: 'bg-muted text-foreground',
-    pending_approval: 'bg-status-warning-bg text-status-warning',
-    approved: 'bg-status-info-bg text-status-info',
-    sent: 'bg-primary/10 text-primary',
-    received: 'bg-status-success-bg text-status-success',
-    cancelled: 'bg-muted text-muted-foreground',
 };
 
 const formatDate = (date: string) =>
@@ -112,8 +113,32 @@ const formatDate = (date: string) =>
         year: 'numeric',
     });
 
-const formatStatus = (status: string) =>
-    status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+type VendorTab = 'details' | 'contacts' | 'bills' | 'purchase-orders';
+
+const TABS: { key: VendorTab; label: string; icon: typeof Building2 }[] = [
+    { key: 'details', label: 'Details', icon: FileText },
+    { key: 'contacts', label: 'Contacts', icon: Users },
+    { key: 'bills', label: 'Bills', icon: Receipt },
+    { key: 'purchase-orders', label: 'Purchase orders', icon: ShoppingCart },
+];
+
+const isVendorTab = (value: string | null): value is VendorTab =>
+    TABS.some((t) => t.key === value);
+
+function DetailRow({
+    label,
+    children,
+}: {
+    label: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div>
+            <dt className="text-caption">{label}</dt>
+            <dd className="mt-1 text-sm">{children}</dd>
+        </div>
+    );
+}
 
 export default function VendorsShow({
     vendor,
@@ -121,7 +146,31 @@ export default function VendorsShow({
     purchaseOrders,
     totalOutstanding,
     totalPaidYtd,
+    billsCount,
+    openBillsCount,
+    purchaseOrdersCount,
+    canManage,
+    expenseAccounts,
 }: Props) {
+    const [tab, setTab] = useState<VendorTab>(() => {
+        if (typeof window === 'undefined') return 'details';
+        const requested = new URLSearchParams(window.location.search).get(
+            'tab',
+        );
+        return isVendorTab(requested) ? requested : 'details';
+    });
+    const [editOpen, setEditOpen] = useState(false);
+
+    const selectTab = (key: string) => {
+        if (!isVendorTab(key)) return;
+        setTab(key);
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', key);
+            window.history.replaceState({}, '', url);
+        }
+    };
+
     const address = [
         vendor.address_line_1,
         vendor.address_line_2,
@@ -133,386 +182,449 @@ export default function VendorsShow({
         .join(', ');
 
     const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
         { title: 'Finance', href: '/finance' },
+        { title: 'Payables', href: '/finance/payables' },
         { title: 'Vendors', href: '/finance/vendors' },
         { title: vendor.name, href: `/finance/vendors/${vendor.id}` },
     ];
+
+    const billsHref = `/finance/bills?vendor_id=${vendor.id}`;
+    const posHref = `/finance/purchase-orders?vendor_id=${vendor.id}`;
+
+    const billColumns: EntityTableColumn<Bill>[] = [
+        {
+            key: 'bill_date',
+            label: 'Bill date',
+            width: '1fr',
+            cell: (b) => (
+                <span className="text-muted-foreground">
+                    {formatDate(b.bill_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'due_date',
+            label: 'Due',
+            width: '1fr',
+            cell: (b) => (
+                <span className="text-muted-foreground">
+                    {formatDate(b.due_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'total',
+            label: 'Total',
+            width: '1fr',
+            align: 'right',
+            cell: (b) => (
+                <span className="tabular-nums">
+                    {formatMoney(b.total_amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '130px',
+            cell: (b) => (
+                <StatusBadge
+                    status={b.status}
+                    className="rounded-[8px] font-semibold"
+                />
+            ),
+        },
+    ];
+
+    const poColumns: EntityTableColumn<PurchaseOrder>[] = [
+        {
+            key: 'order_date',
+            label: 'Order date',
+            width: '1fr',
+            cell: (p) => (
+                <span className="text-muted-foreground">
+                    {formatDate(p.order_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'total',
+            label: 'Total',
+            width: '1fr',
+            align: 'right',
+            cell: (p) => (
+                <span className="tabular-nums">
+                    {formatMoney(p.total_amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '150px',
+            cell: (p) => (
+                <StatusBadge
+                    status={p.status}
+                    className="rounded-[8px] font-semibold"
+                />
+            ),
+        },
+    ];
+
+    const contactColumns: EntityTableColumn<Contact>[] = [
+        {
+            key: 'email',
+            label: 'Email',
+            width: '1.6fr',
+            cell: (c) => (
+                <span className="truncate text-muted-foreground">
+                    {c.email || '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'phone',
+            label: 'Phone',
+            width: '1.2fr',
+            cell: (c) => (
+                <span className="truncate text-muted-foreground">
+                    {c.phone || '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'primary',
+            label: 'Primary',
+            width: '120px',
+            cell: (c) =>
+                c.is_primary ? (
+                    <StatusBadge
+                        variant="info"
+                        className="rounded-[8px] font-semibold"
+                    >
+                        Primary
+                    </StatusBadge>
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+    ];
+
+    const editableVendor: EditableVendor = {
+        ...vendor,
+        contacts: vendor.contacts,
+    };
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/finance/vendors"
+            icon={Building2}
+            title={vendor.name}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={vendor.is_active ? 'success' : 'neutral'}
+                >
+                    {vendor.is_active ? 'Active' : 'Inactive'}
+                </PageHeaderStatusChip>
+            }
+            subline={[
+                VENDOR_TYPE_LABELS[vendor.vendor_type] ?? vendor.vendor_type,
+                vendor.trading_name ? `Trading as ${vendor.trading_name}` : null,
+                vendor.payment_terms_days != null
+                    ? `${vendor.payment_terms_days}-day terms`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                <>
+                    <PageHeaderGlassButton
+                        icon={Receipt}
+                        onClick={() => router.get(billsHref)}
+                    >
+                        View bills
+                    </PageHeaderGlassButton>
+                    {canManage && (
+                        <PageHeaderPrimaryButton
+                            icon={Pencil}
+                            onClick={() => setEditOpen(true)}
+                        >
+                            Edit vendor
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Outstanding"
+                        tone="warning"
+                        href={billsHref}
+                        ariaLabel="View this vendor's unpaid bills"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(totalOutstanding)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {openBillsCount} bill
+                            {openBillsCount === 1 ? '' : 's'} still to pay
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Paid this year"
+                        tone="success"
+                        href={`${billsHref}&status=paid`}
+                        ariaLabel="View this vendor's paid bills"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(totalPaidYtd)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Since 1 January
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Bills"
+                        href={billsHref}
+                        ariaLabel="View this vendor's bills"
+                    >
+                        <PageHeaderMeterBig>{billsCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            All bills for this vendor
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Purchase orders"
+                        href={posHref}
+                        ariaLabel="View this vendor's purchase orders"
+                    >
+                        <PageHeaderMeterBig>
+                            {purchaseOrdersCount}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Raised with this vendor
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={vendor.name} />
 
             <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/vendors"
-                        title={
-                            <span className="flex flex-wrap items-center gap-3">
-                                {vendor.name}
-                                <Badge
-                                    variant={
-                                        vendor.is_active
-                                            ? 'default'
-                                            : 'secondary'
-                                    }
-                                    className={
-                                        vendor.is_active
-                                            ? 'bg-status-success-bg text-status-success'
-                                            : 'bg-muted text-muted-foreground'
-                                    }
-                                >
-                                    {vendor.is_active ? 'Active' : 'Inactive'}
-                                </Badge>
-                            </span>
-                        }
-                        description={
-                            vendor.trading_name
-                                ? `Trading as: ${vendor.trading_name}`
-                                : undefined
-                        }
-                        actions={
-                            <Button asChild>
-                                <Link
-                                    href={`/finance/vendors/${vendor.id}/edit`}
-                                >
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit
-                                </Link>
-                            </Button>
-                        }
+                hero={header}
+                tabs={
+                    <TierTwoTabs
+                        tabs={TABS.map((t) => ({
+                            key: t.key,
+                            label: t.label,
+                            icon: t.icon,
+                            count:
+                                t.key === 'contacts'
+                                    ? vendor.contacts.length
+                                    : t.key === 'bills'
+                                      ? billsCount
+                                      : t.key === 'purchase-orders'
+                                        ? purchaseOrdersCount
+                                        : undefined,
+                        }))}
+                        activeTab={tab}
+                        onTab={selectTab}
+                        testIdPrefix="vendor"
+                        ariaLabel="Vendor sections"
+                        renderLink={() => null}
                     />
                 }
             >
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    {/* Left column */}
-                    <div className="space-y-6 lg:col-span-2">
-                        {/* Vendor Details */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Vendor Details</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                                    <div>
-                                        <dt className="text-sm font-medium text-muted-foreground">
-                                            Type
-                                        </dt>
-                                        <dd className="mt-1">
-                                            <Badge
-                                                variant="secondary"
-                                                className={
-                                                    vendorTypeColors[
-                                                        vendor.vendor_type
-                                                    ] || ''
-                                                }
-                                            >
-                                                {vendorTypeLabels[
-                                                    vendor.vendor_type
-                                                ] || vendor.vendor_type}
-                                            </Badge>
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt className="text-sm font-medium text-muted-foreground">
-                                            GST Number
-                                        </dt>
-                                        <dd className="mt-1 text-sm">
-                                            {vendor.gst_number || '-'}
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt className="text-sm font-medium text-muted-foreground">
-                                            Email
-                                        </dt>
-                                        <dd className="mt-1 text-sm">
-                                            {vendor.email ? (
-                                                <a
-                                                    href={`mailto:${vendor.email}`}
-                                                    className="text-primary hover:underline"
-                                                >
-                                                    {vendor.email}
-                                                </a>
-                                            ) : (
-                                                '-'
-                                            )}
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt className="text-sm font-medium text-muted-foreground">
-                                            Phone
-                                        </dt>
-                                        <dd className="mt-1 text-sm">
-                                            {vendor.phone || '-'}
-                                        </dd>
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <dt className="text-sm font-medium text-muted-foreground">
-                                            Address
-                                        </dt>
-                                        <dd className="mt-1 text-sm">
-                                            {address || '-'}
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt className="text-sm font-medium text-muted-foreground">
-                                            Payment Terms
-                                        </dt>
-                                        <dd className="mt-1 text-sm">
-                                            {vendor.payment_terms_days != null
-                                                ? `${vendor.payment_terms_days} days`
-                                                : '-'}
-                                        </dd>
-                                    </div>
-                                    {vendor.notes && (
-                                        <div className="sm:col-span-2">
-                                            <dt className="text-sm font-medium text-muted-foreground">
-                                                Notes
-                                            </dt>
-                                            <dd className="mt-1 text-sm whitespace-pre-line">
-                                                {vendor.notes}
-                                            </dd>
-                                        </div>
+                {tab === 'details' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-section-title">
+                                Vendor details
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+                                <DetailRow label="Type">
+                                    {VENDOR_TYPE_LABELS[vendor.vendor_type] ??
+                                        vendor.vendor_type}
+                                </DetailRow>
+                                <DetailRow label="GST number">
+                                    {vendor.gst_number || '—'}
+                                </DetailRow>
+                                <DetailRow label="Email">
+                                    {vendor.email ? (
+                                        <a
+                                            href={`mailto:${vendor.email}`}
+                                            className="text-primary hover:underline"
+                                        >
+                                            {vendor.email}
+                                        </a>
+                                    ) : (
+                                        '—'
                                     )}
-                                </dl>
-                            </CardContent>
-                        </Card>
-
-                        {/* Contacts */}
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center gap-2">
-                                    <Users className="h-5 w-5 text-muted-foreground" />
-                                    <CardTitle>Contacts</CardTitle>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                {vendor.contacts.length === 0 ? (
-                                    <p className="py-4 text-center text-sm text-muted-foreground">
-                                        No contacts recorded.
-                                    </p>
-                                ) : (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>Role</TableHead>
-                                                <TableHead>Email</TableHead>
-                                                <TableHead>Phone</TableHead>
-                                                <TableHead></TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {vendor.contacts.map((contact) => (
-                                                <TableRow key={contact.id}>
-                                                    <TableCell className="font-medium">
-                                                        {contact.name}
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground">
-                                                        {contact.role || '-'}
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground">
-                                                        {contact.email || '-'}
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground">
-                                                        {contact.phone || '-'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {contact.is_primary && (
-                                                            <Badge className="bg-status-info-bg text-status-info">
-                                                                Primary
-                                                            </Badge>
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                </DetailRow>
+                                <DetailRow label="Phone">
+                                    {vendor.phone || '—'}
+                                </DetailRow>
+                                <DetailRow label="Address">
+                                    {address || '—'}
+                                </DetailRow>
+                                <DetailRow label="Bank account">
+                                    {vendor.bank_account_number || '—'}
+                                </DetailRow>
+                                <DetailRow label="Payment terms">
+                                    {vendor.payment_terms_days != null
+                                        ? `${vendor.payment_terms_days} days`
+                                        : '—'}
+                                </DetailRow>
+                                {vendor.notes && (
+                                    <div className="sm:col-span-2 lg:col-span-3">
+                                        <dt className="text-caption">Notes</dt>
+                                        <dd className="mt-1 text-sm whitespace-pre-line">
+                                            {vendor.notes}
+                                        </dd>
+                                    </div>
                                 )}
-                            </CardContent>
-                        </Card>
+                            </dl>
+                        </CardContent>
+                    </Card>
+                )}
 
-                        {/* Recent Bills */}
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center gap-2">
-                                    <FileText className="h-5 w-5 text-muted-foreground" />
-                                    <CardTitle>Recent Bills</CardTitle>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                {bills.length === 0 ? (
-                                    <p className="py-4 text-center text-sm text-muted-foreground">
-                                        No bills recorded.
-                                    </p>
-                                ) : (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>
-                                                    Bill Number
-                                                </TableHead>
-                                                <TableHead>Date</TableHead>
-                                                <TableHead>Due Date</TableHead>
-                                                <TableHead className="text-right">
-                                                    Amount
-                                                </TableHead>
-                                                <TableHead>Status</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {bills.map((bill) => (
-                                                <TableRow key={bill.id}>
-                                                    <TableCell>
-                                                        <Link
-                                                            href={`/finance/bills/${bill.id}`}
-                                                            className="font-medium text-primary hover:underline"
-                                                        >
-                                                            {bill.bill_number}
-                                                        </Link>
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground">
-                                                        {formatDate(
-                                                            bill.bill_date,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground">
-                                                        {formatDate(
-                                                            bill.due_date,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {formatMoney(
-                                                            bill.total_amount,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            variant="secondary"
-                                                            className={
-                                                                billStatusColors[
-                                                                    bill.status
-                                                                ] ||
-                                                                'bg-muted text-foreground'
-                                                            }
-                                                        >
-                                                            {formatStatus(
-                                                                bill.status,
-                                                            )}
-                                                        </Badge>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                )}
-                            </CardContent>
-                        </Card>
+                {tab === 'contacts' && (
+                    <>
+                        <ListCaption
+                            title="Contacts"
+                            caption={`${vendor.contacts.length} recorded`}
+                        />
+                        {vendor.contacts.length === 0 ? (
+                            <EmptyList
+                                icon={Users}
+                                itemName="contact"
+                                title="No contacts recorded"
+                                description="Add a named contact on the vendor if you deal with someone in particular."
+                            />
+                        ) : (
+                            <EntityTable
+                                rows={vendor.contacts}
+                                rowKey={(c) => c.id}
+                                identityLabel="Contact"
+                                identity={(c) => ({
+                                    icon: Users,
+                                    name: c.name,
+                                    subline: c.role || undefined,
+                                })}
+                                columns={contactColumns}
+                                actionsFor={() => []}
+                                minWidth={760}
+                            />
+                        )}
+                    </>
+                )}
 
-                        {/* Recent Purchase Orders */}
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center gap-2">
-                                    <ShoppingCart className="h-5 w-5 text-muted-foreground" />
-                                    <CardTitle>
-                                        Recent Purchase Orders
-                                    </CardTitle>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                {purchaseOrders.length === 0 ? (
-                                    <p className="py-4 text-center text-sm text-muted-foreground">
-                                        No purchase orders recorded.
-                                    </p>
-                                ) : (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>PO Number</TableHead>
-                                                <TableHead>Date</TableHead>
-                                                <TableHead className="text-right">
-                                                    Amount
-                                                </TableHead>
-                                                <TableHead>Status</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {purchaseOrders.map((po) => (
-                                                <TableRow key={po.id}>
-                                                    <TableCell>
-                                                        <Link
-                                                            href={`/finance/purchase-orders/${po.id}`}
-                                                            className="font-medium text-primary hover:underline"
-                                                        >
-                                                            {po.po_number}
-                                                        </Link>
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground">
-                                                        {formatDate(
-                                                            po.order_date,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {formatMoney(
-                                                            po.total_amount,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            variant="secondary"
-                                                            className={
-                                                                poStatusColors[
-                                                                    po.status
-                                                                ] ||
-                                                                'bg-muted text-foreground'
-                                                            }
-                                                        >
-                                                            {formatStatus(
-                                                                po.status,
-                                                            )}
-                                                        </Badge>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
+                {tab === 'bills' && (
+                    <>
+                        <ListCaption
+                            title="Recent bills"
+                            caption={`${bills.length} of ${billsCount} shown`}
+                            right={
+                                <Link
+                                    href={billsHref}
+                                    className="text-[12.5px] font-semibold text-primary hover:underline"
+                                >
+                                    See all bills
+                                </Link>
+                            }
+                        />
+                        {bills.length === 0 ? (
+                            <EmptyList
+                                icon={Receipt}
+                                itemName="bill"
+                                title="No bills for this vendor"
+                                description="Bills raised against this vendor will appear here."
+                            />
+                        ) : (
+                            <EntityTable
+                                rows={bills}
+                                rowKey={(b) => b.id}
+                                identityLabel="Bill"
+                                identity={(b) => ({
+                                    icon: Receipt,
+                                    name: b.bill_number,
+                                })}
+                                columns={billColumns}
+                                actionsFor={() => []}
+                                hrefFor={(b) => `/finance/bills/${b.id}`}
+                                onOpen={(b) =>
+                                    router.get(`/finance/bills/${b.id}`)
+                                }
+                                minWidth={820}
+                            />
+                        )}
+                    </>
+                )}
 
-                    {/* Right column - Financial Summary */}
-                    <div className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center gap-2">
-                                    <DollarSign className="h-5 w-5 text-muted-foreground" />
-                                    <CardTitle>Financial Summary</CardTitle>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-6">
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">
-                                        Total Outstanding
-                                    </p>
-                                    <p className="mt-1 text-2xl font-bold">
-                                        {formatMoney(totalOutstanding)}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">
-                                        Total Paid YTD
-                                    </p>
-                                    <p className="mt-1 text-2xl font-bold">
-                                        {formatMoney(totalPaidYtd)}
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </div>
+                {tab === 'purchase-orders' && (
+                    <>
+                        <ListCaption
+                            title="Recent purchase orders"
+                            caption={`${purchaseOrders.length} of ${purchaseOrdersCount} shown`}
+                            right={
+                                <Link
+                                    href={posHref}
+                                    className="text-[12.5px] font-semibold text-primary hover:underline"
+                                >
+                                    See all purchase orders
+                                </Link>
+                            }
+                        />
+                        {purchaseOrders.length === 0 ? (
+                            <EmptyList
+                                icon={ShoppingCart}
+                                itemName="purchase order"
+                                title="No purchase orders for this vendor"
+                                description="Purchase orders raised with this vendor will appear here."
+                            />
+                        ) : (
+                            <EntityTable
+                                rows={purchaseOrders}
+                                rowKey={(p) => p.id}
+                                identityLabel="Purchase order"
+                                identity={(p) => ({
+                                    icon: ShoppingCart,
+                                    name: p.po_number,
+                                })}
+                                columns={poColumns}
+                                actionsFor={() => []}
+                                hrefFor={(p) =>
+                                    `/finance/purchase-orders/${p.id}`
+                                }
+                                onOpen={(p) =>
+                                    router.get(
+                                        `/finance/purchase-orders/${p.id}`,
+                                    )
+                                }
+                                minWidth={760}
+                            />
+                        )}
+                    </>
+                )}
             </PageLayout>
+
+            {canManage && editOpen && (
+                <NewVendorDialog
+                    open
+                    vendor={editableVendor}
+                    onClose={() => setEditOpen(false)}
+                    expenseAccounts={expenseAccounts}
+                />
+            )}
         </AppLayout>
     );
 }

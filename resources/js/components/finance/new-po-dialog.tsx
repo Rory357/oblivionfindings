@@ -33,6 +33,29 @@ type LineForm = {
     gst_rate: string; // percentage: '15' standard, '0' zero-rated
 };
 
+/** A cost centre or funding stream the PO can be attributed to. */
+export type PoAttributionOption = { id: number; code: string; name: string };
+
+/** An existing draft purchase order to prefill the wizard with (edit mode). */
+export type EditablePurchaseOrderLine = {
+    description: string;
+    quantity: string | number;
+    unit_price: string | number;
+    account_id: number | string | null;
+    /** Backend stores a FRACTION (0.15); prefilled back to a percentage. */
+    gst_rate: string | number;
+};
+export type EditablePurchaseOrder = {
+    id: number;
+    vendor_id: number | string;
+    order_date: string;
+    expected_date: string | null;
+    notes: string | null;
+    cost_centre_id: number | string | null;
+    funding_stream_id: number | string | null;
+    lines: EditablePurchaseOrderLine[];
+};
+
 const emptyLine = (): LineForm => ({
     description: '',
     quantity: '1',
@@ -40,6 +63,19 @@ const emptyLine = (): LineForm => ({
     account_id: '',
     gst_rate: '15',
 });
+
+/** Map a stored line (gst_rate as a fraction) back into the form's percentage shape. */
+const lineFromPo = (l: EditablePurchaseOrderLine): LineForm => ({
+    description: l.description ?? '',
+    quantity: String(l.quantity ?? '1'),
+    unit_price: String(l.unit_price ?? ''),
+    account_id: l.account_id != null ? String(l.account_id) : '',
+    gst_rate: String(Math.round(Number(l.gst_rate ?? 0.15) * 100)),
+});
+
+// Radix SelectItem cannot take an empty-string value, so the "clear" row on the
+// optional attribution selects uses a sentinel that maps back to '' on change.
+const NO_ATTRIBUTION = '__none';
 
 const STEPS: readonly WizardStep[] = [
     {
@@ -71,22 +107,34 @@ const money = (n: number | string) =>
 const today = () => new Date().toISOString().split('T')[0];
 
 /**
- * New Purchase Order wizard — the multi-line PO as an Add-Client-grade stepper
+ * Purchase Order wizard — the multi-line PO as an Add-Client-grade stepper
  * modal (Details → Line items → Review). Mirrors the New Bill modal, but the GL
  * account is optional per line and the dates are order/expected. Posts a draft to
- * `finance.purchase-orders.store`, then redirects to the PO.
+ * `finance.purchase-orders.store` / PUTs `finance.purchase-orders.update`; it
+ * carries the cost centre and funding stream the retired routed Edit page set,
+ * so a PO created here can be attributed without a second trip.
  */
 export function NewPoDialog({
     open,
     onClose,
     vendors,
     accounts,
+    costCentres = [],
+    fundingStreams = [],
+    purchaseOrder,
 }: {
     open: boolean;
     onClose: () => void;
     vendors: VendorOption[];
     accounts: AccountOption[];
+    /** Active cost centres this PO can be attributed to (optional). */
+    costCentres?: PoAttributionOption[];
+    /** Active funding streams this PO can be attributed to (optional). */
+    fundingStreams?: PoAttributionOption[];
+    /** When provided, the wizard opens in EDIT mode (prefilled, PUTs the update). */
+    purchaseOrder?: EditablePurchaseOrder | null;
 }) {
+    const isEdit = !!purchaseOrder;
     const wizard = useWizard(STEPS.length);
     const { index, goTo, next, back, isFirst, isLast, reset } = wizard;
 
@@ -95,14 +143,40 @@ export function NewPoDialog({
         order_date: string;
         expected_date: string;
         notes: string;
+        cost_centre_id: string;
+        funding_stream_id: string;
         lines: LineForm[];
-    }>({
-        vendor_id: '',
-        order_date: today(),
-        expected_date: '',
-        notes: '',
-        lines: [emptyLine()],
-    });
+    }>(
+        purchaseOrder
+            ? {
+                  vendor_id: String(purchaseOrder.vendor_id ?? ''),
+                  order_date: String(purchaseOrder.order_date).slice(0, 10),
+                  expected_date: purchaseOrder.expected_date
+                      ? String(purchaseOrder.expected_date).slice(0, 10)
+                      : '',
+                  notes: purchaseOrder.notes ?? '',
+                  cost_centre_id:
+                      purchaseOrder.cost_centre_id != null
+                          ? String(purchaseOrder.cost_centre_id)
+                          : '',
+                  funding_stream_id:
+                      purchaseOrder.funding_stream_id != null
+                          ? String(purchaseOrder.funding_stream_id)
+                          : '',
+                  lines: purchaseOrder.lines.length
+                      ? purchaseOrder.lines.map(lineFromPo)
+                      : [emptyLine()],
+              }
+            : {
+                  vendor_id: '',
+                  order_date: today(),
+                  expected_date: '',
+                  notes: '',
+                  cost_centre_id: '',
+                  funding_stream_id: '',
+                  lines: [emptyLine()],
+              },
+    );
     const { data, setData, processing, errors } = form;
 
     const vendorOptions = vendors.map((v) => ({
@@ -113,6 +187,26 @@ export function NewPoDialog({
         value: String(a.id),
         label: `${a.code} · ${a.name}`,
     }));
+    const costCentreOptions = [
+        { value: NO_ATTRIBUTION, label: 'None' },
+        ...costCentres.map((c) => ({
+            value: String(c.id),
+            label: `${c.code} · ${c.name}`,
+        })),
+    ];
+    const fundingStreamOptions = [
+        { value: NO_ATTRIBUTION, label: 'None' },
+        ...fundingStreams.map((f) => ({
+            value: String(f.id),
+            label: `${f.code} · ${f.name}`,
+        })),
+    ];
+    const costCentreLabel = costCentres.find(
+        (c) => String(c.id) === data.cost_centre_id,
+    );
+    const fundingStreamLabel = fundingStreams.find(
+        (f) => String(f.id) === data.funding_stream_id,
+    );
     const gstOptions = [
         { value: '15', label: 'GST 15%' },
         { value: '0', label: 'Zero-rated 0%' },
@@ -162,11 +256,13 @@ export function NewPoDialog({
     };
 
     const submit = () => {
-        // Drop empty optional account_id so the nullable rule passes.
+        // Drop empty optional ids so the nullable rules pass.
         form.transform((d) => ({
             ...d,
             expected_date: d.expected_date || null,
             notes: d.notes || null,
+            cost_centre_id: d.cost_centre_id || null,
+            funding_stream_id: d.funding_stream_id || null,
             lines: d.lines.map((l) => ({
                 description: l.description,
                 quantity: l.quantity,
@@ -175,21 +271,30 @@ export function NewPoDialog({
                 account_id: l.account_id || null,
             })),
         }));
-        form.post('/finance/purchase-orders', {
+        const opts = {
             preserveScroll: true,
             onSuccess: () => close(),
             onError: () => goTo(0),
-        });
+        };
+        if (isEdit && purchaseOrder) {
+            form.put(`/finance/purchase-orders/${purchaseOrder.id}`, opts);
+        } else {
+            form.post('/finance/purchase-orders', opts);
+        }
     };
 
     return (
         <WizardShell
             open={open}
             onClose={close}
-            title="New purchase order"
-            description="Create a draft purchase order"
+            title={isEdit ? 'Edit purchase order' : 'New purchase order'}
+            description={
+                isEdit
+                    ? 'Update this draft purchase order'
+                    : 'Create a draft purchase order'
+            }
             railIcon={ClipboardList}
-            railTitle="New PO"
+            railTitle={isEdit ? 'Edit PO' : 'New PO'}
             railSub="Purchases"
             steps={STEPS}
             stepIndex={index}
@@ -246,7 +351,7 @@ export function NewPoDialog({
                                 processing || !detailsValid || !linesValid
                             }
                         >
-                            Create PO
+                            {isEdit ? 'Save changes' : 'Create PO'}
                         </Button>
                     )}
                 </>
@@ -299,6 +404,44 @@ export function NewPoDialog({
                                 }
                             />
                         </Field>
+                        {costCentres.length > 0 && (
+                            <Field
+                                label="Cost centre"
+                                hint="optional"
+                                error={errors.cost_centre_id}
+                            >
+                                <SelectInput
+                                    value={data.cost_centre_id}
+                                    onChange={(v) =>
+                                        setData(
+                                            'cost_centre_id',
+                                            v === NO_ATTRIBUTION ? '' : v,
+                                        )
+                                    }
+                                    placeholder="None"
+                                    options={costCentreOptions}
+                                />
+                            </Field>
+                        )}
+                        {fundingStreams.length > 0 && (
+                            <Field
+                                label="Funding stream"
+                                hint="optional"
+                                error={errors.funding_stream_id}
+                            >
+                                <SelectInput
+                                    value={data.funding_stream_id}
+                                    onChange={(v) =>
+                                        setData(
+                                            'funding_stream_id',
+                                            v === NO_ATTRIBUTION ? '' : v,
+                                        )
+                                    }
+                                    placeholder="None"
+                                    options={fundingStreamOptions}
+                                />
+                            </Field>
+                        )}
                         <Field
                             label="Notes"
                             span
@@ -482,8 +625,12 @@ export function NewPoDialog({
                 <div>
                     <StepHead
                         icon={ListChecks}
-                        title="Review & create"
-                        blurb="Creates a draft PO you can then approve + convert to a bill."
+                        title={isEdit ? 'Review & save' : 'Review & create'}
+                        blurb={
+                            isEdit
+                                ? 'Updates this draft PO.'
+                                : 'Creates a draft PO you can then approve + convert to a bill.'
+                        }
                     />
                     <ReviewCard icon={FileText} title="Purchase order">
                         <ReviewRow label="Vendor" value={vendorName} />
@@ -492,6 +639,18 @@ export function NewPoDialog({
                             <ReviewRow
                                 label="Expected"
                                 value={data.expected_date}
+                            />
+                        )}
+                        {costCentreLabel && (
+                            <ReviewRow
+                                label="Cost centre"
+                                value={`${costCentreLabel.code} · ${costCentreLabel.name}`}
+                            />
+                        )}
+                        {fundingStreamLabel && (
+                            <ReviewRow
+                                label="Funding stream"
+                                value={`${fundingStreamLabel.code} · ${fundingStreamLabel.name}`}
                             />
                         )}
                         <ReviewRow
@@ -510,7 +669,7 @@ export function NewPoDialog({
                     </ReviewCard>
                     {processing && (
                         <p className="mt-3 text-[13px] text-muted-foreground">
-                            Creating…
+                            {isEdit ? 'Saving…' : 'Creating…'}
                         </p>
                     )}
                 </div>

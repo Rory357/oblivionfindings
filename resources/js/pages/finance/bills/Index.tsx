@@ -1,48 +1,61 @@
 import {
+    FinanceSectionRail,
     NewBillDialog,
-    PayablesTabsFooter,
     formatMoney,
-    useRowContextMenu,
     type AccountOption,
-    type RowCtxItem,
     type SpendApprovalOption,
 } from '@/components/finance';
-import { FinanceSummaryCard } from '@/components/finance/summary-card';
-import { PageHero, PageLayout } from '@/components/page';
+import type {
+    BillAttributionOption,
+    BillPurchaseOrderOption,
+    EditableBill,
+} from '@/components/finance/new-bill-dialog';
+import {
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { StatusBadge } from '@/components/ui/status-badge';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
 import { PageProps, type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowDownToLine,
-    CalendarClock,
-    DollarSign,
+    Building2,
+    CalendarRange,
     Download,
     Eye,
     Pencil,
     Plus,
-    Search,
+    Receipt,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -58,6 +71,8 @@ interface BillLine {
     unit_price: string;
     gst_rate: string;
     account_id: number | null;
+    cost_centre_id: number | null;
+    funding_stream_id: number | null;
 }
 
 interface Bill {
@@ -73,6 +88,7 @@ interface Bill {
     status: string;
     notes: string | null;
     spend_approval_id: number | null;
+    purchase_order_id: number | null;
     lines: BillLine[];
 }
 
@@ -81,6 +97,7 @@ interface PaginatedBills {
     links: Array<{ url: string | null; label: string; active: boolean }>;
     current_page: number;
     last_page: number;
+    total: number;
 }
 
 interface Filters {
@@ -93,8 +110,13 @@ interface Filters {
 
 interface Summary {
     total_unpaid: number;
+    unpaid_count: number;
     total_overdue: number;
+    overdue_count: number;
     due_this_week: number;
+    due_this_week_count: number;
+    awaiting_total: number;
+    awaiting_count: number;
 }
 
 interface Props extends PageProps {
@@ -105,7 +127,29 @@ interface Props extends PageProps {
     canManage: boolean;
     accounts: AccountOption[];
     spendApprovals: SpendApprovalOption[];
+    purchaseOrders: BillPurchaseOrderOption[];
+    costCentres: BillAttributionOption[];
+    fundingStreams: BillAttributionOption[];
 }
+
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'All statuses' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'awaiting_approval', label: 'Awaiting approval' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'partially_paid', label: 'Partially paid' },
+    { value: 'paid', label: 'Paid' },
+    { value: 'cancelled', label: 'Cancelled' },
+];
+
+const STATUS_LABELS: Record<string, string> = {
+    draft: 'Draft',
+    awaiting_approval: 'Awaiting approval',
+    approved: 'Approved',
+    partially_paid: 'Partially paid',
+    paid: 'Paid',
+    cancelled: 'Cancelled',
+};
 
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', {
@@ -115,12 +159,13 @@ const formatDate = (date: string) =>
     });
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
+    { title: 'Payables', href: '/finance/payables' },
     { title: 'Bills', href: '/finance/bills' },
 ];
 
 export default function BillsIndex({
-    auth,
     bills,
     vendors,
     filters,
@@ -128,409 +173,444 @@ export default function BillsIndex({
     canManage,
     accounts,
     spendApprovals,
+    purchaseOrders,
+    costCentres,
+    fundingStreams,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
-    const [status, setStatus] = useState(filters.status ?? '');
-    const [vendorId, setVendorId] = useState(filters.vendor_id ?? '');
-    const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
-    const [dateTo, setDateTo] = useState(filters.date_to ?? '');
     const [newBillOpen, setNewBillOpen] = useState(false);
     const [editBill, setEditBill] = useState<Bill | null>(null);
+    const [rangeOpen, setRangeOpen] = useState(false);
+    const [range, setRange] = useState({
+        from: filters.date_from ?? '',
+        to: filters.date_to ?? '',
+    });
 
-    const applyFilters = () => {
-        const params: Record<string, string> = {};
-        if (search) params.search = search;
-        if (status) params.status = status;
-        if (vendorId) params.vendor_id = vendorId;
-        if (dateFrom) params.date_from = dateFrom;
-        if (dateTo) params.date_to = dateTo;
+    const rangeLabel =
+        filters.date_from && filters.date_to
+            ? `${formatDate(filters.date_from)} – ${formatDate(filters.date_to)}`
+            : filters.date_from
+              ? `From ${formatDate(filters.date_from)}`
+              : filters.date_to
+                ? `To ${formatDate(filters.date_to)}`
+                : 'Bill date';
 
-        router.get('/finance/bills', params, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
+    const apply = (next: Filters) =>
+        router.get(
+            '/finance/bills',
+            Object.fromEntries(
+                Object.entries({ ...filters, ...next }).filter(([, v]) => v),
+            ),
+            { preserveState: true, preserveScroll: true },
+        );
 
     const clearFilters = () => {
         setSearch('');
-        setStatus('');
-        setVendorId('');
-        setDateFrom('');
-        setDateTo('');
         router.get('/finance/bills', {}, { preserveState: true });
     };
 
     const hasFilters = Boolean(
-        search ||
-        (status && status !== 'all') ||
-        (vendorId && vendorId !== 'all') ||
-        dateFrom ||
-        dateTo,
+        filters.search ||
+            filters.status ||
+            filters.vendor_id ||
+            filters.date_from ||
+            filters.date_to,
     );
 
-    const isOverdue = (bill: Bill) => {
-        if (bill.status === 'paid' || bill.status === 'cancelled') return false;
-        return new Date(bill.due_date) < new Date();
-    };
+    const isOverdue = (bill: Bill) =>
+        bill.status !== 'paid' &&
+        bill.status !== 'cancelled' &&
+        new Date(bill.due_date) < new Date();
 
-    // Right-click row menu — mirrors the row's existing inline actions (Open first).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (bill: Bill): RowCtxItem[] => {
-        const items: RowCtxItem[] = [
+    const ctx = useEntityContextMenu<Bill>();
+
+    const menuFor = (bill: Bill): MenuItem[] =>
+        compactMenu([
             {
-                kind: 'item',
-                label: 'Open',
+                label: 'Open bill',
                 icon: Eye,
-                onSelect: () => router.get(`/finance/bills/${bill.id}`),
+                onClick: () => router.get(`/finance/bills/${bill.id}`),
             },
-        ];
-        if (canManage && bill.status === 'draft') {
-            items.push({
-                kind: 'item',
-                label: 'Edit',
-                icon: Pencil,
-                onSelect: () => setEditBill(bill),
-            });
-        }
-        return items;
-    };
+            canManage && bill.status === 'draft'
+                ? {
+                      label: 'Edit bill',
+                      icon: Pencil,
+                      onClick: () => setEditBill(bill),
+                  }
+                : false,
+            bill.vendor
+                ? {
+                      label: 'Open vendor',
+                      icon: Building2,
+                      onClick: () =>
+                          router.get(`/finance/vendors/${bill.vendor?.id}`),
+                  }
+                : false,
+        ]);
+
+    const columns: EntityTableColumn<Bill>[] = [
+        {
+            key: 'vendor',
+            label: 'Vendor',
+            width: '1.5fr',
+            cell: (b) => (
+                <span className="truncate">{b.vendor?.name ?? '—'}</span>
+            ),
+        },
+        {
+            key: 'bill_date',
+            label: 'Bill date',
+            width: '1.1fr',
+            cell: (b) => (
+                <span className="text-muted-foreground">
+                    {formatDate(b.bill_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'due_date',
+            label: 'Due',
+            width: '1.3fr',
+            cell: (b) =>
+                isOverdue(b) ? (
+                    <EntityStatusChip variant="critical" icon={AlertTriangle}>
+                        {formatDate(b.due_date)}
+                    </EntityStatusChip>
+                ) : (
+                    <span className="text-muted-foreground">
+                        {formatDate(b.due_date)}
+                    </span>
+                ),
+        },
+        {
+            key: 'total',
+            label: 'Total',
+            width: '1.1fr',
+            align: 'right',
+            cell: (b) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(b.total_amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'paid',
+            label: 'Paid',
+            width: '1.1fr',
+            align: 'right',
+            cell: (b) => (
+                <span className="tabular-nums text-muted-foreground">
+                    {formatMoney(b.amount_paid)}
+                </span>
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '160px',
+            cell: (b) => (
+                <StatusBadge
+                    status={b.status}
+                    label={STATUS_LABELS[b.status]}
+                    className="rounded-[8px] font-semibold"
+                />
+            ),
+        },
+    ];
+
+    const exportUrl = `/finance/bills/export?${new URLSearchParams(
+        Object.entries({
+            status: filters.status ?? '',
+            vendor_id: filters.vendor_id ?? '',
+            search: filters.search ?? '',
+            date_from: filters.date_from ?? '',
+            date_to: filters.date_to ?? '',
+        }).filter(([, v]) => v),
+    ).toString()}`;
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={Receipt}
+            title="Bills"
+            titleChip={
+                summary.overdue_count > 0 ? (
+                    <PageHeaderStatusChip variant="critical">
+                        {summary.overdue_count} overdue
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="success">
+                        Nothing overdue
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={`Accounts payable · ${bills.total} bills · ${formatMoney(summary.total_unpaid)} unpaid`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') apply({ search });
+                        }}
+                        placeholder="Search bill number or vendor reference…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={() => {
+                            window.location.href = exportUrl;
+                        }}
+                    >
+                        Export CSV
+                    </PageHeaderGlassButton>
+                    {canManage && (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setNewBillOpen(true)}
+                        >
+                            New bill
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Unpaid"
+                        href="/finance/bills?status=approved"
+                        ariaLabel="View unpaid bills"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.total_unpaid)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {summary.unpaid_count} bill
+                            {summary.unpaid_count === 1 ? '' : 's'} approved and
+                            owing
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Overdue"
+                        tone="critical"
+                        href="/finance/bills?status=approved"
+                        ariaLabel="View overdue bills"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.total_overdue)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {summary.overdue_count} past their due date
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Due this week"
+                        tone="warning"
+                        href="/finance/bills?status=approved"
+                        ariaLabel="View bills due this week"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.due_this_week)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {summary.due_this_week_count} due in the next 7 days
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Awaiting approval"
+                        tone="warning"
+                        href="/finance/bills?status=awaiting_approval"
+                        ariaLabel="View bills awaiting approval"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.awaiting_count}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {formatMoney(summary.awaiting_total)} in drafts and
+                            approvals
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={filters.status || 'all'}
+                        options={STATUS_OPTIONS}
+                        onChange={(value) =>
+                            apply({ status: value === 'all' ? '' : value })
+                        }
+                    />
+                    <PageHeaderFilterSelect
+                        label="Vendor"
+                        value={filters.vendor_id || 'all'}
+                        options={[
+                            { value: 'all', label: 'All vendors' },
+                            ...vendors.map((v) => ({
+                                value: String(v.id),
+                                label: v.name,
+                            })),
+                        ]}
+                        onChange={(value) =>
+                            apply({ vendor_id: value === 'all' ? '' : value })
+                        }
+                    />
+                    <Popover open={rangeOpen} onOpenChange={setRangeOpen}>
+                        <PopoverTrigger asChild>
+                            <PageHeaderFilterButton
+                                icon={CalendarRange}
+                                active={Boolean(
+                                    filters.date_from || filters.date_to,
+                                )}
+                                aria-label="Filter by bill date"
+                            >
+                                {rangeLabel}
+                            </PageHeaderFilterButton>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-64">
+                            <form
+                                className="flex flex-col gap-3"
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    setRangeOpen(false);
+                                    apply({
+                                        date_from: range.from,
+                                        date_to: range.to,
+                                    });
+                                }}
+                            >
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="bills-date-from">
+                                        From
+                                    </Label>
+                                    <Input
+                                        id="bills-date-from"
+                                        type="date"
+                                        value={range.from}
+                                        onChange={(e) =>
+                                            setRange((r) => ({
+                                                ...r,
+                                                from: e.target.value,
+                                            }))
+                                        }
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="bills-date-to">To</Label>
+                                    <Input
+                                        id="bills-date-to"
+                                        type="date"
+                                        value={range.to}
+                                        onChange={(e) =>
+                                            setRange((r) => ({
+                                                ...r,
+                                                to: e.target.value,
+                                            }))
+                                        }
+                                    />
+                                </div>
+                                <div className="flex justify-between gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setRange({ from: '', to: '' });
+                                            setRangeOpen(false);
+                                            apply({
+                                                date_from: '',
+                                                date_to: '',
+                                            });
+                                        }}
+                                    >
+                                        Clear
+                                    </Button>
+                                    <Button type="submit" size="sm">
+                                        Show these dates
+                                    </Button>
+                                </div>
+                            </form>
+                        </PopoverContent>
+                    </Popover>
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
-        <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Bills" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={ArrowDownToLine}
-                        title="Bills"
-                        description="Manage accounts payable"
-                        stats={[
-                            {
-                                label: 'Total unpaid',
-                                value: formatMoney(summary.total_unpaid),
-                            },
-                            {
-                                label: 'Overdue',
-                                value: formatMoney(summary.total_overdue),
-                            },
-                            {
-                                label: 'Due this week',
-                                value: formatMoney(summary.due_this_week),
-                            },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button size="sm" variant="outline" asChild>
-                                    <a
-                                        href={`/finance/bills/export?${new URLSearchParams(Object.entries({ status, vendor_id: vendorId, search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}
-                                    >
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Export CSV
-                                    </a>
-                                </Button>
-                                {canManage && (
+            <PageLayout hero={header}>
+                <ListCaption
+                    title="Bills"
+                    caption={`${bills.data.length} of ${bills.total} shown`}
+                />
+
+                {bills.data.length === 0 ? (
+                    hasFilters ? (
+                        <EmptySearch
+                            onClear={clearFilters}
+                            title="No bills match your filters"
+                        />
+                    ) : (
+                        <EmptyList
+                            icon={Receipt}
+                            itemName="bill"
+                            title="No bills yet"
+                            description="Record your first supplier bill to get started."
+                            action={
+                                canManage ? (
                                     <Button
                                         size="sm"
                                         onClick={() => setNewBillOpen(true)}
                                     >
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        New Bill
+                                        New bill
                                     </Button>
-                                )}
-                            </div>
-                        }
-                        footer={<PayablesTabsFooter active="bills" />}
-                    />
-                }
-            >
-                {/* KPI Summary Cards */}
-                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <FinanceSummaryCard
-                        icon={DollarSign}
-                        tone="info"
-                        label="Total Unpaid"
-                        value={formatMoney(summary.total_unpaid)}
-                    />
-                    <FinanceSummaryCard
-                        icon={AlertTriangle}
-                        tone="critical"
-                        label="Overdue"
-                        value={formatMoney(summary.total_overdue)}
-                    />
-                    <FinanceSummaryCard
-                        icon={CalendarClock}
-                        tone="warning"
-                        label="Due This Week"
-                        value={formatMoney(summary.due_this_week)}
-                    />
-                </div>
-
-                {/* Filters */}
-                <Card className="mb-6">
-                    <CardContent className="pt-6">
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-                            <div className="relative">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search bill # or vendor ref..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={(e) =>
-                                        e.key === 'Enter' && applyFilters()
-                                    }
-                                    className="pl-9"
-                                />
-                            </div>
-                            <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger aria-label="Filter by status">
-                                    <SelectValue placeholder="All Statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Statuses
-                                    </SelectItem>
-                                    <SelectItem value="draft">Draft</SelectItem>
-                                    <SelectItem value="awaiting_approval">
-                                        Awaiting Approval
-                                    </SelectItem>
-                                    <SelectItem value="approved">
-                                        Approved
-                                    </SelectItem>
-                                    <SelectItem value="partially_paid">
-                                        Partially Paid
-                                    </SelectItem>
-                                    <SelectItem value="paid">Paid</SelectItem>
-                                    <SelectItem value="cancelled">
-                                        Cancelled
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={vendorId}
-                                onValueChange={setVendorId}
-                            >
-                                <SelectTrigger aria-label="Filter by vendor">
-                                    <SelectValue placeholder="All Vendors" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Vendors
-                                    </SelectItem>
-                                    {vendors.map((v) => (
-                                        <SelectItem
-                                            key={v.id}
-                                            value={String(v.id)}
-                                        >
-                                            {v.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <Input
-                                type="date"
-                                value={dateFrom}
-                                onChange={(e) => setDateFrom(e.target.value)}
-                                placeholder="From"
-                            />
-                            <div className="flex gap-2">
-                                <Input
-                                    type="date"
-                                    value={dateTo}
-                                    onChange={(e) => setDateTo(e.target.value)}
-                                    placeholder="To"
-                                />
-                                <Button
-                                    onClick={applyFilters}
-                                    variant="secondary"
-                                    className="shrink-0"
-                                >
-                                    Filter
-                                </Button>
-                                <Button
-                                    onClick={clearFilters}
-                                    variant="ghost"
-                                    className="shrink-0"
-                                >
-                                    Clear
-                                </Button>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Table */}
-                <Card>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Bill #</TableHead>
-                                <TableHead>Vendor Ref</TableHead>
-                                <TableHead>Vendor</TableHead>
-                                <TableHead>Bill Date</TableHead>
-                                <TableHead>Due Date</TableHead>
-                                <TableHead className="text-right">
-                                    Total
-                                </TableHead>
-                                <TableHead className="text-right">
-                                    Paid
-                                </TableHead>
-                                <TableHead>Status</TableHead>
-                                {canManage && (
-                                    <TableHead className="text-right">
-                                        Actions
-                                    </TableHead>
-                                )}
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {bills.data.length === 0 ? (
-                                <TableRow>
-                                    <TableCell
-                                        colSpan={canManage ? 9 : 8}
-                                        className="p-0"
-                                    >
-                                        {hasFilters ? (
-                                            <EmptySearch
-                                                onClear={clearFilters}
-                                                title="No bills match your filters"
-                                                className="border-0"
-                                            />
-                                        ) : (
-                                            <EmptyList
-                                                icon={ArrowDownToLine}
-                                                itemName="bill"
-                                                title="No bills yet"
-                                                description="Record your first supplier bill to get started."
-                                                className="border-0"
-                                                action={
-                                                    canManage ? (
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                setNewBillOpen(
-                                                                    true,
-                                                                )
-                                                            }
-                                                        >
-                                                            New bill
-                                                        </Button>
-                                                    ) : undefined
-                                                }
-                                            />
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                bills.data.map((bill) => (
-                                    <TableRow
-                                        key={bill.id}
-                                        className={cn(
-                                            'cursor-pointer hover:bg-muted/50',
-                                            isOverdue(bill) &&
-                                                'bg-status-critical-bg hover:bg-status-critical-bg dark:hover:bg-status-critical',
-                                        )}
-                                        onClick={() =>
-                                            router.get(
-                                                `/finance/bills/${bill.id}`,
-                                            )
-                                        }
-                                        onContextMenu={rowMenu.open(
-                                            rowMenuItems(bill),
-                                        )}
-                                    >
-                                        <TableCell className="font-medium">
-                                            <Link
-                                                href={`/finance/bills/${bill.id}`}
-                                                className="text-primary hover:underline"
-                                            >
-                                                {bill.bill_number}
-                                            </Link>
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">
-                                            {bill.vendor_reference ?? '-'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {bill.vendor?.name ?? '-'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {formatDate(bill.bill_date)}
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className="inline-flex items-center gap-1">
-                                                {isOverdue(bill) && (
-                                                    <AlertTriangle className="h-3.5 w-3.5 text-status-critical" />
-                                                )}
-                                                <span
-                                                    className={cn(
-                                                        isOverdue(bill) &&
-                                                            'font-medium text-status-critical dark:text-status-critical',
-                                                    )}
-                                                >
-                                                    {formatDate(bill.due_date)}
-                                                </span>
-                                            </span>
-                                        </TableCell>
-                                        <TableCell className="text-right font-medium">
-                                            {formatMoney(bill.total_amount)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {formatMoney(bill.amount_paid)}
-                                        </TableCell>
-                                        <TableCell>
-                                            <StatusBadge status={bill.status} />
-                                        </TableCell>
-                                        {canManage && (
-                                            <TableCell className="text-right">
-                                                {bill.status === 'draft' && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setEditBill(bill);
-                                                        }}
-                                                    >
-                                                        Edit
-                                                    </Button>
-                                                )}
-                                            </TableCell>
-                                        )}
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-
-                    {/* Pagination */}
-                    {bills.last_page > 1 && (
-                        <div className="flex items-center justify-center gap-1 border-t p-4">
-                            {bills.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'ghost'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() =>
-                                        link.url &&
-                                        router.get(
-                                            link.url,
-                                            {},
-                                            { preserveState: true },
-                                        )
-                                    }
-                                    dangerouslySetInnerHTML={{
-                                        __html: link.label,
-                                    }}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </Card>
-
-                {rowMenu.element}
+                                ) : undefined
+                            }
+                        />
+                    )
+                ) : (
+                    <>
+                        <EntityTable
+                            rows={bills.data}
+                            rowKey={(b) => b.id}
+                            identityLabel="Bill"
+                            identity={(b) => ({
+                                icon: Receipt,
+                                name: b.bill_number,
+                                subline: b.vendor_reference
+                                    ? `Ref ${b.vendor_reference}`
+                                    : undefined,
+                            })}
+                            columns={columns}
+                            actionsFor={menuFor}
+                            hrefFor={(b) => `/finance/bills/${b.id}`}
+                            onOpen={(b) => router.get(`/finance/bills/${b.id}`)}
+                            onRowContextMenu={ctx.open}
+                            mutedFor={(b) => b.status === 'cancelled'}
+                            minWidth={1180}
+                        />
+                        <LaravelPagination
+                            links={bills.links}
+                            lastPage={bills.last_page}
+                        />
+                    </>
+                )}
             </PageLayout>
+
+            {ctx.ctx && (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Receipt}
+                    title={ctx.ctx.record.bill_number}
+                    items={menuFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            )}
 
             {canManage && (
                 <NewBillDialog
@@ -539,6 +619,9 @@ export default function BillsIndex({
                     vendors={vendors}
                     accounts={accounts}
                     spendApprovals={spendApprovals}
+                    purchaseOrders={purchaseOrders}
+                    costCentres={costCentres}
+                    fundingStreams={fundingStreams}
                 />
             )}
 
@@ -546,11 +629,14 @@ export default function BillsIndex({
                 <NewBillDialog
                     key={editBill.id}
                     open
-                    bill={editBill}
+                    bill={editBill as unknown as EditableBill}
                     onClose={() => setEditBill(null)}
                     vendors={vendors}
                     accounts={accounts}
                     spendApprovals={spendApprovals}
+                    purchaseOrders={purchaseOrders}
+                    costCentres={costCentres}
+                    fundingStreams={fundingStreams}
                 />
             )}
         </AppLayout>

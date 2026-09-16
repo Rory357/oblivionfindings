@@ -1,37 +1,46 @@
 import {
+    FinanceSectionRail,
     NewPoDialog,
-    PayablesTabsFooter,
     formatMoney,
-    useRowContextMenu,
     type AccountOption,
-    type RowCtxItem,
 } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
+import type { PoAttributionOption } from '@/components/finance/new-po-dialog';
+import {
+    EntityContextMenu,
+    EntityTable,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Download, Eye, Plus, ShoppingCart } from 'lucide-react';
+import { Head, router, usePage } from '@inertiajs/react';
+import {
+    Building2,
+    Download,
+    Eye,
+    Plus,
+    Receipt,
+    ShoppingCart,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type Vendor = { id: number; name: string };
@@ -46,21 +55,81 @@ type PurchaseOrder = {
     status: string;
 };
 
-type PaginationLink = { url: string | null; label: string; active: boolean };
+type Paginated<T> = {
+    data: T[];
+    links: { url: string | null; label: string; active: boolean }[];
+    current_page: number;
+    last_page: number;
+    total: number;
+};
+
+type Summary = {
+    total: number;
+    draft: number;
+    approved: number;
+    open_value: number;
+};
+
+type PoIndexProps = {
+    purchaseOrders: Paginated<PurchaseOrder>;
+    vendors: Vendor[];
+    filters: { status: string; vendor_id: string; search: string };
+    summary: Summary;
+    canManage: boolean;
+    accounts: AccountOption[];
+    costCentres: PoAttributionOption[];
+    fundingStreams: PoAttributionOption[];
+};
+
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'All statuses' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'sent', label: 'Sent' },
+    { value: 'partially_received', label: 'Partially received' },
+    { value: 'received', label: 'Received' },
+    { value: 'cancelled', label: 'Cancelled' },
+];
+
+const STATUS_LABELS: Record<string, string> = {
+    draft: 'Draft',
+    approved: 'Approved',
+    sent: 'Sent',
+    partially_received: 'Partially received',
+    received: 'Received',
+    cancelled: 'Cancelled',
+};
+
+const formatDate = (date: string | null) =>
+    date
+        ? new Date(date).toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          })
+        : '—';
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
-    { title: 'Purchase Orders', href: '/finance/purchase-orders' },
+    { title: 'Payables', href: '/finance/payables' },
+    { title: 'Purchase orders', href: '/finance/purchase-orders' },
 ];
 
 export default function PurchaseOrderIndex() {
-    const { purchaseOrders, vendors, filters, canManage, accounts } = usePage()
-        .props as any;
-    const [newPoOpen, setNewPoOpen] = useState(false);
+    const {
+        purchaseOrders,
+        vendors,
+        filters,
+        summary,
+        canManage,
+        accounts,
+        costCentres,
+        fundingStreams,
+    } = usePage().props as unknown as PoIndexProps;
 
-    const rows: PurchaseOrder[] = purchaseOrders?.data ?? [];
-    const vendorList: Vendor[] = vendors ?? [];
-    const accountList: AccountOption[] = accounts ?? [];
+    const [newPoOpen, setNewPoOpen] = useState(false);
+    const [search, setSearch] = useState(filters?.search ?? '');
 
     const current = {
         status: filters?.status ?? '',
@@ -68,286 +137,313 @@ export default function PurchaseOrderIndex() {
         search: filters?.search ?? '',
     };
 
-    function apply(next: Record<string, string>) {
+    const apply = (next: Record<string, string>) =>
         router.get(
             '/finance/purchase-orders',
             { ...current, ...next },
             { preserveState: true, preserveScroll: true },
         );
-    }
 
-    function clearFilters() {
+    const clearFilters = () => {
+        setSearch('');
         router.get(
             '/finance/purchase-orders',
             {},
             { preserveState: true, preserveScroll: true },
         );
-    }
+    };
 
     const hasFilters = Boolean(
         current.search || current.status || current.vendor_id,
     );
 
-    // Right-click row menu — mirrors the row's existing inline action (the PO-number link to the show route).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (po: PurchaseOrder): RowCtxItem[] => [
+    const ctx = useEntityContextMenu<PurchaseOrder>();
+
+    const menuFor = (po: PurchaseOrder): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Open purchase order',
+                icon: Eye,
+                onClick: () =>
+                    router.get(`/finance/purchase-orders/${po.id}`),
+            },
+            po.vendor
+                ? {
+                      label: 'Open vendor',
+                      icon: Building2,
+                      onClick: () =>
+                          router.get(`/finance/vendors/${po.vendor?.id}`),
+                  }
+                : false,
+        ]);
+
+    const columns: EntityTableColumn<PurchaseOrder>[] = [
         {
-            kind: 'item',
-            label: 'Open',
-            icon: Eye,
-            onSelect: () => router.get(`/finance/purchase-orders/${po.id}`),
+            key: 'vendor',
+            label: 'Vendor',
+            width: '1.6fr',
+            cell: (po) => (
+                <span className="truncate">{po.vendor?.name ?? '—'}</span>
+            ),
+        },
+        {
+            key: 'order_date',
+            label: 'Ordered',
+            width: '1.1fr',
+            cell: (po) => (
+                <span className="text-muted-foreground">
+                    {formatDate(po.order_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'expected_date',
+            label: 'Expected',
+            width: '1.1fr',
+            cell: (po) => (
+                <span className="text-muted-foreground">
+                    {formatDate(po.expected_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'total',
+            label: 'Total',
+            width: '1.1fr',
+            align: 'right',
+            cell: (po) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(po.total_amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '150px',
+            cell: (po) => (
+                <StatusBadge
+                    status={po.status}
+                    label={STATUS_LABELS[po.status]}
+                    className="rounded-[8px] font-semibold"
+                />
+            ),
         },
     ];
 
+    const exportUrl = `/finance/purchase-orders/export?${new URLSearchParams(
+        Object.entries({
+            status: current.status,
+            vendor_id: current.vendor_id,
+            search: current.search,
+        }).filter(([, v]) => v),
+    ).toString()}`;
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={ShoppingCart}
+            title="Purchase orders"
+            titleChip={
+                <PageHeaderStatusChip variant="warning">
+                    {summary.draft} draft
+                </PageHeaderStatusChip>
+            }
+            subline={`Accounts payable · ${summary.total} purchase orders · ${formatMoney(summary.open_value)} still open`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') apply({ search });
+                        }}
+                        placeholder="Search purchase orders by number…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={() => {
+                            window.location.href = exportUrl;
+                        }}
+                    >
+                        Export CSV
+                    </PageHeaderGlassButton>
+                    {canManage && (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setNewPoOpen(true)}
+                        >
+                            New purchase order
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="All purchase orders"
+                        href="/finance/purchase-orders"
+                        ariaLabel="View all purchase orders"
+                    >
+                        <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Raised across every vendor
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Draft"
+                        tone="warning"
+                        href="/finance/purchase-orders?status=draft"
+                        ariaLabel="View draft purchase orders"
+                    >
+                        <PageHeaderMeterBig>{summary.draft}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Waiting to be approved
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Approved"
+                        tone="success"
+                        href="/finance/purchase-orders?status=approved"
+                        ariaLabel="View approved purchase orders"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.approved}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Ready to receive or bill
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Open value"
+                        href="/finance/purchase-orders?status=approved"
+                        ariaLabel="View open purchase-order value"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.open_value)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Not yet fully received
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={current.status || 'all'}
+                        options={STATUS_OPTIONS}
+                        onChange={(value) =>
+                            apply({ status: value === 'all' ? '' : value })
+                        }
+                    />
+                    <PageHeaderFilterSelect
+                        label="Vendor"
+                        value={
+                            current.vendor_id ? String(current.vendor_id) : 'all'
+                        }
+                        options={[
+                            { value: 'all', label: 'All vendors' },
+                            ...vendors.map((v) => ({
+                                value: String(v.id),
+                                label: v.name,
+                            })),
+                        ]}
+                        onChange={(value) =>
+                            apply({ vendor_id: value === 'all' ? '' : value })
+                        }
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Purchase Orders" />
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={ShoppingCart}
-                        title="Purchase Orders"
-                        description="Manage purchase orders and convert them to bills."
-                        stats={[
-                            {
-                                label: 'Total',
-                                value: purchaseOrders?.total ?? rows.length,
-                            },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button size="sm" variant="outline" asChild>
-                                    <a
-                                        href={`/finance/purchase-orders/export?${new URLSearchParams(Object.entries({ status: current.status, vendor_id: current.vendor_id, search: current.search }).filter(([, v]) => v)).toString()}`}
-                                    >
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Export CSV
-                                    </a>
-                                </Button>
-                                {canManage && (
+            <Head title="Purchase orders" />
+
+            <PageLayout hero={header}>
+                <ListCaption
+                    title="Purchase orders"
+                    caption={`${purchaseOrders.data.length} of ${purchaseOrders.total} shown`}
+                />
+
+                {purchaseOrders.data.length === 0 ? (
+                    hasFilters ? (
+                        <EmptySearch
+                            onClear={clearFilters}
+                            title="No purchase orders match your filters"
+                        />
+                    ) : (
+                        <EmptyList
+                            icon={ShoppingCart}
+                            itemName="purchase order"
+                            title="No purchase orders yet"
+                            description="Create your first purchase order to get started."
+                            action={
+                                canManage ? (
                                     <Button
                                         size="sm"
                                         onClick={() => setNewPoOpen(true)}
                                     >
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        New Purchase Order
+                                        New purchase order
                                     </Button>
-                                )}
-                            </div>
-                        }
-                        footer={<PayablesTabsFooter active="purchase-orders" />}
-                    />
-                }
-            >
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Filters</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                        <div className="space-y-1">
-                            <Label>Status</Label>
-                            <Select
-                                value={current.status || 'all'}
-                                onValueChange={(v) =>
-                                    apply({ status: v === 'all' ? '' : v })
-                                }
-                            >
-                                <SelectTrigger aria-label="Filter by status">
-                                    <SelectValue placeholder="All statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All</SelectItem>
-                                    <SelectItem value="draft">Draft</SelectItem>
-                                    <SelectItem value="approved">
-                                        Approved
-                                    </SelectItem>
-                                    <SelectItem value="sent">Sent</SelectItem>
-                                    <SelectItem value="partially_received">
-                                        Partially Received
-                                    </SelectItem>
-                                    <SelectItem value="received">
-                                        Received
-                                    </SelectItem>
-                                    <SelectItem value="cancelled">
-                                        Cancelled
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-1">
-                            <Label>Vendor</Label>
-                            <Select
-                                value={
-                                    current.vendor_id
-                                        ? String(current.vendor_id)
-                                        : 'all'
-                                }
-                                onValueChange={(v) =>
-                                    apply({ vendor_id: v === 'all' ? '' : v })
-                                }
-                            >
-                                <SelectTrigger aria-label="Filter by vendor">
-                                    <SelectValue placeholder="All vendors" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All</SelectItem>
-                                    {vendorList.map((v) => (
-                                        <SelectItem
-                                            key={v.id}
-                                            value={String(v.id)}
-                                        >
-                                            {v.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-1">
-                            <Label>Search</Label>
-                            <Input
-                                value={current.search}
-                                placeholder="PO number..."
-                                onChange={(e) =>
-                                    apply({ search: e.target.value })
-                                }
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>PO Number</TableHead>
-                                    <TableHead>Vendor</TableHead>
-                                    <TableHead>Order Date</TableHead>
-                                    <TableHead>Expected Date</TableHead>
-                                    <TableHead className="text-right">
-                                        Total
-                                    </TableHead>
-                                    <TableHead>Status</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {rows.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="p-0">
-                                            {hasFilters ? (
-                                                <EmptySearch
-                                                    onClear={clearFilters}
-                                                    title="No purchase orders match your filters"
-                                                    className="border-0"
-                                                />
-                                            ) : (
-                                                <EmptyList
-                                                    icon={ShoppingCart}
-                                                    itemName="purchase order"
-                                                    title="No purchase orders yet"
-                                                    description="Create your first purchase order to get started."
-                                                    className="border-0"
-                                                    action={
-                                                        canManage ? (
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    setNewPoOpen(
-                                                                        true,
-                                                                    )
-                                                                }
-                                                            >
-                                                                New purchase
-                                                                order
-                                                            </Button>
-                                                        ) : undefined
-                                                    }
-                                                />
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    rows.map((po) => (
-                                        <TableRow
-                                            key={po.id}
-                                            onContextMenu={rowMenu.open(
-                                                rowMenuItems(po),
-                                            )}
-                                        >
-                                            <TableCell>
-                                                <Link
-                                                    href={`/finance/purchase-orders/${po.id}`}
-                                                    className="font-medium text-primary hover:underline"
-                                                >
-                                                    {po.po_number}
-                                                </Link>
-                                            </TableCell>
-                                            <TableCell>
-                                                {po.vendor?.name ?? '-'}
-                                            </TableCell>
-                                            <TableCell>
-                                                {po.order_date}
-                                            </TableCell>
-                                            <TableCell>
-                                                {po.expected_date ?? '-'}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {formatMoney(po.total_amount)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <StatusBadge
-                                                    status={po.status}
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-
-                {purchaseOrders?.links ? (
-                    <div className="flex flex-wrap gap-2">
-                        {purchaseOrders.links.map(
-                            (l: PaginationLink, idx: number) => (
-                                <Button
-                                    key={idx}
-                                    variant={l.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!l.url}
-                                    onClick={() =>
-                                        l.url &&
-                                        router.get(
-                                            l.url,
-                                            {},
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                            },
-                                        )
-                                    }
-                                    dangerouslySetInnerHTML={{
-                                        __html: l.label,
-                                    }}
-                                />
-                            ),
-                        )}
-                    </div>
-                ) : null}
-
-                {rowMenu.element}
+                                ) : undefined
+                            }
+                        />
+                    )
+                ) : (
+                    <>
+                        <EntityTable
+                            rows={purchaseOrders.data}
+                            rowKey={(po) => po.id}
+                            identityLabel="PO number"
+                            identity={(po) => ({
+                                icon: Receipt,
+                                name: po.po_number,
+                                subline: po.vendor?.name ?? undefined,
+                            })}
+                            columns={columns}
+                            actionsFor={menuFor}
+                            hrefFor={(po) =>
+                                `/finance/purchase-orders/${po.id}`
+                            }
+                            onOpen={(po) =>
+                                router.get(`/finance/purchase-orders/${po.id}`)
+                            }
+                            onRowContextMenu={ctx.open}
+                            mutedFor={(po) => po.status === 'cancelled'}
+                            minWidth={1040}
+                        />
+                        <LaravelPagination
+                            links={purchaseOrders.links}
+                            lastPage={purchaseOrders.last_page}
+                        />
+                    </>
+                )}
             </PageLayout>
+
+            {ctx.ctx && (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Receipt}
+                    title={ctx.ctx.record.po_number}
+                    items={menuFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            )}
 
             {canManage && (
                 <NewPoDialog
                     open={newPoOpen}
                     onClose={() => setNewPoOpen(false)}
-                    vendors={vendorList}
-                    accounts={accountList}
+                    vendors={vendors}
+                    accounts={accounts}
+                    costCentres={costCentres}
+                    fundingStreams={fundingStreams}
                 />
             )}
         </AppLayout>

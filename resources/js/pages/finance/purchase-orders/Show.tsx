@@ -1,24 +1,46 @@
-import { ConfirmDialog, formatMoney } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatusBadge } from '@/components/ui/status-badge';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    ConfirmDialog,
+    FinanceSectionRail,
+    NewPoDialog,
+    formatMoney,
+    type AccountOption,
+} from '@/components/finance';
+import type {
+    EditablePurchaseOrder,
+    PoAttributionOption,
+} from '@/components/finance/new-po-dialog';
+import {
+    EntityTable,
+    ListCaption,
+    type EntityTableColumn,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
+import {
+    CheckCircle,
+    FileText,
+    Pencil,
+    Receipt,
+    ShoppingCart,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type Account = { id: number; code: string; name: string };
 type Vendor = { id: number; name: string };
-type CostCentre = { id: number; code: string; name: string };
-type FundingStream = { id: number; code: string; name: string };
+type Attribution = { id: number; code: string; name: string };
 type ApprovedBy = { id: number; name: string };
 type Bill = {
     id: number;
@@ -36,6 +58,7 @@ type Line = {
     gst_rate: string;
     gst_amount: string;
     line_total: string;
+    account_id: number | null;
     account?: Account | null;
 };
 
@@ -43,6 +66,7 @@ type PurchaseOrder = {
     id: number;
     po_number: string;
     status: string;
+    vendor_id: number;
     order_date: string;
     expected_date: string | null;
     subtotal: string;
@@ -50,32 +74,101 @@ type PurchaseOrder = {
     total_amount: string;
     notes: string | null;
     approved_at: string | null;
+    cost_centre_id: number | null;
+    funding_stream_id: number | null;
     vendor?: Vendor | null;
     lines: Line[];
     approved_by_user?: ApprovedBy | null;
     approved_by?: ApprovedBy | null;
-    cost_centre?: CostCentre | null;
-    funding_stream?: FundingStream | null;
+    cost_centre?: Attribution | null;
+    funding_stream?: Attribution | null;
     bills: Bill[];
 };
 
-export default function PurchaseOrderShow() {
-    const { purchaseOrder } = usePage().props as unknown as {
-        purchaseOrder: PurchaseOrder;
-    };
-    const po = purchaseOrder;
-    const approver = po.approved_by ?? po.approved_by_user;
-    const canApprove = po.status === 'draft';
-    const canEdit = po.status === 'draft';
-    const canConvert = ['approved', 'partially_received', 'received'].includes(
-        po.status,
+type PoShowProps = {
+    purchaseOrder: PurchaseOrder;
+    canManage: boolean;
+    vendors: Vendor[];
+    accounts: AccountOption[];
+    costCentres: PoAttributionOption[];
+    fundingStreams: PoAttributionOption[];
+};
+
+const STATUS_LABELS: Record<string, string> = {
+    draft: 'Draft',
+    approved: 'Approved',
+    sent: 'Sent',
+    partially_received: 'Partially received',
+    received: 'Received',
+    cancelled: 'Cancelled',
+};
+
+const CHIP_VARIANTS: Record<string, StatusVariant> = {
+    draft: 'neutral',
+    approved: 'success',
+    sent: 'info',
+    partially_received: 'warning',
+    received: 'success',
+    cancelled: 'neutral',
+};
+
+const formatDate = (date: string | null) =>
+    date
+        ? new Date(date).toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          })
+        : '—';
+
+/** Whole days from today to the expected date; negative once it has passed. */
+function daysToExpected(expected: string | null): number | null {
+    if (!expected) return null;
+    const midnight = (d: Date) =>
+        new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diff = midnight(new Date(expected)) - midnight(new Date());
+    return Math.round(diff / 86_400_000);
+}
+
+function DetailRow({
+    label,
+    children,
+}: {
+    label: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div>
+            <dt className="text-caption">{label}</dt>
+            <dd className="mt-1 text-sm">{children}</dd>
+        </div>
     );
+}
+
+export default function PurchaseOrderShow() {
+    const {
+        purchaseOrder: po,
+        canManage,
+        vendors,
+        accounts,
+        costCentres,
+        fundingStreams,
+    } = usePage().props as unknown as PoShowProps;
+
+    const approver = po.approved_by ?? po.approved_by_user;
+    const canApprove = canManage && po.status === 'draft';
+    const canEdit = canManage && po.status === 'draft';
+    const canConvert =
+        canManage &&
+        ['approved', 'partially_received', 'received'].includes(po.status);
+
     const [confirmAction, setConfirmAction] = useState<
         'approve' | 'convert' | null
     >(null);
     const [processing, setProcessing] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
 
-    function handleApprove() {
+    const handleApprove = () => {
         router.post(
             `/finance/purchase-orders/${po.id}/approve`,
             {},
@@ -85,9 +178,9 @@ export default function PurchaseOrderShow() {
                 onSuccess: () => setConfirmAction(null),
             },
         );
-    }
+    };
 
-    function handleConvertToBill() {
+    const handleConvertToBill = () => {
         router.post(
             `/finance/purchase-orders/${po.id}/convert-to-bill`,
             {},
@@ -97,125 +190,294 @@ export default function PurchaseOrderShow() {
                 onSuccess: () => setConfirmAction(null),
             },
         );
-    }
+    };
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Payables', href: '/finance/payables' },
+        { title: 'Purchase orders', href: '/finance/purchase-orders' },
+        {
+            title: po.po_number,
+            href: `/finance/purchase-orders/${po.id}`,
+        },
+    ];
+
+    const days = daysToExpected(po.expected_date);
+    const lineColumns: EntityTableColumn<Line>[] = [
+        {
+            key: 'qty',
+            label: 'Qty',
+            width: '80px',
+            align: 'right',
+            cell: (l) => (
+                <span className="tabular-nums">
+                    {Number(l.quantity).toFixed(2)}
+                </span>
+            ),
+        },
+        {
+            key: 'unit',
+            label: 'Unit price',
+            width: '1fr',
+            align: 'right',
+            cell: (l) => (
+                <span className="tabular-nums">
+                    {formatMoney(l.unit_price)}
+                </span>
+            ),
+        },
+        {
+            key: 'gst_rate',
+            label: 'GST %',
+            width: '80px',
+            align: 'right',
+            cell: (l) => (
+                <span className="tabular-nums text-muted-foreground">
+                    {(Number(l.gst_rate) * 100).toFixed(0)}%
+                </span>
+            ),
+        },
+        {
+            key: 'gst',
+            label: 'GST',
+            width: '1fr',
+            align: 'right',
+            cell: (l) => (
+                <span className="tabular-nums text-muted-foreground">
+                    {formatMoney(l.gst_amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'account',
+            label: 'Account',
+            width: '1.6fr',
+            cell: (l) => (
+                <span className="truncate text-muted-foreground">
+                    {l.account
+                        ? `${l.account.code} · ${l.account.name}`
+                        : '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'total',
+            label: 'Line total',
+            width: '1.1fr',
+            align: 'right',
+            cell: (l) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(l.line_total)}
+                </span>
+            ),
+        },
+    ];
+
+    const billColumns: EntityTableColumn<Bill>[] = [
+        {
+            key: 'bill_date',
+            label: 'Bill date',
+            width: '1fr',
+            cell: (b) => (
+                <span className="text-muted-foreground">
+                    {formatDate(b.bill_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'total',
+            label: 'Total',
+            width: '1fr',
+            align: 'right',
+            cell: (b) => (
+                <span className="tabular-nums">
+                    {formatMoney(b.total_amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '150px',
+            cell: (b) => (
+                <StatusBadge
+                    status={b.status}
+                    className="rounded-[8px] font-semibold"
+                />
+            ),
+        },
+    ];
+
+    const editablePo: EditablePurchaseOrder = {
+        id: po.id,
+        vendor_id: po.vendor_id,
+        order_date: po.order_date,
+        expected_date: po.expected_date,
+        notes: po.notes,
+        cost_centre_id: po.cost_centre_id,
+        funding_stream_id: po.funding_stream_id,
+        lines: po.lines.map((l) => ({
+            description: l.description,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            account_id: l.account_id,
+            gst_rate: l.gst_rate,
+        })),
+    };
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/finance/purchase-orders"
+            icon={ShoppingCart}
+            title={po.po_number}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={CHIP_VARIANTS[po.status] ?? 'neutral'}
+                >
+                    {STATUS_LABELS[po.status] ?? po.status}
+                </PageHeaderStatusChip>
+            }
+            subline={[
+                po.vendor?.name ?? 'No vendor',
+                `Ordered ${formatDate(po.order_date)}`,
+                po.expected_date
+                    ? `Expected ${formatDate(po.expected_date)}`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                <>
+                    {canEdit && (
+                        <PageHeaderGlassButton
+                            icon={Pencil}
+                            onClick={() => setEditOpen(true)}
+                        >
+                            Edit
+                        </PageHeaderGlassButton>
+                    )}
+                    {canConvert && (
+                        <PageHeaderGlassButton
+                            icon={Receipt}
+                            onClick={() => setConfirmAction('convert')}
+                        >
+                            Convert to bill
+                        </PageHeaderGlassButton>
+                    )}
+                    {canApprove && (
+                        <PageHeaderPrimaryButton
+                            icon={CheckCircle}
+                            onClick={() => setConfirmAction('approve')}
+                        >
+                            Approve
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Total"
+                        href={`/finance/purchase-orders/${po.id}`}
+                        ariaLabel="View this purchase order's total"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(po.total_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {formatMoney(po.subtotal)} plus GST
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="GST"
+                        href={`/finance/purchase-orders/${po.id}`}
+                        ariaLabel="View this purchase order's GST"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(po.gst_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {po.lines.length} line
+                            {po.lines.length === 1 ? '' : 's'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Linked bills"
+                        href={`/finance/bills?vendor_id=${po.vendor_id}`}
+                        ariaLabel="View bills raised from this purchase order"
+                    >
+                        <PageHeaderMeterBig>
+                            {po.bills?.length ?? 0}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Raised from this order
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {days !== null && (
+                        <PageHeaderMeterBlock
+                            label="Expected"
+                            tone={days < 0 ? 'critical' : 'brand'}
+                            href={`/finance/purchase-orders/${po.id}`}
+                            ariaLabel="View the expected delivery date"
+                        >
+                            <PageHeaderMeterBig>
+                                {Math.abs(days)}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {days < 0
+                                    ? `day${Math.abs(days) === 1 ? '' : 's'} overdue · ${formatDate(po.expected_date)}`
+                                    : `day${days === 1 ? '' : 's'} away · ${formatDate(po.expected_date)}`}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    )}
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance' },
-                { title: 'Purchase Orders', href: '/finance/purchase-orders' },
-                { title: po.po_number, href: '#' },
-            ]}
-        >
-            <Head title={`PO ${po.po_number}`} />
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/purchase-orders"
-                        title={
-                            <span className="flex flex-wrap items-center gap-3">
-                                {po.po_number}
-                                <StatusBadge status={po.status} />
-                            </span>
-                        }
-                        description={`Vendor: ${po.vendor?.name ?? '—'}`}
-                        actions={
-                            <>
-                                {canEdit && (
-                                    <Link
-                                        href={`/finance/purchase-orders/${po.id}/edit`}
-                                    >
-                                        <Button variant="outline">Edit</Button>
-                                    </Link>
-                                )}
-                                {canApprove && (
-                                    <Button
-                                        onClick={() =>
-                                            setConfirmAction('approve')
-                                        }
-                                    >
-                                        Approve
-                                    </Button>
-                                )}
-                                {canConvert && (
-                                    <Button
-                                        variant="outline"
-                                        onClick={() =>
-                                            setConfirmAction('convert')
-                                        }
-                                    >
-                                        Convert to Bill
-                                    </Button>
-                                )}
-                            </>
-                        }
-                    />
-                }
-            >
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title={`Purchase order ${po.po_number}`} />
+
+            <PageLayout hero={header}>
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">
-                            Order Details
+                        <CardTitle className="text-section-title">
+                            Order details
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            <div>
-                                <dt className="text-xs font-medium text-muted-foreground">
-                                    Order Date
-                                </dt>
-                                <dd className="mt-1 text-sm">
-                                    {po.order_date}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="text-xs font-medium text-muted-foreground">
-                                    Expected Date
-                                </dt>
-                                <dd className="mt-1 text-sm">
-                                    {po.expected_date ?? '—'}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="text-xs font-medium text-muted-foreground">
-                                    Cost Centre
-                                </dt>
-                                <dd className="mt-1 text-sm">
-                                    {po.cost_centre
-                                        ? `${po.cost_centre.code} - ${po.cost_centre.name}`
-                                        : '—'}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="text-xs font-medium text-muted-foreground">
-                                    Funding Stream
-                                </dt>
-                                <dd className="mt-1 text-sm">
-                                    {po.funding_stream
-                                        ? `${po.funding_stream.code} - ${po.funding_stream.name}`
-                                        : '—'}
-                                </dd>
-                            </div>
+                            <DetailRow label="Order date">
+                                {formatDate(po.order_date)}
+                            </DetailRow>
+                            <DetailRow label="Expected date">
+                                {formatDate(po.expected_date)}
+                            </DetailRow>
+                            <DetailRow label="Cost centre">
+                                {po.cost_centre
+                                    ? `${po.cost_centre.code} · ${po.cost_centre.name}`
+                                    : '—'}
+                            </DetailRow>
+                            <DetailRow label="Funding stream">
+                                {po.funding_stream
+                                    ? `${po.funding_stream.code} · ${po.funding_stream.name}`
+                                    : '—'}
+                            </DetailRow>
                             {approver && (
-                                <div>
-                                    <dt className="text-xs font-medium text-muted-foreground">
-                                        Approved By
-                                    </dt>
-                                    <dd className="mt-1 text-sm">
-                                        {approver.name}
-                                        {po.approved_at
-                                            ? ` on ${po.approved_at}`
-                                            : ''}
-                                    </dd>
-                                </div>
+                                <DetailRow label="Approved by">
+                                    {approver.name}
+                                    {po.approved_at
+                                        ? ` on ${formatDate(po.approved_at)}`
+                                        : ''}
+                                </DetailRow>
                             )}
                             {po.notes && (
                                 <div className="sm:col-span-2 lg:col-span-4">
-                                    <dt className="text-xs font-medium text-muted-foreground">
-                                        Notes
-                                    </dt>
+                                    <dt className="text-caption">Notes</dt>
                                     <dd className="mt-1 text-sm whitespace-pre-wrap">
                                         {po.notes}
                                     </dd>
@@ -225,143 +487,41 @@ export default function PurchaseOrderShow() {
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Line Items</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">
-                                        Qty
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Unit Price
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        GST Rate
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        GST
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Line Total
-                                    </TableHead>
-                                    <TableHead>Account</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {po.lines.map((line) => (
-                                    <TableRow key={line.id}>
-                                        <TableCell>
-                                            {line.description}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {Number(line.quantity).toFixed(2)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {formatMoney(line.unit_price)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {(
-                                                Number(line.gst_rate) * 100
-                                            ).toFixed(0)}
-                                            %
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {formatMoney(line.gst_amount)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {formatMoney(line.line_total)}
-                                        </TableCell>
-                                        <TableCell>
-                                            {line.account
-                                                ? `${line.account.code} - ${line.account.name}`
-                                                : '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-
-                        <div className="border-t p-4">
-                            <div className="flex justify-end">
-                                <div className="w-64 space-y-1 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">
-                                            Subtotal
-                                        </span>
-                                        <span>{formatMoney(po.subtotal)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">
-                                            GST
-                                        </span>
-                                        <span>
-                                            {formatMoney(po.gst_amount)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between border-t pt-1 font-semibold">
-                                        <span>Total</span>
-                                        <span>
-                                            {formatMoney(po.total_amount)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                <ListCaption
+                    title="Line items"
+                    caption={`${po.lines.length} line${po.lines.length === 1 ? '' : 's'} · ${formatMoney(po.total_amount)} total`}
+                />
+                <EntityTable
+                    rows={po.lines}
+                    rowKey={(l) => l.id}
+                    identityLabel="Description"
+                    identity={(l) => ({ icon: FileText, name: l.description })}
+                    columns={lineColumns}
+                    actionsFor={() => []}
+                    minWidth={1040}
+                />
 
                 {po.bills && po.bills.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Linked Bills
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Bill Number</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead className="text-right">
-                                            Total
-                                        </TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {po.bills.map((bill) => (
-                                        <TableRow key={bill.id}>
-                                            <TableCell>
-                                                <Link
-                                                    href={`/finance/bills/${bill.id}`}
-                                                    className="font-medium text-status-info hover:underline"
-                                                >
-                                                    {bill.bill_number}
-                                                </Link>
-                                            </TableCell>
-                                            <TableCell>
-                                                {bill.bill_date}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {formatMoney(bill.total_amount)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <StatusBadge
-                                                    status={bill.status}
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
+                    <>
+                        <ListCaption
+                            title="Linked bills"
+                            caption={`${po.bills.length} raised from this order`}
+                        />
+                        <EntityTable
+                            rows={po.bills}
+                            rowKey={(b) => b.id}
+                            identityLabel="Bill"
+                            identity={(b) => ({
+                                icon: Receipt,
+                                name: b.bill_number,
+                            })}
+                            columns={billColumns}
+                            actionsFor={() => []}
+                            hrefFor={(b) => `/finance/bills/${b.id}`}
+                            onOpen={(b) => router.get(`/finance/bills/${b.id}`)}
+                            minWidth={760}
+                        />
+                    </>
                 )}
             </PageLayout>
 
@@ -385,6 +545,18 @@ export default function PurchaseOrderShow() {
                 processing={processing}
                 onConfirm={handleConvertToBill}
             />
+
+            {canEdit && editOpen && (
+                <NewPoDialog
+                    open
+                    purchaseOrder={editablePo}
+                    onClose={() => setEditOpen(false)}
+                    vendors={vendors}
+                    accounts={accounts}
+                    costCentres={costCentres}
+                    fundingStreams={fundingStreams}
+                />
+            )}
         </AppLayout>
     );
 }

@@ -28,7 +28,7 @@ export * from './new-invoice-dialog';
 export * from './new-journal-dialog';
 export * from './new-po-dialog';
 export * from './new-vendor-dialog';
-export * from './payables-hub';
+export * from './payment-run-dialog';
 export * from './petty-cash-fund-dialog';
 export * from './posting-preview';
 export * from './price-book-dialog';

@@ -49,6 +49,16 @@ class PurchaseOrderController extends Controller
 
         $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
 
+        // Whole-register counts for the header meter row — never the current
+        // page of results (DESIGN.md "Page-local counts labelled as totals").
+        $statusCounts = FinPurchaseOrder::forOrganization($orgId)
+            ->selectRaw('status, COUNT(*) as aggregate, COALESCE(SUM(total_amount), 0) as value')
+            ->groupBy('status')
+            ->get()
+            ->keyBy('status');
+
+        $openStatuses = ['draft', 'approved', 'sent', 'partially_received'];
+
         return Inertia::render('finance/purchase-orders/Index', [
             'purchaseOrders' => $purchaseOrders,
             'vendors' => $vendors,
@@ -57,11 +67,26 @@ class PurchaseOrderController extends Controller
                 'vendor_id' => $request->input('vendor_id', ''),
                 'search' => $request->input('search', ''),
             ],
+            'summary' => [
+                'total' => (int) $statusCounts->sum('aggregate'),
+                'draft' => (int) ($statusCounts['draft']->aggregate ?? 0),
+                'approved' => (int) ($statusCounts['approved']->aggregate ?? 0),
+                'open_value' => (float) $statusCounts
+                    ->filter(fn ($row, $status) => in_array($status, $openStatuses, true))
+                    ->sum('value'),
+            ],
             'canManage' => $canManage,
             // Expense accounts for the New PO modal's optional per-line account.
             'accounts' => $canManage
                 ? FinAccount::forOrganization($orgId)->active()->ofType('expense')
                     ->orderBy('code')->get(['id', 'code', 'name'])
+                : [],
+            // Cost centre / funding stream attribution on the PO modal.
+            'costCentres' => $canManage
+                ? FinCostCentre::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name'])
+                : [],
+            'fundingStreams' => $canManage
+                ? FinFundingStream::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name'])
                 : [],
         ]);
     }
@@ -108,19 +133,8 @@ class PurchaseOrderController extends Controller
         );
     }
 
-    public function create(Request $request)
-    {
-        $this->authorize('create', FinPurchaseOrder::class);
-
-        $orgId = $request->user()->organization_id;
-
-        return Inertia::render('finance/purchase-orders/Create', [
-            'vendors' => FinVendor::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'name']),
-            'accounts' => FinAccount::forOrganization($orgId)->active()->ofType('expense')->orderBy('code')->get(['id', 'code', 'name']),
-            'costCentres' => FinCostCentre::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name']),
-            'fundingStreams' => FinFundingStream::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name']),
-        ]);
-    }
+    // Create and edit are WizardShell modals on the index/show pages; the
+    // retired full-page URLs redirect to the list (routes/finance.php).
 
     public function store(StorePurchaseOrderRequest $request)
     {
@@ -196,30 +210,25 @@ class PurchaseOrderController extends Controller
             'bills:id,purchase_order_id,bill_number,status,total_amount,bill_date',
         ]);
 
+        $orgId = $request->user()->organization_id;
+        $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
+
         return Inertia::render('finance/purchase-orders/Show', [
             'purchaseOrder' => $purchaseOrder,
-        ]);
-    }
-
-    public function edit(Request $request, FinPurchaseOrder $purchaseOrder)
-    {
-        $this->authorize('update', $purchaseOrder);
-
-        if ($purchaseOrder->status !== 'draft') {
-            return redirect()->route('finance.purchase-orders.show', $purchaseOrder)
-                ->with('error', 'Only draft purchase orders can be edited.');
-        }
-
-        $orgId = $request->user()->organization_id;
-
-        $purchaseOrder->load('lines');
-
-        return Inertia::render('finance/purchase-orders/Edit', [
-            'purchaseOrder' => $purchaseOrder,
-            'vendors' => FinVendor::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'name']),
-            'accounts' => FinAccount::forOrganization($orgId)->active()->ofType('expense')->orderBy('code')->get(['id', 'code', 'name']),
-            'costCentres' => FinCostCentre::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name']),
-            'fundingStreams' => FinFundingStream::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name']),
+            'canManage' => $canManage,
+            // Reference data for the Edit PO modal (draft POs only).
+            'vendors' => $canManage
+                ? FinVendor::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'name'])
+                : [],
+            'accounts' => $canManage
+                ? FinAccount::forOrganization($orgId)->active()->ofType('expense')->orderBy('code')->get(['id', 'code', 'name'])
+                : [],
+            'costCentres' => $canManage
+                ? FinCostCentre::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name'])
+                : [],
+            'fundingStreams' => $canManage
+                ? FinFundingStream::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name'])
+                : [],
         ]);
     }
 

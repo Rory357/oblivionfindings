@@ -116,6 +116,10 @@ export const statusColors: Record<string, string> = {
     unbalanced: CRITICAL,
     restricted: NEUTRAL,
     unrestricted: SUCCESS,
+    // WP4 (payables): vendor active/inactive and the exported payment-run leg
+    // of the bank settlement workflow.
+    inactive: NEUTRAL,
+    exported: INFO,
 };
 
 export function getStatusColor(status: string): string {

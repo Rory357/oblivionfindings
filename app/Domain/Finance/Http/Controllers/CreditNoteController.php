@@ -37,9 +37,26 @@ class CreditNoteController extends Controller
         $user = $request->user();
         $canManage = (bool) $user->can('create', FinCreditNote::class);
 
+        // Whole-register counts for the header meter row — never the current
+        // page of results (DESIGN.md "Page-local counts labelled as totals").
+        $typeCounts = FinCreditNote::forOrganization($orgId)
+            ->selectRaw('type, COUNT(*) as aggregate, COALESCE(SUM(total_amount), 0) as value')
+            ->groupBy('type')
+            ->get()
+            ->keyBy('type');
+        $draftCount = (int) FinCreditNote::forOrganization($orgId)->where('status', 'draft')->count();
+
         return Inertia::render('finance/credit-notes/Index', [
             'creditNotes' => $creditNotes,
             'filters' => $request->only(['type', 'status', 'search', 'date_from', 'date_to']),
+            'summary' => [
+                'total' => (int) $typeCounts->sum('aggregate'),
+                'payable_count' => (int) ($typeCounts['payable']->aggregate ?? 0),
+                'payable_total' => (float) ($typeCounts['payable']->value ?? 0),
+                'receivable_count' => (int) ($typeCounts['receivable']->aggregate ?? 0),
+                'receivable_total' => (float) ($typeCounts['receivable']->value ?? 0),
+                'draft_count' => $draftCount,
+            ],
             'canManage' => $canManage,
             // Reference data for the create modal.
             'vendors' => $canManage ? $this->vendorOptions($orgId) : [],
@@ -185,6 +202,7 @@ class CreditNoteController extends Controller
 
         return Inertia::render('finance/credit-notes/Show', [
             'creditNote' => $creditNote,
+            'canApprove' => (bool) $request->user()->can('approve', $creditNote),
         ]);
     }
 

@@ -40,12 +40,30 @@ class VendorController extends Controller
 
         $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
 
+        // Whole-register counts for the header meter row — never the current
+        // page of results (DESIGN.md "Page-local counts labelled as totals").
+        $typeCounts = FinVendor::query()
+            ->forOrganization($orgId)
+            ->selectRaw('vendor_type, COUNT(*) as aggregate')
+            ->groupBy('vendor_type')
+            ->pluck('aggregate', 'vendor_type');
+
+        $totalVendors = (int) $typeCounts->sum();
+        $activeVendors = (int) FinVendor::query()->forOrganization($orgId)->where('is_active', true)->count();
+
         return Inertia::render('finance/vendors/Index', [
             'vendors' => $vendors,
             'filters' => [
                 'search' => $request->search ?? '',
                 'vendor_type' => $request->vendor_type ?? '',
                 'is_active' => $request->is_active ?? '',
+            ],
+            'summary' => [
+                'total' => $totalVendors,
+                'active' => $activeVendors,
+                'inactive' => $totalVendors - $activeVendors,
+                'suppliers' => (int) ($typeCounts['supplier'] ?? 0),
+                'contractors' => (int) ($typeCounts['contractor'] ?? 0),
             ],
             'canManage' => $canManage,
             // Expense accounts for the New Vendor modal's optional default account.
@@ -100,23 +118,8 @@ class VendorController extends Controller
         );
     }
 
-    public function create(Request $request)
-    {
-        $this->authorize('create', FinVendor::class);
-
-        $orgId = $request->user()->organization_id;
-
-        $expenseAccounts = FinAccount::query()
-            ->forOrganization($orgId)
-            ->ofType('expense')
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'code', 'name']);
-
-        return Inertia::render('finance/vendors/Create', [
-            'expenseAccounts' => $expenseAccounts,
-        ]);
-    }
+    // Create and edit are WizardShell modals on the index/show pages; the
+    // retired full-page URLs redirect to the list (routes/finance.php).
 
     public function store(StoreVendorRequest $request)
     {
@@ -163,6 +166,8 @@ class VendorController extends Controller
     {
         $this->authorize('view', $vendor);
 
+        $orgId = $request->user()->organization_id;
+
         $vendor->load('contacts');
 
         $bills = $vendor->bills()
@@ -189,33 +194,25 @@ class VendorController extends Controller
             ->selectRaw('COALESCE(SUM(amount_paid), 0) as total')
             ->value('total');
 
+        $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
+
         return Inertia::render('finance/vendors/Show', [
             'vendor' => $vendor,
             'bills' => $bills,
             'purchaseOrders' => $purchaseOrders,
             'totalOutstanding' => (float) $totalOutstanding,
             'totalPaidYtd' => (float) $totalPaidYtd,
-        ]);
-    }
-
-    public function edit(Request $request, FinVendor $vendor)
-    {
-        $this->authorize('update', $vendor);
-
-        $vendor->load('contacts');
-
-        $orgId = $request->user()->organization_id;
-
-        $expenseAccounts = FinAccount::query()
-            ->forOrganization($orgId)
-            ->ofType('expense')
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'code', 'name']);
-
-        return Inertia::render('finance/vendors/Edit', [
-            'vendor' => $vendor,
-            'expenseAccounts' => $expenseAccounts,
+            // Real totals for the header meters — the lists above are capped at
+            // the 10 most recent (DESIGN.md "Page-local counts labelled as totals").
+            'billsCount' => (int) $vendor->bills()->count(),
+            'openBillsCount' => (int) $vendor->bills()->whereNotIn('status', ['paid', 'cancelled'])->count(),
+            'purchaseOrdersCount' => (int) $vendor->purchaseOrders()->count(),
+            'canManage' => $canManage,
+            // Expense accounts for the Edit Vendor modal's optional default account.
+            'expenseAccounts' => $canManage
+                ? FinAccount::query()->forOrganization($orgId)->ofType('expense')->active()
+                    ->orderBy('name')->get(['id', 'code', 'name'])
+                : [],
         ]);
     }
 

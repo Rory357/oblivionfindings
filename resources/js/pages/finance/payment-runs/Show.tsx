@@ -1,28 +1,38 @@
-import { ConfirmDialog, formatMoney } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { ConfirmDialog, FinanceSectionRail, formatMoney } from '@/components/finance';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    EntityTable,
+    ListCaption,
+    type EntityTableColumn,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyList } from '@/components/ui/empty-state';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Banknote,
+    Building2,
     CheckCircle,
     Download,
-    FileText,
+    Landmark,
     Play,
+    Receipt,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+
+import { SettlementEvidenceDialog, type SettlementAction } from './_dialogs';
 
 type PaymentRunItem = {
     id: number;
@@ -67,412 +77,489 @@ type PageProps = {
     paymentRun: PaymentRun;
 };
 
+const STATUS_LABELS: Record<string, string> = {
+    draft: 'Draft',
+    approved: 'Approved',
+    prepared: 'Prepared',
+    exported: 'Exported',
+    accepted: 'Bank accepted',
+    settled: 'Settled',
+    reconciled: 'Reconciled',
+    rejected: 'Rejected',
+    failed: 'Failed',
+    processing: 'Processed (legacy)',
+    completed: 'Completed (legacy)',
+};
+
+const CHIP_VARIANTS: Record<string, StatusVariant> = {
+    draft: 'neutral',
+    approved: 'info',
+    prepared: 'info',
+    exported: 'warning',
+    accepted: 'success',
+    settled: 'success',
+    reconciled: 'success',
+    rejected: 'critical',
+    failed: 'critical',
+};
+
+const formatDate = (date: string | null) =>
+    date
+        ? new Date(date).toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          })
+        : '—';
+
+const formatDateTime = (date: string | null) =>
+    date
+        ? new Date(date).toLocaleString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+          })
+        : '—';
+
+function DetailRow({
+    label,
+    children,
+}: {
+    label: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div>
+            <dt className="text-caption">{label}</dt>
+            <dd className="mt-1 text-sm">{children}</dd>
+        </div>
+    );
+}
+
 export default function PaymentRunShow({ paymentRun }: PageProps) {
-    const [approving, setApproving] = useState(false);
-    const [processingRun, setProcessingRun] = useState(false);
+    const [processing, setProcessing] = useState(false);
     const [confirmAction, setConfirmAction] = useState<
         'approve' | 'process' | null
     >(null);
+    // Accept / reject / settle / reconcile all collect their bank evidence in
+    // one dialog with real fields and validation — never window.prompt().
+    const [settlementAction, setSettlementAction] =
+        useState<SettlementAction | null>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
         { title: 'Finance', href: '/finance' },
-        { title: 'Payment Runs', href: '/finance/payment-runs' },
+        { title: 'Payables', href: '/finance/payables' },
+        { title: 'Payment runs', href: '/finance/payment-runs' },
         {
             title: paymentRun.run_number,
             href: `/finance/payment-runs/${paymentRun.id}`,
         },
     ];
 
-    const handleApprove = () => {
-        setApproving(true);
+    const post = (action: 'approve' | 'process') =>
         router.post(
-            `/finance/payment-runs/${paymentRun.id}/approve`,
+            `/finance/payment-runs/${paymentRun.id}/${action}`,
             {},
             {
                 preserveScroll: true,
-                onFinish: () => setApproving(false),
+                onStart: () => setProcessing(true),
+                onFinish: () => setProcessing(false),
                 onSuccess: () => setConfirmAction(null),
             },
         );
-    };
 
-    const handleProcess = () => {
-        setProcessingRun(true);
-        router.post(
-            `/finance/payment-runs/${paymentRun.id}/process`,
-            {},
-            {
-                preserveScroll: true,
-                onFinish: () => setProcessingRun(false),
-                onSuccess: () => setConfirmAction(null),
-            },
-        );
-    };
+    const canDownload =
+        ['prepared', 'exported', 'accepted', 'settled', 'reconciled'].includes(
+            paymentRun.status,
+        ) && Boolean(paymentRun.file_path);
 
-    const handleAccept = () => {
-        const reference = window.prompt('Bank acceptance reference');
-        const confirmationDigest = window.prompt(
-            'Bank confirmation digest or immutable evidence reference',
-        );
-        if (!reference || !confirmationDigest) return;
-
-        router.post(`/finance/payment-runs/${paymentRun.id}/accept`, {
-            idempotency_key:
-                `accept:${paymentRun.id}:${reference}:${confirmationDigest}`.slice(
-                    0,
-                    128,
+    const itemColumns: EntityTableColumn<PaymentRunItem>[] = [
+        {
+            key: 'bill',
+            label: 'Bill',
+            width: '1.4fr',
+            cell: (item) =>
+                item.bill ? (
+                    <Link
+                        href={`/finance/bills/${item.bill.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-primary hover:underline"
+                    >
+                        {item.bill.bill_number}
+                    </Link>
+                ) : (
+                    <span className="text-muted-foreground">—</span>
                 ),
-            reference,
-            evidence: { confirmation_digest: confirmationDigest },
-        });
-    };
+        },
+        {
+            key: 'bank_account',
+            label: 'Bank account',
+            width: '1.4fr',
+            cell: (item) => (
+                <span className="truncate text-muted-foreground">
+                    {item.bank_account_number || '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'reference',
+            label: 'Reference',
+            width: '1.4fr',
+            cell: (item) => (
+                <span className="truncate text-muted-foreground">
+                    {item.reference || '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'amount',
+            label: 'Amount',
+            width: '1.2fr',
+            align: 'right',
+            cell: (item) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(item.amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '140px',
+            cell: (item) => (
+                <StatusBadge
+                    status={item.status}
+                    label={STATUS_LABELS[item.status]}
+                    className="rounded-[8px] font-semibold"
+                />
+            ),
+        },
+    ];
 
-    const handleSettle = () => {
-        const acceptanceReference = paymentRun.settlement?.acceptance_reference;
-        if (!acceptanceReference) return;
-        router.post(`/finance/payment-runs/${paymentRun.id}/settle`, {
-            idempotency_key: `settle:${paymentRun.id}:${acceptanceReference}`,
-        });
-    };
-
-    const handleReject = () => {
-        const reference = window.prompt('Bank rejection reference');
-        const reason = window.prompt('Bank rejection reason');
-        const evidenceReference = window.prompt(
-            'Bank rejection digest or immutable evidence reference',
-        );
-        if (!reference || !reason || !evidenceReference) return;
-
-        router.post(`/finance/payment-runs/${paymentRun.id}/reject`, {
-            idempotency_key:
-                `reject:${paymentRun.id}:${reference}:${evidenceReference}`.slice(
-                    0,
-                    128,
-                ),
-            reference,
-            reason,
-            evidence: { rejection_digest: evidenceReference },
-        });
-    };
-
-    const handleReconcile = () => {
-        const bankTransactionInput = window.prompt(
-            'Cleared bank transaction ID',
-        );
-        const reference = window.prompt('Bank reconciliation reference');
-        const evidenceReference = window.prompt(
-            'Bank reconciliation digest or immutable evidence reference',
-        );
-        if (!bankTransactionInput || !reference || !evidenceReference) return;
-
-        const bankTransactionId = Number(bankTransactionInput);
-        if (!Number.isSafeInteger(bankTransactionId) || bankTransactionId < 1)
-            return;
-
-        router.post(`/finance/payment-runs/${paymentRun.id}/reconcile`, {
-            idempotency_key: `payment-run-reconcile:${paymentRun.id}:${bankTransactionId}`,
-            bank_transaction_id: bankTransactionId,
-            reference,
-            evidence: { reconciliation_digest: evidenceReference },
-        });
-    };
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/finance/payment-runs"
+            icon={Banknote}
+            title={paymentRun.run_number}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={CHIP_VARIANTS[paymentRun.status] ?? 'neutral'}
+                >
+                    {STATUS_LABELS[paymentRun.status] ?? paymentRun.status}
+                </PageHeaderStatusChip>
+            }
+            subline={[
+                paymentRun.bank_account
+                    ? `${paymentRun.bank_account.name} · ${paymentRun.bank_account.bank_name}`
+                    : 'No bank account',
+                `Payment date ${formatDate(paymentRun.payment_date)}`,
+                `${paymentRun.item_count} bill${paymentRun.item_count === 1 ? '' : 's'}`,
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                <>
+                    {canDownload && (
+                        <PageHeaderGlassButton
+                            icon={Download}
+                            onClick={() => {
+                                window.location.href = `/finance/payment-runs/${paymentRun.id}/download`;
+                            }}
+                        >
+                            Download bank file
+                        </PageHeaderGlassButton>
+                    )}
+                    {['exported', 'accepted'].includes(paymentRun.status) && (
+                        <PageHeaderGlassButton
+                            icon={XCircle}
+                            onClick={() => setSettlementAction('reject')}
+                        >
+                            Record bank rejection
+                        </PageHeaderGlassButton>
+                    )}
+                    {paymentRun.status === 'draft' && (
+                        <PageHeaderPrimaryButton
+                            icon={CheckCircle}
+                            onClick={() => setConfirmAction('approve')}
+                        >
+                            Approve
+                        </PageHeaderPrimaryButton>
+                    )}
+                    {paymentRun.status === 'approved' && (
+                        <PageHeaderPrimaryButton
+                            icon={Play}
+                            onClick={() => setConfirmAction('process')}
+                        >
+                            Prepare bank file
+                        </PageHeaderPrimaryButton>
+                    )}
+                    {paymentRun.status === 'exported' && (
+                        <PageHeaderPrimaryButton
+                            icon={CheckCircle}
+                            onClick={() => setSettlementAction('accept')}
+                        >
+                            Record bank acceptance
+                        </PageHeaderPrimaryButton>
+                    )}
+                    {paymentRun.status === 'accepted' && (
+                        <PageHeaderPrimaryButton
+                            icon={Banknote}
+                            onClick={() => setSettlementAction('settle')}
+                        >
+                            Settle run
+                        </PageHeaderPrimaryButton>
+                    )}
+                    {paymentRun.status === 'settled' && (
+                        <PageHeaderPrimaryButton
+                            icon={Landmark}
+                            onClick={() => setSettlementAction('reconcile')}
+                        >
+                            Record bank reconciliation
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Total"
+                        href={`/finance/payment-runs/${paymentRun.id}`}
+                        ariaLabel="View this run's total"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(paymentRun.total_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Across {paymentRun.item_count} bill
+                            {paymentRun.item_count === 1 ? '' : 's'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Bills paid"
+                        href="/finance/bills?status=paid"
+                        ariaLabel="View paid bills"
+                    >
+                        <PageHeaderMeterBig>
+                            {paymentRun.items.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Items in this run
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Bank settlement"
+                        tone={
+                            paymentRun.settlement?.settled_at
+                                ? 'success'
+                                : paymentRun.settlement?.rejected_at
+                                  ? 'critical'
+                                  : 'warning'
+                        }
+                        href={`/finance/payment-runs/${paymentRun.id}`}
+                        ariaLabel="View the bank settlement status"
+                    >
+                        <PageHeaderMeterBig>
+                            {paymentRun.settlement
+                                ? (STATUS_LABELS[
+                                      paymentRun.settlement.status
+                                  ] ?? paymentRun.settlement.status)
+                                : 'Not started'}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {paymentRun.settlement?.acceptance_reference
+                                ? `Reference ${paymentRun.settlement.acceptance_reference}`
+                                : 'No bank evidence recorded yet'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Ledger journal"
+                        tone={paymentRun.journal ? 'success' : 'warning'}
+                        href={
+                            paymentRun.journal
+                                ? `/finance/journals/${paymentRun.journal.id}`
+                                : '/finance/journals'
+                        }
+                        ariaLabel="View the ledger journal for this run"
+                    >
+                        <PageHeaderMeterBig>
+                            {paymentRun.journal
+                                ? paymentRun.journal.journal_number
+                                : 'Not posted'}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {paymentRun.journal
+                                ? 'Posted on settlement'
+                                : 'Posts when the bank settles the run'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Payment Run ${paymentRun.run_number}`} />
+            <Head title={`Payment run ${paymentRun.run_number}`} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/payment-runs"
-                        title={paymentRun.run_number}
-                        description="Payment run details and items"
-                        actions={
-                            <>
-                                {paymentRun.status === 'draft' && (
-                                    <Button
-                                        onClick={() =>
-                                            setConfirmAction('approve')
-                                        }
-                                        disabled={approving}
-                                        variant="outline"
-                                    >
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        {approving ? 'Approving...' : 'Approve'}
-                                    </Button>
-                                )}
-                                {paymentRun.status === 'approved' && (
-                                    <Button
-                                        onClick={() =>
-                                            setConfirmAction('process')
-                                        }
-                                        disabled={processingRun}
-                                    >
-                                        <Play className="mr-2 h-4 w-4" />
-                                        {processingRun
-                                            ? 'Preparing...'
-                                            : 'Prepare Bank File'}
-                                    </Button>
-                                )}
-                                {[
-                                    'prepared',
-                                    'exported',
-                                    'accepted',
-                                    'settled',
-                                    'reconciled',
-                                ].includes(paymentRun.status) &&
-                                    paymentRun.file_path && (
-                                        <a
-                                            href={`/finance/payment-runs/${paymentRun.id}/download`}
-                                        >
-                                            <Button variant="outline">
-                                                <Download className="mr-2 h-4 w-4" />
-                                                Download Bank File
-                                            </Button>
-                                        </a>
-                                    )}
-                                {paymentRun.status === 'exported' && (
-                                    <Button onClick={handleAccept}>
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        Record Bank Acceptance
-                                    </Button>
-                                )}
-                                {paymentRun.status === 'accepted' && (
-                                    <Button onClick={handleSettle}>
-                                        <Banknote className="mr-2 h-4 w-4" />
-                                        Settle Accepted Run
-                                    </Button>
-                                )}
-                                {paymentRun.status === 'settled' && (
-                                    <Button onClick={handleReconcile}>
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        Record Bank Reconciliation
-                                    </Button>
-                                )}
-                                {['exported', 'accepted'].includes(
-                                    paymentRun.status,
-                                ) && (
-                                    <Button
-                                        variant="outline"
-                                        onClick={handleReject}
-                                    >
-                                        <XCircle className="mr-2 h-4 w-4" />
-                                        Record Bank Rejection
-                                    </Button>
-                                )}
-                            </>
-                        }
-                    />
-                }
-            >
-                {/* Summary Card */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Banknote className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>Payment Run Details</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Run Number
-                                </p>
-                                <p className="font-mono font-medium">
-                                    {paymentRun.run_number}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Payment Date
-                                </p>
-                                <p className="font-medium">
-                                    {paymentRun.payment_date}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Bank Account
-                                </p>
-                                <p className="font-medium">
+            <PageLayout hero={header}>
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-section-title">
+                                Run details
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <DetailRow label="Payment date">
+                                    {formatDate(paymentRun.payment_date)}
+                                </DetailRow>
+                                <DetailRow label="Bank account">
                                     {paymentRun.bank_account
-                                        ? `${paymentRun.bank_account.name} (${paymentRun.bank_account.bank_name})`
-                                        : '-'}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Status
-                                </p>
-                                <StatusBadge status={paymentRun.status} />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Total Amount
-                                </p>
-                                <p className="font-mono text-lg font-semibold tabular-nums">
-                                    {formatMoney(paymentRun.total_amount)}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Item Count
-                                </p>
-                                <p className="font-medium">
-                                    {paymentRun.item_count}
-                                </p>
-                            </div>
-                            {paymentRun.approved_by && (
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Approved By
-                                    </p>
-                                    <p className="font-medium">
+                                        ? `${paymentRun.bank_account.name} · ${paymentRun.bank_account.bank_name}`
+                                        : '—'}
+                                </DetailRow>
+                                {paymentRun.approved_by && (
+                                    <DetailRow label="Approved by">
                                         {paymentRun.approved_by.name}
-                                    </p>
-                                    {paymentRun.approved_at && (
-                                        <p className="text-xs text-muted-foreground">
-                                            {paymentRun.approved_at}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                            {paymentRun.processed_by && (
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Processed By
-                                    </p>
-                                    <p className="font-medium">
+                                        {paymentRun.approved_at
+                                            ? ` · ${formatDateTime(paymentRun.approved_at)}`
+                                            : ''}
+                                    </DetailRow>
+                                )}
+                                {paymentRun.processed_by && (
+                                    <DetailRow label="Prepared by">
                                         {paymentRun.processed_by.name}
-                                    </p>
-                                    {paymentRun.processed_at && (
-                                        <p className="text-xs text-muted-foreground">
-                                            {paymentRun.processed_at}
-                                        </p>
+                                        {paymentRun.processed_at
+                                            ? ` · ${formatDateTime(paymentRun.processed_at)}`
+                                            : ''}
+                                    </DetailRow>
+                                )}
+                                {paymentRun.notes && (
+                                    <div className="sm:col-span-2">
+                                        <dt className="text-caption">Notes</dt>
+                                        <dd className="mt-1 text-sm whitespace-pre-wrap">
+                                            {paymentRun.notes}
+                                        </dd>
+                                    </div>
+                                )}
+                            </dl>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-section-title">
+                                Bank settlement evidence
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {paymentRun.settlement ? (
+                                <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <DetailRow label="Status">
+                                        <StatusBadge
+                                            status={
+                                                paymentRun.settlement.status
+                                            }
+                                            label={
+                                                STATUS_LABELS[
+                                                    paymentRun.settlement.status
+                                                ]
+                                            }
+                                            className="rounded-[8px] font-semibold"
+                                        />
+                                    </DetailRow>
+                                    <DetailRow label="File digest">
+                                        <span className="font-mono text-[12px] break-all">
+                                            {
+                                                paymentRun.settlement
+                                                    .artifact_sha256
+                                            }
+                                        </span>
+                                    </DetailRow>
+                                    <DetailRow label="Exported">
+                                        {formatDateTime(
+                                            paymentRun.settlement.exported_at,
+                                        )}
+                                    </DetailRow>
+                                    <DetailRow label="Accepted">
+                                        {formatDateTime(
+                                            paymentRun.settlement.accepted_at,
+                                        )}
+                                        {paymentRun.settlement
+                                            .acceptance_reference
+                                            ? ` · ${paymentRun.settlement.acceptance_reference}`
+                                            : ''}
+                                    </DetailRow>
+                                    <DetailRow label="Settled">
+                                        {formatDateTime(
+                                            paymentRun.settlement.settled_at,
+                                        )}
+                                    </DetailRow>
+                                    <DetailRow label="Reconciled">
+                                        {formatDateTime(
+                                            paymentRun.settlement.reconciled_at,
+                                        )}
+                                    </DetailRow>
+                                    {paymentRun.settlement.rejected_at && (
+                                        <div className="sm:col-span-2">
+                                            <dt className="text-caption">
+                                                Rejected
+                                            </dt>
+                                            <dd className="mt-1 text-sm">
+                                                {formatDateTime(
+                                                    paymentRun.settlement
+                                                        .rejected_at,
+                                                )}
+                                                {paymentRun.settlement
+                                                    .rejection_reason
+                                                    ? ` — ${paymentRun.settlement.rejection_reason}`
+                                                    : ''}
+                                            </dd>
+                                        </div>
                                     )}
-                                </div>
+                                </dl>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">
+                                    No bank evidence yet. Once the bank file is
+                                    prepared and exported, record the bank&rsquo;s
+                                    acceptance, rejection or reconciliation here.
+                                </p>
                             )}
-                        </div>
+                        </CardContent>
+                    </Card>
+                </div>
 
-                        {paymentRun.notes && (
-                            <div className="mt-4 border-t pt-4">
-                                <p className="text-sm text-muted-foreground">
-                                    Notes
-                                </p>
-                                <p className="text-sm">{paymentRun.notes}</p>
-                            </div>
-                        )}
-
-                        {paymentRun.journal && (
-                            <div className="mt-4 border-t pt-4">
-                                <p className="text-sm text-muted-foreground">
-                                    GL Journal
-                                </p>
-                                <Link
-                                    href={`/finance/journals/${paymentRun.journal.id}`}
-                                    className="font-mono text-sm text-primary hover:underline"
-                                >
-                                    {paymentRun.journal.journal_number}
-                                </Link>
-                            </div>
-                        )}
-                        {paymentRun.settlement && (
-                            <div className="mt-4 border-t pt-4">
-                                <p className="text-sm text-muted-foreground">
-                                    External settlement
-                                </p>
-                                <div className="mt-1 flex items-center gap-2">
-                                    <StatusBadge
-                                        status={paymentRun.settlement.status}
-                                    />
-                                    <span className="font-mono text-xs text-muted-foreground">
-                                        {paymentRun.settlement.artifact_sha256}
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Items Table */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>Payment Items</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        {paymentRun.items.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center px-4 py-12">
-                                <div className="mb-4 rounded-full bg-muted p-4">
-                                    <FileText className="h-8 w-8 text-muted-foreground" />
-                                </div>
-                                <h3 className="mb-1 text-lg font-semibold text-foreground">
-                                    No payment items
-                                </h3>
-                                <p className="max-w-sm text-center text-sm text-muted-foreground">
-                                    This payment run has no items yet.
-                                </p>
-                            </div>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Vendor</TableHead>
-                                        <TableHead>Bill #</TableHead>
-                                        <TableHead className="text-right">
-                                            Amount
-                                        </TableHead>
-                                        <TableHead>Bank Account</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {paymentRun.items.map((item) => {
-                                        return (
-                                            <TableRow key={item.id}>
-                                                <TableCell className="font-medium">
-                                                    {item.vendor?.name || '-'}
-                                                </TableCell>
-                                                <TableCell className="font-mono">
-                                                    {item.bill ? (
-                                                        <Link
-                                                            href={`/finance/bills/${item.bill.id}`}
-                                                            className="text-primary hover:underline"
-                                                        >
-                                                            {
-                                                                item.bill
-                                                                    .bill_number
-                                                            }
-                                                        </Link>
-                                                    ) : (
-                                                        '-'
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums">
-                                                    {formatMoney(item.amount)}
-                                                </TableCell>
-                                                <TableCell className="font-mono text-muted-foreground">
-                                                    {item.bank_account_number ||
-                                                        '-'}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <StatusBadge
-                                                        status={item.status}
-                                                    />
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
+                <ListCaption
+                    title="Payment items"
+                    caption={`${paymentRun.items.length} item${paymentRun.items.length === 1 ? '' : 's'} · ${formatMoney(paymentRun.total_amount)} total`}
+                />
+                {paymentRun.items.length === 0 ? (
+                    <EmptyList
+                        icon={Receipt}
+                        itemName="payment item"
+                        title="No payment items"
+                        description="This payment run has no bills attached to it."
+                    />
+                ) : (
+                    <EntityTable
+                        rows={paymentRun.items}
+                        rowKey={(item) => item.id}
+                        identityLabel="Vendor"
+                        identity={(item) => ({
+                            icon: Building2,
+                            name: item.vendor?.name ?? 'Unknown vendor',
+                        })}
+                        columns={itemColumns}
+                        actionsFor={() => []}
+                        minWidth={1140}
+                    />
+                )}
             </PageLayout>
 
             <ConfirmDialog
@@ -480,20 +567,30 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                 open={confirmAction === 'approve'}
                 onClose={() => setConfirmAction(null)}
                 title="Approve payment run?"
-                description="This approves the payment run so an immutable bank file can be prepared. No bill is paid until a separate bank-accepted settlement."
+                description="This approves the payment run so a bank file can be prepared. No bill is paid until the bank confirms settlement."
                 confirmText="Approve run"
-                processing={approving}
-                onConfirm={handleApprove}
+                processing={processing}
+                onConfirm={() => post('approve')}
             />
             <ConfirmDialog
                 variant="default"
                 open={confirmAction === 'process'}
                 onClose={() => setConfirmAction(null)}
                 title="Prepare bank file?"
-                description="This prepares the payment instruction only. It does not pay bills or post the bank journal."
+                description="This prepares the payment instruction only. It does not pay bills or post a journal to the ledger."
                 confirmText="Prepare file"
-                processing={processingRun}
-                onConfirm={handleProcess}
+                processing={processing}
+                onConfirm={() => post('process')}
+            />
+
+            <SettlementEvidenceDialog
+                action={settlementAction}
+                paymentRunId={paymentRun.id}
+                runNumber={paymentRun.run_number}
+                acceptanceReference={
+                    paymentRun.settlement?.acceptance_reference
+                }
+                onClose={() => setSettlementAction(null)}
             />
         </AppLayout>
     );

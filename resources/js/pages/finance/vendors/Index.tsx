@@ -1,35 +1,40 @@
 import {
+    FinanceSectionRail,
     NewVendorDialog,
-    PayablesTabsFooter,
-    useRowContextMenu,
     type AccountOption,
-    type RowCtxItem,
 } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import {
+    CounterPill,
+    EntityChip,
+    EntityContextMenu,
+    EntityTable,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type PageProps } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import { Building2, Download, Eye, Plus, Search } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { Building2, Download, Eye, Plus, Receipt } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 interface Vendor {
@@ -58,14 +63,23 @@ interface Filters {
     is_active: string;
 }
 
+interface Summary {
+    total: number;
+    active: number;
+    inactive: number;
+    suppliers: number;
+    contractors: number;
+}
+
 interface Props extends PageProps {
     vendors: PaginatedVendors;
     filters: Filters;
+    summary: Summary;
     canManage: boolean;
     expenseAccounts: AccountOption[];
 }
 
-const vendorTypeLabels: Record<string, string> = {
+const VENDOR_TYPE_LABELS: Record<string, string> = {
     supplier: 'Supplier',
     contractor: 'Contractor',
     utility: 'Utility',
@@ -73,22 +87,31 @@ const vendorTypeLabels: Record<string, string> = {
     other: 'Other',
 };
 
-const vendorTypeColors: Record<string, string> = {
-    supplier: 'bg-status-info-bg text-status-info',
-    contractor: 'bg-primary/10 text-primary',
-    utility: 'bg-status-warning-bg text-status-warning',
-    government: 'bg-status-info-bg text-status-info',
-    other: 'bg-muted text-foreground',
-};
+const TYPE_OPTIONS = [
+    { value: 'all', label: 'All types' },
+    ...Object.entries(VENDOR_TYPE_LABELS).map(([value, label]) => ({
+        value,
+        label,
+    })),
+];
+
+const ACTIVE_OPTIONS = [
+    { value: 'all', label: 'Active & inactive' },
+    { value: '1', label: 'Active only' },
+    { value: '0', label: 'Inactive only' },
+];
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
+    { title: 'Payables', href: '/finance/payables' },
     { title: 'Vendors', href: '/finance/vendors' },
 ];
 
 export default function VendorsIndex({
     vendors,
     filters,
+    summary,
     canManage,
     expenseAccounts,
 }: Props) {
@@ -106,17 +129,11 @@ export default function VendorsIndex({
         [filters],
     );
 
-    const handleSearch = useCallback(() => {
-        applyFilters({ search });
-    }, [search, applyFilters]);
-
     const handleSearchKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
-            if (e.key === 'Enter') {
-                handleSearch();
-            }
+            if (e.key === 'Enter') applyFilters({ search });
         },
-        [handleSearch],
+        [search, applyFilters],
     );
 
     const clearFilters = useCallback(() => {
@@ -132,297 +149,276 @@ export default function VendorsIndex({
         filters.search || filters.vendor_type || filters.is_active,
     );
 
-    const activeCount = vendors.data.filter((v) => v.is_active).length;
+    const ctx = useEntityContextMenu<Vendor>();
 
-    // Right-click row menu — mirrors the row's existing inline actions (Open first).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (vendor: Vendor): RowCtxItem[] => {
-        const items: RowCtxItem[] = [
+    // ONE MenuItem[] feeds both the kebab and the right-click menu.
+    const menuFor = (vendor: Vendor): MenuItem[] =>
+        compactMenu([
             {
-                kind: 'item',
-                label: 'Open',
+                label: 'Open vendor',
                 icon: Eye,
-                onSelect: () => router.get(`/finance/vendors/${vendor.id}`),
+                onClick: () => router.get(`/finance/vendors/${vendor.id}`),
             },
-        ];
-        return items;
-    };
+            {
+                label: 'View bills',
+                icon: Receipt,
+                onClick: () =>
+                    router.get('/finance/bills', { vendor_id: vendor.id }),
+            },
+        ]);
+
+    const columns: EntityTableColumn<Vendor>[] = [
+        {
+            key: 'type',
+            label: 'Type',
+            width: '1fr',
+            cell: (v) => (
+                <EntityChip>
+                    {VENDOR_TYPE_LABELS[v.vendor_type] ?? v.vendor_type}
+                </EntityChip>
+            ),
+        },
+        {
+            key: 'email',
+            label: 'Email',
+            width: '1.6fr',
+            cell: (v) => (
+                <span className="truncate text-muted-foreground">
+                    {v.email || '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'phone',
+            label: 'Phone',
+            width: '1.2fr',
+            cell: (v) => (
+                <span className="truncate text-muted-foreground">
+                    {v.phone || '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'bills',
+            label: 'Bills',
+            width: '80px',
+            align: 'center',
+            cell: (v) => <CounterPill tone="neutral">{v.bills_count}</CounterPill>,
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '110px',
+            cell: (v) => (
+                <StatusBadge
+                    status={v.is_active ? 'active' : 'inactive'}
+                    label={v.is_active ? 'Active' : 'Inactive'}
+                    className="rounded-[8px] font-semibold"
+                />
+            ),
+        },
+    ];
+
+    const exportUrl = `/finance/vendors/export?${new URLSearchParams(
+        Object.entries({
+            search: filters.search,
+            vendor_type: filters.vendor_type,
+            is_active: filters.is_active,
+        }).filter(([, v]) => v),
+    ).toString()}`;
+
+    const pct = (n: number) =>
+        summary.total > 0 ? (n / summary.total) * 100 : 0;
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={Building2}
+            title="Vendors"
+            titleChip={
+                <PageHeaderStatusChip variant="success">
+                    {summary.active} active
+                </PageHeaderStatusChip>
+            }
+            subline={`Accounts payable · ${summary.total} vendors · ${summary.suppliers} suppliers · ${summary.contractors} contractors`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        onKeyDown={handleSearchKeyDown}
+                        placeholder="Search vendors by name or email…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={() => {
+                            window.location.href = exportUrl;
+                        }}
+                    >
+                        Export CSV
+                    </PageHeaderGlassButton>
+                    {canManage && (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setNewVendorOpen(true)}
+                        >
+                            New vendor
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="All vendors"
+                        href="/finance/vendors"
+                        ariaLabel="View all vendors"
+                    >
+                        <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Suppliers, contractors and services
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Active"
+                        tone="success"
+                        href="/finance/vendors?is_active=1"
+                        ariaLabel="View active vendors"
+                    >
+                        <PageHeaderMeterDonut
+                            percent={pct(summary.active)}
+                            caption={`${summary.active} active · ${summary.inactive} inactive`}
+                        />
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Suppliers"
+                        href="/finance/vendors?vendor_type=supplier"
+                        ariaLabel="View suppliers"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.suppliers}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Goods and services accounts
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Contractors"
+                        href="/finance/vendors?vendor_type=contractor"
+                        ariaLabel="View contractors"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.contractors}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Engaged on contract
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Type"
+                        value={filters.vendor_type || 'all'}
+                        options={TYPE_OPTIONS}
+                        onChange={(value) =>
+                            applyFilters({
+                                vendor_type: value === 'all' ? '' : value,
+                            })
+                        }
+                    />
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={filters.is_active || 'all'}
+                        options={ACTIVE_OPTIONS}
+                        onChange={(value) =>
+                            applyFilters({
+                                is_active: value === 'all' ? '' : value,
+                            })
+                        }
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Vendors" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Building2}
-                        title="Vendors"
-                        description="Manage your suppliers, contractors and service providers"
-                        stats={[
-                            { label: 'Total', value: vendors.total },
-                            { label: 'Active (this page)', value: activeCount },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button size="sm" variant="outline" asChild>
-                                    <a
-                                        href={`/finance/vendors/export?${new URLSearchParams(Object.entries({ search, vendor_type: filters.vendor_type, is_active: filters.is_active }).filter(([, v]) => v)).toString()}`}
-                                    >
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Export CSV
-                                    </a>
-                                </Button>
-                                {canManage && (
+            <PageLayout hero={header}>
+                <ListCaption
+                    title="Vendors"
+                    caption={`${vendors.data.length} of ${vendors.total} shown`}
+                />
+
+                {vendors.data.length === 0 ? (
+                    hasFilters ? (
+                        <EmptySearch
+                            onClear={clearFilters}
+                            title="No vendors match your filters"
+                        />
+                    ) : (
+                        <EmptyList
+                            icon={Building2}
+                            itemName="vendor"
+                            title="No vendors yet"
+                            description="Add your first supplier or contractor to get started."
+                            action={
+                                canManage ? (
                                     <Button
                                         size="sm"
                                         onClick={() => setNewVendorOpen(true)}
                                     >
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Add Vendor
+                                        New vendor
                                     </Button>
-                                )}
-                            </div>
-                        }
-                        footer={<PayablesTabsFooter active="vendors" />}
-                    />
-                }
-            >
-                {/* Filters */}
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex flex-col gap-4 sm:flex-row">
-                            <div className="flex-1">
-                                <div className="relative">
-                                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Search by name or email..."
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        onKeyDown={handleSearchKeyDown}
-                                        className="pl-10"
-                                    />
-                                </div>
-                            </div>
-                            <Select
-                                value={filters.vendor_type || 'all'}
-                                onValueChange={(value) =>
-                                    applyFilters({
-                                        vendor_type:
-                                            value === 'all' ? '' : value,
-                                    })
-                                }
-                            >
-                                <SelectTrigger
-                                    className="w-[180px]"
-                                    aria-label="Filter by type"
-                                >
-                                    <SelectValue placeholder="All Types" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Types
-                                    </SelectItem>
-                                    <SelectItem value="supplier">
-                                        Supplier
-                                    </SelectItem>
-                                    <SelectItem value="contractor">
-                                        Contractor
-                                    </SelectItem>
-                                    <SelectItem value="utility">
-                                        Utility
-                                    </SelectItem>
-                                    <SelectItem value="government">
-                                        Government
-                                    </SelectItem>
-                                    <SelectItem value="other">Other</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={
-                                    filters.is_active === ''
-                                        ? 'all'
-                                        : filters.is_active
-                                }
-                                onValueChange={(value) =>
-                                    applyFilters({
-                                        is_active: value === 'all' ? '' : value,
-                                    })
-                                }
-                            >
-                                <SelectTrigger
-                                    className="w-[180px]"
-                                    aria-label="Filter by active state"
-                                >
-                                    <SelectValue placeholder="All Statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Statuses
-                                    </SelectItem>
-                                    <SelectItem value="1">Active</SelectItem>
-                                    <SelectItem value="0">Inactive</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Button variant="outline" onClick={handleSearch}>
-                                Search
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Table */}
-                <Card>
-                    <CardContent className="p-0">
-                        {vendors.data.length === 0 ? (
-                            hasFilters ? (
-                                <EmptySearch
-                                    onClear={clearFilters}
-                                    title="No vendors match your filters"
-                                    className="border-0"
-                                />
-                            ) : (
-                                <EmptyList
-                                    icon={Building2}
-                                    itemName="vendor"
-                                    title="No vendors yet"
-                                    description="Add your first supplier or contractor to get started."
-                                    className="border-0"
-                                    action={
-                                        canManage ? (
-                                            <Button
-                                                size="sm"
-                                                onClick={() =>
-                                                    setNewVendorOpen(true)
-                                                }
-                                            >
-                                                New vendor
-                                            </Button>
-                                        ) : undefined
-                                    }
-                                />
-                            )
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Trading Name</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead>Email</TableHead>
-                                        <TableHead>Phone</TableHead>
-                                        <TableHead className="text-center">
-                                            Bills
-                                        </TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {vendors.data.map((vendor) => (
-                                        <TableRow
-                                            key={vendor.id}
-                                            onContextMenu={rowMenu.open(
-                                                rowMenuItems(vendor),
-                                            )}
-                                        >
-                                            <TableCell>
-                                                <Link
-                                                    href={`/finance/vendors/${vendor.id}`}
-                                                    className="font-medium text-primary hover:underline"
-                                                >
-                                                    {vendor.name}
-                                                </Link>
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {vendor.trading_name || '-'}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant="secondary"
-                                                    className={
-                                                        vendorTypeColors[
-                                                            vendor.vendor_type
-                                                        ] || ''
-                                                    }
-                                                >
-                                                    {vendorTypeLabels[
-                                                        vendor.vendor_type
-                                                    ] || vendor.vendor_type}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {vendor.email || '-'}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {vendor.phone || '-'}
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                {vendor.bills_count}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant={
-                                                        vendor.is_active
-                                                            ? 'default'
-                                                            : 'secondary'
-                                                    }
-                                                    className={
-                                                        vendor.is_active
-                                                            ? 'bg-status-success-bg text-status-success'
-                                                            : 'bg-muted text-muted-foreground'
-                                                    }
-                                                >
-                                                    {vendor.is_active
-                                                        ? 'Active'
-                                                        : 'Inactive'}
-                                                </Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Pagination */}
-                {vendors.last_page > 1 && (
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                            Showing{' '}
-                            {(vendors.current_page - 1) * vendors.per_page + 1}{' '}
-                            to{' '}
-                            {Math.min(
-                                vendors.current_page * vendors.per_page,
-                                vendors.total,
-                            )}{' '}
-                            of {vendors.total} vendors
-                        </p>
-                        <div className="flex gap-1">
-                            {vendors.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={
-                                        link.active ? 'default' : 'outline'
-                                    }
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() =>
-                                        link.url && router.get(link.url)
-                                    }
-                                    dangerouslySetInnerHTML={{
-                                        __html: link.label,
-                                    }}
-                                />
-                            ))}
-                        </div>
-                    </div>
+                                ) : undefined
+                            }
+                        />
+                    )
+                ) : (
+                    <>
+                        <EntityTable
+                            rows={vendors.data}
+                            rowKey={(v) => v.id}
+                            identityLabel="Vendor"
+                            identity={(v) => ({
+                                icon: Building2,
+                                name: v.name,
+                                subline: v.trading_name
+                                    ? `Trading as ${v.trading_name}`
+                                    : undefined,
+                            })}
+                            columns={columns}
+                            actionsFor={menuFor}
+                            hrefFor={(v) => `/finance/vendors/${v.id}`}
+                            onOpen={(v) =>
+                                router.get(`/finance/vendors/${v.id}`)
+                            }
+                            onRowContextMenu={ctx.open}
+                            mutedFor={(v) => !v.is_active}
+                            minWidth={1000}
+                        />
+                        <LaravelPagination
+                            links={vendors.links}
+                            lastPage={vendors.last_page}
+                        />
+                    </>
                 )}
-
-                {rowMenu.element}
             </PageLayout>
+
+            {ctx.ctx && (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Building2}
+                    title={ctx.ctx.record.name}
+                    items={menuFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            )}
 
             {canManage && (
                 <NewVendorDialog
