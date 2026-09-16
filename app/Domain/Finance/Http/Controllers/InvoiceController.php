@@ -538,12 +538,14 @@ class InvoiceController extends Controller
             return back()->withErrors(['invoice' => 'Cannot send a cancelled invoice.']);
         }
 
-        $shouldPostJournal = false;
+        $wasDraft = false;
 
-        DB::transaction(function () use ($invoice) {
+        DB::transaction(function () use ($invoice, &$wasDraft) {
             $invoice->refresh();
+            $wasDraft = $invoice->status === 'draft';
 
-            if ($invoice->status === 'draft') {
+            // Only the first send moves the invoice and posts to the ledger.
+            if ($wasDraft) {
                 $invoice->update([
                     'status' => 'sent',
                     'sent_at' => $invoice->sent_at ?? now(),
@@ -552,15 +554,22 @@ class InvoiceController extends Controller
                 if ($invoice->journal_id === null) {
                     PostFinInvoiceJournalJob::dispatch($invoice)->afterCommit();
                 }
-
-                SendInvoiceEmailJob::dispatch($invoice->id)->afterCommit();
             }
+
+            // The email goes every time. Re-sending is how a client gets
+            // another copy of an invoice they lost — the accounting-package
+            // convention — and it must never re-post the AR journal. Gating
+            // this on 'draft' made Send on an already-sent invoice a silent
+            // no-op that still flashed "Invoice is being sent to …".
+            SendInvoiceEmailJob::dispatch($invoice->id)->afterCommit();
         });
 
         $invoice->refresh();
 
         return redirect()->route('finance.invoices.show', $invoice)
-            ->with('success', 'Invoice is being sent to '.$invoice->client_email);
+            ->with('success', $wasDraft
+                ? 'Invoice is being sent to '.$invoice->client_email
+                : 'Invoice is being resent to '.$invoice->client_email);
     }
 
     public function downloadPdf(Request $request, FinInvoice $invoice, InvoicePdfService $pdfService)

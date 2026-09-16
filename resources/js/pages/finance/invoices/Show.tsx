@@ -124,6 +124,10 @@ export default function InvoiceShow({
         invoice.status !== 'cancelled' &&
         invoice.status !== 'paid' &&
         !!invoice.client_email;
+    // Sending again emails another copy; it never re-posts the AR journal, so
+    // the button and its confirmation say so rather than repeating the
+    // first-send wording.
+    const isResend = canSend && !isDraft;
     const canReceipt =
         canManage &&
         Number(invoice.amount_due ?? 0) > 0 &&
@@ -221,7 +225,7 @@ export default function InvoiceShow({
                             icon={Send}
                             onClick={() => setSendOpen(true)}
                         >
-                            Send invoice
+                            {isResend ? 'Resend invoice' : 'Send invoice'}
                         </PageHeaderPrimaryButton>
                     ) : null}
                 </>
@@ -588,9 +592,13 @@ export default function InvoiceShow({
                 variant="default"
                 open={sendOpen}
                 onClose={() => setSendOpen(false)}
-                title="Send invoice?"
-                description={`This marks ${invoice.invoice_number} as sent, emails it to the client and posts the AR journal to the ledger.`}
-                confirmText="Send invoice"
+                title={isResend ? 'Resend invoice?' : 'Send invoice?'}
+                description={
+                    isResend
+                        ? `This emails ${invoice.invoice_number} to the client again. It stays as it is on the ledger — no second journal is posted.`
+                        : `This marks ${invoice.invoice_number} as sent, emails it to the client and posts the AR journal to the ledger.`
+                }
+                confirmText={isResend ? 'Resend invoice' : 'Send invoice'}
                 processing={sending}
                 onConfirm={confirmSend}
             />

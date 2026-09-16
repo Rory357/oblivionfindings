@@ -217,32 +217,44 @@ it('rolls back the disposal occurrence terminal state journal and event on posti
     Event::assertNotDispatched(JournalPosted::class);
 });
 
-it('discards JournalPosted when an outer transaction rolls back', function (): void {
+/**
+ * JournalPosted is announced through DB::afterCommit, so it must never reach a
+ * listener for work that was rolled back.
+ *
+ * On transaction levels: these tests open ONE transaction around the disposal
+ * and treat the level they start at as the floor. Laravel deliberately ignores
+ * the transaction RefreshDatabase wraps each test in — otherwise afterCommit
+ * code could never be observed in a test at all — so committing back to that
+ * floor is what a real commit-to-zero looks like from in here.
+ */
+it('discards JournalPosted when the transaction around the disposal rolls back', function (): void {
     Event::fake([JournalPosted::class]);
     $connection = DB::connection();
+    $floor = $connection->transactionLevel();
 
     $connection->beginTransaction();
     try {
         $this->service->disposeAsset($this->asset, fadpPayload());
-        Event::assertNotDispatched(JournalPosted::class);
-
-        $connection->commit();
+        // Still uncommitted: nothing may have been announced yet.
         Event::assertNotDispatched(JournalPosted::class);
 
         $connection->rollBack();
-        Event::assertNotDispatched(JournalPosted::class);
 
+        // The work is gone, and so is the announcement.
+        Event::assertNotDispatched(JournalPosted::class);
         expect(FinFixedAssetDisposal::query()->count())->toBe(0)
             ->and(FinJournal::query()->count())->toBe(0);
     } finally {
-        while ($connection->transactionLevel() > 0) {
+        while ($connection->transactionLevel() > $floor) {
             $connection->rollBack();
         }
-        $connection->beginTransaction();
+        if ($connection->transactionLevel() === 0) {
+            $connection->beginTransaction();
+        }
     }
 });
 
-it('dispatches JournalPosted once and only after the outermost commit', function (): void {
+it('dispatches JournalPosted once, and only once the disposal has committed', function (): void {
     Event::fake([JournalPosted::class]);
     $connection = DB::connection();
     $actorId = $this->actor->id;
@@ -250,16 +262,18 @@ it('dispatches JournalPosted once and only after the outermost commit', function
     $connection->beginTransaction();
     try {
         $this->service->disposeAsset($this->asset, fadpPayload());
+        // The service commits its own nested transaction here, but the work is
+        // not durable until the transaction around it commits — so nothing is
+        // announced yet.
         Event::assertNotDispatched(JournalPosted::class);
 
         $connection->commit();
-        Event::assertNotDispatched(JournalPosted::class);
 
-        $connection->commit();
         Event::assertDispatched(JournalPosted::class, function (JournalPosted $event): bool {
             return $event->journal->source_type === FinFixedAssetDisposal::class
                 && $event->journal->status === 'posted';
         });
+        // Exactly once, however many nested transactions were involved.
         Event::assertDispatchedTimes(JournalPosted::class, 1);
     } finally {
         fadpResetCommittedFixtures($connection, [$actorId]);
