@@ -496,9 +496,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/bank-reconciliation', [BankReconciliationController::class, 'index'])
         ->name('bank-reconciliation.index')
         ->middleware('permission:finance.bank.view');
-    Route::get('/bank-reconciliation/create', [BankReconciliationController::class, 'create'])
-        ->name('bank-reconciliation.create')
-        ->middleware('permission:finance.bank.manage');
+    // Starting a reconciliation is a three-field dialog on the index (and on a
+    // bank account), so the old routed create page is gone and its URL
+    // redirects to the list. (Must stay registered BEFORE
+    // /bank-reconciliation/{reconciliation}.)
+    Route::redirect('/bank-reconciliation/create', '/finance/bank-reconciliation')
+        ->name('bank-reconciliation.create');
     Route::post('/bank-reconciliation', [BankReconciliationController::class, 'store'])
         ->name('bank-reconciliation.store')
         ->middleware('permission:finance.bank.manage');

@@ -31,7 +31,7 @@ class BankReconciliationReminderNotification extends Notification
             ->subject("Bank reconciliation reminder for {$this->bankAccount->name}")
             ->line("A bank reconciliation is due for **{$this->bankAccount->name}** ({$this->bankAccount->bank_name}).")
             ->line($lastReconciled)
-            ->action('Start Reconciliation', url('/finance/bank-reconciliation/create'))
+            ->action('Start reconciliation', url("/finance/bank-accounts/{$this->bankAccount->id}"))
             ->line('Regular bank reconciliation helps ensure your records are accurate.');
     }
 

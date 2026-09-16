@@ -39,32 +39,30 @@ class BankReconciliationController extends Controller
         $bankAccounts = FinBankAccount::forOrganization($orgId)
             ->active()
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'current_balance']);
+
+        // Organisation-wide counts: the header meters state totals, never the
+        // size of the page you happen to be on (DESIGN.md "page-local counts
+        // labelled as totals").
+        $byStatus = FinBankReconciliation::forOrganization($orgId)
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
 
         return Inertia::render('finance/bank-reconciliation/Index', [
             'reconciliations' => $reconciliations,
             'bankAccounts' => $bankAccounts,
+            'summary' => [
+                'total' => (int) $byStatus->sum(),
+                'completed' => (int) ($byStatus['completed'] ?? 0),
+                'in_progress' => (int) ($byStatus['in_progress'] ?? 0),
+                'bank_accounts' => $bankAccounts->count(),
+            ],
+            'canManage' => $request->user()->can('create', FinBankReconciliation::class),
             'filters' => [
                 'bank_account_id' => $request->bank_account_id ?? '',
                 'status' => $request->status ?? '',
             ],
-        ]);
-    }
-
-    public function create(Request $request)
-    {
-        $this->authorize('create', FinBankReconciliation::class);
-
-        $orgId = $request->user()->organization_id;
-
-        $bankAccounts = FinBankAccount::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'current_balance']);
-
-        return Inertia::render('finance/bank-reconciliation/Create', [
-            'bankAccounts' => $bankAccounts,
-            'preselectedBankAccountId' => $request->bank_account_id ? (int) $request->bank_account_id : null,
         ]);
     }
 

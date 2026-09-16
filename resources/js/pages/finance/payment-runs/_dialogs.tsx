@@ -1,3 +1,4 @@
+import type { RequestPayload } from '@inertiajs/core';
 import { router } from '@inertiajs/react';
 import {
     Banknote,
@@ -180,7 +181,7 @@ function SettlementEvidenceBody({
         return next;
     };
 
-    const payload = (): Record<string, unknown> => {
+    const payload = (): RequestPayload => {
         const ref = reference.trim();
         const digest = evidence.trim();
 
