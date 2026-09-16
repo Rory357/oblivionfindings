@@ -1,25 +1,40 @@
 import {
     ConfirmDialog,
-    FundingStreamDialog,
     type EditableFundingStream,
+    FinanceSectionRail,
+    FUNDING_STREAM_FUNDER_TYPES,
+    FundingStreamDialog,
+    fundingStreamFunderTypeLabel,
     type FundingStreamRevenueAccount,
 } from '@/components/finance';
-import { SettingsTabsFooter } from '@/components/finance/settings-hub';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    EmptyValue,
+    EntityContextMenu,
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { Banknote, Pencil, Plus, Sprout, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Sprout, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type RevenueAccount = FundingStreamRevenueAccount;
@@ -42,27 +57,29 @@ type PageProps = {
     canManage: boolean;
 };
 
-const funderTypes = [
-    { value: 'whaikaha', label: 'Whaikaha' },
-    { value: 'carer_support', label: 'Carer Support' },
-    { value: 'nasc', label: 'NASC-allocated' },
-    { value: 'egl_if', label: 'EGL / Individualised Funding' },
-    { value: 'acc', label: 'ACC' },
-    { value: 'te_whatu_ora', label: 'Te Whatu Ora' },
-    { value: 'msd', label: 'MSD' },
-    { value: 'private', label: 'Private' },
-    { value: 'other', label: 'Other' },
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Settings', href: '/finance/settings' },
+    { title: 'Funding streams', href: '/finance/funding-streams' },
 ];
 
-const funderTypeLabels: Record<string, string> = Object.fromEntries(
-    funderTypes.map((ft) => [ft.value, ft.label]),
-);
+const funderTypeLabel = fundingStreamFunderTypeLabel;
+
+const ACTIVE_OPTIONS = [
+    { value: 'all', label: 'All funding streams' },
+    { value: 'active', label: 'Active only' },
+    { value: 'inactive', label: 'Inactive only' },
+];
 
 export default function FundingStreamsIndex({
     fundingStreams,
     revenueAccounts,
     canManage = false,
 }: PageProps) {
+    const [search, setSearch] = useState('');
+    const [activeFilter, setActiveFilter] = useState('all');
+    const [funderFilter, setFunderFilter] = useState('all');
     const [createOpen, setCreateOpen] = useState(false);
     const [editStream, setEditStream] = useState<EditableFundingStream | null>(
         null,
@@ -72,10 +89,7 @@ export default function FundingStreamsIndex({
     );
     const [deleting, setDeleting] = useState(false);
 
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Funding Streams', href: '/finance/funding-streams' },
-    ];
+    const ctx = useEntityContextMenu<FundingStream>();
 
     function confirmDelete() {
         if (!deleteTarget) return;
@@ -99,158 +113,309 @@ export default function FundingStreamsIndex({
         });
 
     const activeCount = fundingStreams.filter((fs) => fs.is_active).length;
+    const codedCount = fundingStreams.filter(
+        (fs) => fs.default_revenue_account,
+    ).length;
+
+    // Only offer funder types that actually appear in the register.
+    const funderOptions = [
+        { value: 'all', label: 'All funder types' },
+        ...FUNDING_STREAM_FUNDER_TYPES.filter((ft) =>
+            fundingStreams.some((fs) => fs.funder_type === ft.value),
+        ),
+        ...(fundingStreams.some((fs) => !fs.funder_type)
+            ? [{ value: 'none', label: 'Not specified' }]
+            : []),
+    ];
+
+    const query = search.trim().toLowerCase();
+    const shown = fundingStreams.filter((fs) => {
+        const matchesText =
+            query === '' ||
+            fs.code.toLowerCase().includes(query) ||
+            fs.name.toLowerCase().includes(query) ||
+            (funderTypeLabel(fs.funder_type) ?? '')
+                .toLowerCase()
+                .includes(query) ||
+            (fs.contact_name ?? '').toLowerCase().includes(query);
+        const matchesActive =
+            activeFilter === 'all' ||
+            (activeFilter === 'active' ? fs.is_active : !fs.is_active);
+        const matchesFunder =
+            funderFilter === 'all' ||
+            (funderFilter === 'none'
+                ? !fs.funder_type
+                : fs.funder_type === funderFilter);
+        return matchesText && matchesActive && matchesFunder;
+    });
+
+    const actionsFor = (fs: FundingStream): MenuItem[] =>
+        canManage
+            ? [
+                  {
+                      label: 'Edit funding stream',
+                      icon: Pencil,
+                      onClick: () => openEdit(fs),
+                  },
+                  {
+                      label: 'Delete funding stream',
+                      icon: Trash2,
+                      danger: true,
+                      onClick: () => setDeleteTarget(fs),
+                  },
+              ]
+            : [];
+
+    const columns: EntityTableColumn<FundingStream>[] = [
+        {
+            key: 'funder_type',
+            label: 'Funder type',
+            width: '200px',
+            cell: (fs) =>
+                fs.funder_type ? (
+                    <span className="truncate text-muted-foreground">
+                        {funderTypeLabel(fs.funder_type)}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'revenue_account',
+            label: 'Default revenue account',
+            width: '1.4fr',
+            cell: (fs) =>
+                fs.default_revenue_account ? (
+                    <span className="truncate">
+                        <span className="font-mono">
+                            {fs.default_revenue_account.code}
+                        </span>{' '}
+                        <span className="text-muted-foreground">
+                            {fs.default_revenue_account.name}
+                        </span>
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'contact',
+            label: 'Funder contact',
+            width: '1fr',
+            cell: (fs) =>
+                fs.contact_name || fs.contact_email ? (
+                    <span className="truncate text-muted-foreground">
+                        {fs.contact_name ?? fs.contact_email}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '140px',
+            cell: (fs) => (
+                <StatusBadge variant={fs.is_active ? 'success' : 'neutral'}>
+                    {fs.is_active ? 'Active' : 'Inactive'}
+                </StatusBadge>
+            ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            icon={Sprout}
+            title="Funding streams"
+            titleChip={
+                <PageHeaderStatusChip variant="success">
+                    {activeCount} active
+                </PageHeaderStatusChip>
+            }
+            subline={`Settings · ${fundingStreams.length} streams · funder sources and their default revenue coding`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search code, name, funder or contact…"
+                    />
+                    {canManage && (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                        >
+                            New funding stream
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Funding streams"
+                        ariaLabel="Show every funding stream"
+                        onClick={() => {
+                            setActiveFilter('all');
+                            setFunderFilter('all');
+                            setSearch('');
+                        }}
+                    >
+                        <PageHeaderMeterBig>
+                            {fundingStreams.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            available to invoices and journals
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Active"
+                        tone="success"
+                        ariaLabel="Show only active funding streams"
+                        onClick={() => setActiveFilter('active')}
+                    >
+                        <PageHeaderMeterDonut
+                            percent={
+                                fundingStreams.length === 0
+                                    ? 0
+                                    : (activeCount / fundingStreams.length) *
+                                      100
+                            }
+                            caption={`${activeCount} of ${fundingStreams.length} allocatable`}
+                        />
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Inactive"
+                        tone="warning"
+                        ariaLabel="Show only inactive funding streams"
+                        onClick={() => setActiveFilter('inactive')}
+                    >
+                        <PageHeaderMeterBig>
+                            {fundingStreams.length - activeCount}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            hidden from new allocations
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Revenue coded"
+                        href="/finance/accounts"
+                        ariaLabel="View the chart of accounts"
+                    >
+                        <PageHeaderMeterBig>{codedCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {revenueAccounts.length} revenue accounts to code to
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Funder type"
+                        value={funderFilter}
+                        allValue="all"
+                        options={funderOptions}
+                        onChange={setFunderFilter}
+                    />
+                    <PageHeaderFilterSelect
+                        label="Active state"
+                        value={activeFilter}
+                        allValue="all"
+                        options={ACTIVE_OPTIONS}
+                        onChange={setActiveFilter}
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Funding Streams" />
+            <Head title="Funding streams" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Sprout}
-                        title="Funding Streams"
-                        description="Manage funding sources and revenue allocations"
-                        stats={[
-                            { label: 'Total', value: fundingStreams.length },
-                            { label: 'Active', value: activeCount },
-                        ]}
-                        actions={
-                            canManage ? (
-                                <Button onClick={() => setCreateOpen(true)}>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add Funding Stream
-                                </Button>
-                            ) : undefined
-                        }
-                        footer={<SettingsTabsFooter active="funding-streams" />}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Funding streams"
+                        caption={`${shown.length} of ${fundingStreams.length} shown`}
                     />
-                }
-            >
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Banknote className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>All Funding Streams</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Code</TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Funder Type</TableHead>
-                                    <TableHead>
-                                        Default Revenue Account
-                                    </TableHead>
-                                    <TableHead>Status</TableHead>
-                                    {canManage && (
-                                        <TableHead className="text-right">
-                                            Actions
-                                        </TableHead>
-                                    )}
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {fundingStreams.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={canManage ? 6 : 5}
-                                            className="py-8 text-center text-muted-foreground"
+
+                    {shown.length === 0 ? (
+                        <EmptyState
+                            icon={Sprout}
+                            heading={
+                                fundingStreams.length === 0
+                                    ? 'No funding streams yet'
+                                    : 'No funding streams match your filters'
+                            }
+                            description={
+                                fundingStreams.length === 0
+                                    ? 'Add your first funding stream so invoices, journals and claims can be attributed to the funder that pays for them.'
+                                    : 'Clear the search, funder type or active-state filter to see every funding stream.'
+                            }
+                            action={
+                                fundingStreams.length === 0 ? (
+                                    canManage ? (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setCreateOpen(true)}
                                         >
-                                            No funding streams defined yet.
-                                            Create your first funding stream to
-                                            get started.
-                                        </TableCell>
-                                    </TableRow>
+                                            New funding stream
+                                        </Button>
+                                    ) : undefined
                                 ) : (
-                                    fundingStreams.map((fs) => (
-                                        <TableRow key={fs.id}>
-                                            <TableCell className="font-mono text-sm">
-                                                {fs.code}
-                                            </TableCell>
-                                            <TableCell className="font-medium">
-                                                {fs.name}
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
-                                                {fs.funder_type
-                                                    ? funderTypeLabels[
-                                                          fs.funder_type
-                                                      ] || fs.funder_type
-                                                    : '-'}
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                                {fs.default_revenue_account ? (
-                                                    <span className="font-mono">
-                                                        {
-                                                            fs
-                                                                .default_revenue_account
-                                                                .code
-                                                        }{' '}
-                                                        -{' '}
-                                                        {
-                                                            fs
-                                                                .default_revenue_account
-                                                                .name
-                                                        }
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-muted-foreground">
-                                                        -
-                                                    </span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={
-                                                        fs.is_active
-                                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                                            : 'border-border/30 bg-muted-foreground/10 text-muted-foreground'
-                                                    }
-                                                >
-                                                    {fs.is_active
-                                                        ? 'Active'
-                                                        : 'Inactive'}
-                                                </Badge>
-                                            </TableCell>
-                                            {canManage && (
-                                                <TableCell className="text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            aria-label={`Edit ${fs.name}`}
-                                                            onClick={() =>
-                                                                openEdit(fs)
-                                                            }
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            aria-label={`Delete ${fs.name}`}
-                                                            onClick={() =>
-                                                                setDeleteTarget(
-                                                                    fs,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            )}
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearch('');
+                                            setActiveFilter('all');
+                                            setFunderFilter('all');
+                                        }}
+                                    >
+                                        Clear filters
+                                    </Button>
+                                )
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={shown}
+                            rowKey={(fs) => fs.id}
+                            identityLabel="Funding stream"
+                            minWidth={980}
+                            identity={(fs) => ({
+                                icon: Sprout,
+                                name: fs.name,
+                                subline: fs.code,
+                            })}
+                            columns={columns}
+                            actionsFor={actionsFor}
+                            mutedFor={(fs) => !fs.is_active}
+                            onOpen={
+                                canManage ? (fs) => openEdit(fs) : undefined
+                            }
+                            onRowContextMenu={(e, fs) => ctx.open(e, fs)}
+                        />
+                    )}
+                </div>
             </PageLayout>
+
+            {ctx.ctx && canManage ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Sprout}
+                    title={`${ctx.ctx.record.code} — ${ctx.ctx.record.name}`}
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
 
             {canManage && (
                 <FundingStreamDialog

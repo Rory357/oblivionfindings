@@ -5,6 +5,7 @@ namespace App\Domain\Finance\Http\Controllers;
 use App\Domain\Finance\Jobs\SyncAccountingIntegrationJob;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinAccountingIntegration;
+use App\Domain\Finance\Models\FinGlSyncLog;
 use App\Domain\Finance\Services\GlSyncService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -24,11 +25,13 @@ class AccountingIntegrationController extends Controller
     {
         $orgId = $request->user()->organization_id;
 
-        $integrations = FinAccountingIntegration::forOrganization($orgId)
+        $records = FinAccountingIntegration::forOrganization($orgId)
             ->with('createdBy:id,name')
             ->withCount('syncLogs')
             ->orderByDesc('created_at')
-            ->get()
+            ->get();
+
+        $integrations = $records
             ->map(fn (FinAccountingIntegration $integration) => [
                 'id' => $integration->id,
                 'provider' => $integration->provider,
@@ -61,8 +64,22 @@ class AccountingIntegrationController extends Controller
                     ]),
             ]);
 
+        // Real server totals for the header meter row — the per-card counts on
+        // this page only cover the five most recent logs each, so the "syncs
+        // logged" meter would otherwise be a page-local number.
+        $integrationIds = $records->pluck('id')->all();
+        $since = now()->subDays(7);
+        $recentLogs = FinGlSyncLog::query()->whereIn('integration_id', $integrationIds)
+            ->where('started_at', '>=', $since);
+
         return Inertia::render('finance/Integrations/Index', [
             'integrations' => $integrations,
+            'summary' => [
+                'syncs_total' => (int) $records->sum('sync_logs_count'),
+                'syncs_7d' => (int) (clone $recentLogs)->count(),
+                'records_synced_7d' => (int) (clone $recentLogs)->sum('success_count'),
+                'errors_7d' => (int) (clone $recentLogs)->sum('error_count'),
+            ],
         ]);
     }
 

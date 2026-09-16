@@ -36,10 +36,12 @@ export type EditableFundingStream = {
     is_active: boolean;
 };
 
-// 'none' is the sentinel for "no funder type" — Radix can't take an empty-string
-// SelectItem value, so it maps back to null on submit.
-const FUNDER_TYPES = [
-    { value: 'none', label: 'Not specified' },
+/**
+ * The funder taxonomy, in NZ funder order — the ONE list behind both this
+ * wizard and the funding-streams register's filter/labels, so the enum is
+ * never transcribed twice.
+ */
+export const FUNDING_STREAM_FUNDER_TYPES = [
     { value: 'whaikaha', label: 'Whaikaha' },
     { value: 'carer_support', label: 'Carer Support' },
     { value: 'nasc', label: 'NASC-allocated' },
@@ -49,6 +51,22 @@ const FUNDER_TYPES = [
     { value: 'msd', label: 'MSD' },
     { value: 'private', label: 'Private' },
     { value: 'other', label: 'Other' },
+];
+
+/** Display label for a stored funder type; null when none is set. */
+export const fundingStreamFunderTypeLabel = (
+    value: string | null | undefined,
+): string | null =>
+    !value || value === 'none'
+        ? null
+        : (FUNDING_STREAM_FUNDER_TYPES.find((t) => t.value === value)?.label ??
+          value);
+
+// 'none' is the sentinel for "no funder type" — Radix can't take an empty-string
+// SelectItem value, so it maps back to null on submit.
+const FUNDER_TYPES = [
+    { value: 'none', label: 'Not specified' },
+    ...FUNDING_STREAM_FUNDER_TYPES,
 ];
 
 const STEPS: readonly WizardStep[] = [
