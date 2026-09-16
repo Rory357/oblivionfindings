@@ -6,6 +6,7 @@ use App\Domain\Finance\Jobs\PostFundingClaimJournalJob;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Services\FundingClaimJournalService;
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BillingEntry;
 use App\Models\Client;
@@ -89,6 +90,24 @@ class FundingClaimJournalDispatchTest extends TestCase
             'actual_ends_at' => $endsAt,
             'status' => 'completed',
         ]);
+        // A completed shift must carry clock evidence before its timesheet
+        // can be approved — TimesheetReconciliationService treats a missing
+        // attendance session on a completed shift as a hard stop, because
+        // payroll cannot be trusted without it. (Time with no clock evidence
+        // is entered as a shiftless manual timesheet instead, which skips
+        // that branch entirely.) This claim is built on a real shift, so it
+        // gets the real session.
+        HrAttendanceSession::query()->create([
+            'tenant_id' => null,
+            'user_id' => $staff->id,
+            'shift_id' => $shift->id,
+            'site_id' => $site->id,
+            'clock_in_at' => $startsAt,
+            'clock_out_at' => $endsAt,
+            'break_minutes' => 0,
+            'status' => 'closed',
+        ]);
+
         $timesheet = Timesheet::factory()->create([
             'shift_id' => $shift->id,
             'user_id' => $staff->id,
