@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { Banknote, ListChecks, Wallet } from 'lucide-react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,19 @@ const money = (n: number | string, currency = 'NZD') =>
         Number(n),
     );
 
+/** A v4 uuid — `crypto.randomUUID` where available, else an RFC-4122 fallback. */
+function newIdempotencyKey(): string {
+    const cryptoApi = globalThis.crypto;
+    if (cryptoApi?.randomUUID) return cryptoApi.randomUUID();
+
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+        const random = Math.floor(Math.random() * 16);
+        const value = char === 'x' ? random : (random & 0x3) | 0x8;
+
+        return value.toString(16);
+    });
+}
+
 /**
  * Record Receipt wizard — record a (partial or full) payment received against an
  * AR invoice. Posts to `finance.receivables.allocate`, which posts a balanced
@@ -67,16 +81,23 @@ export function RecordReceiptDialog({
     const due = invoice?.amount_due ?? 0;
     const currency = invoice?.currency_code ?? 'NZD';
 
+    // `finance.receivables.allocate` requires a uuid idempotency key, so one is
+    // minted per mount: a retry after a validation error replays the SAME key
+    // and can never double-post the receipt.
+    const [idempotencyKey] = useState(() => newIdempotencyKey());
+
     const form = useForm<{
         invoice_id: number | null;
         amount: string;
         payment_date: string;
         notes: string;
+        idempotency_key: string;
     }>({
         invoice_id: invoice?.id ?? null,
         amount: due > 0 ? due.toFixed(2) : '',
         payment_date: new Date().toISOString().split('T')[0],
         notes: '',
+        idempotency_key: idempotencyKey,
     });
     const { data, setData, processing, errors } = form;
 
@@ -93,7 +114,11 @@ export function RecordReceiptDialog({
 
     const submit = () => {
         if (!invoice) return;
-        form.transform((d) => ({ ...d, invoice_id: invoice.id }));
+        form.transform((d) => ({
+            ...d,
+            invoice_id: invoice.id,
+            idempotency_key: idempotencyKey,
+        }));
         form.post('/finance/receivables/allocate', {
             preserveScroll: true,
             onSuccess: () => close(),

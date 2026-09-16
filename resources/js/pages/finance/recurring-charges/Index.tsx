@@ -1,37 +1,49 @@
 import {
+    ConfirmDialog,
+    FinanceSectionRail,
     formatMoney,
-    ReceivablesTabsFooter,
     RecurringChargeDialog,
     type ChargeClientOption,
     type EditableRecurringCharge,
 } from '@/components/finance';
-import { OpsStatCard } from '@/components/ops-stat-card';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    EntityCard,
+    EntityCardGrid,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
     CalendarDays,
-    DollarSign,
     Pencil,
     Plus,
     RefreshCw,
-    Search,
+    Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-const ANY = '__ANY__';
+const ALL = '__all';
 
 type RecurringCharge = {
     id: number;
@@ -45,20 +57,20 @@ type RecurringCharge = {
     client: { id: number; first_name: string; last_name: string } | null;
 };
 
+type Filters = { q?: string; status?: string };
+
 type Props = {
     charges: {
         data: RecurringCharge[];
-        links: any[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
         current_page: number;
         last_page: number;
         total: number;
     };
-    filters: {
-        q?: string;
-        status?: string;
-    };
+    filters: Filters;
     stats: {
         active: number;
+        inactive: number;
         monthly_total: number;
         next_due: number;
     };
@@ -74,9 +86,22 @@ const FREQUENCY_LABELS: Record<string, string> = {
     annually: 'Annually',
 };
 
-function formatDate(d: string | null): string {
-    if (!d) return '-';
-    return new Date(d).toLocaleDateString('en-NZ', {
+const STATUS_OPTIONS = [
+    { value: ALL, label: 'Any status' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+];
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Receivables', href: '/finance/invoices' },
+    { title: 'Recurring charges', href: '/finance/recurring-charges' },
+];
+
+function formatDate(value: string | null): string {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString('en-NZ', {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -84,22 +109,53 @@ function formatDate(d: string | null): string {
 }
 
 export default function RecurringChargesIndex({
-    charges = { data: [], links: [], current_page: 1, last_page: 1, total: 0 },
-    filters = {} as any,
-    stats = {} as any,
+    charges,
+    filters = {},
+    stats,
     canManage = false,
     clients = [],
 }: Props) {
     const [createOpen, setCreateOpen] = useState(false);
     const [editCharge, setEditCharge] =
         useState<EditableRecurringCharge | null>(null);
+    const [deleteCharge, setDeleteCharge] = useState<RecurringCharge | null>(
+        null,
+    );
+    const [deleting, setDeleting] = useState(false);
+    const [search, setSearch] = useState(filters.q ?? '');
+    const ctxMenu = useEntityContextMenu<RecurringCharge>();
 
-    const updateFilters = (key: string, value: string | null) => {
-        router.get(
-            '/finance/recurring-charges',
-            { ...filters, [key]: value },
-            { preserveState: true, replace: true },
-        );
+    const go = (patch: Filters) => {
+        const next = { ...filters, ...patch };
+        const query: Record<string, string> = {};
+        if (next.q) query.q = next.q;
+        if (next.status && next.status !== ALL) query.status = next.status;
+        router.get('/finance/recurring-charges', query, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    useEffect(() => {
+        setSearch(filters.q ?? '');
+    }, [filters.q]);
+
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            if ((filters.q ?? '') !== search) {
+                go({ q: search.trim() || undefined });
+            }
+        }, 350);
+        return () => clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
+
+    const hasFilters = Boolean(filters.q || filters.status);
+
+    const clearFilters = () => {
+        setSearch('');
+        router.get('/finance/recurring-charges', {}, { preserveState: true });
     };
 
     const openEdit = (charge: RecurringCharge) =>
@@ -113,209 +169,244 @@ export default function RecurringChargesIndex({
             is_active: charge.is_active,
         });
 
-    return (
-        <AppLayout>
-            <Head title="Recurring Charges" />
-            <PageHero
-                category="finance"
-                icon={RefreshCw}
-                title="Recurring Charges"
-                description="Manage recurring billing charges for clients."
-                stats={[
-                    { label: 'Active', value: stats?.active ?? 0 },
-                    {
-                        label: 'Monthly total',
-                        value: formatMoney(stats?.monthly_total ?? 0),
-                    },
-                    { label: 'Next due', value: stats?.next_due ?? 0 },
-                ]}
-                footer={<ReceivablesTabsFooter active="recurring-charges" />}
-            />
-            <PageShell>
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <OpsStatCard
-                        label="Active Charges"
-                        value={stats?.active ?? 0}
-                        icon={RefreshCw}
-                        color="indigo"
-                    />
-                    <OpsStatCard
-                        label="Monthly Total"
-                        value={formatMoney(stats?.monthly_total ?? 0)}
-                        icon={DollarSign}
-                        color="emerald"
-                    />
-                    <OpsStatCard
-                        label="Next Charges Due"
-                        value={stats?.next_due ?? 0}
-                        icon={CalendarDays}
-                        color="amber"
-                    />
-                </div>
+    const clientName = (charge: RecurringCharge) =>
+        charge.client
+            ? `${charge.client.first_name} ${charge.client.last_name}`
+            : 'No client';
 
-                {/* Filters */}
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                            placeholder="Search recurring charges..."
-                            className="h-9 pl-8 text-sm"
-                            defaultValue={filters?.q ?? ''}
-                            onChange={(e) =>
-                                updateFilters('q', e.target.value || null)
-                            }
-                        />
-                    </div>
-                    <Select
-                        value={filters?.status ?? ANY}
-                        onValueChange={(v) =>
-                            updateFilters('status', v === ANY ? null : v)
-                        }
-                    >
-                        <SelectTrigger
-                            className="h-9 w-[130px] text-xs"
-                            aria-label="Filter by status"
-                        >
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Status</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                    </Select>
+    const actionsFor = (charge: RecurringCharge): MenuItem[] =>
+        compactMenu(
+            canManage
+                ? [
+                      {
+                          label: 'Edit charge',
+                          icon: Pencil,
+                          onClick: () => openEdit(charge),
+                      },
+                      { separator: true },
+                      {
+                          label: 'Delete charge',
+                          icon: Trash2,
+                          danger: true,
+                          onClick: () => setDeleteCharge(charge),
+                      },
+                  ]
+                : [],
+        );
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={RefreshCw}
+            title="Recurring charges"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={stats.active > 0 ? 'success' : 'neutral'}
+                >
+                    {stats.active} active
+                </PageHeaderStatusChip>
+            }
+            subline={`Scheduled client billing · ${formatMoney(
+                stats.monthly_total,
+            )} per cycle · ${stats.next_due} due in the next 7 days`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search charges, clients…"
+                    />
                     {canManage && (
-                        <Button size="sm" onClick={() => setCreateOpen(true)}>
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            New Charge
-                        </Button>
-                    )}
-                </div>
-
-                {/* List */}
-                <div className="mt-4 space-y-2">
-                    {(charges?.data ?? []).length === 0 && (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16">
-                                <RefreshCw className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <h2 className="text-lg font-semibold text-muted-foreground">
-                                    No Recurring Charges
-                                </h2>
-                                <p className="mt-1 text-sm text-muted-foreground/80">
-                                    Create your first recurring charge to get
-                                    started.
-                                </p>
-                                {canManage && (
-                                    <Button
-                                        size="sm"
-                                        className="mt-4"
-                                        onClick={() => setCreateOpen(true)}
-                                    >
-                                        Create Charge
-                                    </Button>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
-                    {(charges?.data ?? []).map((charge) => (
-                        <Card
-                            key={charge.id}
-                            className="transition-all hover:border-border hover:shadow-sm"
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
                         >
-                            <CardContent className="flex items-center gap-4 p-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70">
-                                    <RefreshCw className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-semibold">
-                                            {charge.name}
-                                        </span>
-                                        <Badge
-                                            variant={
-                                                charge.is_active
-                                                    ? 'default'
-                                                    : 'secondary'
-                                            }
-                                            className="h-4 px-1.5 text-[9px]"
-                                        >
-                                            {charge.is_active
-                                                ? 'Active'
-                                                : 'Inactive'}
-                                        </Badge>
-                                        <Badge
-                                            variant="outline"
-                                            className="h-4 px-1.5 text-[9px]"
-                                        >
-                                            {FREQUENCY_LABELS[
-                                                charge.frequency
-                                            ] ?? charge.frequency}
-                                        </Badge>
-                                    </div>
-                                    <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                                        {charge.client && (
-                                            <span>
-                                                {charge.client.first_name}{' '}
-                                                {charge.client.last_name}
-                                            </span>
-                                        )}
-                                        <span className="font-semibold text-status-success tabular-nums dark:text-status-success">
-                                            {formatMoney(charge.amount)}
-                                        </span>
-                                        {charge.next_charge_date && (
-                                            <span className="flex items-center gap-1">
-                                                <CalendarDays className="h-3 w-3" />
-                                                Next:{' '}
-                                                {formatDate(
-                                                    charge.next_charge_date,
-                                                )}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                {canManage && (
-                                    <div className="flex shrink-0 gap-1">
+                            New charge
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Active charges"
+                        tone="success"
+                        href="/finance/recurring-charges?status=active"
+                        ariaLabel="View active recurring charges"
+                    >
+                        <PageHeaderMeterBig>{stats.active}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Still generating billing
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Value per cycle"
+                        href="/finance/recurring-charges?status=active"
+                        ariaLabel="View the charges making up this value"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(stats.monthly_total)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Across active charges
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Due this week"
+                        tone={stats.next_due > 0 ? 'warning' : 'brand'}
+                        href="/finance/recurring-charges?status=active"
+                        ariaLabel="View charges due in the next seven days"
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.next_due}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Next charge within 7 days
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Paused"
+                        tone={stats.inactive > 0 ? 'warning' : 'brand'}
+                        href="/finance/recurring-charges?status=inactive"
+                        ariaLabel="View inactive recurring charges"
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.inactive}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Not generating billing
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    label="Status"
+                    value={filters.status || ALL}
+                    allValue={ALL}
+                    options={STATUS_OPTIONS}
+                    onChange={(value) =>
+                        go({ status: value === ALL ? undefined : value })
+                    }
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Recurring charges" />
+
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Recurring charges"
+                        caption={`${charges.data.length} of ${charges.total} shown`}
+                    />
+
+                    {charges.data.length === 0 ? (
+                        hasFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                title="No charges match your filters"
+                            />
+                        ) : (
+                            <EmptyList
+                                icon={RefreshCw}
+                                itemName="recurring charge"
+                                title="No recurring charges yet"
+                                description="Set up a scheduled charge so regular client billing raises itself."
+                                action={
+                                    canManage ? (
                                         <Button
                                             size="sm"
-                                            variant="ghost"
-                                            className="h-7 w-7 p-0"
-                                            aria-label={`Edit ${charge.name}`}
-                                            onClick={() => openEdit(charge)}
+                                            onClick={() => setCreateOpen(true)}
                                         >
-                                            <Pencil className="h-3.5 w-3.5" />
+                                            New charge
                                         </Button>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-
-                {/* Pagination */}
-                {(charges?.last_page ?? 1) > 1 && (
-                    <div className="mt-4 flex items-center justify-center gap-1">
-                        {(charges?.links ?? []).map((link: any, i: number) => (
-                            <Button
-                                key={i}
-                                size="sm"
-                                variant={link.active ? 'default' : 'outline'}
-                                className="h-7 min-w-[28px] px-2 text-xs"
-                                disabled={!link.url}
-                                onClick={() =>
-                                    link.url &&
-                                    router.get(
-                                        link.url,
-                                        {},
-                                        { preserveState: true },
-                                    )
+                                    ) : undefined
                                 }
-                                dangerouslySetInnerHTML={{ __html: link.label }}
                             />
-                        ))}
-                    </div>
-                )}
-            </PageShell>
+                        )
+                    ) : (
+                        <>
+                            <EntityCardGrid>
+                                {charges.data.map((charge) => (
+                                    <EntityCard
+                                        key={charge.id}
+                                        meridian={
+                                            charge.is_active
+                                                ? 'success'
+                                                : 'warning'
+                                        }
+                                        icon={RefreshCw}
+                                        name={charge.name}
+                                        subline={clientName(charge)}
+                                        actions={actionsFor(charge)}
+                                        onOpen={
+                                            canManage
+                                                ? () => openEdit(charge)
+                                                : undefined
+                                        }
+                                        openLabel="Edit"
+                                        onContextMenu={(e) =>
+                                            ctxMenu.open(e, charge)
+                                        }
+                                        muted={!charge.is_active}
+                                        chips={
+                                            <>
+                                                <EntityStatusChip
+                                                    variant={
+                                                        charge.is_active
+                                                            ? 'success'
+                                                            : 'neutral'
+                                                    }
+                                                >
+                                                    {charge.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
+                                                </EntityStatusChip>
+                                                <EntityChip outline>
+                                                    {FREQUENCY_LABELS[
+                                                        charge.frequency
+                                                    ] ?? charge.frequency}
+                                                </EntityChip>
+                                                <EntityChip icon={CalendarDays}>
+                                                    Next{' '}
+                                                    {formatDate(
+                                                        charge.next_charge_date,
+                                                    )}
+                                                </EntityChip>
+                                            </>
+                                        }
+                                        metric={{
+                                            label: 'Amount per cycle',
+                                            value: formatMoney(charge.amount),
+                                            percent: null,
+                                        }}
+                                    />
+                                ))}
+                            </EntityCardGrid>
+                            <LaravelPagination
+                                links={charges.links}
+                                lastPage={charges.last_page}
+                            />
+                        </>
+                    )}
+                </div>
+            </PageLayout>
+
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={RefreshCw}
+                    title={ctxMenu.ctx.record.name}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
 
             {canManage && (
                 <RecurringChargeDialog
@@ -334,6 +425,34 @@ export default function RecurringChargesIndex({
                     clients={clients}
                 />
             )}
+
+            <ConfirmDialog
+                variant="destructive"
+                open={deleteCharge !== null}
+                onClose={() => setDeleteCharge(null)}
+                title="Delete this recurring charge?"
+                description={
+                    deleteCharge
+                        ? `“${deleteCharge.name}” stops generating billing immediately. Billing entries it already raised are kept.`
+                        : ''
+                }
+                confirmText="Delete charge"
+                processing={deleting}
+                onConfirm={() => {
+                    if (!deleteCharge) return;
+                    router.delete(
+                        `/finance/recurring-charges/${deleteCharge.id}`,
+                        {
+                            preserveScroll: true,
+                            onStart: () => setDeleting(true),
+                            onFinish: () => {
+                                setDeleting(false);
+                                setDeleteCharge(null);
+                            },
+                        },
+                    );
+                }}
+            />
         </AppLayout>
     );
 }

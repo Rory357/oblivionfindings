@@ -1,5 +1,5 @@
 import { useForm } from '@inertiajs/react';
-import { FileText, ListChecks, Plus, Receipt, Trash2 } from 'lucide-react';
+import { FileText, ListChecks, Mail, Plus, Receipt, Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,8 @@ import {
 
 export type ClientOption = { id: number; name: string };
 export type TaxRateOption = { id: number; name: string; rate: string | number };
+/** A revenue/asset account a line can be coded to. */
+export type InvoiceAccountOption = { id: number; code: string; name: string };
 
 /** An existing draft invoice to prefill the wizard with (edit mode). */
 export type EditableInvoiceLine = {
@@ -28,6 +30,7 @@ export type EditableInvoiceLine = {
     quantity: string | number;
     unit_price: string | number;
     tax_rate_id: number | string | null;
+    account_id?: number | string | null;
 };
 export type EditableInvoice = {
     id: number;
@@ -37,6 +40,9 @@ export type EditableInvoice = {
     invoice_date: string;
     due_date: string;
     notes: string | null;
+    terms?: string | null;
+    email_subject?: string | null;
+    email_body?: string | null;
     lines: EditableInvoiceLine[];
 };
 
@@ -45,6 +51,7 @@ type LineForm = {
     quantity: string;
     unit_price: string;
     tax_rate_id: string; // 'default' = NZ GST 15% (mapped to null server-side)
+    account_id: string; // 'none' = let the posting rules pick the revenue account
 };
 
 const emptyLine = (): LineForm => ({
@@ -52,6 +59,7 @@ const emptyLine = (): LineForm => ({
     quantity: '1',
     unit_price: '',
     tax_rate_id: 'default',
+    account_id: 'none',
 });
 
 /** Map a stored line (tax_rate_id FK or null) into the form shape ('default' = no rate). */
@@ -60,6 +68,7 @@ const lineFromInvoice = (l: EditableInvoiceLine): LineForm => ({
     quantity: String(l.quantity ?? '1'),
     unit_price: String(l.unit_price ?? ''),
     tax_rate_id: l.tax_rate_id != null ? String(l.tax_rate_id) : 'default',
+    account_id: l.account_id != null ? String(l.account_id) : 'none',
 });
 
 const STEPS: readonly WizardStep[] = [
@@ -69,6 +78,12 @@ const STEPS: readonly WizardStep[] = [
         label: 'Line items',
         blurb: 'What you are billing',
         icon: Receipt,
+    },
+    {
+        key: 'delivery',
+        label: 'Terms & email',
+        blurb: 'How it reads when sent',
+        icon: Mail,
     },
     {
         key: 'review',
@@ -102,12 +117,15 @@ export function NewInvoiceDialog({
     onClose,
     clients,
     taxRates,
+    accounts = [],
     invoice,
 }: {
     open: boolean;
     onClose: () => void;
     clients: ClientOption[];
     taxRates: TaxRateOption[];
+    /** Revenue/asset accounts for per-line coding. Omit to hide the picker. */
+    accounts?: InvoiceAccountOption[];
     /** When provided, the wizard opens in EDIT mode (prefilled, PUTs the update). */
     invoice?: EditableInvoice | null;
 }) {
@@ -123,6 +141,9 @@ export function NewInvoiceDialog({
         invoice_date: string;
         due_date: string;
         notes: string;
+        terms: string;
+        email_subject: string;
+        email_body: string;
         lines: LineForm[];
     }>(
         invoice
@@ -137,6 +158,9 @@ export function NewInvoiceDialog({
                   invoice_date: String(invoice.invoice_date).slice(0, 10),
                   due_date: String(invoice.due_date).slice(0, 10),
                   notes: invoice.notes ?? '',
+                  terms: invoice.terms ?? '',
+                  email_subject: invoice.email_subject ?? '',
+                  email_body: invoice.email_body ?? '',
                   lines: invoice.lines.length
                       ? invoice.lines.map(lineFromInvoice)
                       : [emptyLine()],
@@ -149,6 +173,9 @@ export function NewInvoiceDialog({
                   invoice_date: today(),
                   due_date: plusDays(30),
                   notes: '',
+                  terms: '',
+                  email_subject: '',
+                  email_body: '',
                   lines: [emptyLine()],
               },
     );
@@ -164,6 +191,14 @@ export function NewInvoiceDialog({
         ...taxRates.map((t) => ({
             value: String(t.id),
             label: `${t.name} (${Number(t.rate)}%)`,
+        })),
+    ];
+    // 'none' (not '') keeps Radix happy and the request maps it to null.
+    const accountOptions = [
+        { value: 'none', label: 'Default revenue account' },
+        ...accounts.map((a) => ({
+            value: String(a.id),
+            label: `${a.code} — ${a.name}`,
         })),
     ];
     const rateFor = (id: string): number => {
@@ -232,11 +267,15 @@ export function NewInvoiceDialog({
             invoice_date: d.invoice_date,
             due_date: d.due_date,
             notes: d.notes || null,
+            terms: d.terms || null,
+            email_subject: d.email_subject || null,
+            email_body: d.email_body || null,
             lines: d.lines.map((l) => ({
                 description: l.description,
                 quantity: l.quantity,
                 unit_price: l.unit_price,
                 tax_rate_id: l.tax_rate_id, // 'default' → null server-side
+                account_id: l.account_id, // 'none' → null server-side
             })),
         }));
         const opts = {
@@ -532,6 +571,26 @@ export function NewInvoiceDialog({
                                                 options={taxOptions}
                                             />
                                         </Field>
+                                        {accounts.length > 0 && (
+                                            <Field
+                                                label="Account"
+                                                hint="optional"
+                                            >
+                                                <SelectInput
+                                                    value={line.account_id}
+                                                    onChange={(v) =>
+                                                        updateLine(
+                                                            i,
+                                                            'account_id',
+                                                            v,
+                                                        )
+                                                    }
+                                                    placeholder="Default revenue account"
+                                                    options={accountOptions}
+                                                    ariaLabel={`Line ${i + 1} revenue account`}
+                                                />
+                                            </Field>
+                                        )}
                                         <Field label="Line net">
                                             <div className="flex h-9 items-center px-1 text-sm font-medium tabular-nums">
                                                 {money(net)}
@@ -593,6 +652,62 @@ export function NewInvoiceDialog({
             {index === 2 && (
                 <div>
                     <StepHead
+                        icon={Mail}
+                        title="Terms & email"
+                        blurb="Payment terms printed on the invoice, and the covering email used when it is sent."
+                    />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <Field
+                            label="Payment terms"
+                            span
+                            hint="optional"
+                            error={errors.terms}
+                        >
+                            <Textarea
+                                rows={2}
+                                value={data.terms}
+                                onChange={(e) =>
+                                    setData('terms', e.target.value)
+                                }
+                                placeholder="e.g. Payable within 20 days of the statement month"
+                            />
+                        </Field>
+                        <Field
+                            label="Email subject"
+                            span
+                            hint="optional"
+                            error={errors.email_subject}
+                        >
+                            <Input
+                                value={data.email_subject}
+                                onChange={(e) =>
+                                    setData('email_subject', e.target.value)
+                                }
+                                placeholder="e.g. Invoice from Oblivion Findings"
+                            />
+                        </Field>
+                        <Field
+                            label="Email message"
+                            span
+                            hint="optional"
+                            error={errors.email_body}
+                        >
+                            <Textarea
+                                rows={4}
+                                value={data.email_body}
+                                onChange={(e) =>
+                                    setData('email_body', e.target.value)
+                                }
+                                placeholder="Kia ora, please find this month's invoice attached."
+                            />
+                        </Field>
+                    </div>
+                </div>
+            )}
+
+            {index === 3 && (
+                <div>
+                    <StepHead
                         icon={ListChecks}
                         title={isEdit ? 'Review & save' : 'Review & create'}
                         blurb={
@@ -627,6 +742,18 @@ export function NewInvoiceDialog({
                             label="Total (NZD)"
                             value={money(totals.total)}
                         />
+                        {data.terms && (
+                            <ReviewRow
+                                label="Payment terms"
+                                value={data.terms}
+                            />
+                        )}
+                        {data.email_subject && (
+                            <ReviewRow
+                                label="Email subject"
+                                value={data.email_subject}
+                            />
+                        )}
                     </ReviewCard>
                     {processing && (
                         <p className="mt-3 text-[13px] text-muted-foreground">

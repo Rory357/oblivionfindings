@@ -47,47 +47,18 @@ class BillingController extends Controller
             ->where('status', 'pending')
             ->count();
 
-        $recentEntries = (clone $baseQuery)
-            ->with(['client:id,first_name,last_name', 'staff:id,name'])
-            ->orderByDesc('service_date')
-            ->limit(10)
-            ->get();
-
         $statusBreakdown = (clone $baseQuery)
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status')
             ->toArray();
 
-        $entries = (clone $baseQuery)
-            ->with(['client:id,first_name,last_name', 'staff:id,name', 'serviceAgreement:id,title'])
-            ->when(! empty($request->get('status')), fn ($q) => $q->where('status', $request->get('status')))
-            ->when(! empty($request->get('q')), fn ($q) => $q->where('notes', 'like', '%'.$request->get('q').'%'))
-            ->orderByDesc('service_date')
-            ->paginate(20)
-            ->withQueryString();
-
-        return inertia('finance/billing/Index', [
-            'stats' => [
-                'billed_this_month' => (float) $totalBilledThisMonth,
-                'outstanding' => (float) $outstanding,
-                'paid_this_month' => (float) $paidThisMonth,
-                'pending_count' => $pendingCount,
-            ],
-            'entries' => $entries,
-            'status_breakdown' => $statusBreakdown,
-            'filters' => $request->only(['status', 'q']),
-        ]);
-    }
-
-    public function entries(Request $request)
-    {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('finance.ar.view'), 403);
-
+        // The retired /billing/entries page's filters now live on this index —
+        // it is the one place delivered-support entries are listed.
         $data = $request->validate([
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             'status' => ['nullable', 'string', 'in:pending,approved,billed,paid,cancelled'],
+            'q' => ['nullable', 'string', 'max:255'],
+            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
@@ -100,14 +71,23 @@ class BillingController extends Controller
             );
         }
 
-        $entries = $this->accessibleEntries($auth)
+        $entries = (clone $baseQuery)
             ->with(['client:id,first_name,last_name', 'staff:id,name', 'serviceAgreement:id,title'])
-            ->when(! empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
             ->when(! empty($data['status']), fn ($q) => $q->where('status', $data['status']))
+            ->when(! empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
             ->when(! empty($data['date_from']), fn ($q) => $q->where('service_date', '>=', $data['date_from']))
             ->when(! empty($data['date_to']), fn ($q) => $q->where('service_date', '<=', $data['date_to']))
+            ->when(! empty($data['q']), function ($query) use ($data): void {
+                $search = '%'.$data['q'].'%';
+                $query->where(function ($inner) use ($search): void {
+                    $inner->where('notes', 'like', $search)
+                        ->orWhereHas('client', fn ($clientQuery) => $clientQuery
+                            ->where('first_name', 'like', $search)
+                            ->orWhere('last_name', 'like', $search));
+                });
+            })
             ->orderByDesc('service_date')
-            ->paginate(25)
+            ->paginate(20)
             ->withQueryString();
 
         $clients = $this->siteAccess->applyClientScope(
@@ -117,10 +97,17 @@ class BillingController extends Controller
         )
             ->get(['id', 'first_name', 'last_name']);
 
-        return inertia('finance/billing/Entries', [
+        return inertia('finance/billing/Index', [
+            'stats' => [
+                'billed_this_month' => (float) $totalBilledThisMonth,
+                'outstanding' => (float) $outstanding,
+                'paid_this_month' => (float) $paidThisMonth,
+                'pending_count' => $pendingCount,
+            ],
             'entries' => $entries,
             'clients' => $clients,
-            'filters' => $request->only(['client_id', 'status', 'date_from', 'date_to']),
+            'status_breakdown' => $statusBreakdown,
+            'filters' => $request->only(['status', 'q', 'client_id', 'date_from', 'date_to']),
         ]);
     }
 

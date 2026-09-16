@@ -40,13 +40,29 @@ class FinanceNavMoveTest extends TestCase
 
         foreach ([
             '/finance/billing',
-            '/finance/billing/entries',
             '/finance/invoices',
             '/finance/price-books',
             '/finance/quotes',
             '/finance/recurring-charges',
         ] as $path) {
             $this->actingAs($user)->get($path)->assertOk();
+        }
+    }
+
+    public function test_retired_finance_page_urls_redirect_to_their_register(): void
+    {
+        $user = User::factory()->create([
+            'organization_id' => 1,
+            'approved_at' => now(),
+        ]);
+        $this->grantPermissions($user, ['finance.ar.view', 'finance.ar.manage']);
+
+        foreach ([
+            '/finance/billing/entries' => '/finance/billing',
+            '/finance/invoices/create' => '/finance/invoices',
+            '/finance/receivables/aging' => '/finance/receivables',
+        ] as $path => $target) {
+            $this->actingAs($user)->get($path)->assertRedirect($target);
         }
     }
 

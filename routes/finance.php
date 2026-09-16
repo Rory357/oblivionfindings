@@ -344,9 +344,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     // workflows below; there is no generic polymorphic allocation write route.
 
     // ── Accounts Receivable ─────────────────────────────────────────────
+    // The Aged AR rail view IS the ageing report; the old /aging URL is kept as
+    // a bookmark redirect, with Statements as its tier-2 sibling.
+    Route::redirect('/receivables/aging', '/finance/receivables')->name('receivables.aging');
     Route::middleware('permission:finance.ar.view')->group(function () {
         Route::get('/receivables', [AccountsReceivableController::class, 'index'])->name('receivables.index');
-        Route::get('/receivables/aging', [AccountsReceivableController::class, 'aging'])->name('receivables.aging');
         Route::get('/receivables/statements', [AccountsReceivableController::class, 'statements'])->name('receivables.statements');
     });
 
@@ -355,9 +357,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         ->middleware('permission:finance.ar.manage');
 
     // ── Billing ────────────────────────────────────────────────────────
+    // The Billing index IS the entries register (client/status/date filters live
+    // in its header), so the old standalone entries URL redirects to it.
+    Route::redirect('/billing/entries', '/finance/billing')->name('billing.entries');
     Route::middleware('permission:finance.ar.view')->group(function () {
         Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
-        Route::get('/billing/entries', [BillingController::class, 'entries'])->name('billing.entries');
     });
 
     // ── Price Books ────────────────────────────────────────────────────
@@ -680,18 +684,16 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/invoices/export', [InvoiceController::class, 'export'])
         ->name('invoices.export')
         ->middleware('permission:finance.ar.view');
-    Route::get('/invoices/create', [InvoiceController::class, 'create'])
-        ->name('invoices.create')
-        ->middleware('permission:finance.ar.manage');
+    // Create/edit are the NewInvoiceDialog WizardShell on the index and the
+    // invoice's own page; the retired full-page forms redirect back to the list.
+    Route::redirect('/invoices/create', '/finance/invoices')->name('invoices.create');
     Route::post('/invoices', [InvoiceController::class, 'store'])
         ->name('invoices.store')
         ->middleware('permission:finance.ar.manage');
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])
         ->name('invoices.show')
         ->middleware('permission:finance.ar.view');
-    Route::get('/invoices/{invoice}/edit', [InvoiceController::class, 'edit'])
-        ->name('invoices.edit')
-        ->middleware('permission:finance.ar.manage');
+    Route::redirect('/invoices/{invoice}/edit', '/finance/invoices')->name('invoices.edit');
     Route::put('/invoices/{invoice}', [InvoiceController::class, 'update'])
         ->name('invoices.update')
         ->middleware('permission:finance.ar.manage');

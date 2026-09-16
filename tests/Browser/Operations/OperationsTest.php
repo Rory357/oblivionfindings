@@ -410,13 +410,13 @@ test('operations activity page loads', function () {
     });
 });
 
-test('finance billing entries page loads', function () {
+test('finance billing entries url redirects to the billing register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/billing/entries')
-            ->waitForText('Entr', 10)
-            ->assertPathIs('/finance/billing/entries');
+            ->waitForText('Billing', 10)
+            ->assertPathIs('/finance/billing');
     });
 });
 
@@ -460,13 +460,13 @@ test('operations geofences create page loads', function () {
     });
 });
 
-test('finance invoices create page loads', function () {
+test('finance invoices create url redirects to the index (modal flow)', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/invoices/create')
-            ->waitForText('Invoice', 10)
-            ->assertPathIs('/finance/invoices/create');
+            ->waitForText('Invoices', 10)
+            ->assertPathIs('/finance/invoices');
     });
 });
 
@@ -510,13 +510,13 @@ test('finance price books create url redirects to the index (modal flow)', funct
     });
 });
 
-test('finance quotes create page loads', function () {
+test('finance quotes create url redirects to the index (modal flow)', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/quotes/create')
-            ->waitForText('Quote', 10)
-            ->assertPathIs('/finance/quotes/create');
+            ->waitForText('Quotes', 10)
+            ->assertPathIs('/finance/quotes');
     });
 });
 

@@ -44,7 +44,13 @@ class InvoiceController extends Controller
             ->orderBy('invoice_date', 'desc');
 
         if ($request->filled('status')) {
-            $query->ofStatus($request->input('status'));
+            // "unpaid" is a view, not a stored status — it is what the Aged AR
+            // rail view and the Outstanding meter link to.
+            if ($request->input('status') === 'unpaid') {
+                $query->whereIn('status', ['sent', 'viewed', 'overdue']);
+            } else {
+                $query->ofStatus($request->input('status'));
+            }
         }
 
         if ($request->filled('search')) {
@@ -96,12 +102,18 @@ class InvoiceController extends Controller
         });
 
         $allInvoices = FinInvoice::forOrganization($orgId)->get();
+        $outstanding = $allInvoices->whereIn('status', ['sent', 'viewed', 'overdue']);
+        $overdue = $allInvoices->where('status', 'overdue');
+        $paidThisMonth = $allInvoices->where('status', 'paid')
+            ->where('paid_at', '>=', now()->startOfMonth());
         $summary = [
-            'total_outstanding' => $allInvoices->whereIn('status', ['sent', 'viewed', 'overdue'])->sum('total_amount'),
-            'total_overdue' => $allInvoices->where('status', 'overdue')->sum('total_amount'),
+            'total_outstanding' => $outstanding->sum('total_amount'),
+            'outstanding_count' => $outstanding->count(),
+            'total_overdue' => $overdue->sum('total_amount'),
+            'overdue_count' => $overdue->count(),
             'draft_count' => $allInvoices->where('status', 'draft')->count(),
-            'paid_this_month' => $allInvoices->where('status', 'paid')
-                ->where('paid_at', '>=', now()->startOfMonth())->sum('total_amount'),
+            'paid_this_month' => $paidThisMonth->sum('total_amount'),
+            'paid_this_month_count' => $paidThisMonth->count(),
         ];
 
         $canManage = (bool) $request->user()?->canDo('finance.ar.manage');
@@ -121,6 +133,9 @@ class InvoiceController extends Controller
             'taxRates' => $canManage
                 ? FinTaxRate::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'name', 'rate'])
                 : [],
+            // Per-line revenue coding in the invoice modal (parity with the
+            // retired routed edit page).
+            'accounts' => $canManage ? $this->invoiceLineAccounts($orgId) : [],
         ]);
     }
 
@@ -135,7 +150,11 @@ class InvoiceController extends Controller
         $query = FinInvoice::forOrganization($orgId)->orderBy('invoice_date', 'desc');
 
         if ($request->filled('status')) {
-            $query->ofStatus($request->input('status'));
+            if ($request->input('status') === 'unpaid') {
+                $query->whereIn('status', ['sent', 'viewed', 'overdue']);
+            } else {
+                $query->ofStatus($request->input('status'));
+            }
         }
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -166,45 +185,6 @@ class InvoiceController extends Controller
             ['Invoice #', 'Client / Funder', 'Invoice Date', 'Due Date', 'Subtotal', 'GST', 'Total', 'Status'],
             $rows,
         );
-    }
-
-    public function create(Request $request)
-    {
-        $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;
-
-        $accounts = FinAccount::forOrganization($orgId)
-            ->active()
-            ->whereIn('type', ['revenue', 'income', 'asset'])
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'type']);
-
-        $taxRates = FinTaxRate::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'rate']);
-
-        $bills = FinBill::forOrganization($orgId)
-            ->with('vendor:id,name')
-            ->orderBy('bill_date', 'desc')
-            ->limit(50)
-            ->get(['id', 'bill_number', 'vendor_id', 'total_amount']);
-
-        $clients = $this->clientOptions($request->user());
-
-        $billingEntries = $this->accessibleBillingEntries($request->user())
-            ->whereIn('status', ['pending', 'approved'])
-            ->with(['client:id,first_name,last_name'])
-            ->orderByDesc('service_date')
-            ->limit(250)
-            ->get();
-
-        return Inertia::render('finance/invoices/Create', [
-            'accounts' => $accounts,
-            'taxRates' => $taxRates,
-            'bills' => $bills,
-            'clients' => $clients,
-            'billingEntries' => $billingEntries,
-        ]);
     }
 
     public function store(
@@ -425,48 +405,30 @@ class InvoiceController extends Controller
             'journal:id,journal_number,status,posted_at',
         ]);
 
+        $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;
+        $canManage = (bool) $request->user()?->canDo('finance.ar.manage');
+
+        // The outstanding balance drives both the header meter and the
+        // Record-receipt wizard's default (and cap).
+        $paid = (float) FinPaymentAllocation::where('allocatable_type', FinInvoice::class)
+            ->where('allocatable_id', $invoice->id)
+            ->sum('amount');
+        $invoice->amount_paid = round($paid, 2);
+        $invoice->amount_due = round((float) $invoice->total_amount - $paid, 2);
+
         return Inertia::render('finance/invoices/Show', [
             'invoice' => $invoice,
-        ]);
-    }
-
-    public function edit(Request $request, FinInvoice $invoice)
-    {
-        if ($this->isDeliveryBoundInvoice($invoice)) {
-            return redirect()->route('finance.invoices.show', $invoice)
-                ->with('error', 'Delivered-support invoice provenance is immutable; use the finance correction workflow.');
-        }
-        if ($invoice->status !== 'draft') {
-            return redirect()->route('finance.invoices.show', $invoice)
-                ->with('error', 'Only draft invoices can be edited.');
-        }
-
-        $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;
-
-        $invoice->load('lines');
-
-        $accounts = FinAccount::forOrganization($orgId)
-            ->active()
-            ->whereIn('type', ['revenue', 'income', 'asset'])
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'type']);
-
-        $taxRates = FinTaxRate::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'rate']);
-
-        $bills = FinBill::forOrganization($orgId)
-            ->with('vendor:id,name')
-            ->orderBy('bill_date', 'desc')
-            ->limit(50)
-            ->get(['id', 'bill_number', 'vendor_id', 'total_amount']);
-
-        return Inertia::render('finance/invoices/Edit', [
-            'invoice' => $invoice,
-            'accounts' => $accounts,
-            'taxRates' => $taxRates,
-            'bills' => $bills,
+            'canManage' => $canManage,
+            // Reference data for the in-place edit modal (draft invoices only).
+            'clients' => $canManage
+                ? $this->clientOptions($request->user())
+                    ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)])
+                    ->values()
+                : [],
+            'taxRates' => $canManage
+                ? FinTaxRate::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'name', 'rate'])
+                : [],
+            'accounts' => $canManage ? $this->invoiceLineAccounts($orgId) : [],
         ]);
     }
 
@@ -739,6 +701,16 @@ class InvoiceController extends Controller
     {
         return $invoice->source_type === BillingEntry::class
             || $invoice->lines()->whereNotNull('billing_entry_id')->exists();
+    }
+
+    /** Revenue/asset accounts an invoice line can be coded to. */
+    private function invoiceLineAccounts(int $orgId)
+    {
+        return FinAccount::forOrganization($orgId)
+            ->active()
+            ->whereIn('type', ['revenue', 'income', 'asset'])
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
     }
 
     private function clientOptions(User $user)

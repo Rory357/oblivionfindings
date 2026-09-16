@@ -1,37 +1,47 @@
 import {
+    FinanceSectionRail,
     PriceBookDialog,
-    ReceivablesTabsFooter,
     type EditablePriceBook,
 } from '@/components/finance';
-import { OpsStatCard } from '@/components/ops-stat-card';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    EntityCard,
+    EntityCardGrid,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
 import {
     BookOpen,
     CalendarDays,
     Eye,
-    Hash,
     Pencil,
     Plus,
-    Search,
     Star,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-const ANY = '__ANY__';
+const ALL = '__all';
 
 type PriceBook = {
     id: number;
@@ -44,29 +54,42 @@ type PriceBook = {
     items_count: number;
 };
 
+type Filters = { q?: string; status?: string };
+
 type Props = {
     price_books: {
         data: PriceBook[];
-        links: any[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
         current_page: number;
         last_page: number;
         total: number;
     };
-    filters: {
-        q?: string;
-        status?: string;
-    };
+    filters: Filters;
     stats: {
         total: number;
+        active: number;
         active_items: number;
         default_book: string;
     };
     canManage: boolean;
 };
 
-function formatDate(d: string | null): string {
-    if (!d) return '-';
-    return new Date(d).toLocaleDateString('en-NZ', {
+const STATUS_OPTIONS = [
+    { value: ALL, label: 'Any status' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+];
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Receivables', href: '/finance/invoices' },
+    { title: 'Price books', href: '/finance/price-books' },
+];
+
+function formatDate(value: string | null): string {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString('en-NZ', {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -74,26 +97,47 @@ function formatDate(d: string | null): string {
 }
 
 export default function PriceBooksIndex({
-    price_books = {
-        data: [],
-        links: [],
-        current_page: 1,
-        last_page: 1,
-        total: 0,
-    },
-    filters = {} as any,
-    stats = {} as any,
+    price_books,
+    filters = {},
+    stats,
     canManage = false,
 }: Props) {
     const [createOpen, setCreateOpen] = useState(false);
     const [editBook, setEditBook] = useState<EditablePriceBook | null>(null);
+    const [search, setSearch] = useState(filters.q ?? '');
+    const ctxMenu = useEntityContextMenu<PriceBook>();
 
-    const updateFilters = (key: string, value: string | null) => {
-        router.get(
-            '/finance/price-books',
-            { ...filters, [key]: value },
-            { preserveState: true, replace: true },
-        );
+    const go = (patch: Filters) => {
+        const next = { ...filters, ...patch };
+        const query: Record<string, string> = {};
+        if (next.q) query.q = next.q;
+        if (next.status && next.status !== ALL) query.status = next.status;
+        router.get('/finance/price-books', query, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    useEffect(() => {
+        setSearch(filters.q ?? '');
+    }, [filters.q]);
+
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            if ((filters.q ?? '') !== search) {
+                go({ q: search.trim() || undefined });
+            }
+        }, 350);
+        return () => clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
+
+    const hasFilters = Boolean(filters.q || filters.status);
+
+    const clearFilters = () => {
+        setSearch('');
+        router.get('/finance/price-books', {}, { preserveState: true });
     };
 
     const openEdit = (book: PriceBook) =>
@@ -106,229 +150,235 @@ export default function PriceBooksIndex({
             is_active: book.is_active,
         });
 
-    return (
-        <AppLayout>
-            <Head title="Price Books" />
-            <PageHero
-                category="finance"
-                icon={BookOpen}
-                title="Price Books"
-                description="Manage pricing structures and rate schedules for services."
-                stats={[
-                    { label: 'Total books', value: stats?.total ?? 0 },
-                    { label: 'Active items', value: stats?.active_items ?? 0 },
-                    {
-                        label: 'Default book',
-                        value: stats?.default_book ?? 'None',
-                    },
-                ]}
-                footer={<ReceivablesTabsFooter active="price-books" />}
-            />
-            <PageShell>
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <OpsStatCard
-                        label="Total Books"
-                        value={stats?.total ?? 0}
-                        icon={BookOpen}
-                        color="indigo"
-                    />
-                    <OpsStatCard
-                        label="Active Items"
-                        value={stats?.active_items ?? 0}
-                        icon={Hash}
-                        color="emerald"
-                    />
-                    <OpsStatCard
-                        label="Default Book"
-                        value={stats?.default_book ?? 'None'}
-                        icon={Star}
-                        color="amber"
-                    />
-                </div>
+    const actionsFor = (book: PriceBook): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Open price book',
+                icon: Eye,
+                onClick: () => router.visit(`/finance/price-books/${book.id}`),
+            },
+            canManage
+                ? {
+                      label: 'Edit details',
+                      icon: Pencil,
+                      onClick: () => openEdit(book),
+                  }
+                : null,
+        ]);
 
-                {/* Filters */}
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                            placeholder="Search price books..."
-                            className="h-9 pl-8 text-sm"
-                            defaultValue={filters?.q ?? ''}
-                            onChange={(e) =>
-                                updateFilters('q', e.target.value || null)
-                            }
-                        />
-                    </div>
-                    <Select
-                        value={filters?.status ?? ANY}
-                        onValueChange={(v) =>
-                            updateFilters('status', v === ANY ? null : v)
-                        }
-                    >
-                        <SelectTrigger
-                            className="h-9 w-[130px] text-xs"
-                            aria-label="Filter by status"
-                        >
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Status</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                    </Select>
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={BookOpen}
+            title="Price books"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={stats.active > 0 ? 'success' : 'neutral'}
+                >
+                    {stats.active} active
+                </PageHeaderStatusChip>
+            }
+            subline={`Rate cards for quotes and invoices · ${stats.total} books · default ${stats.default_book}`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search price books…"
+                    />
                     {canManage && (
-                        <Button size="sm" onClick={() => setCreateOpen(true)}>
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            New Price Book
-                        </Button>
-                    )}
-                </div>
-
-                {/* List */}
-                <div className="mt-4 space-y-2">
-                    {(price_books?.data ?? []).length === 0 && (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16">
-                                <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <h2 className="text-lg font-semibold text-muted-foreground">
-                                    No Price Books Found
-                                </h2>
-                                <p className="mt-1 text-sm text-muted-foreground/80">
-                                    Create your first price book to get started.
-                                </p>
-                                {canManage && (
-                                    <Button
-                                        size="sm"
-                                        className="mt-4"
-                                        onClick={() => setCreateOpen(true)}
-                                    >
-                                        Create Price Book
-                                    </Button>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
-                    {(price_books?.data ?? []).map((book) => (
-                        <Card
-                            key={book.id}
-                            className="transition-all hover:border-border hover:shadow-sm"
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
                         >
-                            <CardContent className="flex items-center gap-4 p-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70">
-                                    <BookOpen className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <Link
-                                            href={`/finance/price-books/${book.id}`}
-                                            className="text-sm font-semibold hover:underline"
-                                        >
-                                            {book.name}
-                                        </Link>
-                                        <Badge
-                                            variant={
-                                                book.is_active
-                                                    ? 'default'
-                                                    : 'secondary'
-                                            }
-                                            className="h-4 px-1.5 text-[9px]"
-                                        >
-                                            {book.is_active
-                                                ? 'Active'
-                                                : 'Inactive'}
-                                        </Badge>
-                                        {book.is_default && (
-                                            <Badge
-                                                variant="outline"
-                                                className="h-4 px-1.5 text-[9px]"
-                                            >
-                                                <Star className="mr-0.5 h-2.5 w-2.5" />{' '}
-                                                Default
-                                            </Badge>
-                                        )}
-                                    </div>
-                                    <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                                        <span>{book.items_count} items</span>
-                                        {book.effective_from && (
-                                            <span className="flex items-center gap-1">
-                                                <CalendarDays className="h-3 w-3" />
-                                                {formatDate(
-                                                    book.effective_from,
-                                                )}{' '}
-                                                -{' '}
-                                                {formatDate(book.effective_to)}
-                                            </span>
-                                        )}
-                                        {book.description && (
-                                            <span className="truncate">
-                                                {book.description}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex shrink-0 gap-1">
-                                    <Button
-                                        asChild
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0"
-                                    >
-                                        <Link
-                                            href={`/finance/price-books/${book.id}`}
-                                            aria-label={`View ${book.name}`}
-                                        >
-                                            <Eye className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
-                                    {canManage && (
+                            New price book
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Price books"
+                        href="/finance/price-books"
+                        ariaLabel="View every price book"
+                    >
+                        <PageHeaderMeterBig>{stats.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Rate cards in the register
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Active"
+                        tone="success"
+                        href="/finance/price-books?status=active"
+                        ariaLabel="View active price books"
+                    >
+                        <PageHeaderMeterBig>{stats.active}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            In use for new quotes
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Rate items"
+                        href="/finance/price-books?status=active"
+                        ariaLabel="View the books holding these rates"
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.active_items}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Active priced services
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Retired"
+                        tone={
+                            stats.total - stats.active > 0 ? 'warning' : 'brand'
+                        }
+                        href="/finance/price-books?status=inactive"
+                        ariaLabel="View inactive price books"
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.total - stats.active}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Inactive rate cards
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    label="Status"
+                    value={filters.status || ALL}
+                    allValue={ALL}
+                    options={STATUS_OPTIONS}
+                    onChange={(value) =>
+                        go({ status: value === ALL ? undefined : value })
+                    }
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Price books" />
+
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Price books"
+                        caption={`${price_books.data.length} of ${price_books.total} shown`}
+                    />
+
+                    {price_books.data.length === 0 ? (
+                        hasFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                title="No price books match your filters"
+                            />
+                        ) : (
+                            <EmptyList
+                                icon={BookOpen}
+                                itemName="price book"
+                                title="No price books yet"
+                                description="Create a rate card so quotes and invoices can be built from agreed prices."
+                                action={
+                                    canManage ? (
                                         <Button
                                             size="sm"
-                                            variant="ghost"
-                                            className="h-7 w-7 p-0"
-                                            aria-label={`Edit ${book.name}`}
-                                            onClick={() => openEdit(book)}
+                                            onClick={() => setCreateOpen(true)}
                                         >
-                                            <Pencil className="h-3.5 w-3.5" />
+                                            New price book
                                         </Button>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                    ) : undefined
+                                }
+                            />
+                        )
+                    ) : (
+                        <>
+                            <EntityCardGrid>
+                                {price_books.data.map((book) => (
+                                    <EntityCard
+                                        key={book.id}
+                                        meridian={
+                                            book.is_active
+                                                ? 'success'
+                                                : 'warning'
+                                        }
+                                        icon={BookOpen}
+                                        name={book.name}
+                                        subline={
+                                            book.description ?? 'No description'
+                                        }
+                                        actions={actionsFor(book)}
+                                        href={`/finance/price-books/${book.id}`}
+                                        onContextMenu={(e) =>
+                                            ctxMenu.open(e, book)
+                                        }
+                                        muted={!book.is_active}
+                                        chips={
+                                            <>
+                                                <EntityStatusChip
+                                                    variant={
+                                                        book.is_active
+                                                            ? 'success'
+                                                            : 'neutral'
+                                                    }
+                                                >
+                                                    {book.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
+                                                </EntityStatusChip>
+                                                {book.is_default ? (
+                                                    <EntityChip icon={Star}>
+                                                        Default
+                                                    </EntityChip>
+                                                ) : null}
+                                                <EntityChip
+                                                    outline
+                                                    icon={CalendarDays}
+                                                >
+                                                    {formatDate(
+                                                        book.effective_from,
+                                                    )}{' '}
+                                                    –{' '}
+                                                    {formatDate(
+                                                        book.effective_to,
+                                                    )}
+                                                </EntityChip>
+                                            </>
+                                        }
+                                        metric={{
+                                            label: 'Rate items',
+                                            value: String(book.items_count),
+                                            percent: null,
+                                        }}
+                                    />
+                                ))}
+                            </EntityCardGrid>
+                            <LaravelPagination
+                                links={price_books.links}
+                                lastPage={price_books.last_page}
+                            />
+                        </>
+                    )}
                 </div>
+            </PageLayout>
 
-                {/* Pagination */}
-                {(price_books?.last_page ?? 1) > 1 && (
-                    <div className="mt-4 flex items-center justify-center gap-1">
-                        {(price_books?.links ?? []).map(
-                            (link: any, i: number) => (
-                                <Button
-                                    key={i}
-                                    size="sm"
-                                    variant={
-                                        link.active ? 'default' : 'outline'
-                                    }
-                                    className="h-7 min-w-[28px] px-2 text-xs"
-                                    disabled={!link.url}
-                                    onClick={() =>
-                                        link.url &&
-                                        router.get(
-                                            link.url,
-                                            {},
-                                            { preserveState: true },
-                                        )
-                                    }
-                                    dangerouslySetInnerHTML={{
-                                        __html: link.label,
-                                    }}
-                                />
-                            ),
-                        )}
-                    </div>
-                )}
-            </PageShell>
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={BookOpen}
+                    title={ctxMenu.ctx.record.name}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
 
             {canManage && (
                 <PriceBookDialog

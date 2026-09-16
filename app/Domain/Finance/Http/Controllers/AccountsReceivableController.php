@@ -16,58 +16,30 @@ class AccountsReceivableController extends Controller
     ) {}
 
     /**
-     * AR overview: summary cards + paginated outstanding invoices.
+     * The Aged AR rail view: receivables bucketed by client and age, with the
+     * outstanding/overdue headline figures. The outstanding-invoice LIST lives
+     * on Invoices (`?status=unpaid`) — this page links there rather than
+     * duplicating it.
      */
     public function index(Request $request)
     {
         $orgId = $request->user()->organization_id;
+        $aged = $this->service->getAgedReceivables($orgId);
         $invoices = $this->service->getOutstandingInvoices($orgId);
 
         $today = Carbon::today();
-        $totalOutstanding = $invoices->sum('amount_due');
         $overdueInvoices = $invoices->filter(fn ($inv) => $inv->due_date->lt($today));
-        $totalOverdue = $overdueInvoices->sum('amount_due');
-        $unpaidCount = $invoices->count();
-
-        // Build rows for the table
-        $rows = $invoices->map(fn ($inv) => [
-            'id' => $inv->id,
-            'invoice_number' => $inv->invoice_number,
-            'client_name' => $inv->client
-                ? $inv->client->first_name.' '.$inv->client->last_name
-                : ($inv->client_name ?: 'Unknown'),
-            'issue_date' => $inv->invoice_date->toDateString(),
-            'due_date' => $inv->due_date->toDateString(),
-            'total_amount' => (float) $inv->total_amount,
-            'amount_paid' => $inv->amount_paid,
-            'amount_due' => $inv->amount_due,
-            'is_overdue' => $inv->due_date->lt($today),
-            'days_overdue' => $inv->due_date->lt($today)
-                ? (int) $today->diffInDays($inv->due_date)
-                : 0,
-        ])->values()->all();
 
         return Inertia::render('finance/receivables/Index', [
-            'summary' => [
-                'total_outstanding' => round($totalOutstanding, 2),
-                'total_overdue' => round($totalOverdue, 2),
-                'unpaid_count' => $unpaidCount,
-            ],
-            'invoices' => $rows,
-        ]);
-    }
-
-    /**
-     * Aged receivables report.
-     */
-    public function aging(Request $request)
-    {
-        $orgId = $request->user()->organization_id;
-        $aged = $this->service->getAgedReceivables($orgId);
-
-        return Inertia::render('finance/receivables/Aging', [
             'clients' => $aged['clients'],
             'totals' => $aged['totals'],
+            'summary' => [
+                'total_outstanding' => round($invoices->sum('amount_due'), 2),
+                'total_overdue' => round($overdueInvoices->sum('amount_due'), 2),
+                'unpaid_count' => $invoices->count(),
+                'overdue_count' => $overdueInvoices->count(),
+                'client_count' => count($aged['clients']),
+            ],
         ]);
     }
 

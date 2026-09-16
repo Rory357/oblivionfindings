@@ -33,7 +33,6 @@ export * from './petty-cash-fund-dialog';
 export * from './posting-preview';
 export * from './price-book-dialog';
 export * from './quote-dialog';
-export * from './receivables-hub';
 export * from './record-receipt-dialog';
 export * from './recurring-charge-dialog';
 export * from './reports-hub';

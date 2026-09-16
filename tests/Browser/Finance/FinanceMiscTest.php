@@ -353,13 +353,13 @@ test('finance petty cash create page loads', function () {
     });
 });
 
-test('finance receivables aging page loads', function () {
+test('finance receivables aging url redirects to the Aged AR view', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/receivables/aging')
-            ->waitForText('Aging', 10)
-            ->assertPathBeginsWith('/finance');
+            ->waitForText('Aged receivables', 10)
+            ->assertPathIs('/finance/receivables');
     });
 });
 

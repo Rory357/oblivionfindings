@@ -1,45 +1,53 @@
 import {
+    FinanceSectionRail,
     formatMoney,
     QuoteDialog,
-    ReceivablesTabsFooter,
-    useRowContextMenu,
     type EditableQuote,
     type QuoteClientOption,
     type QuotePriceBook,
-    type RowCtxItem,
 } from '@/components/finance';
-import { OpsStatCard } from '@/components/ops-stat-card';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import {
+    EntityCard,
+    EntityCardGrid,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type EntityMeridian,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
 import {
-    ArrowRightLeft,
     Calculator,
-    CheckCircle2,
-    Clock,
+    CalendarDays,
     Download,
     Eye,
     FileText,
     Pencil,
     Plus,
-    Search,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-const ANY = '__ANY__';
+const ALL = '__all';
 
 type Quote = {
     id: number;
@@ -65,13 +73,12 @@ type Quote = {
 type Props = {
     quotes: {
         data: Quote[];
-        links: any[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
         current_page: number;
         last_page: number;
         total: number;
     };
     filters: {
-        q?: string;
         status?: string;
     };
     stats: {
@@ -79,15 +86,42 @@ type Props = {
         pending: number;
         accepted: number;
         converted: number;
+        pending_value: number;
     };
     canManage: boolean;
     clients: QuoteClientOption[];
     priceBooks: QuotePriceBook[];
 };
 
-function formatDate(d: string | null): string {
-    if (!d) return '-';
-    return new Date(d).toLocaleDateString('en-NZ', {
+const STATUS_OPTIONS = [
+    { value: ALL, label: 'Any status' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'sent', label: 'Sent' },
+    { value: 'accepted', label: 'Accepted' },
+    { value: 'declined', label: 'Declined' },
+    { value: 'expired', label: 'Expired' },
+    { value: 'converted', label: 'Converted' },
+];
+
+const MERIDIAN: Record<string, EntityMeridian> = {
+    draft: 'warning',
+    sent: 'warning',
+    accepted: 'success',
+    converted: 'success',
+    declined: 'critical',
+    expired: 'critical',
+};
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Receivables', href: '/finance/invoices' },
+    { title: 'Quotes', href: '/finance/quotes' },
+];
+
+function formatDate(value: string | null): string {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString('en-NZ', {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -95,35 +129,55 @@ function formatDate(d: string | null): string {
 }
 
 export default function QuotesIndex({
-    quotes = { data: [], links: [], current_page: 1, last_page: 1, total: 0 },
-    filters = {} as any,
-    stats = {} as any,
+    quotes,
+    filters = {},
+    stats,
     canManage = false,
     clients = [],
     priceBooks = [],
 }: Props) {
     const [createOpen, setCreateOpen] = useState(false);
     const [editQuote, setEditQuote] = useState<EditableQuote | null>(null);
+    const [search, setSearch] = useState('');
+    const ctxMenu = useEntityContextMenu<Quote>();
 
-    const updateFilters = (key: string, value: string | null) => {
-        router.get(
-            '/finance/quotes',
-            { ...filters, [key]: value },
-            { preserveState: true, replace: true },
-        );
+    const go = (patch: { status?: string }) => {
+        const next = { ...filters, ...patch };
+        const query: Record<string, string> = {};
+        if (next.status && next.status !== ALL) query.status = next.status;
+        router.get('/finance/quotes', query, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
     };
+
+    useEffect(() => {
+        setSearch('');
+    }, [filters.status]);
+
+    const clientName = (quote: Quote) =>
+        quote.client
+            ? `${quote.client.first_name} ${quote.client.last_name}`
+            : 'No client';
+
+    const rows = useMemo(() => {
+        const term = search.trim().toLowerCase();
+        if (!term) return quotes.data;
+        return quotes.data.filter(
+            (quote) =>
+                quote.reference.toLowerCase().includes(term) ||
+                quote.title.toLowerCase().includes(term) ||
+                clientName(quote).toLowerCase().includes(term),
+        );
+    }, [quotes.data, search]);
+
+    const hasFilters = Boolean(filters.status) || Boolean(search.trim());
 
     const clearFilters = () => {
-        router.get(
-            '/finance/quotes',
-            {},
-            { preserveState: true, replace: true },
-        );
+        setSearch('');
+        router.get('/finance/quotes', {}, { preserveState: true });
     };
-
-    const hasFilters = Boolean(
-        filters?.q || (filters?.status && filters.status !== ANY),
-    );
 
     const openEdit = (quote: Quote) =>
         setEditQuote({
@@ -135,269 +189,286 @@ export default function QuotesIndex({
             lines: quote.lines,
         });
 
-    // Right-click row menu — mirrors the row's existing inline actions (Open first).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (quote: Quote): RowCtxItem[] => {
-        const items: RowCtxItem[] = [
+    const actionsFor = (quote: Quote): MenuItem[] =>
+        compactMenu([
             {
-                kind: 'item',
-                label: 'Open',
+                label: 'Open quote',
                 icon: Eye,
-                onSelect: () => router.get(`/finance/quotes/${quote.id}`),
+                onClick: () => router.visit(`/finance/quotes/${quote.id}`),
             },
-        ];
-        if (canManage && quote.status === 'draft') {
-            items.push({
-                kind: 'item',
-                label: 'Edit',
-                icon: Pencil,
-                onSelect: () => openEdit(quote),
-            });
-        }
-        return items;
-    };
+            canManage && quote.status === 'draft'
+                ? {
+                      label: 'Edit quote',
+                      icon: Pencil,
+                      onClick: () => openEdit(quote),
+                  }
+                : null,
+        ]);
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={Calculator}
+            title="Quotes"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={stats.pending > 0 ? 'warning' : 'success'}
+                >
+                    {stats.pending} awaiting a decision
+                </PageHeaderStatusChip>
+            }
+            subline={`Service quotes · ${stats.total} in total · ${stats.converted} converted to work`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search quotes, clients…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={() => {
+                            const query = filters.status
+                                ? `?status=${filters.status}`
+                                : '';
+                            window.location.href = `/finance/quotes/export${query}`;
+                        }}
+                    >
+                        Export CSV
+                    </PageHeaderGlassButton>
+                    {canManage && (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                        >
+                            New quote
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Open quotes"
+                        tone={stats.pending > 0 ? 'warning' : 'brand'}
+                        href="/finance/quotes?status=sent"
+                        ariaLabel="View sent quotes"
+                    >
+                        <PageHeaderMeterBig>{stats.pending}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Draft or sent
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Value in play"
+                        href="/finance/quotes?status=sent"
+                        ariaLabel="View quotes awaiting a decision"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(stats.pending_value)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Across open quotes
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Accepted"
+                        tone="success"
+                        href="/finance/quotes?status=accepted"
+                        ariaLabel="View accepted quotes"
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.accepted}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Ready to convert
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Converted"
+                        href="/finance/quotes?status=converted"
+                        ariaLabel="View converted quotes"
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.converted}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Now an agreement or invoice
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    label="Status"
+                    value={filters.status || ALL}
+                    allValue={ALL}
+                    options={STATUS_OPTIONS}
+                    onChange={(value) =>
+                        go({ status: value === ALL ? undefined : value })
+                    }
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Quotes" />
-            <PageHero
-                category="finance"
-                icon={Calculator}
-                title="Quotes"
-                description="Create and manage service quotes for clients."
-                stats={[
-                    { label: 'Total', value: stats?.total ?? 0 },
-                    { label: 'Pending', value: stats?.pending ?? 0 },
-                    { label: 'Accepted', value: stats?.accepted ?? 0 },
-                    { label: 'Converted', value: stats?.converted ?? 0 },
-                ]}
-                actions={
-                    <Button size="sm" variant="outline" asChild>
-                        <a
-                            href={`/finance/quotes/export?${new URLSearchParams(Object.entries({ status: filters?.status ?? '' }).filter(([, v]) => v)).toString()}`}
-                        >
-                            <Download className="mr-1.5 h-4 w-4" />
-                            Export CSV
-                        </a>
-                    </Button>
-                }
-                footer={<ReceivablesTabsFooter active="quotes" />}
-            />
-            <PageShell>
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <OpsStatCard
-                        label="Total Quotes"
-                        value={stats?.total ?? 0}
-                        icon={FileText}
-                        color="indigo"
-                    />
-                    <OpsStatCard
-                        label="Pending"
-                        value={stats?.pending ?? 0}
-                        icon={Clock}
-                        color="amber"
-                    />
-                    <OpsStatCard
-                        label="Accepted"
-                        value={stats?.accepted ?? 0}
-                        icon={CheckCircle2}
-                        color="emerald"
-                    />
-                    <OpsStatCard
-                        label="Converted"
-                        value={stats?.converted ?? 0}
-                        icon={ArrowRightLeft}
-                        color="blue"
-                    />
-                </div>
 
-                {/* Filters */}
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                            placeholder="Search quotes..."
-                            className="h-9 pl-8 text-sm"
-                            defaultValue={filters?.q ?? ''}
-                            onChange={(e) =>
-                                updateFilters('q', e.target.value || null)
-                            }
-                        />
-                    </div>
-                    <Select
-                        value={filters?.status ?? ANY}
-                        onValueChange={(v) =>
-                            updateFilters('status', v === ANY ? null : v)
-                        }
-                    >
-                        <SelectTrigger
-                            className="h-9 w-[130px] text-xs"
-                            aria-label="Filter by status"
-                        >
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Status</SelectItem>
-                            <SelectItem value="draft">Draft</SelectItem>
-                            <SelectItem value="sent">Sent</SelectItem>
-                            <SelectItem value="accepted">Accepted</SelectItem>
-                            <SelectItem value="declined">Declined</SelectItem>
-                            <SelectItem value="converted">Converted</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    {canManage && (
-                        <Button size="sm" onClick={() => setCreateOpen(true)}>
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            New Quote
-                        </Button>
-                    )}
-                </div>
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Quotes"
+                        caption={`${rows.length} of ${quotes.total} shown`}
+                    />
 
-                {/* List */}
-                <div className="mt-4 space-y-2">
-                    {(quotes?.data ?? []).length === 0 && (
-                        <Card>
-                            {hasFilters ? (
-                                <EmptySearch
-                                    onClear={clearFilters}
-                                    title="No quotes match your filters"
-                                    className="border-0"
-                                />
-                            ) : (
-                                <EmptyList
-                                    icon={FileText}
-                                    itemName="quote"
-                                    title="No quotes yet"
-                                    description="Create your first quote to get started."
-                                    className="border-0"
-                                    action={
-                                        canManage ? (
-                                            <Button
-                                                size="sm"
-                                                onClick={() =>
-                                                    setCreateOpen(true)
-                                                }
-                                            >
-                                                New quote
-                                            </Button>
-                                        ) : undefined
-                                    }
-                                />
-                            )}
-                        </Card>
-                    )}
-                    {(quotes?.data ?? []).map((quote) => (
-                        <Card
-                            key={quote.id}
-                            className="transition-all hover:border-border hover:shadow-sm"
-                            onContextMenu={rowMenu.open(rowMenuItems(quote))}
-                        >
-                            <CardContent className="flex items-center gap-4 p-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70">
-                                    <FileText className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <Link
-                                            href={`/finance/quotes/${quote.id}`}
-                                            className="text-sm font-semibold hover:underline"
-                                        >
-                                            {quote.reference}
-                                        </Link>
-                                        <StatusBadge
-                                            status={quote.status}
-                                            size="sm"
-                                        />
-                                        <span className="text-sm font-semibold text-status-success dark:text-status-success">
-                                            {formatMoney(quote.total_amount)}
-                                        </span>
-                                    </div>
-                                    <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                                        {quote.client && (
-                                            <span>
-                                                {quote.client.first_name}{' '}
-                                                {quote.client.last_name}
-                                            </span>
-                                        )}
-                                        <span>{quote.items_count} items</span>
-                                        {quote.valid_until && (
-                                            <span
-                                                className={
-                                                    new Date(
-                                                        quote.valid_until,
-                                                    ) < new Date()
-                                                        ? 'font-medium text-status-critical'
-                                                        : ''
-                                                }
-                                            >
-                                                Valid until:{' '}
-                                                {formatDate(quote.valid_until)}
-                                            </span>
-                                        )}
-                                        <span>
-                                            Created:{' '}
-                                            {formatDate(quote.created_at)}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="flex shrink-0 gap-1">
-                                    <Button
-                                        asChild
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0"
-                                    >
-                                        <Link
-                                            href={`/finance/quotes/${quote.id}`}
-                                            aria-label={`View ${quote.reference}`}
-                                        >
-                                            <Eye className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
-                                    {canManage && quote.status === 'draft' && (
+                    {rows.length === 0 ? (
+                        hasFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                title="No quotes match your filters"
+                            />
+                        ) : (
+                            <EmptyList
+                                icon={FileText}
+                                itemName="quote"
+                                title="No quotes yet"
+                                description="Create your first quote to get started."
+                                action={
+                                    canManage ? (
                                         <Button
                                             size="sm"
-                                            variant="ghost"
-                                            className="h-7 w-7 p-0"
-                                            aria-label={`Edit ${quote.reference}`}
-                                            onClick={() => openEdit(quote)}
+                                            onClick={() => setCreateOpen(true)}
                                         >
-                                            <Pencil className="h-3.5 w-3.5" />
+                                            New quote
                                         </Button>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-
-                {/* Pagination */}
-                {(quotes?.last_page ?? 1) > 1 && (
-                    <div className="mt-4 flex items-center justify-center gap-1">
-                        {(quotes?.links ?? []).map((link: any, i: number) => (
-                            <Button
-                                key={i}
-                                size="sm"
-                                variant={link.active ? 'default' : 'outline'}
-                                className="h-7 min-w-[28px] px-2 text-xs"
-                                disabled={!link.url}
-                                onClick={() =>
-                                    link.url &&
-                                    router.get(
-                                        link.url,
-                                        {},
-                                        { preserveState: true },
-                                    )
+                                    ) : undefined
                                 }
-                                dangerouslySetInnerHTML={{ __html: link.label }}
                             />
-                        ))}
-                    </div>
-                )}
+                        )
+                    ) : (
+                        <>
+                            <EntityCardGrid>
+                                {rows.map((quote) => {
+                                    const expired =
+                                        quote.valid_until &&
+                                        new Date(quote.valid_until) <
+                                            new Date() &&
+                                        !['accepted', 'converted'].includes(
+                                            quote.status,
+                                        );
+                                    return (
+                                        <EntityCard
+                                            key={quote.id}
+                                            meridian={
+                                                MERIDIAN[quote.status] ??
+                                                'warning'
+                                            }
+                                            icon={FileText}
+                                            name={quote.reference}
+                                            subline={quote.title}
+                                            actions={actionsFor(quote)}
+                                            href={`/finance/quotes/${quote.id}`}
+                                            onContextMenu={(e) =>
+                                                ctxMenu.open(e, quote)
+                                            }
+                                            muted={[
+                                                'declined',
+                                                'expired',
+                                            ].includes(quote.status)}
+                                            chips={
+                                                <>
+                                                    <EntityStatusChip
+                                                        variant={
+                                                            quote.status ===
+                                                                'accepted' ||
+                                                            quote.status ===
+                                                                'converted'
+                                                                ? 'success'
+                                                                : quote.status ===
+                                                                        'declined' ||
+                                                                    quote.status ===
+                                                                        'expired'
+                                                                  ? 'critical'
+                                                                  : quote.status ===
+                                                                      'draft'
+                                                                    ? 'neutral'
+                                                                    : 'info'
+                                                        }
+                                                    >
+                                                        {quote.status
+                                                            .charAt(0)
+                                                            .toUpperCase() +
+                                                            quote.status.slice(
+                                                                1,
+                                                            )}
+                                                    </EntityStatusChip>
+                                                    <EntityChip outline>
+                                                        {quote.items_count}{' '}
+                                                        {quote.items_count === 1
+                                                            ? 'item'
+                                                            : 'items'}
+                                                    </EntityChip>
+                                                    <EntityChip
+                                                        icon={CalendarDays}
+                                                    >
+                                                        Valid to{' '}
+                                                        {formatDate(
+                                                            quote.valid_until,
+                                                        )}
+                                                    </EntityChip>
+                                                </>
+                                            }
+                                            metric={{
+                                                label: 'Quote total',
+                                                value: formatMoney(
+                                                    quote.total_amount,
+                                                ),
+                                                percent: null,
+                                            }}
+                                            alerts={
+                                                expired ? (
+                                                    <EntityStatusChip variant="critical">
+                                                        Past its valid-until
+                                                        date
+                                                    </EntityStatusChip>
+                                                ) : undefined
+                                            }
+                                            footer={{
+                                                personName:
+                                                    quote.creator?.name ?? null,
+                                                primary: clientName(quote),
+                                                secondary: `Raised ${formatDate(quote.created_at)}${
+                                                    quote.creator
+                                                        ? ` · ${quote.creator.name}`
+                                                        : ''
+                                                }`,
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </EntityCardGrid>
+                            <LaravelPagination
+                                links={quotes.links}
+                                lastPage={quotes.last_page}
+                            />
+                        </>
+                    )}
+                </div>
+            </PageLayout>
 
-                {rowMenu.element}
-            </PageShell>
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={FileText}
+                    title={ctxMenu.ctx.record.reference}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
 
             {canManage && (
                 <QuoteDialog
