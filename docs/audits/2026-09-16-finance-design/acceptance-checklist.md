@@ -24,10 +24,14 @@ module-wide sweep over the 117 live files reports zero for `PageHero`,
 | `npx eslint resources/js/pages/finance` | clean — the `PageHero` ban reports 0 (92 at baseline) |
 | `php artisan test tests/Feature/Finance` | 424 passed, 26 failed — **all 26 pre-existing, see below** |
 
-### The 26 Pest failures are not from this migration
+### The 26 Pest failures were not from this migration — but four were real bugs
 
 Every one was reproduced on the pre-migration base commit `19354ecbc`, by
-checking out the base in this worktree and re-running the same files:
+checking out the base in this worktree and re-running the same files, so none
+was a regression. That is where the first pass stopped, on the reading that
+they were environmental. **That reading was wrong**: chasing them afterwards
+turned up four genuine application bugs (see "Pre-existing failures fixed along
+the way" below). The per-file counts at base were:
 
 | File | Failures at base |
 |---|---|
@@ -42,11 +46,10 @@ checking out the base in this worktree and re-running the same files:
 | `ProcessFinancialEventJobDispatchTest` | 3 |
 | Journal-posted event tests | 2 |
 
-They share one root cause visible in the trace: `JournalPostingService:310`
-raising *"An organisation is required to allocate a journal number"* — a
-null `organization_id` in this worktree's test database, i.e. environmental
-seeding, not application code. Two demo-data migrations for exactly this class
-of problem already exist on main (`87afd568`, `e6ec2c4a`).
+The most visible symptom was `JournalPostingService` raising *"An organisation
+is required to allocate a journal number"*. That looked like test-database
+seeding; it was not. The organisation was 0, which this app uses as its default
+organisation, and the guard rejected it.
 
 The one failure that did NOT reproduce at base —
 `FinancialInsightsObjectScopeTest > it makes global access separately
@@ -56,7 +59,8 @@ produced 25 failures on one run and 26 on the next. It is cross-file
 pollution, not a regression. (See the project note on per-pid MySQL test
 databases and the MySQL 1615 "re-prepared" flake.)
 
-**Net regressions from the migration: zero.**
+**Net regressions from the migration: zero.** Nineteen of the 26 now pass;
+the remaining seven are listed at the end of this file.
 
 ## Work packages
 
@@ -259,7 +263,7 @@ pass; the rest are described below.
 
 | Bug | Effect | Fix |
 |---|---|---|
-| Four guards rejected `organization_id` 0 as invalid (`< 1`) | Organisation 0 is this app's default — FinanceSeeder seeds its chart of accounts, and the live database holds 35 accounts and a journal sequence under it — so journal numbering, fixed-asset depreciation and disposal, and invoice storage all threw for it | Reject only null or negative (`88c6156c4`, `3b6f99620`) |
+| Journal numbering rejected `organization_id` 0 | Organisation 0 is this app's default — FinanceSeeder seeds its chart of accounts there, the live ledger holds 35 accounts and a sequence row under it, and the operational GL capture paths post as org 0 — so every such posting threw | `lockJournalSequence` accepts 0; the bulk and storage guards keep rejecting it (`112936903`) |
 | Evidence compared with `===` across a MySQL `json` column | MySQL normalises object key order, so a stored snapshot could never equal a rebuilt one: every governed bill was hidden from the approval picker and could never post against its approval. The same pattern in `WebhookReceiverController` defeated webhook idempotency | `AppSupportJsonEvidence::matches()` compares key/value sets, still strict about types and list order (`3b6f99620`) |
 | `JournalPosted` dispatched inside `DB::transaction` | "A journal was posted" reached listeners — and jobs they queue — before the row was durable, and still reached them when an enclosing transaction rolled back | `DB::afterCommit` (`88c6156c4`) |
 | Payment-run export fixtures built runs with no items | Not an app bug: `PaymentSettlementSiteScope` correctly hides a run whose lines the actor cannot settle, so the CSV held only its header | Fixtures build a visible run (`88c6156c4`) |
@@ -271,13 +275,18 @@ donor-fund bills now name the zero-rated tax rate, because `GstTaxRateResolver`
 refuses — by design — to guess between the seeded zero-rated and exempt rates
 for a line storing a bare 0.
 
-**Still failing (2), both pre-existing:**
-`FixedAssetDisposalIntegrityTest`'s two `JournalPosted` timing cases step a
-hand-rolled transaction ladder and expect the event only at true level 0, while
-Laravel deliberately ignores `RefreshDatabase`'s wrapping transaction so
-`afterCommit` code is testable at all — firing one level earlier. The
-production semantics those tests describe are the ones now implemented; the
-remaining gap is the harness, not the app.
+### Still failing, and why
+
+Five pre-existing failures remain, plus one flake. None is a regression from
+this work, and each is a separate piece of work with its own domain question:
+
+| Test | Why it still fails |
+|---|---|
+| `FixedAssetDisposalIntegrityTest` — the two `JournalPosted` timing cases | They step a hand-rolled transaction ladder and expect the event only at true level 0, while Laravel deliberately ignores `RefreshDatabase`'s wrapping transaction so `afterCommit` code is testable at all, firing one level earlier. The production semantics they describe are the ones now implemented; the gap is the harness |
+| `FinInvoiceJournalPostingTest` — send queues the email job | Expects `SendInvoiceEmailJob` pushed twice, gets once. Needs a decision about whether sending a draft should re-queue |
+| `FundingClaimJournalDispatchTest` | Timesheet approval is blocked by a newer reconciliation gate ("the completed shift has no attendance evidence") — a fixture that predates that rule |
+| `PaymentAllocationIntegrityTest` — settlement constraint migration | `down()` cannot drop an index this worktree's schema never created; a migration-state problem, not application code |
+| `JournalPostingReversalInvariantTest` — two-worker serialisation | A MySQL deadlock under full-suite contention. Passes on consecutive isolated runs; genuinely flaky |
 
 ## Browser walkthrough — done 2026-09-16
 
