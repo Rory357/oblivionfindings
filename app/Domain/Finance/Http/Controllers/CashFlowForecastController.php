@@ -3,6 +3,7 @@
 namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Models\FinCashFlowForecast;
+use App\Domain\Finance\Models\FinCashFlowScenario;
 use App\Domain\Finance\Services\CashFlowForecastService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -21,16 +22,48 @@ class CashFlowForecastController extends Controller
     {
         $orgId = $request->user()->organization_id;
 
+        $search = trim((string) $request->input('q', ''));
+        $status = (string) $request->input('status', '');
+        $periodType = (string) $request->input('period_type', '');
+
         $forecasts = FinCashFlowForecast::forOrganization($orgId)
             ->with('createdBy:id,name')
             ->withCount('scenarios')
+            ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+            ->when(in_array($status, ['draft', 'final'], true), fn ($query) => $query->where('status', $status))
+            ->when(
+                in_array($periodType, ['weekly', 'fortnightly', 'monthly'], true),
+                fn ($query) => $query->where('period_type', $periodType),
+            )
             ->orderByDesc('forecast_date')
             ->orderByDesc('id')
             ->paginate(25)
             ->withQueryString();
 
+        // Whole-register totals for the header meters — never the page slice.
+        $counts = FinCashFlowForecast::forOrganization($orgId)
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
         return Inertia::render('finance/CashFlowForecast/Index', [
             'forecasts' => $forecasts,
+            'summary' => [
+                'total' => (int) $counts->sum(),
+                'draft' => (int) ($counts['draft'] ?? 0),
+                'final' => (int) ($counts['final'] ?? 0),
+                'scenarios' => (int) FinCashFlowScenario::query()
+                    ->whereIn(
+                        'forecast_id',
+                        FinCashFlowForecast::forOrganization($orgId)->select('id'),
+                    )
+                    ->count(),
+            ],
+            'filters' => [
+                'q' => $search,
+                'status' => $status,
+                'period_type' => $periodType,
+            ],
             // Store shares the route group's finance.reports.view permission —
             // passed for consistency with the other index-modal flows.
             'canManage' => (bool) $request->user()->canDo('finance.reports.view'),
@@ -62,7 +95,7 @@ class CashFlowForecastController extends Controller
     }
 
     /**
-     * Show a forecast with chart data and scenario comparison.
+     * Show a forecast with its periods and scenario comparison.
      */
     public function show(Request $request, FinCashFlowForecast $forecast)
     {
@@ -71,12 +104,10 @@ class CashFlowForecastController extends Controller
             'createdBy:id,name',
         ]);
 
-        // Prepare chart data from forecast periods
-        $chartData = $this->buildChartData($forecast);
-
+        // The page charts `forecast_data` (and each scenario's) directly, so
+        // there is no second, pre-shaped chart payload to keep in step.
         return Inertia::render('finance/CashFlowForecast/Show', [
             'forecast' => $forecast,
-            'chartData' => $chartData,
         ]);
     }
 
@@ -94,52 +125,5 @@ class CashFlowForecastController extends Controller
 
         return redirect()->route('finance.cash-flow-forecast.index')
             ->with('success', 'Forecast deleted.');
-    }
-
-    /**
-     * Build chart-ready data from forecast and its scenarios.
-     */
-    private function buildChartData(FinCashFlowForecast $forecast): array
-    {
-        $periods = $forecast->forecast_data ?? [];
-        $labels = array_map(fn ($p) => $p['period_label'] ?? '', $periods);
-
-        $datasets = [
-            [
-                'label' => 'Inflows',
-                'data' => array_map(fn ($p) => (float) ($p['inflows']['total'] ?? 0), $periods),
-                'type' => 'bar',
-            ],
-            [
-                'label' => 'Outflows',
-                'data' => array_map(fn ($p) => (float) ($p['outflows']['total'] ?? 0), $periods),
-                'type' => 'bar',
-            ],
-            [
-                'label' => 'Net Cash Flow',
-                'data' => array_map(fn ($p) => (float) ($p['net_cash_flow'] ?? 0), $periods),
-                'type' => 'bar',
-            ],
-            [
-                'label' => 'Closing Balance',
-                'data' => array_map(fn ($p) => (float) ($p['closing_balance'] ?? 0), $periods),
-                'type' => 'line',
-            ],
-        ];
-
-        // Add scenario closing balances
-        foreach ($forecast->scenarios as $scenario) {
-            $scenarioData = $scenario->forecast_data ?? [];
-            $datasets[] = [
-                'label' => $scenario->name.' (Balance)',
-                'data' => array_map(fn ($p) => (float) ($p['closing_balance'] ?? 0), $scenarioData),
-                'type' => 'line',
-            ];
-        }
-
-        return [
-            'labels' => $labels,
-            'datasets' => $datasets,
-        ];
     }
 }
