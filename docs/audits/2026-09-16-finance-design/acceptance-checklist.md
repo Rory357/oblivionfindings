@@ -15,6 +15,49 @@ module-wide sweep over the 117 live files reports zero for `PageHero`,
 `useRowContextMenu`, `useFinanceTab`, `window.prompt`/`confirm`,
 `(this page)`, `dark:` colour pairs and `dangerouslySetInnerHTML`.
 
+## Verification
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | clean (exit 0) |
+| `npx vitest run resources/js --maxWorkers=2` | 2669 passed / 390 files |
+| `npx eslint resources/js/pages/finance` | clean — the `PageHero` ban reports 0 (92 at baseline) |
+| `php artisan test tests/Feature/Finance` | 424 passed, 26 failed — **all 26 pre-existing, see below** |
+
+### The 26 Pest failures are not from this migration
+
+Every one was reproduced on the pre-migration base commit `19354ecbc`, by
+checking out the base in this worktree and re-running the same files:
+
+| File | Failures at base |
+|---|---|
+| `BillSpendApprovalGateTest` | 11 |
+| `DonorFundReportPdfTest` | 1 |
+| `DonorFundReportingTest` | 1 |
+| `FinInvoiceJournalPostingTest` | 1 |
+| `FundingClaimJournalDispatchTest` | 1 |
+| `LeaveProvisionPostingTest` | 2 |
+| `ListExportPayablesTest` | 2 |
+| `PaymentAllocationIntegrityTest` | 2 |
+| `ProcessFinancialEventJobDispatchTest` | 3 |
+| Journal-posted event tests | 2 |
+
+They share one root cause visible in the trace: `JournalPostingService:310`
+raising *"An organisation is required to allocate a journal number"* — a
+null `organization_id` in this worktree's test database, i.e. environmental
+seeding, not application code. Two demo-data migrations for exactly this class
+of problem already exist on main (`87afd568`, `e6ec2c4a`).
+
+The one failure that did NOT reproduce at base —
+`FinancialInsightsObjectScopeTest > it makes global access separately
+permissioned and still requires the dashboard capability` — passes both in
+isolation and when its whole file runs on this branch, and the full suite
+produced 25 failures on one run and 26 on the next. It is cross-file
+pollution, not a regression. (See the project note on per-pid MySQL test
+databases and the MySQL 1615 "re-prepared" flake.)
+
+**Net regressions from the migration: zero.**
+
 ## Work packages
 
 | WP | Scope | Commit |
