@@ -94,7 +94,7 @@ describe('app sidebar workforce navigation', () => {
         );
     });
 
-    it('moves billing navigation into Finance and leaves funding with client management', () => {
+    it('reaches billing through the Finance hubs and leaves funding with client management', () => {
         const catalog = buildNavSearchCatalog({
             can: {
                 clients: { viewAny: true },
@@ -126,40 +126,35 @@ describe('app sidebar workforce navigation', () => {
         expect(operationsItems.map((item) => item.group)).not.toContain(
             'Time & Billing',
         );
-        expect(operationsItems.map((item) => item.label)).not.toEqual(
-            expect.arrayContaining([
-                'Billing',
-                'Invoices',
-                'Price Books',
-                'Quotes',
-                'Recurring Charges',
-            ]),
-        );
+        // None of the AR registers may reappear under Operations.
+        for (const label of [
+            'Billing',
+            'Invoices',
+            'Price Books',
+            'Quotes',
+            'Recurring Charges',
+        ]) {
+            expect(operationsItems.map((item) => item.label)).not.toContain(
+                label,
+            );
+        }
 
+        // Finance shows ONE entry per hub (2026-09-16 design migration), so the
+        // AR registers are reached through Receivables rather than as six
+        // sibling links — anti-pattern "One sidebar link per register".
         expect(financeItems).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({
-                    label: 'Billing',
-                    href: '/finance/billing',
-                }),
-                expect.objectContaining({
-                    label: 'Invoices',
+                    label: 'Receivables',
                     href: '/finance/invoices',
                 }),
                 expect.objectContaining({
-                    label: 'Price Books',
-                    href: '/finance/price-books',
-                }),
-                expect.objectContaining({
-                    label: 'Quotes',
-                    href: '/finance/quotes',
-                }),
-                expect.objectContaining({
-                    label: 'Recurring Charges',
-                    href: '/finance/recurring-charges',
+                    label: 'Overview',
+                    href: '/finance',
                 }),
             ]),
         );
+        expect(financeItems.map((item) => item.label)).not.toContain('Quotes');
     });
 
     it('groups shift, handover, and time navigation under Workforce instead of Operations', () => {
