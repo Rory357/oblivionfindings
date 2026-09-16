@@ -19,6 +19,21 @@ type ParentAccount = { id: number; code: string; name: string; type?: string };
 type TaxRate = { id: number; name: string; code: string; rate: string };
 type FundingStream = { id: number; code: string; name: string };
 
+/** The chart row an edit opens with — every field the update endpoint accepts. */
+export type EditableAccount = {
+    id: number;
+    code: string;
+    name: string;
+    type: string;
+    sub_type: string | null;
+    parent_id: number | null;
+    description: string | null;
+    gst_applicable: boolean;
+    is_active: boolean;
+    default_tax_rate_id: number | null;
+    funding_stream_id: number | null;
+};
+
 const ACCOUNT_TYPES = [
     { value: 'asset', label: 'Asset' },
     { value: 'liability', label: 'Liability' },
@@ -81,9 +96,10 @@ const STEPS: readonly WizardStep[] = [
 ];
 
 /**
- * New Account wizard — adds an account to the chart of accounts from a 2-step
- * Add-Client-grade modal, in place of the standalone Create page. Posts to
- * `finance.accounts.store` (redirects back to the chart on success).
+ * Account wizard — adds or edits a chart-of-accounts row from a 2-step
+ * Add-Client-grade modal, in place of the standalone Create/Edit pages. CREATE
+ * posts to `finance.accounts.store`; EDIT (the `account` prop) PUTs
+ * `finance.accounts.update`. Both redirect back to the chart on success.
  */
 export function NewAccountDialog({
     open,
@@ -91,27 +107,34 @@ export function NewAccountDialog({
     parentAccounts,
     taxRates,
     fundingStreams,
+    account,
 }: {
     open: boolean;
     onClose: () => void;
     parentAccounts: ParentAccount[];
     taxRates: TaxRate[];
     fundingStreams: FundingStream[];
+    /** When provided, the wizard opens in EDIT mode (prefilled, PUTs the update). */
+    account?: EditableAccount | null;
 }) {
+    const isEdit = !!account;
     const wizard = useWizard(STEPS.length);
     const { index, goTo, next, back, isFirst, isLast, reset } = wizard;
 
+    const idString = (value: number | null | undefined) =>
+        value == null ? '' : String(value);
+
     const form = useForm({
-        code: '',
-        name: '',
-        type: '',
-        sub_type: '',
-        parent_id: '',
-        description: '',
-        gst_applicable: false,
-        is_active: true,
-        default_tax_rate_id: '',
-        funding_stream_id: '',
+        code: account?.code ?? '',
+        name: account?.name ?? '',
+        type: account?.type ?? '',
+        sub_type: account?.sub_type ?? '',
+        parent_id: idString(account?.parent_id),
+        description: account?.description ?? '',
+        gst_applicable: account?.gst_applicable ?? false,
+        is_active: account?.is_active ?? true,
+        default_tax_rate_id: idString(account?.default_tax_rate_id),
+        funding_stream_id: idString(account?.funding_stream_id),
     });
     const { data, setData, processing, errors } = form;
 
@@ -123,11 +146,16 @@ export function NewAccountDialog({
     };
 
     const submit = () => {
-        form.post('/finance/accounts', {
+        const options = {
             preserveScroll: true,
             onSuccess: () => close(),
             onError: () => goTo(0),
-        });
+        };
+        if (isEdit && account) {
+            form.put(`/finance/accounts/${account.id}`, options);
+        } else {
+            form.post('/finance/accounts', options);
+        }
     };
 
     const detailsReady =
@@ -142,6 +170,7 @@ export function NewAccountDialog({
     // No empty-string option values — Radix Select forbids them. The placeholder
     // ("None") conveys the unselected state for these optional fields.
     const parentOptions = parentAccounts
+        .filter((p) => p.id !== account?.id)
         .filter((p) => !data.type || p.type === data.type)
         .map((p) => ({ value: String(p.id), label: `${p.code} - ${p.name}` }));
     const taxOptions = taxRates.map((t) => ({
@@ -157,10 +186,14 @@ export function NewAccountDialog({
         <WizardShell
             open={open}
             onClose={close}
-            title="New account"
-            description="Add a new account to the chart of accounts"
+            title={isEdit ? 'Edit account' : 'New account'}
+            description={
+                isEdit
+                    ? 'Update this account in the chart of accounts'
+                    : 'Add a new account to the chart of accounts'
+            }
             railIcon={Wallet}
-            railTitle="New Account"
+            railTitle={isEdit ? 'Edit account' : 'New account'}
             railSub="Chart of accounts"
             steps={STEPS}
             stepIndex={index}
@@ -192,7 +225,13 @@ export function NewAccountDialog({
                             onClick={submit}
                             disabled={processing || !detailsReady}
                         >
-                            {processing ? 'Creating…' : 'Create account'}
+                            {processing
+                                ? isEdit
+                                    ? 'Saving…'
+                                    : 'Creating…'
+                                : isEdit
+                                  ? 'Save account'
+                                  : 'Create account'}
                         </Button>
                     )}
                 </>
@@ -346,7 +385,7 @@ export function NewAccountDialog({
                         </div>
                     </div>
                     <p className="mt-4 text-[13px] text-muted-foreground">
-                        Creating{' '}
+                        {isEdit ? 'Saving' : 'Creating'}{' '}
                         <span className="font-semibold text-foreground">
                             {data.code || '—'}
                         </span>

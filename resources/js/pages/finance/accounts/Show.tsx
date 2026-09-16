@@ -1,22 +1,36 @@
-import { formatMoney } from '@/components/finance/money';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    FinanceSectionRail,
+    NewAccountDialog,
+    formatMoney,
+    type EditableAccount,
+} from '@/components/finance';
+import { FinancePeriodFilter } from '@/components/finance/finance-period-filter';
+import {
+    EmptyValue,
+    EntityContextMenu,
+    EntityTable,
+    type EntityTableColumn,
+    type EntityTableFooterRow,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDelta,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Filter } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import type { BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { BookOpen, Pencil, Wallet } from 'lucide-react';
+import { useState } from 'react';
 
 type LedgerLine = {
     id: number;
@@ -39,6 +53,9 @@ type Account = {
     is_active: boolean;
     gst_applicable: boolean;
     description: string | null;
+    parent_id: number | null;
+    default_tax_rate_id: number | null;
+    funding_stream_id: number | null;
     balance: number;
 };
 
@@ -48,13 +65,16 @@ type Ledger = {
     closing_balance: number;
 };
 
+type RefItem = { id: number; code: string; name: string; type?: string };
+
 type PageProps = {
     account: Account;
     ledger: Ledger;
-    filters: {
-        start_date: string;
-        end_date: string;
-    };
+    filters: { from: string; to: string };
+    canManage?: boolean;
+    parentAccounts?: RefItem[];
+    taxRates?: { id: number; name: string; code: string; rate: string }[];
+    fundingStreams?: RefItem[];
 };
 
 const typeLabels: Record<string, string> = {
@@ -65,210 +85,324 @@ const typeLabels: Record<string, string> = {
     expense: 'Expense',
 };
 
-const typeColors: Record<string, string> = {
-    asset: 'bg-status-info-bg text-status-info border-status-info/30',
-    liability:
-        'bg-status-critical-bg text-status-critical border-status-critical/30',
-    equity: 'bg-primary/10 text-primary border-primary/30',
-    revenue:
-        'bg-status-success-bg text-status-success border-status-success/30',
-    expense:
-        'bg-status-warning-bg text-status-warning border-status-warning/30',
+const dateLabel = (value: string) => {
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return value;
+
+    return parsed.toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
 };
 
-export default function AccountShow({ account, ledger, filters }: PageProps) {
-    const [startDate, setStartDate] = useState(filters.start_date);
-    const [endDate, setEndDate] = useState(filters.end_date);
+export default function AccountShow({
+    account,
+    ledger,
+    filters,
+    canManage = false,
+    parentAccounts = [],
+    taxRates = [],
+    fundingStreams = [],
+}: PageProps) {
+    const [editOpen, setEditOpen] = useState(false);
+    const ctx = useEntityContextMenu<LedgerLine>();
 
-    const breadcrumbs = [
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
         { title: 'Finance', href: '/finance' },
-        { title: 'Chart of Accounts', href: '/finance/accounts' },
+        { title: 'General ledger', href: '/finance/ledger' },
+        { title: 'Chart of accounts', href: '/finance/accounts' },
+        { title: `${account.code} — ${account.name}` },
+    ];
+
+    const editable: EditableAccount = {
+        id: account.id,
+        code: account.code,
+        name: account.name,
+        type: account.type,
+        sub_type: account.sub_type,
+        parent_id: account.parent_id,
+        description: account.description,
+        gst_applicable: account.gst_applicable,
+        is_active: account.is_active,
+        default_tax_rate_id: account.default_tax_rate_id,
+        funding_stream_id: account.funding_stream_id,
+    };
+
+    const movement = ledger.closing_balance - ledger.opening_balance;
+
+    const actionsFor = (line: LedgerLine): MenuItem[] => [
         {
-            title: `${account.code} - ${account.name}`,
-            href: `/finance/accounts/${account.id}`,
+            label: `Open journal ${line.journal_number}`,
+            icon: BookOpen,
+            onClick: () => router.visit(`/finance/journals/${line.journal_id}`),
         },
     ];
 
-    function handleFilter(e: FormEvent) {
-        e.preventDefault();
-        router.get(
-            `/finance/accounts/${account.id}`,
-            {
-                start_date: startDate,
-                end_date: endDate,
+    const columns: EntityTableColumn<LedgerLine>[] = [
+        {
+            key: 'date',
+            label: 'Date',
+            width: '140px',
+            cell: (line) => (
+                <span className="whitespace-nowrap text-muted-foreground">
+                    {dateLabel(line.date)}
+                </span>
+            ),
+        },
+        {
+            key: 'description',
+            label: 'Description',
+            width: '1.4fr',
+            cell: (line) =>
+                line.description ? (
+                    <span className="truncate">{line.description}</span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'debit',
+            label: 'Debit',
+            width: '140px',
+            align: 'right',
+            cell: (line) =>
+                line.debit > 0 ? (
+                    <span className="tabular-nums">
+                        {formatMoney(line.debit)}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'credit',
+            label: 'Credit',
+            width: '140px',
+            align: 'right',
+            cell: (line) =>
+                line.credit > 0 ? (
+                    <span className="tabular-nums">
+                        {formatMoney(line.credit)}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'balance',
+            label: 'Balance',
+            width: '150px',
+            align: 'right',
+            cell: (line) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(line.running_balance)}
+                </span>
+            ),
+        },
+    ];
+
+    // Opening and closing belong to the balance column, not to synthetic body
+    // rows that sort and hover like real journal lines.
+    const footerRows: EntityTableFooterRow[] = [
+        {
+            key: 'opening',
+            label: 'Opening balance',
+            cells: {
+                balance: (
+                    <span className="tabular-nums">
+                        {formatMoney(ledger.opening_balance)}
+                    </span>
+                ),
             },
-            { preserveState: true },
-        );
-    }
+        },
+        {
+            key: 'closing',
+            label: 'Closing balance',
+            tone: 'strong',
+            cells: {
+                balance: (
+                    <span className="tabular-nums">
+                        {formatMoney(ledger.closing_balance)}
+                    </span>
+                ),
+            },
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            icon={Wallet}
+            backHref="/finance/accounts"
+            title={`${account.code} — ${account.name}`}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={account.is_active ? 'success' : 'neutral'}
+                >
+                    {account.is_active ? 'Active' : 'Inactive'}
+                </PageHeaderStatusChip>
+            }
+            subline={[
+                typeLabels[account.type] ?? account.type,
+                account.sub_type ? account.sub_type.replace(/_/g, ' ') : null,
+                account.is_system ? 'System account' : null,
+                account.gst_applicable ? 'GST applicable' : null,
+                account.description,
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                canManage ? (
+                    <PageHeaderGlassButton
+                        icon={Pencil}
+                        onClick={() => setEditOpen(true)}
+                    >
+                        Edit account
+                    </PageHeaderGlassButton>
+                ) : undefined
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Current balance"
+                        href={`/finance/accounts/${account.id}`}
+                        ariaLabel="Reload this account's ledger"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(account.balance)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            all posted journals to date
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Opening"
+                        href={`/finance/accounts/${account.id}`}
+                        ariaLabel="View the opening balance for this period"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(ledger.opening_balance)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            at {dateLabel(filters.from)}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Closing"
+                        href={`/finance/accounts/${account.id}`}
+                        ariaLabel="View the closing balance for this period"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(ledger.closing_balance)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            at {dateLabel(filters.to)}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Movement"
+                        tone={movement >= 0 ? 'success' : 'warning'}
+                        href="/finance/journals"
+                        ariaLabel="View the journals behind this movement"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(movement)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterDelta
+                            trend={movement >= 0 ? 'up' : 'down'}
+                            good={movement >= 0}
+                        >
+                            {ledger.lines.length} journal{' '}
+                            {ledger.lines.length === 1 ? 'line' : 'lines'}
+                        </PageHeaderMeterDelta>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <FinancePeriodFilter
+                    url={`/finance/accounts/${account.id}`}
+                    from={filters.from}
+                    to={filters.to}
+                    idPrefix={`account-${account.id}-period`}
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`${account.code} - ${account.name}`} />
+            <Head title={`${account.code} — ${account.name}`} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/accounts"
-                        title={`${account.code} - ${account.name}`}
-                        description={account.description ?? undefined}
-                        actions={
-                            <div className="flex items-center gap-3">
-                                <Badge
-                                    variant="outline"
-                                    className={typeColors[account.type]}
-                                >
-                                    {typeLabels[account.type]}
-                                </Badge>
-                                {account.is_system && (
-                                    <Badge variant="outline">System</Badge>
-                                )}
-                                {!account.is_active && (
-                                    <Badge variant="secondary">Inactive</Badge>
-                                )}
-                                <div className="text-right">
-                                    <p className="text-xs text-muted-foreground">
-                                        Current Balance
-                                    </p>
-                                    <p className="font-mono text-xl font-bold tabular-nums">
-                                        {formatMoney(account.balance)}
-                                    </p>
-                                </div>
-                            </div>
-                        }
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Account ledger"
+                        caption={`${ledger.lines.length} ${
+                            ledger.lines.length === 1 ? 'line' : 'lines'
+                        } · ${dateLabel(filters.from)} – ${dateLabel(filters.to)}`}
                     />
-                }
-            >
-                {/* Date Filter */}
-                <Card>
-                    <CardContent className="pt-6">
-                        <form
-                            onSubmit={handleFilter}
-                            className="flex items-end gap-4"
-                        >
-                            <div className="space-y-1.5">
-                                <Label htmlFor="start_date">From</Label>
-                                <Input
-                                    id="start_date"
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) =>
-                                        setStartDate(e.target.value)
-                                    }
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label htmlFor="end_date">To</Label>
-                                <Input
-                                    id="end_date"
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                />
-                            </div>
-                            <Button type="submit" variant="outline">
-                                <Filter className="mr-2 h-4 w-4" />
-                                Filter
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
 
-                {/* Ledger Table */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Account Ledger</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Journal #</TableHead>
-                                    <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">
-                                        Debit
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Credit
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Balance
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {/* Opening Balance Row */}
-                                <TableRow className="bg-muted/30 font-medium">
-                                    <TableCell colSpan={5}>
-                                        Opening Balance
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono tabular-nums">
-                                        {formatMoney(ledger.opening_balance)}
-                                    </TableCell>
-                                </TableRow>
-
-                                {ledger.lines.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={6}
-                                            className="py-8 text-center text-muted-foreground"
-                                        >
-                                            No journal entries found for this
-                                            period.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    ledger.lines.map((line) => (
-                                        <TableRow key={line.id}>
-                                            <TableCell className="text-sm">
-                                                {line.date}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Link
-                                                    href={`/finance/journals/${line.journal_id}`}
-                                                    className="font-mono text-sm text-primary hover:underline"
-                                                >
-                                                    {line.journal_number}
-                                                </Link>
-                                            </TableCell>
-                                            <TableCell className="max-w-xs truncate text-sm">
-                                                {line.description}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono text-sm tabular-nums">
-                                                {line.debit > 0
-                                                    ? formatMoney(line.debit)
-                                                    : ''}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono text-sm tabular-nums">
-                                                {line.credit > 0
-                                                    ? formatMoney(line.credit)
-                                                    : ''}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
-                                                {formatMoney(
-                                                    line.running_balance,
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-
-                                {/* Closing Balance Row */}
-                                <TableRow className="bg-muted/30 font-semibold">
-                                    <TableCell colSpan={5}>
-                                        Closing Balance
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono tabular-nums">
-                                        {formatMoney(ledger.closing_balance)}
-                                    </TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                    {ledger.lines.length === 0 ? (
+                        <EmptyState
+                            icon={BookOpen}
+                            heading="No journal entries in this period"
+                            description="Widen the reporting period to see earlier postings against this account."
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={ledger.lines}
+                            rowKey={(line) => line.id}
+                            identityLabel="Journal"
+                            minWidth={980}
+                            identity={(line) => ({
+                                icon: BookOpen,
+                                name: line.journal_number,
+                                subline: dateLabel(line.date),
+                            })}
+                            hrefFor={(line) =>
+                                `/finance/journals/${line.journal_id}`
+                            }
+                            columns={columns}
+                            actionsFor={actionsFor}
+                            footerRows={footerRows}
+                            onOpen={(line) =>
+                                router.visit(
+                                    `/finance/journals/${line.journal_id}`,
+                                )
+                            }
+                            onRowContextMenu={(e, line) => ctx.open(e, line)}
+                        />
+                    )}
+                </div>
             </PageLayout>
+
+            {ctx.ctx ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={BookOpen}
+                    title={ctx.ctx.record.journal_number}
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
+
+            {canManage ? (
+                <NewAccountDialog
+                    open={editOpen}
+                    account={editable}
+                    onClose={() => setEditOpen(false)}
+                    parentAccounts={parentAccounts}
+                    taxRates={taxRates}
+                    fundingStreams={fundingStreams}
+                />
+            ) : null}
         </AppLayout>
     );
 }

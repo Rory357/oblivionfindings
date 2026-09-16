@@ -13,12 +13,14 @@ test('finance journals index loads', function () {
     });
 });
 
-test('finance journals create page loads', function () {
+// The routed create form is retired — new journals are the wizard on the list,
+// so the old URL redirects there.
+test('finance journals create url redirects to the list', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/journals/create')
-            ->waitForText('Journal', 10)
-            ->assertSee('Journal');
+            ->waitForText('Journals', 10)
+            ->assertPathIs('/finance/journals');
     });
 });

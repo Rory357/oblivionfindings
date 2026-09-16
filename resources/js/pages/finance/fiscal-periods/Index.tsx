@@ -1,417 +1,343 @@
+import { ConfirmDialog, FinanceSectionRail } from '@/components/finance';
 import {
-    ConfirmDialog,
-    LedgerTabsFooter,
-    useRowContextMenu,
-    type RowCtxItem,
-} from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
+    EmptyValue,
+    EntityContextMenu,
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
-import { CalendarDays, CalendarRange, Lock, Pencil, Plus } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { formatDateOnly } from '@/lib/datetime';
+import type { BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { CalendarRange, Lock, Pencil, Plus } from 'lucide-react';
+import { useState } from 'react';
 
-type FiscalPeriod = {
-    id: number;
-    name: string;
-    start_date: string;
-    end_date: string;
-    status: 'open' | 'closed' | 'locked';
-    closed_at: string | null;
-    closed_by: string | null;
-};
+import { FiscalPeriodDialog, type FiscalPeriod } from './_dialogs';
 
 type PageProps = {
     periods: FiscalPeriod[];
 };
 
-function CreatePeriodDialog() {
-    const [open, setOpen] = useState(false);
-    const { data, setData, post, processing, errors, reset } = useForm({
-        name: '',
-        start_date: '',
-        end_date: '',
-    });
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'General ledger', href: '/finance/ledger' },
+    { title: 'Fiscal periods', href: '/finance/fiscal-periods' },
+];
 
-    function handleSubmit(e: FormEvent) {
-        e.preventDefault();
-        post('/finance/fiscal-periods', {
-            onSuccess: () => {
-                reset();
-                setOpen(false);
-            },
-        });
-    }
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'All statuses' },
+    { value: 'open', label: 'Open' },
+    { value: 'closed', label: 'Closed' },
+    { value: 'locked', label: 'Locked' },
+];
 
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Period
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Create Fiscal Period</DialogTitle>
-                    <DialogDescription>
-                        Add a new fiscal period for your organisation.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-1.5">
-                        <Label htmlFor="period-name">Period Name *</Label>
-                        <Input
-                            id="period-name"
-                            value={data.name}
-                            onChange={(e) => setData('name', e.target.value)}
-                            placeholder="e.g. FY 2025-26 Q1"
-                        />
-                        {errors.name && (
-                            <p className="text-sm text-destructive">
-                                {errors.name}
-                            </p>
-                        )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="period-start">Start Date *</Label>
-                            <Input
-                                id="period-start"
-                                type="date"
-                                value={data.start_date}
-                                onChange={(e) =>
-                                    setData('start_date', e.target.value)
-                                }
-                            />
-                            {errors.start_date && (
-                                <p className="text-sm text-destructive">
-                                    {errors.start_date}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="period-end">End Date *</Label>
-                            <Input
-                                id="period-end"
-                                type="date"
-                                value={data.end_date}
-                                onChange={(e) =>
-                                    setData('end_date', e.target.value)
-                                }
-                            />
-                            {errors.end_date && (
-                                <p className="text-sm text-destructive">
-                                    {errors.end_date}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={processing}>
-                            {processing ? 'Creating...' : 'Create Period'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function EditPeriodDialog({ period }: { period: FiscalPeriod }) {
-    const [open, setOpen] = useState(false);
-    const { data, setData, put, processing, errors } = useForm({
-        name: period.name,
-        start_date: period.start_date,
-        end_date: period.end_date,
-    });
-
-    function handleSubmit(e: FormEvent) {
-        e.preventDefault();
-        put(`/finance/fiscal-periods/${period.id}`, {
-            onSuccess: () => setOpen(false),
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    disabled={period.status !== 'open'}
-                >
-                    <Pencil className="h-4 w-4" />
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Edit Fiscal Period</DialogTitle>
-                    <DialogDescription>
-                        Update the fiscal period details.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-1.5">
-                        <Label htmlFor="edit-name">Period Name *</Label>
-                        <Input
-                            id="edit-name"
-                            value={data.name}
-                            onChange={(e) => setData('name', e.target.value)}
-                        />
-                        {errors.name && (
-                            <p className="text-sm text-destructive">
-                                {errors.name}
-                            </p>
-                        )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="edit-start">Start Date *</Label>
-                            <Input
-                                id="edit-start"
-                                type="date"
-                                value={data.start_date}
-                                onChange={(e) =>
-                                    setData('start_date', e.target.value)
-                                }
-                            />
-                            {errors.start_date && (
-                                <p className="text-sm text-destructive">
-                                    {errors.start_date}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="edit-end">End Date *</Label>
-                            <Input
-                                id="edit-end"
-                                type="date"
-                                value={data.end_date}
-                                onChange={(e) =>
-                                    setData('end_date', e.target.value)
-                                }
-                            />
-                            {errors.end_date && (
-                                <p className="text-sm text-destructive">
-                                    {errors.end_date}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={processing}>
-                            {processing ? 'Saving...' : 'Save Changes'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
+const periodDate = (value: string) =>
+    formatDateOnly(value.slice(0, 10), value);
 
 export default function FiscalPeriodsIndex({ periods }: PageProps) {
-    const [closingId, setClosingId] = useState<number | null>(null);
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editTarget, setEditTarget] = useState<FiscalPeriod | null>(null);
     const [closeTarget, setCloseTarget] = useState<FiscalPeriod | null>(null);
+    const [closing, setClosing] = useState(false);
 
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Fiscal Periods', href: '/finance/fiscal-periods' },
-    ];
+    const ctx = useEntityContextMenu<FiscalPeriod>();
 
-    function handleClose() {
+    const handleClose = () => {
         if (!closeTarget) return;
-        setClosingId(closeTarget.id);
+        setClosing(true);
         router.post(
             `/finance/fiscal-periods/${closeTarget.id}/close`,
             {},
             {
-                onFinish: () => setClosingId(null),
+                onFinish: () => setClosing(false),
                 onSuccess: () => setCloseTarget(null),
             },
         );
-    }
+    };
 
     const openCount = periods.filter((p) => p.status === 'open').length;
     const closedCount = periods.filter((p) => p.status === 'closed').length;
     const lockedCount = periods.filter((p) => p.status === 'locked').length;
 
-    // Right-click row menu — mirrors the row's existing inline action (same guard).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (period: FiscalPeriod): RowCtxItem[] => {
-        const items: RowCtxItem[] = [];
+    const query = search.trim().toLowerCase();
+    const shown = periods.filter((period) => {
+        const matchesText =
+            query === '' || period.name.toLowerCase().includes(query);
+        const matchesStatus =
+            statusFilter === 'all' || period.status === statusFilter;
+        return matchesText && matchesStatus;
+    });
+
+    const actionsFor = (period: FiscalPeriod): MenuItem[] => {
+        const items: MenuItem[] = [];
         if (period.status === 'open') {
             items.push({
-                kind: 'item',
-                label: 'Close',
+                label: 'Edit period',
+                icon: Pencil,
+                onClick: () => setEditTarget(period),
+            });
+            items.push({
+                label: 'Close period',
                 icon: Lock,
-                onSelect: () => setCloseTarget(period),
+                onClick: () => setCloseTarget(period),
             });
         }
         return items;
     };
 
+    const columns: EntityTableColumn<FiscalPeriod>[] = [
+        {
+            key: 'start',
+            label: 'Start date',
+            width: '150px',
+            cell: (period) => (
+                <span className="whitespace-nowrap text-muted-foreground">
+                    {periodDate(period.start_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'end',
+            label: 'End date',
+            width: '150px',
+            cell: (period) => (
+                <span className="whitespace-nowrap text-muted-foreground">
+                    {periodDate(period.end_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '130px',
+            cell: (period) => <StatusBadge status={period.status} />,
+        },
+        {
+            key: 'closed_by',
+            label: 'Closed by',
+            width: '190px',
+            cell: (period) =>
+                period.closed_by ? (
+                    <span className="truncate">{period.closed_by}</span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            icon={CalendarRange}
+            title="Fiscal periods"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={openCount > 0 ? 'info' : 'neutral'}
+                >
+                    {openCount} open
+                </PageHeaderStatusChip>
+            }
+            subline={`General ledger · ${periods.length} periods · ${closedCount} closed · ${lockedCount} locked`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search period name…"
+                    />
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() => setCreateOpen(true)}
+                    >
+                        New period
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Periods"
+                        href="/finance/fiscal-periods"
+                        ariaLabel="View every fiscal period"
+                    >
+                        <PageHeaderMeterBig>
+                            {periods.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            accounting periods on record
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Open"
+                        tone="success"
+                        ariaLabel="Show only open periods"
+                        onClick={() => setStatusFilter('open')}
+                    >
+                        <PageHeaderMeterDonut
+                            percent={
+                                periods.length === 0
+                                    ? 0
+                                    : (openCount / periods.length) * 100
+                            }
+                            caption={`${openCount} of ${periods.length} accepting postings`}
+                        />
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Closed"
+                        ariaLabel="Show only closed periods"
+                        onClick={() => setStatusFilter('closed')}
+                    >
+                        <PageHeaderMeterBig>{closedCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            no further journals accepted
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Locked"
+                        tone="warning"
+                        ariaLabel="Show only locked periods"
+                        onClick={() => setStatusFilter('locked')}
+                    >
+                        <PageHeaderMeterBig>{lockedCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            sealed after year-end
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    label="Status"
+                    value={statusFilter}
+                    allValue="all"
+                    options={STATUS_OPTIONS}
+                    onChange={setStatusFilter}
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Fiscal Periods" />
+            <Head title="Fiscal periods" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        footer={<LedgerTabsFooter active="fiscal-periods" />}
-                        icon={CalendarRange}
-                        title="Fiscal Periods"
-                        description="Manage accounting periods for your organisation"
-                        stats={[
-                            { label: 'Total', value: periods.length },
-                            { label: 'Open', value: openCount },
-                            { label: 'Closed', value: closedCount },
-                            { label: 'Locked', value: lockedCount },
-                        ]}
-                        actions={<CreatePeriodDialog />}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Fiscal periods"
+                        caption={`${shown.length} of ${periods.length} shown`}
                     />
-                }
-            >
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>All Periods</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Period Name</TableHead>
-                                    <TableHead>Start Date</TableHead>
-                                    <TableHead>End Date</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Closed By</TableHead>
-                                    <TableHead className="text-right">
-                                        Actions
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {periods.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={6}
-                                            className="py-8 text-center text-muted-foreground"
-                                        >
-                                            No fiscal periods defined yet.
-                                            Create your first period to get
-                                            started.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    periods.map((period) => {
-                                        const menuItems = rowMenuItems(period);
-                                        return (
-                                            <TableRow
-                                                key={period.id}
-                                                onContextMenu={
-                                                    menuItems.length
-                                                        ? rowMenu.open(
-                                                              menuItems,
-                                                          )
-                                                        : undefined
-                                                }
-                                            >
-                                                <TableCell className="font-medium">
-                                                    {period.name}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {period.start_date}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {period.end_date}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <StatusBadge
-                                                        status={period.status}
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="text-sm text-muted-foreground">
-                                                    {period.closed_by || '-'}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <EditPeriodDialog
-                                                            period={period}
-                                                        />
-                                                        {period.status ===
-                                                            'open' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    setCloseTarget(
-                                                                        period,
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    closingId ===
-                                                                    period.id
-                                                                }
-                                                            >
-                                                                <Lock className="mr-1 h-3 w-3" />
-                                                                {closingId ===
-                                                                period.id
-                                                                    ? 'Closing...'
-                                                                    : 'Close'}
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
 
-                {rowMenu.element}
+                    {shown.length === 0 ? (
+                        <EmptyState
+                            icon={CalendarRange}
+                            heading={
+                                periods.length === 0
+                                    ? 'No fiscal periods yet'
+                                    : 'No periods match your search'
+                            }
+                            description={
+                                periods.length === 0
+                                    ? 'Create your first period so journals, invoices and bills know which accounting period they belong to.'
+                                    : 'Clear the search or the status filter to see every period.'
+                            }
+                            action={
+                                periods.length === 0 ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
+                                        New period
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearch('');
+                                            setStatusFilter('all');
+                                        }}
+                                    >
+                                        Clear filters
+                                    </Button>
+                                )
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={shown}
+                            rowKey={(period) => period.id}
+                            identityLabel="Period"
+                            minWidth={860}
+                            identity={(period) => ({
+                                icon: CalendarRange,
+                                name: period.name,
+                                subline: `${periodDate(period.start_date)} – ${periodDate(period.end_date)}`,
+                            })}
+                            columns={columns}
+                            actionsFor={actionsFor}
+                            mutedFor={(period) => period.status !== 'open'}
+                            onOpen={(period) => {
+                                if (period.status === 'open') {
+                                    setEditTarget(period);
+                                }
+                            }}
+                            onRowContextMenu={(e, period) =>
+                                ctx.open(e, period)
+                            }
+                        />
+                    )}
+                </div>
             </PageLayout>
+
+            {ctx.ctx ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={CalendarRange}
+                    title={ctx.ctx.record.name}
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
+
+            <FiscalPeriodDialog
+                open={createOpen}
+                onClose={() => setCreateOpen(false)}
+            />
+
+            {editTarget ? (
+                <FiscalPeriodDialog
+                    key={editTarget.id}
+                    open
+                    period={editTarget}
+                    onClose={() => setEditTarget(null)}
+                />
+            ) : null}
 
             <ConfirmDialog
                 open={!!closeTarget}
@@ -421,8 +347,13 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                     <>
                         This closes{' '}
                         <span className="font-medium text-foreground">
-                            {closeTarget?.name} ({closeTarget?.start_date} –{' '}
-                            {closeTarget?.end_date})
+                            {closeTarget?.name} (
+                            {closeTarget
+                                ? periodDate(closeTarget.start_date)
+                                : ''}{' '}
+                            –{' '}
+                            {closeTarget ? periodDate(closeTarget.end_date) : ''}
+                            )
                         </span>
                         . Once closed,{' '}
                         <span className="font-medium text-foreground">
@@ -435,7 +366,7 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                 }
                 confirmText="Close period"
                 variant="destructive"
-                processing={closingId === closeTarget?.id}
+                processing={closing}
                 onConfirm={handleClose}
             />
         </AppLayout>

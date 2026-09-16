@@ -31,6 +31,7 @@ export {
 export {
     EntityTable,
     type EntityTableColumn,
+    type EntityTableFooterRow,
     type EntityTableIdentity,
     type EntityTableProps,
 } from './entity-table';

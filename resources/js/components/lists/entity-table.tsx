@@ -48,6 +48,21 @@ export interface EntityTableIdentity {
     extra?: ReactNode;
 }
 
+/**
+ * A summary row pinned under the data rows — an opening/closing balance on a
+ * ledger, a debit/credit total on a journal. It is the table's own footer, not
+ * a card below it, so the numbers stay in their columns.
+ */
+export interface EntityTableFooterRow {
+    key: string;
+    /** Rendered in the identity column. */
+    label: ReactNode;
+    /** Values by column key; a column with no entry renders empty. */
+    cells?: Record<string, ReactNode>;
+    /** `strong` is the closing/total row; `default` the opening one. */
+    tone?: 'default' | 'strong';
+}
+
 export interface EntityTableProps<T> {
     rows: T[];
     rowKey: (row: T) => string | number;
@@ -73,6 +88,8 @@ export interface EntityTableProps<T> {
     mutedFor?: (row: T) => boolean;
     /** Horizontal scroll threshold for the inner grid. */
     minWidth?: number;
+    /** Summary rows pinned under the data rows (opening/closing, totals). */
+    footerRows?: EntityTableFooterRow[];
     /* Multi-select support (page-owned state). */
     selectMode?: boolean;
     selectedKeys?: ReadonlySet<string | number>;
@@ -103,6 +120,7 @@ export function EntityTable<T>({
     onRowContextMenu,
     mutedFor,
     minWidth = 900,
+    footerRows,
     selectMode = false,
     selectedKeys,
     onToggleSelect,
@@ -296,6 +314,41 @@ export function EntityTable<T>({
                             </div>
                         );
                     })}
+
+                    {/* footer summary rows — same tracks, no actions */}
+                    {footerRows?.map((footer) => (
+                        <div
+                            key={footer.key}
+                            role="row"
+                            className={cn(
+                                'grid h-[46px] items-center border-t border-border bg-muted/50',
+                                footer.tone === 'strong'
+                                    ? 'font-semibold text-foreground'
+                                    : 'text-muted-foreground',
+                            )}
+                            style={{ gridTemplateColumns: template }}
+                        >
+                            <span
+                                role="cell"
+                                className="truncate px-3 text-[12.5px]"
+                            >
+                                {footer.label}
+                            </span>
+                            {columns.map((c) => (
+                                <span
+                                    key={c.key}
+                                    role="cell"
+                                    className={cn(
+                                        'flex min-w-0 items-center px-3 text-[12.5px]',
+                                        ALIGN[c.align ?? 'left'],
+                                    )}
+                                >
+                                    {footer.cells?.[c.key] ?? null}
+                                </span>
+                            ))}
+                            <span role="cell" />
+                        </div>
+                    ))}
                 </div>
             </div>
         </Card>

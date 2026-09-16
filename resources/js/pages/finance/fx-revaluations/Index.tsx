@@ -1,24 +1,35 @@
+import { ConfirmDialog, FinanceSectionRail, formatMoney } from '@/components/finance';
 import {
-    ConfirmDialog,
-    LedgerTabsFooter,
-    formatMoney,
-    useRowContextMenu,
-    type RowCtxItem,
-} from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
+    EmptyValue,
+    EntityContextMenu,
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDelta,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import {
-    ArrowLeftRight,
-    Globe,
-    Plus,
-    TrendingDown,
-    TrendingUp,
-} from 'lucide-react';
+import { formatDateOnly } from '@/lib/datetime';
+import type { BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { ArrowLeftRight, Globe, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 type Revaluation = {
@@ -37,29 +48,56 @@ type PaginatedData = {
     links: { url: string | null; label: string; active: boolean }[];
     current_page: number;
     last_page: number;
+    total: number;
+};
+
+/** Register-wide totals — never the current page's slice. */
+type Summary = {
+    total: number;
+    posted: number;
+    draft: number;
+    net_gain_loss: number;
+    posted_gain_loss: number;
 };
 
 type PageProps = {
     revaluations: PaginatedData;
+    summary: Summary;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
-    { title: 'FX Revaluations', href: '/finance/fx-revaluations' },
+    { title: 'General ledger', href: '/finance/ledger' },
+    { title: 'FX revaluations', href: '/finance/fx-revaluations' },
 ];
 
-const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'All statuses' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'posted', label: 'Posted' },
+];
 
-export default function FxRevaluationsIndex({ revaluations }: PageProps) {
+const revalDate = (value: string) => formatDateOnly(value.slice(0, 10), value);
+
+/** Losses read as "(1,234.00)" — the accounting convention. */
+const signedMoney = (value: number) =>
+    value < 0
+        ? `(${formatMoney(Math.abs(value))})`
+        : formatMoney(Math.abs(value));
+
+export default function FxRevaluationsIndex({
+    revaluations,
+    summary,
+}: PageProps) {
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
     const [postTarget, setPostTarget] = useState<Revaluation | null>(null);
     const [posting, setPosting] = useState(false);
 
-    function confirmPost() {
+    const ctx = useEntityContextMenu<Revaluation>();
+
+    const confirmPost = () => {
         if (!postTarget) return;
         router.post(
             `/finance/fx-revaluations/${postTarget.id}/post`,
@@ -70,280 +108,318 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                 onSuccess: () => setPostTarget(null),
             },
         );
-    }
+    };
 
-    // Compute KPI: total gain/loss across all revaluations on current page
-    const totalGainLoss = revaluations.data.reduce(
-        (sum, r) => sum + Number(r.total_gain_loss),
-        0,
-    );
-    const isGain = totalGainLoss > 0;
-    const isLoss = totalGainLoss < 0;
+    const query = search.trim().toLowerCase();
+    const shown = revaluations.data.filter((reval) => {
+        const matchesText =
+            query === '' ||
+            (reval.journal_number ?? '').toLowerCase().includes(query) ||
+            (reval.notes ?? '').toLowerCase().includes(query) ||
+            (reval.created_by_name ?? '').toLowerCase().includes(query);
+        const matchesStatus =
+            statusFilter === 'all' || reval.status === statusFilter;
+        return matchesText && matchesStatus;
+    });
 
-    const postedCount = revaluations.data.filter(
-        (r) => r.status === 'posted',
-    ).length;
-
-    // Right-click row menu — mirrors the row's existing inline action (same guard).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (reval: Revaluation): RowCtxItem[] => {
-        const items: RowCtxItem[] = [];
+    const actionsFor = (reval: Revaluation): MenuItem[] => {
+        const items: MenuItem[] = [];
         if (reval.status === 'draft') {
             items.push({
-                kind: 'item',
-                label: 'Post to GL',
+                label: 'Post to the general ledger',
                 icon: ArrowLeftRight,
-                onSelect: () => setPostTarget(reval),
+                onClick: () => setPostTarget(reval),
             });
         }
         return items;
     };
 
+    const columns: EntityTableColumn<Revaluation>[] = [
+        {
+            key: 'gain_loss',
+            label: 'Gain / loss',
+            width: '160px',
+            align: 'right',
+            cell: (reval) => {
+                const value = Number(reval.total_gain_loss);
+                return (
+                    <span
+                        className={
+                            value > 0
+                                ? 'font-semibold text-status-success tabular-nums'
+                                : value < 0
+                                  ? 'font-semibold text-status-critical tabular-nums'
+                                  : 'font-semibold tabular-nums'
+                        }
+                    >
+                        {signedMoney(value)}
+                    </span>
+                );
+            },
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '130px',
+            cell: (reval) => <StatusBadge status={reval.status} />,
+        },
+        {
+            key: 'journal',
+            label: 'Journal',
+            width: '150px',
+            cell: (reval) =>
+                reval.journal_number ? (
+                    <span className="truncate">{reval.journal_number}</span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'created_by',
+            label: 'Created by',
+            width: '180px',
+            cell: (reval) =>
+                reval.created_by_name ? (
+                    <span className="truncate">{reval.created_by_name}</span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'notes',
+            label: 'Notes',
+            width: '1.2fr',
+            cell: (reval) =>
+                reval.notes ? (
+                    <span className="truncate text-muted-foreground">
+                        {reval.notes}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+    ];
+
+    const netGain = summary.net_gain_loss >= 0;
+
+    const header = (
+        <PageHeader
+            icon={Globe}
+            title="FX revaluations"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={summary.draft > 0 ? 'warning' : 'success'}
+                >
+                    {summary.draft} draft{summary.draft === 1 ? '' : 's'}
+                </PageHeaderStatusChip>
+            }
+            subline={`General ledger · ${summary.total} revaluations · unrealised foreign-exchange gain and loss`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search journal, notes or author…"
+                    />
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() =>
+                            router.visit('/finance/fx-revaluations/create')
+                        }
+                    >
+                        New revaluation
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Revaluations"
+                        href="/finance/fx-revaluations"
+                        ariaLabel="View every revaluation"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.total}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            calculated to date
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Posted"
+                        tone="success"
+                        ariaLabel="Show only posted revaluations"
+                        onClick={() => setStatusFilter('posted')}
+                    >
+                        <PageHeaderMeterDonut
+                            percent={
+                                summary.total === 0
+                                    ? 0
+                                    : (summary.posted / summary.total) * 100
+                            }
+                            caption={`${summary.posted} of ${summary.total} on the ledger`}
+                        />
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Awaiting posting"
+                        tone={summary.draft > 0 ? 'warning' : 'brand'}
+                        ariaLabel="Show only draft revaluations"
+                        onClick={() => setStatusFilter('draft')}
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.draft}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            drafts not yet posted to the GL
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Net gain / loss"
+                        tone={netGain ? 'success' : 'critical'}
+                        href="/finance/journals"
+                        ariaLabel="View the journals behind the revaluation gain and loss"
+                    >
+                        <PageHeaderMeterBig>
+                            {signedMoney(summary.net_gain_loss)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterDelta
+                            trend={netGain ? 'up' : 'down'}
+                            good={netGain}
+                        >
+                            {signedMoney(summary.posted_gain_loss)} posted
+                        </PageHeaderMeterDelta>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    label="Status"
+                    value={statusFilter}
+                    allValue="all"
+                    options={STATUS_OPTIONS}
+                    onChange={setStatusFilter}
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="FX Revaluations" />
+            <Head title="FX revaluations" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        footer={<LedgerTabsFooter active="fx-revaluations" />}
-                        icon={Globe}
-                        title="FX Revaluations"
-                        description="Calculate and post unrealised foreign exchange gain/loss adjustments"
-                        stats={[
-                            {
-                                label: 'Revaluations',
-                                value: revaluations.data.length,
-                            },
-                            { label: 'Posted', value: postedCount },
-                            {
-                                label: 'Net gain/loss',
-                                value: formatMoney(totalGainLoss),
-                            },
-                        ]}
-                        actions={
-                            <Link href="/finance/fx-revaluations/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Revaluation
-                                </Button>
-                            </Link>
-                        }
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Revaluation history"
+                        caption={`${shown.length} of ${revaluations.total} shown`}
                     />
-                }
-            >
-                {/* KPI Summary */}
-                {revaluations.data.length > 0 && (
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div
-                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isGain ? 'bg-status-success' : isLoss ? 'bg-status-critical' : 'bg-muted'}`}
-                            >
-                                {isGain ? (
-                                    <TrendingUp className="h-5 w-5 text-status-success" />
-                                ) : isLoss ? (
-                                    <TrendingDown className="h-5 w-5 text-status-critical" />
-                                ) : (
-                                    <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
-                                )}
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Total Unrealised{' '}
-                                    {isGain
-                                        ? 'Gain'
-                                        : isLoss
-                                          ? 'Loss'
-                                          : 'Gain/Loss'}
-                                </p>
-                                <p
-                                    className={`font-mono text-2xl font-bold tabular-nums ${isGain ? 'text-status-success' : isLoss ? 'text-status-critical' : 'text-foreground'}`}
-                                >
-                                    {isLoss ? '(' : ''}
-                                    {formatMoney(Math.abs(totalGainLoss))}
-                                    {isLoss ? ')' : ''}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>Revaluation History</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b text-left text-muted-foreground">
-                                        <th className="pr-4 pb-3 font-medium">
-                                            Date
-                                        </th>
-                                        <th className="pr-4 pb-3 text-right font-medium">
-                                            Gain / Loss
-                                        </th>
-                                        <th className="pr-4 pb-3 font-medium">
-                                            Status
-                                        </th>
-                                        <th className="pr-4 pb-3 font-medium">
-                                            Journal
-                                        </th>
-                                        <th className="pr-4 pb-3 font-medium">
-                                            Created By
-                                        </th>
-                                        <th className="pb-3 font-medium">
-                                            Notes
-                                        </th>
-                                        <th className="pb-3 text-right font-medium">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {revaluations.data.length === 0 ? (
-                                        <tr>
-                                            <td
-                                                colSpan={7}
-                                                className="py-8 text-center text-muted-foreground"
-                                            >
-                                                No FX revaluations found. Create
-                                                your first revaluation to
-                                                calculate unrealised gain/loss.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        revaluations.data.map((reval) => {
-                                            const gainLoss = Number(
-                                                reval.total_gain_loss,
-                                            );
-                                            const rowIsGain = gainLoss > 0;
-                                            const rowIsLoss = gainLoss < 0;
-                                            const menuItems =
-                                                rowMenuItems(reval);
-
-                                            return (
-                                                <tr
-                                                    key={reval.id}
-                                                    className="border-b last:border-0 hover:bg-muted/50"
-                                                    onContextMenu={
-                                                        menuItems.length
-                                                            ? rowMenu.open(
-                                                                  menuItems,
-                                                              )
-                                                            : undefined
-                                                    }
-                                                >
-                                                    <td className="py-3 pr-4 font-medium">
-                                                        {formatDate(
-                                                            reval.revaluation_date,
-                                                        )}
-                                                    </td>
-                                                    <td
-                                                        className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${
-                                                            rowIsGain
-                                                                ? 'text-status-success'
-                                                                : rowIsLoss
-                                                                  ? 'text-status-critical'
-                                                                  : ''
-                                                        }`}
-                                                    >
-                                                        {rowIsLoss ? '(' : ''}
-                                                        {formatMoney(
-                                                            Math.abs(gainLoss),
-                                                        )}
-                                                        {rowIsLoss ? ')' : ''}
-                                                    </td>
-                                                    <td className="py-3 pr-4">
-                                                        <StatusBadge
-                                                            status={
-                                                                reval.status
-                                                            }
-                                                        />
-                                                    </td>
-                                                    <td className="py-3 pr-4 font-mono text-sm text-muted-foreground">
-                                                        {reval.journal_number ??
-                                                            '-'}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-sm text-muted-foreground">
-                                                        {reval.created_by_name ??
-                                                            '-'}
-                                                    </td>
-                                                    <td className="max-w-[200px] truncate py-3 pr-4 text-sm text-muted-foreground">
-                                                        {reval.notes ?? '-'}
-                                                    </td>
-                                                    <td className="py-3 text-right">
-                                                        {reval.status ===
-                                                            'draft' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    setPostTarget(
-                                                                        reval,
-                                                                    )
-                                                                }
-                                                            >
-                                                                Post to GL
-                                                            </Button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {revaluations.last_page > 1 && (
-                            <div className="mt-4 flex items-center justify-center gap-1">
-                                {revaluations.links.map((link, i) => (
+                    {shown.length === 0 ? (
+                        <EmptyState
+                            icon={ArrowLeftRight}
+                            heading={
+                                revaluations.data.length === 0
+                                    ? 'No FX revaluations yet'
+                                    : 'No revaluations match your search'
+                            }
+                            description={
+                                revaluations.data.length === 0
+                                    ? 'Create your first revaluation to calculate the unrealised gain or loss on open foreign-currency items.'
+                                    : 'Clear the search or the status filter to see every revaluation.'
+                            }
+                            action={
+                                revaluations.data.length === 0 ? (
                                     <Button
-                                        key={i}
-                                        variant={
-                                            link.active ? 'default' : 'outline'
-                                        }
                                         size="sm"
-                                        disabled={!link.url}
                                         onClick={() =>
-                                            link.url && router.visit(link.url)
+                                            router.visit(
+                                                '/finance/fx-revaluations/create',
+                                            )
                                         }
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
+                                    >
+                                        New revaluation
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearch('');
+                                            setStatusFilter('all');
                                         }}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {rowMenu.element}
+                                    >
+                                        Clear filters
+                                    </Button>
+                                )
+                            }
+                        />
+                    ) : (
+                        <>
+                            <EntityTable
+                                rows={shown}
+                                rowKey={(reval) => reval.id}
+                                identityLabel="Revaluation"
+                                minWidth={1080}
+                                identity={(reval) => ({
+                                    icon: Globe,
+                                    name: revalDate(reval.revaluation_date),
+                                    subline: reval.journal_number ?? undefined,
+                                })}
+                                columns={columns}
+                                actionsFor={actionsFor}
+                                onRowContextMenu={(e, reval) =>
+                                    ctx.open(e, reval)
+                                }
+                            />
+                            <LaravelPagination
+                                links={revaluations.links}
+                                lastPage={revaluations.last_page}
+                            />
+                        </>
+                    )}
+                </div>
             </PageLayout>
+
+            {ctx.ctx ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Globe}
+                    title={revalDate(ctx.ctx.record.revaluation_date)}
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
 
             <ConfirmDialog
                 variant="default"
                 open={!!postTarget}
                 onClose={() => setPostTarget(null)}
-                title="Post revaluation to the General Ledger?"
+                title="Post revaluation to the general ledger?"
                 description={
                     <>
-                        This posts the FX revaluation dated{' '}
+                        This posts a journal to the ledger for the FX
+                        revaluation dated{' '}
                         <span className="font-medium text-foreground">
                             {postTarget
-                                ? formatDate(postTarget.revaluation_date)
+                                ? revalDate(postTarget.revaluation_date)
                                 : ''}
                         </span>{' '}
-                        and creates the journal entry for the unrealised
-                        gain/loss. Once posted it can&rsquo;t be undone.
+                        recognising{' '}
+                        <span className="font-medium text-foreground">
+                            {postTarget
+                                ? signedMoney(Number(postTarget.total_gain_loss))
+                                : ''}
+                        </span>{' '}
+                        of unrealised gain or loss. Once posted it can&rsquo;t
+                        be undone.
                     </>
                 }
-                confirmText="Post to GL"
+                confirmText="Post to the general ledger"
                 processing={posting}
                 onConfirm={confirmPost}
             />

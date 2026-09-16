@@ -4,30 +4,46 @@ import {
 } from '@/components/assets/asset-finance-technology-projection';
 import {
     ConfirmDialog,
+    FinanceSectionRail,
     FixedAssetDialog,
     FixedAssetDisposeDialog,
     formatMoney,
     type EditableFixedAsset,
     type FixedAssetGlAccount,
 } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatusBadge } from '@/components/ui/status-badge';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    EmptyValue,
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import { BookCheck, Edit, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { formatDateOnly } from '@/lib/datetime';
+import type { BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import {
+    BookCheck,
+    Package,
+    PackageMinus,
+    Pencil,
+    TrendingDown,
+} from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 
 interface GlAccount {
     id: number;
@@ -99,23 +115,16 @@ const categoryLabels: Record<string, string> = {
     equipment: 'Equipment',
     building: 'Building',
     furniture: 'Furniture',
-    it_equipment: 'IT Equipment',
+    it_equipment: 'IT equipment',
     land: 'Land',
 };
 
-const categoryColors: Record<string, string> = {
-    vehicle: 'bg-status-info-bg text-status-info',
-    equipment: 'bg-primary/10 text-primary',
-    building: 'bg-status-warning-bg text-status-warning',
-    furniture: 'bg-status-info-bg text-status-info',
-    it_equipment: 'bg-primary/10 text-primary',
-    land: 'bg-status-success-bg text-status-success',
+const methodLabels: Record<string, string> = {
+    straight_line: 'Straight line',
+    diminishing_value: 'Diminishing value',
 };
 
-const methodLabels: Record<string, string> = {
-    straight_line: 'Straight Line',
-    diminishing_value: 'Diminishing Value',
-};
+const assetDate = (value: string) => formatDateOnly(value.slice(0, 10), value);
 
 export default function FixedAssetShow({
     asset,
@@ -129,19 +138,28 @@ export default function FixedAssetShow({
     const [editOpen, setEditOpen] = useState(false);
     const [disposeOpen, setDisposeOpen] = useState(false);
     const [capitaliseOpen, setCapitaliseOpen] = useState(false);
+    const [capitalising, setCapitalising] = useState(false);
 
     // Captured-at-source assets register without GL accounts; once the GL asset
     // account is assigned, the acquisition journal is posted explicitly here.
     const needsCapitalisation =
         !!asset.gl_asset_account_id && !asset.acquisition_journal_id;
 
-    const bookValue =
-        Number(asset.purchase_cost) - Number(asset.accumulated_depreciation);
+    const purchaseCost = Number(asset.purchase_cost);
+    const accumulated = Number(asset.accumulated_depreciation);
+    const residual = Number(asset.residual_value);
+    const bookValue = purchaseCost - accumulated;
+    const depreciableBase = purchaseCost - residual;
+    const depreciatedPercent =
+        depreciableBase > 0 ? (accumulated / depreciableBase) * 100 : 0;
+    const monthsRemaining = depreciationSchedule.length;
 
     const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
         { title: 'Finance', href: '/finance' },
-        { title: 'Fixed Assets', href: '/finance/fixed-assets' },
-        { title: asset.asset_name, href: `/finance/fixed-assets/${asset.id}` },
+        { title: 'General ledger', href: '/finance/ledger' },
+        { title: 'Fixed assets', href: '/finance/fixed-assets' },
+        { title: asset.asset_name },
     ];
 
     const editableAsset: EditableFixedAsset = {
@@ -161,424 +179,410 @@ export default function FixedAssetShow({
         has_depreciations: hasDepreciations,
     };
 
+    const meta: { label: string; value: ReactNode }[] = [
+        { label: 'Purchase date', value: assetDate(asset.purchase_date) },
+        {
+            label: 'Depreciation method',
+            value:
+                methodLabels[asset.depreciation_method] ??
+                asset.depreciation_method,
+        },
+        {
+            label: 'Useful life',
+            value: `${asset.useful_life_months} months (${(asset.useful_life_months / 12).toFixed(1)} years)`,
+        },
+        { label: 'Residual value', value: formatMoney(asset.residual_value) },
+        {
+            label: 'Asset account',
+            value: asset.gl_asset_account
+                ? `${asset.gl_asset_account.code} — ${asset.gl_asset_account.name}`
+                : '—',
+        },
+        {
+            label: 'Accum. depreciation account',
+            value: asset.gl_depreciation_account
+                ? `${asset.gl_depreciation_account.code} — ${asset.gl_depreciation_account.name}`
+                : '—',
+        },
+        {
+            label: 'Depreciation expense account',
+            value: asset.gl_expense_account
+                ? `${asset.gl_expense_account.code} — ${asset.gl_expense_account.name}`
+                : '—',
+        },
+        { label: 'Created by', value: asset.created_by?.name ?? '—' },
+        ...(asset.disposed_date
+            ? [
+                  {
+                      label: 'Disposal date',
+                      value: assetDate(asset.disposed_date),
+                  },
+              ]
+            : []),
+        ...(asset.disposal_proceeds !== null
+            ? [
+                  {
+                      label: 'Disposal proceeds',
+                      value: formatMoney(asset.disposal_proceeds),
+                  },
+              ]
+            : []),
+    ];
+
+    /* ---------------- Tables ---------------- */
+
+    const depreciationActions = (dep: Depreciation): MenuItem[] => {
+        const items: MenuItem[] = [];
+        if (dep.journal) {
+            items.push({
+                label: `Open journal ${dep.journal.journal_number}`,
+                icon: BookCheck,
+                onClick: () =>
+                    router.visit(`/finance/journals/${dep.journal?.id}`),
+            });
+        }
+        if (dep.reversal_journal) {
+            items.push({
+                label: `Open reversal ${dep.reversal_journal.journal_number}`,
+                icon: BookCheck,
+                onClick: () =>
+                    router.visit(
+                        `/finance/journals/${dep.reversal_journal?.id}`,
+                    ),
+            });
+        }
+        return items;
+    };
+
+    const depreciationColumns: EntityTableColumn<Depreciation>[] = [
+        {
+            key: 'amount',
+            label: 'Amount',
+            width: '150px',
+            align: 'right',
+            cell: (dep) => (
+                <span className="tabular-nums">{formatMoney(dep.amount)}</span>
+            ),
+        },
+        {
+            key: 'accumulated',
+            label: 'Accumulated',
+            width: '160px',
+            align: 'right',
+            cell: (dep) => (
+                <span className="tabular-nums">
+                    {formatMoney(dep.accumulated_total)}
+                </span>
+            ),
+        },
+        {
+            key: 'book_value',
+            label: 'Book value after',
+            width: '170px',
+            align: 'right',
+            cell: (dep) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(dep.book_value_after)}
+                </span>
+            ),
+        },
+        {
+            key: 'journal',
+            label: 'Journal',
+            width: '150px',
+            cell: (dep) =>
+                dep.journal ? (
+                    <span className="truncate">
+                        {dep.journal.journal_number}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'correction',
+            label: 'Correction',
+            width: '210px',
+            cell: (dep) =>
+                dep.reversal_journal ? (
+                    <span className="flex min-w-0 items-center gap-2">
+                        <StatusBadge status="reversed" size="sm" />
+                        <span className="truncate text-muted-foreground">
+                            {dep.reversal_journal.journal_number}
+                        </span>
+                    </span>
+                ) : dep.journal ? (
+                    <StatusBadge status="posted" size="sm" />
+                ) : (
+                    <StatusBadge
+                        status="recorded"
+                        label="Recorded (no GL)"
+                        size="sm"
+                    />
+                ),
+        },
+    ];
+
+    const scheduleActions = (): MenuItem[] => [];
+
+    const scheduleColumns: EntityTableColumn<ScheduleEntry>[] = [
+        {
+            key: 'amount',
+            label: 'Depreciation',
+            width: '170px',
+            align: 'right',
+            cell: (entry) => (
+                <span className="tabular-nums">
+                    {formatMoney(entry.depreciation_amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'accumulated',
+            label: 'Accumulated',
+            width: '170px',
+            align: 'right',
+            cell: (entry) => (
+                <span className="tabular-nums">
+                    {formatMoney(entry.accumulated)}
+                </span>
+            ),
+        },
+        {
+            key: 'book_value',
+            label: 'Book value',
+            width: '170px',
+            align: 'right',
+            cell: (entry) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(entry.book_value)}
+                </span>
+            ),
+        },
+    ];
+
+    /* ---------------- Event Horizon header ---------------- */
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            icon={Package}
+            backHref="/finance/fixed-assets"
+            title={asset.asset_name}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={
+                        asset.status === 'active'
+                            ? 'success'
+                            : asset.status === 'disposed'
+                              ? 'neutral'
+                              : 'info'
+                    }
+                >
+                    {asset.status === 'fully_depreciated'
+                        ? 'Fully depreciated'
+                        : asset.status.charAt(0).toUpperCase() +
+                          asset.status.slice(1)}
+                </PageHeaderStatusChip>
+            }
+            subline={[
+                categoryLabels[asset.category] ?? asset.category,
+                asset.asset_tag ? `Tag ${asset.asset_tag}` : null,
+                methodLabels[asset.depreciation_method] ??
+                    asset.depreciation_method,
+                `Purchased ${assetDate(asset.purchase_date)}`,
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                canManage && asset.status === 'active' ? (
+                    <>
+                        {needsCapitalisation ? (
+                            <PageHeaderGlassButton
+                                icon={Pencil}
+                                onClick={() => setEditOpen(true)}
+                            >
+                                Edit asset
+                            </PageHeaderGlassButton>
+                        ) : null}
+                        <PageHeaderGlassButton
+                            icon={PackageMinus}
+                            onClick={() => setDisposeOpen(true)}
+                        >
+                            Dispose
+                        </PageHeaderGlassButton>
+                        {/* Capitalising is the one thing that must happen next
+                         * when it is outstanding, so it takes the primary. */}
+                        {needsCapitalisation ? (
+                            <PageHeaderPrimaryButton
+                                icon={BookCheck}
+                                onClick={() => setCapitaliseOpen(true)}
+                            >
+                                Post acquisition
+                            </PageHeaderPrimaryButton>
+                        ) : (
+                            <PageHeaderPrimaryButton
+                                icon={Pencil}
+                                onClick={() => setEditOpen(true)}
+                            >
+                                Edit asset
+                            </PageHeaderPrimaryButton>
+                        )}
+                    </>
+                ) : undefined
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Purchase cost"
+                        href="/finance/fixed-assets"
+                        ariaLabel="View the fixed-asset register"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(asset.purchase_cost)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            residual {formatMoney(asset.residual_value)}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Depreciation"
+                        tone="warning"
+                        href="/finance/journals"
+                        ariaLabel="View the depreciation journals"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(asset.accumulated_depreciation)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBar percent={depreciatedPercent} />
+                        <PageHeaderMeterCaption>
+                            {depreciatedPercent.toFixed(1)}% of the depreciable
+                            base
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Book value"
+                        tone="success"
+                        href="/finance/reports/balance-sheet"
+                        ariaLabel="View the balance sheet"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(bookValue)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            carried on the balance sheet
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Months remaining"
+                        ariaLabel="View this asset's projected depreciation"
+                        href={`/finance/fixed-assets/${asset.id}`}
+                    >
+                        <PageHeaderMeterBig>
+                            {monthsRemaining}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            of {asset.useful_life_months} months of useful life
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={asset.asset_name} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/fixed-assets"
-                        title={
-                            <span className="flex flex-wrap items-center gap-3">
-                                {asset.asset_name}
-                                <Badge
-                                    variant="secondary"
-                                    className={
-                                        categoryColors[asset.category] || ''
-                                    }
-                                >
-                                    {categoryLabels[asset.category] ||
-                                        asset.category}
-                                </Badge>
-                                <StatusBadge status={asset.status} />
-                            </span>
-                        }
-                        description={
-                            asset.asset_tag
-                                ? `Tag: ${asset.asset_tag}`
-                                : undefined
-                        }
-                        actions={
-                            canManage && asset.status === 'active' ? (
-                                <>
-                                    {needsCapitalisation && (
-                                        <Button
-                                            onClick={() =>
-                                                setCapitaliseOpen(true)
-                                            }
-                                        >
-                                            <BookCheck className="mr-2 h-4 w-4" />
-                                            Post acquisition
-                                        </Button>
-                                    )}
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => setEditOpen(true)}
-                                    >
-                                        <Edit className="mr-2 h-4 w-4" />
-                                        Edit
-                                    </Button>
-                                    <Button
-                                        variant="destructive"
-                                        onClick={() => setDisposeOpen(true)}
-                                    >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Dispose
-                                    </Button>
-                                </>
-                            ) : undefined
-                        }
-                    />
-                }
-            >
-                {/* Asset Details + Book Value */}
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <Card className="lg:col-span-2">
-                        <CardHeader>
-                            <CardTitle>Asset Details</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                                <div>
-                                    <dt className="text-muted-foreground">
-                                        Purchase Date
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <Card className="rounded-[14px] p-5">
+                        <dl className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                            {meta.map((item) => (
+                                <div key={item.label}>
+                                    <dt className="text-[11.5px] text-muted-foreground">
+                                        {item.label}
                                     </dt>
-                                    <dd className="font-medium">
-                                        {new Date(
-                                            asset.purchase_date,
-                                        ).toLocaleDateString('en-NZ')}
+                                    <dd className="text-[13px] font-semibold text-foreground">
+                                        {item.value}
                                     </dd>
                                 </div>
-                                <div>
-                                    <dt className="text-muted-foreground">
-                                        Depreciation Method
-                                    </dt>
-                                    <dd className="font-medium">
-                                        {methodLabels[
-                                            asset.depreciation_method
-                                        ] || asset.depreciation_method}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground">
-                                        Useful Life
-                                    </dt>
-                                    <dd className="font-medium">
-                                        {asset.useful_life_months} months (
-                                        {(
-                                            asset.useful_life_months / 12
-                                        ).toFixed(1)}{' '}
-                                        years)
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground">
-                                        Residual Value
-                                    </dt>
-                                    <dd className="font-mono font-medium">
-                                        {formatMoney(asset.residual_value)}
-                                    </dd>
-                                </div>
-                                {asset.gl_asset_account && (
-                                    <div>
-                                        <dt className="text-muted-foreground">
-                                            Asset Account
-                                        </dt>
-                                        <dd className="font-medium">
-                                            {asset.gl_asset_account.code} -{' '}
-                                            {asset.gl_asset_account.name}
-                                        </dd>
-                                    </div>
-                                )}
-                                {asset.gl_depreciation_account && (
-                                    <div>
-                                        <dt className="text-muted-foreground">
-                                            Accum. Depreciation Account
-                                        </dt>
-                                        <dd className="font-medium">
-                                            {asset.gl_depreciation_account.code}{' '}
-                                            -{' '}
-                                            {asset.gl_depreciation_account.name}
-                                        </dd>
-                                    </div>
-                                )}
-                                {asset.gl_expense_account && (
-                                    <div>
-                                        <dt className="text-muted-foreground">
-                                            Expense Account
-                                        </dt>
-                                        <dd className="font-medium">
-                                            {asset.gl_expense_account.code} -{' '}
-                                            {asset.gl_expense_account.name}
-                                        </dd>
-                                    </div>
-                                )}
-                                {asset.created_by && (
-                                    <div>
-                                        <dt className="text-muted-foreground">
-                                            Created By
-                                        </dt>
-                                        <dd className="font-medium">
-                                            {asset.created_by.name}
-                                        </dd>
-                                    </div>
-                                )}
-                                {asset.disposed_date && (
-                                    <div>
-                                        <dt className="text-muted-foreground">
-                                            Disposal Date
-                                        </dt>
-                                        <dd className="font-medium">
-                                            {new Date(
-                                                asset.disposed_date,
-                                            ).toLocaleDateString('en-NZ')}
-                                        </dd>
-                                    </div>
-                                )}
-                                {asset.disposal_proceeds !== null && (
-                                    <div>
-                                        <dt className="text-muted-foreground">
-                                            Disposal Proceeds
-                                        </dt>
-                                        <dd className="font-mono font-medium">
-                                            {formatMoney(
-                                                asset.disposal_proceeds,
-                                            )}
-                                        </dd>
-                                    </div>
-                                )}
-                            </dl>
-                            {asset.notes && (
-                                <div className="mt-4 border-t pt-4">
-                                    <p className="mb-1 text-sm text-muted-foreground">
-                                        Notes
-                                    </p>
-                                    <p className="text-sm whitespace-pre-wrap">
-                                        {asset.notes}
-                                    </p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Book Value Card */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Book Value</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-3">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">
-                                        Purchase Cost
-                                    </span>
-                                    <span className="font-mono font-medium tabular-nums">
-                                        {formatMoney(asset.purchase_cost)}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">
-                                        Accumulated Depreciation
-                                    </span>
-                                    <span className="font-mono font-medium text-status-warning tabular-nums">
-                                        -
-                                        {formatMoney(
-                                            asset.accumulated_depreciation,
-                                        )}
-                                    </span>
-                                </div>
-                                <hr />
-                                <div className="flex justify-between">
-                                    <span className="font-medium">
-                                        Book Value
-                                    </span>
-                                    <span className="font-mono text-xl font-bold tabular-nums">
-                                        {formatMoney(bookValue)}
-                                    </span>
-                                </div>
+                            ))}
+                        </dl>
+                        {asset.notes ? (
+                            <div className="mt-5 border-t border-border pt-4">
+                                <p className="text-[11.5px] text-muted-foreground">
+                                    Notes
+                                </p>
+                                <p className="text-[13px] whitespace-pre-wrap">
+                                    {asset.notes}
+                                </p>
                             </div>
-                            {asset.status === 'active' && (
-                                <div className="pt-2">
-                                    <div className="h-2 w-full rounded-full bg-muted">
-                                        <div
-                                            className="h-2 rounded-full bg-primary transition-all"
-                                            style={{
-                                                width: `${Math.min(100, (Number(asset.accumulated_depreciation) / (Number(asset.purchase_cost) - Number(asset.residual_value))) * 100)}%`,
-                                            }}
-                                        />
-                                    </div>
-                                    <p className="mt-1 text-center text-xs text-muted-foreground">
-                                        {(
-                                            (Number(
-                                                asset.accumulated_depreciation,
-                                            ) /
-                                                (Number(asset.purchase_cost) -
-                                                    Number(
-                                                        asset.residual_value,
-                                                    ))) *
-                                            100
-                                        ).toFixed(1)}
-                                        % depreciated
-                                    </p>
-                                </div>
-                            )}
-                        </CardContent>
+                        ) : null}
                     </Card>
+
+                    <AssetFinanceTechnologyProjectionPanel
+                        projection={assetReconciliation}
+                    />
+
+                    <ListCaption
+                        title="Depreciation history"
+                        caption={`${asset.depreciations.length} recorded ${
+                            asset.depreciations.length === 1
+                                ? 'period'
+                                : 'periods'
+                        }`}
+                    />
+                    {asset.depreciations.length === 0 ? (
+                        <EmptyState
+                            variant="compact"
+                            icon={TrendingDown}
+                            heading="No depreciation recorded yet"
+                            description="Depreciation appears here once a monthly run includes this asset."
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={asset.depreciations}
+                            rowKey={(dep) => dep.id}
+                            identityLabel="Period"
+                            minWidth={1020}
+                            identity={(dep) => ({
+                                icon: TrendingDown,
+                                name: assetDate(dep.depreciation_date),
+                            })}
+                            columns={depreciationColumns}
+                            actionsFor={depreciationActions}
+                        />
+                    )}
+
+                    {depreciationSchedule.length > 0 ? (
+                        <>
+                            <ListCaption
+                                title="Projected depreciation schedule"
+                                caption={`${depreciationSchedule.length} months remaining`}
+                            />
+                            <EntityTable
+                                rows={depreciationSchedule}
+                                rowKey={(entry) => entry.month}
+                                identityLabel="Month"
+                                minWidth={860}
+                                identity={(entry) => ({
+                                    icon: TrendingDown,
+                                    name: entry.month,
+                                })}
+                                columns={scheduleColumns}
+                                actionsFor={scheduleActions}
+                            />
+                        </>
+                    ) : null}
                 </div>
-
-                <AssetFinanceTechnologyProjectionPanel
-                    projection={assetReconciliation}
-                />
-
-                {/* Depreciation History */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Depreciation History</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {asset.depreciations.length === 0 ? (
-                            <p className="py-6 text-center text-sm text-muted-foreground">
-                                No depreciation records yet.
-                            </p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead className="text-right">
-                                            Amount
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Accumulated Total
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Book Value After
-                                        </TableHead>
-                                        <TableHead>Journal</TableHead>
-                                        <TableHead>Correction</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {asset.depreciations.map((dep) => (
-                                        <TableRow key={dep.id}>
-                                            <TableCell className="text-sm">
-                                                {new Date(
-                                                    dep.depreciation_date,
-                                                ).toLocaleDateString('en-NZ')}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono text-sm tabular-nums">
-                                                {formatMoney(dep.amount)}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono text-sm tabular-nums">
-                                                {formatMoney(
-                                                    dep.accumulated_total,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
-                                                {formatMoney(
-                                                    dep.book_value_after,
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                {dep.journal ? (
-                                                    <Link
-                                                        href={`/finance/journals/${dep.journal.id}`}
-                                                        className="font-mono text-sm text-primary hover:underline"
-                                                    >
-                                                        {
-                                                            dep.journal
-                                                                .journal_number
-                                                        }
-                                                    </Link>
-                                                ) : (
-                                                    <span className="text-sm text-muted-foreground">
-                                                        -
-                                                    </span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                {dep.reversal_journal ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <StatusBadge
-                                                            status="reversed"
-                                                            size="sm"
-                                                        />
-                                                        <Link
-                                                            href={`/finance/journals/${dep.reversal_journal.id}`}
-                                                            className="font-mono text-sm text-primary hover:underline"
-                                                        >
-                                                            {
-                                                                dep
-                                                                    .reversal_journal
-                                                                    .journal_number
-                                                            }
-                                                        </Link>
-                                                    </div>
-                                                ) : dep.journal ? (
-                                                    <StatusBadge
-                                                        status="posted"
-                                                        size="sm"
-                                                    />
-                                                ) : (
-                                                    <StatusBadge
-                                                        status="recorded"
-                                                        label="Recorded (no GL)"
-                                                        size="sm"
-                                                    />
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Projected Depreciation Schedule */}
-                {depreciationSchedule.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>
-                                Projected Depreciation Schedule
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Month</TableHead>
-                                        <TableHead className="text-right">
-                                            Depreciation Amount
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Accumulated
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Book Value
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {depreciationSchedule.map((entry, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell className="text-sm">
-                                                {entry.month}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono text-sm tabular-nums">
-                                                {formatMoney(
-                                                    entry.depreciation_amount,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono text-sm tabular-nums">
-                                                {formatMoney(entry.accumulated)}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
-                                                {formatMoney(entry.book_value)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                )}
             </PageLayout>
 
-            {canManage && (
+            {canManage ? (
                 <FixedAssetDialog
                     open={editOpen}
                     onClose={() => setEditOpen(false)}
@@ -586,18 +590,18 @@ export default function FixedAssetShow({
                     assetAccounts={assetAccounts}
                     expenseAccounts={expenseAccounts}
                 />
-            )}
+            ) : null}
 
-            {canManage && (
+            {canManage ? (
                 <ConfirmDialog
                     variant="default"
                     open={capitaliseOpen}
                     onClose={() => setCapitaliseOpen(false)}
-                    title="Post acquisition journal"
+                    title="Post the acquisition journal?"
                     description={
                         <>
-                            Posts the acquisition journal for{' '}
-                            <span className="font-medium">
+                            This posts a journal to the ledger for{' '}
+                            <span className="font-medium text-foreground">
                                 {asset.asset_name}
                             </span>
                             : DR{' '}
@@ -605,26 +609,30 @@ export default function FixedAssetShow({
                                 ? `${asset.gl_asset_account.code} ${asset.gl_asset_account.name}`
                                 : 'the GL asset account'}{' '}
                             / CR 1000 Bank for{' '}
-                            {formatMoney(Number(asset.purchase_cost))}. This
-                            posts to the general ledger and can only happen
+                            {formatMoney(purchaseCost)}. It can only happen
                             once.
                         </>
                     }
                     confirmText="Post acquisition"
-                    onConfirm={() =>
+                    processing={capitalising}
+                    onConfirm={() => {
+                        setCapitalising(true);
                         router.post(
                             `/finance/fixed-assets/${asset.id}/capitalise`,
                             {},
                             {
                                 preserveScroll: true,
-                                onFinish: () => setCapitaliseOpen(false),
+                                onFinish: () => {
+                                    setCapitalising(false);
+                                    setCapitaliseOpen(false);
+                                },
                             },
-                        )
-                    }
+                        );
+                    }}
                 />
-            )}
+            ) : null}
 
-            {canManage && (
+            {canManage ? (
                 <FixedAssetDisposeDialog
                     open={disposeOpen}
                     onClose={() => setDisposeOpen(false)}
@@ -649,7 +657,7 @@ export default function FixedAssetShow({
                             : null,
                     }}
                 />
-            )}
+            ) : null}
         </AppLayout>
     );
 }

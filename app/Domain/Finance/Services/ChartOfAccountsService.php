@@ -55,6 +55,11 @@ class ChartOfAccountsService
             'is_active' => $account->is_active,
             'gst_applicable' => $account->gst_applicable,
             'description' => $account->description,
+            // Editable fields so a chart row can prefill the account modal
+            // (the routed Edit page is retired — the index row menu opens it).
+            'parent_id' => $account->parent_id,
+            'default_tax_rate_id' => $account->default_tax_rate_id,
+            'funding_stream_id' => $account->funding_stream_id,
             'balance' => $balances[$account->id] ?? (float) $account->opening_balance,
             'children' => $children->map(function ($child) use ($allAccounts, $balances) {
                 return $this->buildNode($child, $allAccounts, $balances);

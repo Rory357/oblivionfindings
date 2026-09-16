@@ -1,644 +1,360 @@
+import { ConfirmDialog, FinanceSectionRail } from '@/components/finance';
 import {
-    ConfirmDialog,
-    LedgerTabsFooter,
-    useRowContextMenu,
-    type RowCtxItem,
-} from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+    EmptyValue,
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
-import { CircleDollarSign, Coins, Pencil, Plus, Trash2 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { formatDateTime } from '@/lib/datetime';
+import type { BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { Coins, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
-type Currency = {
-    id: number;
-    code: string;
-    name: string;
-    symbol: string;
-    decimal_places: number;
-    exchange_rate: string;
-    rate_updated_at: string | null;
-    is_base: boolean;
-    is_active: boolean;
-};
+import { CurrencyDialog, type Currency } from './_dialogs';
 
 type PageProps = {
     currencies: Currency[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
+    { title: 'General ledger', href: '/finance/ledger' },
     { title: 'Currencies', href: '/finance/currencies' },
 ];
 
-const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-};
-
-function CreateCurrencyDialog() {
-    const [open, setOpen] = useState(false);
-    const { data, setData, post, processing, errors, reset } = useForm({
-        code: '',
-        name: '',
-        symbol: '',
-        decimal_places: 2,
-        exchange_rate: '1.000000',
-        is_base: false,
-        is_active: true,
-    });
-
-    function handleSubmit(e: FormEvent) {
-        e.preventDefault();
-        post('/finance/currencies', {
-            onSuccess: () => {
-                reset();
-                setOpen(false);
-            },
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Currency
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Create Currency</DialogTitle>
-                    <DialogDescription>
-                        Add a new currency for multi-currency transactions.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="curr-code">Code (ISO 4217) *</Label>
-                            <Input
-                                id="curr-code"
-                                value={data.code}
-                                onChange={(e) =>
-                                    setData(
-                                        'code',
-                                        e.target.value.toUpperCase(),
-                                    )
-                                }
-                                placeholder="e.g. AUD"
-                                maxLength={3}
-                            />
-                            {errors.code && (
-                                <p className="text-sm text-destructive">
-                                    {errors.code}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="curr-name">Name *</Label>
-                            <Input
-                                id="curr-name"
-                                value={data.name}
-                                onChange={(e) =>
-                                    setData('name', e.target.value)
-                                }
-                                placeholder="e.g. Australian Dollar"
-                            />
-                            {errors.name && (
-                                <p className="text-sm text-destructive">
-                                    {errors.name}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="curr-symbol">Symbol *</Label>
-                            <Input
-                                id="curr-symbol"
-                                value={data.symbol}
-                                onChange={(e) =>
-                                    setData('symbol', e.target.value)
-                                }
-                                placeholder="e.g. A$"
-                                maxLength={10}
-                            />
-                            {errors.symbol && (
-                                <p className="text-sm text-destructive">
-                                    {errors.symbol}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="curr-decimals">
-                                Decimal Places
-                            </Label>
-                            <Input
-                                id="curr-decimals"
-                                type="number"
-                                min={0}
-                                max={6}
-                                value={data.decimal_places}
-                                onChange={(e) =>
-                                    setData(
-                                        'decimal_places',
-                                        parseInt(e.target.value) || 2,
-                                    )
-                                }
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="curr-rate">Rate to NZD *</Label>
-                            <Input
-                                id="curr-rate"
-                                type="number"
-                                step="0.000001"
-                                min="0.000001"
-                                value={data.exchange_rate}
-                                onChange={(e) =>
-                                    setData('exchange_rate', e.target.value)
-                                }
-                            />
-                            {errors.exchange_rate && (
-                                <p className="text-sm text-destructive">
-                                    {errors.exchange_rate}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id="curr-base"
-                                checked={data.is_base}
-                                onCheckedChange={(checked) =>
-                                    setData('is_base', checked === true)
-                                }
-                            />
-                            <Label htmlFor="curr-base" className="font-normal">
-                                Base Currency
-                            </Label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id="curr-active"
-                                checked={data.is_active}
-                                onCheckedChange={(checked) =>
-                                    setData('is_active', checked === true)
-                                }
-                            />
-                            <Label
-                                htmlFor="curr-active"
-                                className="font-normal"
-                            >
-                                Active
-                            </Label>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={processing}>
-                            {processing ? 'Creating...' : 'Create'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function EditCurrencyDialog({ currency }: { currency: Currency }) {
-    const [open, setOpen] = useState(false);
-    const { data, setData, put, processing, errors } = useForm({
-        code: currency.code,
-        name: currency.name,
-        symbol: currency.symbol,
-        decimal_places: currency.decimal_places,
-        exchange_rate: currency.exchange_rate,
-        is_base: currency.is_base,
-        is_active: currency.is_active,
-    });
-
-    function handleSubmit(e: FormEvent) {
-        e.preventDefault();
-        put(`/finance/currencies/${currency.id}`, {
-            onSuccess: () => setOpen(false),
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button variant="ghost" size="icon">
-                    <Pencil className="h-4 w-4" />
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Edit Currency</DialogTitle>
-                    <DialogDescription>
-                        Update currency details and exchange rate.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="edit-curr-code">
-                                Code (ISO 4217) *
-                            </Label>
-                            <Input
-                                id="edit-curr-code"
-                                value={data.code}
-                                onChange={(e) =>
-                                    setData(
-                                        'code',
-                                        e.target.value.toUpperCase(),
-                                    )
-                                }
-                                maxLength={3}
-                            />
-                            {errors.code && (
-                                <p className="text-sm text-destructive">
-                                    {errors.code}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="edit-curr-name">Name *</Label>
-                            <Input
-                                id="edit-curr-name"
-                                value={data.name}
-                                onChange={(e) =>
-                                    setData('name', e.target.value)
-                                }
-                            />
-                            {errors.name && (
-                                <p className="text-sm text-destructive">
-                                    {errors.name}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="edit-curr-symbol">Symbol *</Label>
-                            <Input
-                                id="edit-curr-symbol"
-                                value={data.symbol}
-                                onChange={(e) =>
-                                    setData('symbol', e.target.value)
-                                }
-                                maxLength={10}
-                            />
-                            {errors.symbol && (
-                                <p className="text-sm text-destructive">
-                                    {errors.symbol}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="edit-curr-decimals">
-                                Decimal Places
-                            </Label>
-                            <Input
-                                id="edit-curr-decimals"
-                                type="number"
-                                min={0}
-                                max={6}
-                                value={data.decimal_places}
-                                onChange={(e) =>
-                                    setData(
-                                        'decimal_places',
-                                        parseInt(e.target.value) || 2,
-                                    )
-                                }
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="edit-curr-rate">
-                                Rate to NZD *
-                            </Label>
-                            <Input
-                                id="edit-curr-rate"
-                                type="number"
-                                step="0.000001"
-                                min="0.000001"
-                                value={data.exchange_rate}
-                                onChange={(e) =>
-                                    setData('exchange_rate', e.target.value)
-                                }
-                            />
-                            {errors.exchange_rate && (
-                                <p className="text-sm text-destructive">
-                                    {errors.exchange_rate}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id="edit-curr-base"
-                                checked={data.is_base}
-                                onCheckedChange={(checked) =>
-                                    setData('is_base', checked === true)
-                                }
-                            />
-                            <Label
-                                htmlFor="edit-curr-base"
-                                className="font-normal"
-                            >
-                                Base Currency
-                            </Label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id="edit-curr-active"
-                                checked={data.is_active}
-                                onCheckedChange={(checked) =>
-                                    setData('is_active', checked === true)
-                                }
-                            />
-                            <Label
-                                htmlFor="edit-curr-active"
-                                className="font-normal"
-                            >
-                                Active
-                            </Label>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={processing}>
-                            {processing ? 'Saving...' : 'Save Changes'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
+const ACTIVE_OPTIONS = [
+    { value: 'all', label: 'All currencies' },
+    { value: 'active', label: 'Active only' },
+    { value: 'inactive', label: 'Inactive only' },
+];
 
 export default function CurrenciesIndex({ currencies }: PageProps) {
-    const activeCurrencies = currencies.filter((c) => c.is_active);
-    const baseCurrency = currencies.find((c) => c.is_base);
+    const [search, setSearch] = useState('');
+    const [activeFilter, setActiveFilter] = useState('all');
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editTarget, setEditTarget] = useState<Currency | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Currency | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    function confirmDelete() {
+    const ctx = useEntityContextMenu<Currency>();
+
+    const confirmDelete = () => {
         if (!deleteTarget) return;
         router.delete(`/finance/currencies/${deleteTarget.id}`, {
             onStart: () => setDeleting(true),
             onFinish: () => setDeleting(false),
             onSuccess: () => setDeleteTarget(null),
         });
-    }
+    };
 
-    // Right-click row menu — mirrors the row's existing inline action (same guard).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (currency: Currency): RowCtxItem[] => {
-        const items: RowCtxItem[] = [];
+    const activeCurrencies = currencies.filter((c) => c.is_active);
+    const baseCurrency = currencies.find((c) => c.is_base);
+    const staleRates = currencies.filter(
+        (c) => !c.is_base && !c.rate_updated_at,
+    ).length;
+
+    const query = search.trim().toLowerCase();
+    const shown = currencies.filter((currency) => {
+        const matchesText =
+            query === '' ||
+            currency.code.toLowerCase().includes(query) ||
+            currency.name.toLowerCase().includes(query);
+        const matchesActive =
+            activeFilter === 'all' ||
+            (activeFilter === 'active'
+                ? currency.is_active
+                : !currency.is_active);
+        return matchesText && matchesActive;
+    });
+
+    const actionsFor = (currency: Currency): MenuItem[] => {
+        const items: MenuItem[] = [
+            {
+                label: 'Edit currency',
+                icon: Pencil,
+                onClick: () => setEditTarget(currency),
+            },
+        ];
+        // The base currency anchors every rate — it can't be deleted.
         if (!currency.is_base) {
             items.push({
-                kind: 'item',
-                label: 'Delete',
+                label: 'Delete currency',
                 icon: Trash2,
-                tone: 'critical',
-                onSelect: () => setDeleteTarget(currency),
+                danger: true,
+                onClick: () => setDeleteTarget(currency),
             });
         }
         return items;
     };
 
+    const columns: EntityTableColumn<Currency>[] = [
+        {
+            key: 'symbol',
+            label: 'Symbol',
+            width: '100px',
+            cell: (currency) => (
+                <span className="text-muted-foreground">
+                    {currency.symbol}
+                </span>
+            ),
+        },
+        {
+            key: 'rate',
+            label: 'Rate to NZD',
+            width: '160px',
+            align: 'right',
+            cell: (currency) => (
+                <span className="font-semibold tabular-nums">
+                    {Number(currency.exchange_rate).toFixed(6)}
+                </span>
+            ),
+        },
+        {
+            key: 'rate_updated',
+            label: 'Rate updated',
+            width: '190px',
+            cell: (currency) =>
+                currency.rate_updated_at ? (
+                    <span className="whitespace-nowrap text-muted-foreground">
+                        {formatDateTime(currency.rate_updated_at)}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '130px',
+            cell: (currency) => (
+                <StatusBadge
+                    variant={currency.is_active ? 'success' : 'neutral'}
+                >
+                    {currency.is_active ? 'Active' : 'Inactive'}
+                </StatusBadge>
+            ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            icon={Coins}
+            title="Currencies"
+            titleChip={
+                <PageHeaderStatusChip variant="info">
+                    Base {baseCurrency ? baseCurrency.code : 'not set'}
+                </PageHeaderStatusChip>
+            }
+            subline={`General ledger · ${currencies.length} currencies · ${activeCurrencies.length} active for new transactions`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search code or name…"
+                    />
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() => setCreateOpen(true)}
+                    >
+                        New currency
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Currencies"
+                        href="/finance/currencies"
+                        ariaLabel="View every currency"
+                    >
+                        <PageHeaderMeterBig>
+                            {currencies.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            available to invoices, bills and bank accounts
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Active"
+                        tone="success"
+                        ariaLabel="Show only active currencies"
+                        onClick={() => setActiveFilter('active')}
+                    >
+                        <PageHeaderMeterDonut
+                            percent={
+                                currencies.length === 0
+                                    ? 0
+                                    : (activeCurrencies.length /
+                                          currencies.length) *
+                                      100
+                            }
+                            caption={`${activeCurrencies.length} of ${currencies.length} in use`}
+                        />
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Base currency"
+                        ariaLabel="View the base currency"
+                        href="/finance/currencies"
+                    >
+                        <PageHeaderMeterBig>
+                            {baseCurrency ? baseCurrency.code : 'Not set'}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {baseCurrency
+                                ? `${baseCurrency.name} (${baseCurrency.symbol})`
+                                : 'set a base currency to anchor every rate'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Rates never updated"
+                        tone={staleRates > 0 ? 'warning' : 'brand'}
+                        href="/finance/fx-revaluations"
+                        ariaLabel="View FX revaluations"
+                    >
+                        <PageHeaderMeterBig>{staleRates}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            still on their entered rate
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    label="Active state"
+                    value={activeFilter}
+                    allValue="all"
+                    options={ACTIVE_OPTIONS}
+                    onChange={setActiveFilter}
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Currencies" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        footer={<LedgerTabsFooter active="currencies" />}
-                        icon={Coins}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
                         title="Currencies"
-                        description="Manage currencies and exchange rates for multi-currency transactions"
-                        stats={[
-                            { label: 'Total', value: currencies.length },
-                            { label: 'Active', value: activeCurrencies.length },
-                            {
-                                label: 'Base',
-                                value: baseCurrency
-                                    ? baseCurrency.code
-                                    : 'Not set',
-                            },
-                        ]}
-                        actions={<CreateCurrencyDialog />}
+                        caption={`${shown.length} of ${currencies.length} shown`}
                     />
-                }
-            >
-                {/* KPI Cards */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                                <Coins className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Active Currencies
-                                </p>
-                                <p className="text-2xl font-bold">
-                                    {activeCurrencies.length}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                                <CircleDollarSign className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Base Currency
-                                </p>
-                                <p className="text-2xl font-bold">
-                                    {baseCurrency
-                                        ? `${baseCurrency.code} (${baseCurrency.symbol})`
-                                        : 'Not set'}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Coins className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>All Currencies</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Code</TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Symbol</TableHead>
-                                    <TableHead className="text-right">
-                                        Exchange Rate (to NZD)
-                                    </TableHead>
-                                    <TableHead>Rate Updated</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">
-                                        Actions
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {currencies.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={7}
-                                            className="py-8 text-center text-muted-foreground"
-                                        >
-                                            No currencies defined yet. Add your
-                                            first currency to enable
-                                            multi-currency support.
-                                        </TableCell>
-                                    </TableRow>
+                    {shown.length === 0 ? (
+                        <EmptyState
+                            icon={Coins}
+                            heading={
+                                currencies.length === 0
+                                    ? 'No currencies yet'
+                                    : 'No currencies match your search'
+                            }
+                            description={
+                                currencies.length === 0
+                                    ? 'Add your first currency to enable multi-currency invoices, bills and bank accounts.'
+                                    : 'Clear the search or the active-state filter to see every currency.'
+                            }
+                            action={
+                                currencies.length === 0 ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
+                                        New currency
+                                    </Button>
                                 ) : (
-                                    currencies.map((currency) => {
-                                        const menuItems =
-                                            rowMenuItems(currency);
-                                        return (
-                                            <TableRow
-                                                key={currency.id}
-                                                onContextMenu={
-                                                    menuItems.length
-                                                        ? rowMenu.open(
-                                                              menuItems,
-                                                          )
-                                                        : undefined
-                                                }
-                                            >
-                                                <TableCell className="font-mono text-sm font-semibold">
-                                                    {currency.code}
-                                                    {currency.is_base && (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="ml-2 border-status-info/30 bg-status-info-bg text-status-info"
-                                                        >
-                                                            Base
-                                                        </Badge>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="font-medium">
-                                                    {currency.name}
-                                                </TableCell>
-                                                <TableCell className="text-sm">
-                                                    {currency.symbol}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono text-sm tabular-nums">
-                                                    {Number(
-                                                        currency.exchange_rate,
-                                                    ).toFixed(6)}
-                                                </TableCell>
-                                                <TableCell className="text-sm text-muted-foreground">
-                                                    {formatDate(
-                                                        currency.rate_updated_at,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={
-                                                            currency.is_active
-                                                                ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                                                : 'border-border bg-muted text-muted-foreground'
-                                                        }
-                                                    >
-                                                        {currency.is_active
-                                                            ? 'Active'
-                                                            : 'Inactive'}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <EditCurrencyDialog
-                                                            currency={currency}
-                                                        />
-                                                        {!currency.is_base && (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                aria-label={`Delete ${currency.code}`}
-                                                                onClick={() =>
-                                                                    setDeleteTarget(
-                                                                        currency,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-
-                {rowMenu.element}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearch('');
+                                            setActiveFilter('all');
+                                        }}
+                                    >
+                                        Clear filters
+                                    </Button>
+                                )
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={shown}
+                            rowKey={(currency) => currency.id}
+                            identityLabel="Currency"
+                            minWidth={900}
+                            identity={(currency) => ({
+                                icon: Coins,
+                                name: currency.code,
+                                subline: currency.name,
+                                extra: currency.is_base ? (
+                                    <EntityStatusChip variant="info">
+                                        Base
+                                    </EntityStatusChip>
+                                ) : undefined,
+                            })}
+                            columns={columns}
+                            actionsFor={actionsFor}
+                            mutedFor={(currency) => !currency.is_active}
+                            onOpen={(currency) => setEditTarget(currency)}
+                            onRowContextMenu={(e, currency) =>
+                                ctx.open(e, currency)
+                            }
+                        />
+                    )}
+                </div>
             </PageLayout>
+
+            {ctx.ctx ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Coins}
+                    title={`${ctx.ctx.record.code} — ${ctx.ctx.record.name}`}
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
+
+            <CurrencyDialog
+                open={createOpen}
+                onClose={() => setCreateOpen(false)}
+            />
+
+            {editTarget ? (
+                <CurrencyDialog
+                    key={editTarget.id}
+                    open
+                    currency={editTarget}
+                    onClose={() => setEditTarget(null)}
+                />
+            ) : null}
 
             <ConfirmDialog
                 open={!!deleteTarget}

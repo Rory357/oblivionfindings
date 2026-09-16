@@ -104,12 +104,19 @@ export function FinancePeriodFilter({
     from,
     to,
     idPrefix = 'finance-period',
+    onApply,
 }: {
     /** The page's own URL — the range re-queries in place. */
     url: string;
     from: string;
     to: string;
     idPrefix?: string;
+    /**
+     * Pages whose date range is one of several filters (a list with status and
+     * type pills) pass their own apply so the rest of the query survives the
+     * re-query; without it the pill re-queries `url` with `?from=&to=` alone.
+     */
+    onApply?: (range: { from: string; to: string }) => void;
 }) {
     const [open, setOpen] = useState(false);
     const [range, setRange] = useState({ from, to });
@@ -120,6 +127,10 @@ export function FinancePeriodFilter({
 
     const apply = (next: { from: string; to: string }) => {
         setOpen(false);
+        if (onApply) {
+            onApply(next);
+            return;
+        }
         router.get(
             url,
             { from: next.from, to: next.to },
@@ -127,15 +138,19 @@ export function FinancePeriodFilter({
         );
     };
 
+    const dated = Boolean(from || to);
+
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <PageHeaderFilterButton
                     icon={CalendarRange}
-                    active
+                    active={dated}
                     aria-label="Change the reporting period"
                 >
-                    {shortDate(from)} – {shortDate(to)}
+                    {dated
+                        ? `${shortDate(from) || 'Earliest'} – ${shortDate(to) || 'Today'}`
+                        : 'Any dates'}
                 </PageHeaderFilterButton>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-64">

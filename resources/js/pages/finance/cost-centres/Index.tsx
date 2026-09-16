@@ -1,410 +1,318 @@
+import { ConfirmDialog, FinanceSectionRail } from '@/components/finance';
 import {
-    ConfirmDialog,
-    LedgerTabsFooter,
-    useRowContextMenu,
-    type RowCtxItem,
-} from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+    EmptyValue,
+    EntityContextMenu,
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
+import type { BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
 import { Building2, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 
-type CostCentre = {
-    id: number;
-    code: string;
-    name: string;
-    type: string | null;
-    site_id: number | null;
-    parent_id: number | null;
-    is_active: boolean;
-};
+import { CostCentreDialog, type CostCentre } from './_dialogs';
 
 type PageProps = {
     costCentres: CostCentre[];
 };
 
-function CreateCostCentreDialog() {
-    const [open, setOpen] = useState(false);
-    const { data, setData, post, processing, errors, reset } = useForm({
-        code: '',
-        name: '',
-        type: '',
-        is_active: true,
-    });
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'General ledger', href: '/finance/ledger' },
+    { title: 'Cost centres', href: '/finance/cost-centres' },
+];
 
-    function handleSubmit(e: FormEvent) {
-        e.preventDefault();
-        post('/finance/cost-centres', {
-            onSuccess: () => {
-                reset();
-                setOpen(false);
-            },
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Cost Centre
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Create Cost Centre</DialogTitle>
-                    <DialogDescription>
-                        Add a new cost centre for tracking expenses.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="cc-code">Code *</Label>
-                            <Input
-                                id="cc-code"
-                                value={data.code}
-                                onChange={(e) =>
-                                    setData('code', e.target.value)
-                                }
-                                placeholder="e.g. CC001"
-                                maxLength={20}
-                            />
-                            {errors.code && (
-                                <p className="text-sm text-destructive">
-                                    {errors.code}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="cc-name">Name *</Label>
-                            <Input
-                                id="cc-name"
-                                value={data.name}
-                                onChange={(e) =>
-                                    setData('name', e.target.value)
-                                }
-                                placeholder="e.g. Administration"
-                            />
-                            {errors.name && (
-                                <p className="text-sm text-destructive">
-                                    {errors.name}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <div className="space-y-1.5">
-                        <Label htmlFor="cc-type">Type</Label>
-                        <Input
-                            id="cc-type"
-                            value={data.type}
-                            onChange={(e) => setData('type', e.target.value)}
-                            placeholder="e.g. Department, Site, Programme"
-                        />
-                        {errors.type && (
-                            <p className="text-sm text-destructive">
-                                {errors.type}
-                            </p>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Checkbox
-                            id="cc-active"
-                            checked={data.is_active}
-                            onCheckedChange={(checked) =>
-                                setData('is_active', checked === true)
-                            }
-                        />
-                        <Label htmlFor="cc-active" className="font-normal">
-                            Active
-                        </Label>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={processing}>
-                            {processing ? 'Creating...' : 'Create'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function EditCostCentreDialog({ costCentre }: { costCentre: CostCentre }) {
-    const [open, setOpen] = useState(false);
-    const { data, setData, put, processing, errors } = useForm({
-        code: costCentre.code,
-        name: costCentre.name,
-        type: costCentre.type || '',
-        is_active: costCentre.is_active,
-    });
-
-    function handleSubmit(e: FormEvent) {
-        e.preventDefault();
-        put(`/finance/cost-centres/${costCentre.id}`, {
-            onSuccess: () => setOpen(false),
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button variant="ghost" size="icon">
-                    <Pencil className="h-4 w-4" />
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Edit Cost Centre</DialogTitle>
-                    <DialogDescription>
-                        Update cost centre details.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="edit-cc-code">Code *</Label>
-                            <Input
-                                id="edit-cc-code"
-                                value={data.code}
-                                onChange={(e) =>
-                                    setData('code', e.target.value)
-                                }
-                                maxLength={20}
-                            />
-                            {errors.code && (
-                                <p className="text-sm text-destructive">
-                                    {errors.code}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="edit-cc-name">Name *</Label>
-                            <Input
-                                id="edit-cc-name"
-                                value={data.name}
-                                onChange={(e) =>
-                                    setData('name', e.target.value)
-                                }
-                            />
-                            {errors.name && (
-                                <p className="text-sm text-destructive">
-                                    {errors.name}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <div className="space-y-1.5">
-                        <Label htmlFor="edit-cc-type">Type</Label>
-                        <Input
-                            id="edit-cc-type"
-                            value={data.type}
-                            onChange={(e) => setData('type', e.target.value)}
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Checkbox
-                            id="edit-cc-active"
-                            checked={data.is_active}
-                            onCheckedChange={(checked) =>
-                                setData('is_active', checked === true)
-                            }
-                        />
-                        <Label htmlFor="edit-cc-active" className="font-normal">
-                            Active
-                        </Label>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={processing}>
-                            {processing ? 'Saving...' : 'Save Changes'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
+const ACTIVE_OPTIONS = [
+    { value: 'all', label: 'All cost centres' },
+    { value: 'active', label: 'Active only' },
+    { value: 'inactive', label: 'Inactive only' },
+];
 
 export default function CostCentresIndex({ costCentres }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Cost Centres', href: '/finance/cost-centres' },
-    ];
-
+    const [search, setSearch] = useState('');
+    const [activeFilter, setActiveFilter] = useState('all');
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editTarget, setEditTarget] = useState<CostCentre | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<CostCentre | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    function confirmDelete() {
+    const ctx = useEntityContextMenu<CostCentre>();
+
+    const confirmDelete = () => {
         if (!deleteTarget) return;
         router.delete(`/finance/cost-centres/${deleteTarget.id}`, {
             onStart: () => setDeleting(true),
             onFinish: () => setDeleting(false),
             onSuccess: () => setDeleteTarget(null),
         });
-    }
+    };
 
     const activeCount = costCentres.filter((c) => c.is_active).length;
+    const typeCount = new Set(
+        costCentres.map((c) => c.type).filter(Boolean),
+    ).size;
 
-    // Right-click row menu — mirrors the row's existing inline action.
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (cc: CostCentre): RowCtxItem[] => [
+    const query = search.trim().toLowerCase();
+    const shown = costCentres.filter((centre) => {
+        const matchesText =
+            query === '' ||
+            centre.code.toLowerCase().includes(query) ||
+            centre.name.toLowerCase().includes(query) ||
+            (centre.type ?? '').toLowerCase().includes(query);
+        const matchesActive =
+            activeFilter === 'all' ||
+            (activeFilter === 'active' ? centre.is_active : !centre.is_active);
+        return matchesText && matchesActive;
+    });
+
+    const actionsFor = (centre: CostCentre): MenuItem[] => [
         {
-            kind: 'item',
-            label: 'Delete',
+            label: 'Edit cost centre',
+            icon: Pencil,
+            onClick: () => setEditTarget(centre),
+        },
+        {
+            label: 'Delete cost centre',
             icon: Trash2,
-            tone: 'critical',
-            onSelect: () => setDeleteTarget(cc),
+            danger: true,
+            onClick: () => setDeleteTarget(centre),
         },
     ];
 
+    const columns: EntityTableColumn<CostCentre>[] = [
+        {
+            key: 'type',
+            label: 'Type',
+            width: '200px',
+            cell: (centre) =>
+                centre.type ? (
+                    <span className="truncate text-muted-foreground">
+                        {centre.type}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '140px',
+            cell: (centre) => (
+                <StatusBadge variant={centre.is_active ? 'success' : 'neutral'}>
+                    {centre.is_active ? 'Active' : 'Inactive'}
+                </StatusBadge>
+            ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            icon={Layers}
+            title="Cost centres"
+            titleChip={
+                <PageHeaderStatusChip variant="success">
+                    {activeCount} active
+                </PageHeaderStatusChip>
+            }
+            subline={`General ledger · ${costCentres.length} cost centres · expense tracking and allocation`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search code, name or type…"
+                    />
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() => setCreateOpen(true)}
+                    >
+                        New cost centre
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Cost centres"
+                        href="/finance/cost-centres"
+                        ariaLabel="View every cost centre"
+                    >
+                        <PageHeaderMeterBig>
+                            {costCentres.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            available to journals and bills
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Active"
+                        tone="success"
+                        ariaLabel="Show only active cost centres"
+                        onClick={() => setActiveFilter('active')}
+                    >
+                        <PageHeaderMeterDonut
+                            percent={
+                                costCentres.length === 0
+                                    ? 0
+                                    : (activeCount / costCentres.length) * 100
+                            }
+                            caption={`${activeCount} of ${costCentres.length} in use`}
+                        />
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Inactive"
+                        tone="warning"
+                        ariaLabel="Show only inactive cost centres"
+                        onClick={() => setActiveFilter('inactive')}
+                    >
+                        <PageHeaderMeterBig>
+                            {costCentres.length - activeCount}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            retired from allocation
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Types"
+                        href="/finance/journals"
+                        ariaLabel="View journals coded to cost centres"
+                    >
+                        <PageHeaderMeterBig>{typeCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            department, site or programme groupings
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    label="Active state"
+                    value={activeFilter}
+                    allValue="all"
+                    options={ACTIVE_OPTIONS}
+                    onChange={setActiveFilter}
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Cost Centres" />
+            <Head title="Cost centres" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        footer={<LedgerTabsFooter active="cost-centres" />}
-                        icon={Layers}
-                        title="Cost Centres"
-                        description="Manage cost centres for expense tracking and allocation"
-                        stats={[
-                            { label: 'Total', value: costCentres.length },
-                            { label: 'Active', value: activeCount },
-                        ]}
-                        actions={<CreateCostCentreDialog />}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Cost centres"
+                        caption={`${shown.length} of ${costCentres.length} shown`}
                     />
-                }
-            >
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Building2 className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>All Cost Centres</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Code</TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">
-                                        Actions
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {costCentres.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={5}
-                                            className="py-8 text-center text-muted-foreground"
-                                        >
-                                            No cost centres defined yet. Create
-                                            your first cost centre to get
-                                            started.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    costCentres.map((cc) => (
-                                        <TableRow
-                                            key={cc.id}
-                                            onContextMenu={rowMenu.open(
-                                                rowMenuItems(cc),
-                                            )}
-                                        >
-                                            <TableCell className="font-mono text-sm">
-                                                {cc.code}
-                                            </TableCell>
-                                            <TableCell className="font-medium">
-                                                {cc.name}
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
-                                                {cc.type || '-'}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={
-                                                        cc.is_active
-                                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                                            : 'border-border/30 bg-muted-foreground/10 text-muted-foreground'
-                                                    }
-                                                >
-                                                    {cc.is_active
-                                                        ? 'Active'
-                                                        : 'Inactive'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <EditCostCentreDialog
-                                                        costCentre={cc}
-                                                    />
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        aria-label={`Delete ${cc.name}`}
-                                                        onClick={() =>
-                                                            setDeleteTarget(cc)
-                                                        }
-                                                    >
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
 
-                {rowMenu.element}
+                    {shown.length === 0 ? (
+                        <EmptyState
+                            icon={Building2}
+                            heading={
+                                costCentres.length === 0
+                                    ? 'No cost centres yet'
+                                    : 'No cost centres match your search'
+                            }
+                            description={
+                                costCentres.length === 0
+                                    ? 'Create your first cost centre so journals and bills can be coded to a department, site or programme.'
+                                    : 'Clear the search or the active-state filter to see every cost centre.'
+                            }
+                            action={
+                                costCentres.length === 0 ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
+                                        New cost centre
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearch('');
+                                            setActiveFilter('all');
+                                        }}
+                                    >
+                                        Clear filters
+                                    </Button>
+                                )
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={shown}
+                            rowKey={(centre) => centre.id}
+                            identityLabel="Cost centre"
+                            minWidth={720}
+                            identity={(centre) => ({
+                                icon: Layers,
+                                name: centre.name,
+                                subline: centre.code,
+                            })}
+                            columns={columns}
+                            actionsFor={actionsFor}
+                            mutedFor={(centre) => !centre.is_active}
+                            onOpen={(centre) => setEditTarget(centre)}
+                            onRowContextMenu={(e, centre) =>
+                                ctx.open(e, centre)
+                            }
+                        />
+                    )}
+                </div>
             </PageLayout>
+
+            {ctx.ctx ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Layers}
+                    title={`${ctx.ctx.record.code} — ${ctx.ctx.record.name}`}
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
+
+            <CostCentreDialog
+                open={createOpen}
+                onClose={() => setCreateOpen(false)}
+            />
+
+            {editTarget ? (
+                <CostCentreDialog
+                    key={editTarget.id}
+                    open
+                    costCentre={editTarget}
+                    onClose={() => setEditTarget(null)}
+                />
+            ) : null}
 
             <ConfirmDialog
                 open={!!deleteTarget}

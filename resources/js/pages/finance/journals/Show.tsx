@@ -1,31 +1,37 @@
-import { formatMoney } from '@/components/finance/money';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
+    ConfirmDialog,
+    FinanceSectionRail,
+    formatMoney,
+} from '@/components/finance';
+import {
+    EmptyValue,
+    EntityChip,
+    EntityTable,
+    type EntityTableColumn,
+    type EntityTableFooterRow,
+    ListCaption,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableFooter,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { PageProps } from '@/types';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
+import type { BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Calendar, CheckCircle, FileText, RotateCcw, User } from 'lucide-react';
-import { useState } from 'react';
+import { BookOpen, CheckCircle, RotateCcw, Wallet } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
 
 interface Account {
     id: number;
@@ -98,32 +104,25 @@ interface Journal {
     lines: JournalLine[];
 }
 
-interface Props extends PageProps {
+interface Props {
     journal: Journal;
 }
 
-const statusBadge = (status: string) => {
-    const map: Record<string, string> = {
-        draft: 'bg-muted text-foreground',
-        posted: 'bg-status-success-bg text-status-success',
-        reversed: 'bg-status-critical-bg text-status-critical',
-    };
-    return map[status] ?? 'bg-muted text-foreground';
+const typeLabels: Record<string, string> = {
+    standard: 'Standard',
+    adjustment: 'Adjustment',
+    opening: 'Opening',
 };
 
-const typeBadge = (type: string) => {
-    const map: Record<string, string> = {
-        standard: 'bg-status-info-bg text-status-info',
-        adjustment: 'bg-status-warning-bg text-status-warning',
-        opening: 'bg-primary/10 text-primary',
-    };
-    return map[type] ?? 'bg-muted text-foreground';
-};
+/** `journal_date` is a date cast — it arrives as an ISO instant. */
+const journalDate = (value: string) => formatDateOnly(value.slice(0, 10), value);
 
-export default function JournalsShow({ auth, journal }: Props) {
-    const [reverseDialogOpen, setReverseDialogOpen] = useState(false);
+export default function JournalsShow({ journal }: Props) {
+    const [reverseOpen, setReverseOpen] = useState(false);
     const [reverseReason, setReverseReason] = useState('');
     const [posting, setPosting] = useState(false);
+    const [reversing, setReversing] = useState(false);
+    const linesRef = useRef<HTMLDivElement>(null);
 
     const totalDebits = journal.lines.reduce(
         (sum, l) => sum + Number(l.debit),
@@ -133,334 +132,399 @@ export default function JournalsShow({ auth, journal }: Props) {
         (sum, l) => sum + Number(l.credit),
         0,
     );
+    const balanced = Math.abs(totalDebits - totalCredits) < 0.005;
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
+        { title: 'Finance', href: '/finance' },
+        { title: 'General ledger', href: '/finance/ledger' },
+        { title: 'Journals', href: '/finance/journals' },
+        { title: journal.journal_number },
+    ];
 
     const handlePost = () => {
         setPosting(true);
         router.post(
             `/finance/journals/${journal.id}/post`,
             {},
-            {
-                onFinish: () => setPosting(false),
-            },
+            { onFinish: () => setPosting(false) },
         );
     };
 
     const handleReverse = () => {
+        setReversing(true);
         router.post(
             `/finance/journals/${journal.id}/reverse`,
+            { reason: reverseReason },
             {
-                reason: reverseReason,
-            },
-            {
-                onSuccess: () => {
-                    setReverseDialogOpen(false);
+                onFinish: () => {
+                    setReversing(false);
+                    setReverseOpen(false);
                     setReverseReason('');
                 },
             },
         );
     };
 
+    const scrollToLines = () =>
+        linesRef.current?.scrollIntoView({ block: 'start' });
+
+    /* ---------------- Lines table ---------------- */
+
+    // A posted journal's lines are immutable — the row menu carries the one
+    // real action, opening the account the line hit.
+    const lineActions = (line: JournalLine): MenuItem[] =>
+        line.account
+            ? [
+                  {
+                      label: `Open account ${line.account.code}`,
+                      icon: Wallet,
+                      onClick: () =>
+                          router.visit(`/finance/accounts/${line.account?.id}`),
+                  },
+              ]
+            : [];
+
+    const columns: EntityTableColumn<JournalLine>[] = [
+        {
+            key: 'description',
+            label: 'Description',
+            width: '1.3fr',
+            cell: (line) =>
+                line.description ? (
+                    <span className="truncate">{line.description}</span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'debit',
+            label: 'Debit',
+            width: '140px',
+            align: 'right',
+            cell: (line) =>
+                Number(line.debit) > 0 ? (
+                    <span className="tabular-nums">
+                        {formatMoney(line.debit)}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'credit',
+            label: 'Credit',
+            width: '140px',
+            align: 'right',
+            cell: (line) =>
+                Number(line.credit) > 0 ? (
+                    <span className="tabular-nums">
+                        {formatMoney(line.credit)}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'cost_centre',
+            label: 'Cost centre',
+            width: '180px',
+            cell: (line) =>
+                line.cost_centre ? (
+                    <EntityChip outline>
+                        {line.cost_centre.code} — {line.cost_centre.name}
+                    </EntityChip>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'funding_stream',
+            label: 'Funding stream',
+            width: '190px',
+            cell: (line) =>
+                line.funding_stream ? (
+                    <EntityChip outline>
+                        {line.funding_stream.code} — {line.funding_stream.name}
+                    </EntityChip>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+    ];
+
+    const footerRows: EntityTableFooterRow[] = [
+        {
+            key: 'totals',
+            label: 'Totals',
+            tone: 'strong',
+            cells: {
+                debit: (
+                    <span className="tabular-nums">
+                        {formatMoney(totalDebits)}
+                    </span>
+                ),
+                credit: (
+                    <span className="tabular-nums">
+                        {formatMoney(totalCredits)}
+                    </span>
+                ),
+            },
+        },
+    ];
+
+    const meta: { label: string; value: ReactNode }[] = [
+        { label: 'Journal date', value: journalDate(journal.journal_date) },
+        { label: 'Reference', value: journal.reference || '—' },
+        {
+            label: 'Fiscal period',
+            value: journal.fiscal_period ? journal.fiscal_period.name : '—',
+        },
+        {
+            label: 'Posted by',
+            value:
+                journal.status === 'posted' && journal.posted_by
+                    ? `${journal.posted_by.name}${
+                          journal.posted_at
+                              ? ` · ${formatDateTime(journal.posted_at)}`
+                              : ''
+                      }`
+                    : '—',
+        },
+        { label: 'Created by', value: journal.created_by?.name ?? '—' },
+    ];
+
+    /* ---------------- Event Horizon header ---------------- */
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            icon={BookOpen}
+            backHref="/finance/journals"
+            title={journal.journal_number}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={
+                        journal.status === 'posted'
+                            ? 'success'
+                            : journal.status === 'reversed'
+                              ? 'critical'
+                              : 'neutral'
+                    }
+                >
+                    {journal.status.charAt(0).toUpperCase() +
+                        journal.status.slice(1)}
+                </PageHeaderStatusChip>
+            }
+            subline={[
+                typeLabels[journal.type] ?? journal.type,
+                journalDate(journal.journal_date),
+                journal.reference,
+                journal.description,
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                <>
+                    {journal.status === 'posted' &&
+                    !journal.reversed_by_journal ? (
+                        <PageHeaderGlassButton
+                            icon={RotateCcw}
+                            onClick={() => setReverseOpen(true)}
+                        >
+                            Reverse
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {journal.status === 'draft' ? (
+                        <PageHeaderPrimaryButton
+                            icon={CheckCircle}
+                            disabled={posting}
+                            onClick={handlePost}
+                        >
+                            {posting ? 'Posting…' : 'Post journal'}
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Total debits"
+                        ariaLabel="Jump to the journal lines"
+                        onClick={scrollToLines}
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(totalDebits)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            across {journal.lines.length} lines
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Total credits"
+                        ariaLabel="Jump to the journal lines"
+                        onClick={scrollToLines}
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(totalCredits)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            across {journal.lines.length} lines
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Balance"
+                        tone={balanced ? 'success' : 'critical'}
+                        ariaLabel="Jump to the journal lines"
+                        onClick={scrollToLines}
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(Math.abs(totalDebits - totalCredits))}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {balanced
+                                ? 'debits equal credits'
+                                : 'out of balance'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    {journal.fiscal_period ? (
+                        <PageHeaderMeterBlock
+                            label="Fiscal period"
+                            href="/finance/fiscal-periods"
+                            ariaLabel="View fiscal periods"
+                        >
+                            <PageHeaderMeterBig>
+                                {journal.fiscal_period.name}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {journalDate(journal.fiscal_period.start_date)} –{' '}
+                                {journalDate(journal.fiscal_period.end_date)}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
-        <AppLayout
-            user={auth.user}
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance' },
-                { title: 'Journals', href: '/finance/journals' },
-                {
-                    title: journal.journal_number,
-                    href: `/finance/journals/${journal.id}`,
-                },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Journal ${journal.journal_number}`} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/journals"
-                        title={
-                            <span className="flex flex-wrap items-center gap-3">
-                                {journal.journal_number}
-                                <Badge className={statusBadge(journal.status)}>
-                                    {journal.status.charAt(0).toUpperCase() +
-                                        journal.status.slice(1)}
-                                </Badge>
-                                <Badge className={typeBadge(journal.type)}>
-                                    {journal.type.charAt(0).toUpperCase() +
-                                        journal.type.slice(1)}
-                                </Badge>
-                            </span>
-                        }
-                        description={journal.description ?? undefined}
-                        actions={
-                            <>
-                                {journal.status === 'draft' && (
-                                    <Button
-                                        onClick={handlePost}
-                                        disabled={posting}
-                                    >
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        Post Journal
-                                    </Button>
-                                )}
-                                {journal.status === 'posted' &&
-                                    !journal.reversed_by_journal && (
-                                        <Dialog
-                                            open={reverseDialogOpen}
-                                            onOpenChange={setReverseDialogOpen}
-                                        >
-                                            <DialogTrigger asChild>
-                                                <Button variant="outline">
-                                                    <RotateCcw className="mr-2 h-4 w-4" />
-                                                    Reverse
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>
-                                                        Reverse Journal{' '}
-                                                        {journal.journal_number}
-                                                    </DialogTitle>
-                                                </DialogHeader>
-                                                <div className="space-y-4 pt-4">
-                                                    <p className="text-sm text-muted-foreground">
-                                                        This will create a new
-                                                        reversing journal that
-                                                        swaps all debits and
-                                                        credits. The reversing
-                                                        journal will be posted
-                                                        immediately.
-                                                    </p>
-                                                    <div>
-                                                        <Label htmlFor="reason">
-                                                            Reason (optional)
-                                                        </Label>
-                                                        <Textarea
-                                                            id="reason"
-                                                            value={
-                                                                reverseReason
-                                                            }
-                                                            onChange={(e) =>
-                                                                setReverseReason(
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            placeholder="Reason for reversal"
-                                                            rows={3}
-                                                        />
-                                                    </div>
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                setReverseDialogOpen(
-                                                                    false,
-                                                                )
-                                                            }
-                                                        >
-                                                            Cancel
-                                                        </Button>
-                                                        <Button
-                                                            variant="destructive"
-                                                            onClick={
-                                                                handleReverse
-                                                            }
-                                                        >
-                                                            Confirm Reversal
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-                                    )}
-                            </>
-                        }
-                    />
-                }
-            >
-                {/* Meta info */}
-                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
-                                <Calendar className="h-4 w-4" />
-                                Journal Date
-                            </div>
-                            <p className="font-semibold">
-                                {new Date(
-                                    journal.journal_date,
-                                ).toLocaleDateString('en-NZ', {
-                                    day: 'numeric',
-                                    month: 'long',
-                                    year: 'numeric',
-                                })}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {journal.reversed_by_journal ? (
+                        <div className="flex items-center gap-2 rounded-[14px] border border-status-critical/30 bg-status-critical-bg px-4 py-3">
+                            <StatusBadge status="reversed" />
+                            <p className="text-sm text-status-critical">
+                                This journal has been reversed by{' '}
+                                <Link
+                                    href={`/finance/journals/${journal.reversed_by_journal.id}`}
+                                    className="font-semibold underline underline-offset-4"
+                                >
+                                    {
+                                        journal.reversed_by_journal
+                                            .journal_number
+                                    }
+                                </Link>
                             </p>
-                        </CardContent>
+                        </div>
+                    ) : null}
+
+                    <Card className="rounded-[14px] p-5">
+                        <dl className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+                            {meta.map((item) => (
+                                <div key={item.label}>
+                                    <dt className="text-[11.5px] text-muted-foreground">
+                                        {item.label}
+                                    </dt>
+                                    <dd className="text-[13px] font-semibold text-foreground">
+                                        {item.value}
+                                    </dd>
+                                </div>
+                            ))}
+                        </dl>
                     </Card>
 
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
-                                <FileText className="h-4 w-4" />
-                                Reference
-                            </div>
-                            <p className="font-semibold">
-                                {journal.reference || '-'}
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    {journal.status === 'posted' && journal.posted_by && (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
-                                    <User className="h-4 w-4" />
-                                    Posted By
-                                </div>
-                                <p className="font-semibold">
-                                    {journal.posted_by.name}
-                                </p>
-                                {journal.posted_at && (
-                                    <p className="text-xs text-muted-foreground">
-                                        {new Date(
-                                            journal.posted_at,
-                                        ).toLocaleString('en-NZ')}
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {journal.fiscal_period && (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Calendar className="h-4 w-4" />
-                                    Fiscal Period
-                                </div>
-                                <p className="font-semibold">
-                                    {journal.fiscal_period.name}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {journal.created_by && (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
-                                    <User className="h-4 w-4" />
-                                    Created By
-                                </div>
-                                <p className="font-semibold">
-                                    {journal.created_by.name}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
-
-                {/* Reversed notice */}
-                {journal.reversed_by_journal && (
-                    <div className="mb-6 rounded-md border border-status-critical/30 bg-status-critical-bg p-4">
-                        <p className="text-sm text-status-critical">
-                            This journal has been reversed by{' '}
-                            <Link
-                                href={`/finance/journals/${journal.reversed_by_journal.id}`}
-                                className="font-semibold underline"
-                            >
-                                {journal.reversed_by_journal.journal_number}
-                            </Link>
-                        </p>
+                    <div
+                        ref={linesRef}
+                        className="flex scroll-mt-5 flex-col gap-5"
+                    >
+                        <ListCaption
+                            title="Journal lines"
+                            caption={`${journal.lines.length} lines · ${formatMoney(journal.total_amount)} total`}
+                        />
+                        <EntityTable
+                            rows={journal.lines}
+                            rowKey={(line) => line.id}
+                            identityLabel="Account"
+                            minWidth={1100}
+                            identity={(line) => ({
+                                icon: Wallet,
+                                name: line.account
+                                    ? `${line.account.code} — ${line.account.name}`
+                                    : 'Unassigned account',
+                            })}
+                            hrefFor={(line) =>
+                                line.account
+                                    ? `/finance/accounts/${line.account.id}`
+                                    : `/finance/journals/${journal.id}`
+                            }
+                            columns={columns}
+                            actionsFor={lineActions}
+                            footerRows={footerRows}
+                            onOpen={(line) => {
+                                if (line.account) {
+                                    router.visit(
+                                        `/finance/accounts/${line.account.id}`,
+                                    );
+                                }
+                            }}
+                        />
                     </div>
-                )}
-
-                {/* Lines Table */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Journal Lines</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Account</TableHead>
-                                    <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">
-                                        Debit
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Credit
-                                    </TableHead>
-                                    <TableHead>Cost Centre</TableHead>
-                                    <TableHead>Funding Stream</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {journal.lines.map((line) => (
-                                    <TableRow key={line.id}>
-                                        <TableCell className="font-medium">
-                                            {line.account ? (
-                                                <span>
-                                                    {line.account.code} -{' '}
-                                                    {line.account.name}
-                                                </span>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    -
-                                                </span>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {line.description ?? '-'}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            {Number(line.debit) > 0
-                                                ? formatMoney(line.debit)
-                                                : '-'}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            {Number(line.credit) > 0
-                                                ? formatMoney(line.credit)
-                                                : '-'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {line.cost_centre
-                                                ? `${line.cost_centre.code} - ${line.cost_centre.name}`
-                                                : '-'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {line.funding_stream
-                                                ? `${line.funding_stream.code} - ${line.funding_stream.name}`
-                                                : '-'}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                            <TableFooter>
-                                <TableRow>
-                                    <TableCell
-                                        colSpan={2}
-                                        className="text-right font-semibold"
-                                    >
-                                        Totals
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono font-semibold">
-                                        {formatMoney(totalDebits)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono font-semibold">
-                                        {formatMoney(totalCredits)}
-                                    </TableCell>
-                                    <TableCell colSpan={2} />
-                                </TableRow>
-                            </TableFooter>
-                        </Table>
-                    </CardContent>
-                </Card>
+                </div>
             </PageLayout>
+
+            <ConfirmDialog
+                open={reverseOpen}
+                onClose={() => setReverseOpen(false)}
+                title={`Reverse journal ${journal.journal_number}?`}
+                description={
+                    <div className="flex flex-col gap-3">
+                        <p>
+                            This posts a new reversing journal to the ledger
+                            that swaps every debit and credit on{' '}
+                            <span className="font-medium text-foreground">
+                                {journal.journal_number}
+                            </span>
+                            . The reversing journal posts immediately and
+                            can&rsquo;t be undone.
+                        </p>
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="reverse-reason">
+                                Reason (optional)
+                            </Label>
+                            <Textarea
+                                id="reverse-reason"
+                                rows={3}
+                                value={reverseReason}
+                                onChange={(e) =>
+                                    setReverseReason(e.target.value)
+                                }
+                                placeholder="Why is this journal being reversed?"
+                            />
+                        </div>
+                    </div>
+                }
+                confirmText="Reverse journal"
+                variant="destructive"
+                processing={reversing}
+                onConfirm={handleReverse}
+            />
         </AppLayout>
     );
 }

@@ -80,34 +80,10 @@ class ChartOfAccountsController extends Controller
         );
     }
 
-    public function create(Request $request)
-    {
-        $this->authorize('create', FinAccount::class);
-
-        $orgId = $request->user()->organization_id;
-
-        $parentAccounts = FinAccount::forOrganization($orgId)
-            ->active()
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'type']);
-
-        $taxRates = FinTaxRate::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'rate']);
-
-        $fundingStreams = FinFundingStream::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'code', 'name']);
-
-        return Inertia::render('finance/accounts/Create', [
-            'parentAccounts' => $parentAccounts,
-            'taxRates' => $taxRates,
-            'fundingStreams' => $fundingStreams,
-        ]);
-    }
-
+    /**
+     * Store a new account. The routed create/edit pages are retired — the
+     * account wizard on the index and record pages posts/puts here.
+     */
     public function store(Request $request)
     {
         $this->authorize('create', FinAccount::class);
@@ -141,10 +117,20 @@ class ChartOfAccountsController extends Controller
     {
         $this->authorize('view', $account);
 
-        $startDate = $request->input('start_date', now()->subMonths(3)->toDateString());
-        $endDate = $request->input('end_date', now()->toDateString());
+        // The header's reporting-period pill re-queries with ?from=&to= (the
+        // shared finance contract); the older start_date/end_date pair still
+        // works so bookmarked ledger links don't break.
+        $startDate = $request->input('from', $request->input('start_date', now()->subMonths(3)->toDateString()));
+        $endDate = $request->input('to', $request->input('end_date', now()->toDateString()));
 
         $ledger = $this->service->getAccountLedger($account->id, $startDate, $endDate);
+
+        $orgId = $request->user()->organization_id;
+
+        // Editing an account happens in the shared account modal, opened from
+        // this page's header action — so the record carries the same reference
+        // data the index does (only for users who can actually update it).
+        $canManage = $request->user()->can('update', $account);
 
         return Inertia::render('finance/accounts/Show', [
             'account' => [
@@ -157,48 +143,26 @@ class ChartOfAccountsController extends Controller
                 'is_active' => $account->is_active,
                 'gst_applicable' => $account->gst_applicable,
                 'description' => $account->description,
+                'parent_id' => $account->parent_id,
+                'default_tax_rate_id' => $account->default_tax_rate_id,
+                'funding_stream_id' => $account->funding_stream_id,
                 'balance' => $account->getBalance(),
             ],
             'ledger' => $ledger,
             'filters' => [
-                'start_date' => $startDate,
-                'end_date' => $endDate,
+                'from' => $startDate,
+                'to' => $endDate,
             ],
-        ]);
-    }
-
-    public function edit(Request $request, FinAccount $account)
-    {
-        $this->authorize('update', $account);
-
-        $orgId = $request->user()->organization_id;
-
-        $parentAccounts = FinAccount::forOrganization($orgId)
-            ->active()
-            ->where('id', '!=', $account->id)
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'type']);
-
-        $taxRates = FinTaxRate::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'rate']);
-
-        $fundingStreams = FinFundingStream::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'code', 'name']);
-
-        return Inertia::render('finance/accounts/Edit', [
-            'account' => $account->only([
-                'id', 'code', 'name', 'type', 'sub_type', 'parent_id',
-                'is_system', 'is_active', 'gst_applicable', 'description',
-                'default_tax_rate_id', 'funding_stream_id',
-            ]),
-            'parentAccounts' => $parentAccounts,
-            'taxRates' => $taxRates,
-            'fundingStreams' => $fundingStreams,
-            'hasJournalLines' => $account->journalLines()->exists(),
+            'canManage' => $canManage,
+            'parentAccounts' => $canManage
+                ? FinAccount::forOrganization($orgId)->active()->where('id', '!=', $account->id)->orderBy('code')->get(['id', 'code', 'name', 'type'])
+                : [],
+            'taxRates' => $canManage
+                ? FinTaxRate::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'name', 'code', 'rate'])
+                : [],
+            'fundingStreams' => $canManage
+                ? FinFundingStream::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name'])
+                : [],
         ]);
     }
 

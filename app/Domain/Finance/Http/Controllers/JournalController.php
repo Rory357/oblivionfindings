@@ -9,7 +9,6 @@ use App\Domain\Finance\Models\FinFixedAssetDepreciation;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinRecurringJournalOccurrence;
-use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Services\FixedAssetService;
 use App\Domain\Finance\Services\JournalPostingService;
 use App\Http\Controllers\Controller;
@@ -32,37 +31,28 @@ class JournalController extends Controller
 
         $orgId = $request->user()->organization_id;
 
-        $query = FinJournal::forOrganization($orgId)
-            ->withCount('lines');
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        if ($request->filled('type')) {
-            $query->ofType($request->input('type'));
-        }
-
-        if ($request->filled('date_from')) {
-            $query->where('journal_date', '>=', $request->input('date_from'));
-        }
-
-        if ($request->filled('date_to')) {
-            $query->where('journal_date', '<=', $request->input('date_to'));
-        }
-
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('journal_number', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
-
-        $journals = $query->orderByDesc('journal_date')
+        $journals = $this->filteredJournals($request, $orgId)
+            ->withCount('lines')
+            ->orderByDesc('journal_date')
             ->orderByDesc('id')
             ->paginate(25)
             ->withQueryString();
+
+        // Header meters need totals for the WHOLE filtered set, not the page
+        // in front of the user — a page-local "Posted (this page)" count reads
+        // as an organisation total and misleads.
+        $statusTotals = $this->filteredJournals($request, $orgId)
+            ->reorder()
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        $summary = [
+            'total' => (int) $statusTotals->sum(),
+            'posted' => (int) ($statusTotals['posted'] ?? 0),
+            'draft' => (int) ($statusTotals['draft'] ?? 0),
+            'reversed' => (int) ($statusTotals['reversed'] ?? 0),
+        ];
 
         // Reference data for the in-list New Journal wizard — only loaded for
         // users who can actually create a journal (the modal trigger is gated too).
@@ -117,6 +107,7 @@ class JournalController extends Controller
 
         return Inertia::render('finance/journals/Index', [
             'journals' => $journals,
+            'summary' => $summary,
             'recurringOccurrenceHistory' => $recurringOccurrenceHistory,
             'filters' => $request->only(['status', 'type', 'date_from', 'date_to', 'search']),
             'canManage' => $canManage,
@@ -130,6 +121,41 @@ class JournalController extends Controller
                 ? FinFundingStream::forOrganization($orgId)->active()->orderBy('code')->get(['id', 'code', 'name'])
                 : [],
         ]);
+    }
+
+    /**
+     * The index's status/type/date/search filters, applied to a fresh query so
+     * the list and its header totals always describe the same set.
+     */
+    private function filteredJournals(Request $request, ?int $orgId): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = FinJournal::forOrganization($orgId);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('type')) {
+            $query->ofType($request->input('type'));
+        }
+
+        if ($request->filled('date_from')) {
+            $query->where('journal_date', '>=', $request->input('date_from'));
+        }
+
+        if ($request->filled('date_to')) {
+            $query->where('journal_date', '<=', $request->input('date_to'));
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('journal_number', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        return $query;
     }
 
     /**
@@ -186,36 +212,8 @@ class JournalController extends Controller
     }
 
     /**
-     * Show the create journal form.
-     */
-    public function create(Request $request)
-    {
-        $this->authorize('create', FinJournal::class);
-
-        $orgId = $request->user()->organization_id;
-
-        return Inertia::render('finance/journals/Create', [
-            'accounts' => FinAccount::forOrganization($orgId)
-                ->active()
-                ->orderBy('code')
-                ->get(['id', 'code', 'name', 'type']),
-            'costCentres' => FinCostCentre::forOrganization($orgId)
-                ->active()
-                ->orderBy('code')
-                ->get(['id', 'code', 'name']),
-            'fundingStreams' => FinFundingStream::forOrganization($orgId)
-                ->active()
-                ->orderBy('code')
-                ->get(['id', 'code', 'name']),
-            'taxRates' => FinTaxRate::forOrganization($orgId)
-                ->active()
-                ->orderBy('name')
-                ->get(['id', 'code', 'name', 'rate']),
-        ]);
-    }
-
-    /**
-     * Store a new draft journal.
+     * Store a new draft journal. The routed create page is retired — the New
+     * journal wizard on the index posts here (route redirects to the index).
      */
     public function store(StoreJournalRequest $request)
     {
