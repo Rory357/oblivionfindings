@@ -134,6 +134,10 @@ interface Props extends PageProps {
 
 const STATUS_OPTIONS = [
     { value: 'all', label: 'All statuses' },
+    // The two grouped options the meters link to, so arriving from a meter
+    // shows the filter that produced the number.
+    { value: 'unpaid', label: 'Unpaid (approved and owing)' },
+    { value: 'awaiting', label: 'Awaiting approval or draft' },
     { value: 'draft', label: 'Draft' },
     { value: 'awaiting_approval', label: 'Awaiting approval' },
     { value: 'approved', label: 'Approved' },
@@ -377,7 +381,7 @@ export default function BillsIndex({
                 <>
                     <PageHeaderMeterBlock
                         label="Unpaid"
-                        href="/finance/bills?status=approved"
+                        href="/finance/bills?status=unpaid"
                         ariaLabel="View unpaid bills"
                     >
                         <PageHeaderMeterBig>
@@ -392,7 +396,7 @@ export default function BillsIndex({
                     <PageHeaderMeterBlock
                         label="Overdue"
                         tone="critical"
-                        href="/finance/bills?status=approved"
+                        href="/finance/bills?due=overdue"
                         ariaLabel="View overdue bills"
                     >
                         <PageHeaderMeterBig>
@@ -405,7 +409,7 @@ export default function BillsIndex({
                     <PageHeaderMeterBlock
                         label="Due this week"
                         tone="warning"
-                        href="/finance/bills?status=approved"
+                        href="/finance/bills?due=week"
                         ariaLabel="View bills due this week"
                     >
                         <PageHeaderMeterBig>
@@ -418,7 +422,7 @@ export default function BillsIndex({
                     <PageHeaderMeterBlock
                         label="Awaiting approval"
                         tone="warning"
-                        href="/finance/bills?status=awaiting_approval"
+                        href="/finance/bills?status=awaiting"
                         ariaLabel="View bills awaiting approval"
                     >
                         <PageHeaderMeterBig>

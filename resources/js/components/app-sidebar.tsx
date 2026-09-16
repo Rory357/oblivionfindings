@@ -17,6 +17,7 @@ import { cn, resolveUrl } from '@/lib/utils';
 import {
     FINANCE_SECTIONS,
     financeHubContainsUrl,
+    isFinanceHubHref,
     visibleSectionTabs as visibleFinanceSectionTabs,
 } from '@/lib/finance-sections';
 import {
@@ -320,9 +321,14 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
         return 2000 + item.length;
     }
 
-    // Likewise a Finance hub entry, on every view (and record) in its rail.
-    if (financeHubContainsUrl(normalizedItemPath, normalizedCurrentPath)) {
-        return 2000 + item.length;
+    // A Finance hub entry is lit by its own hub ONLY. Overview lives at
+    // /finance, a prefix of every other finance URL, so falling through to the
+    // generic prefix rule below would light it on top of the real hub on every
+    // finance page.
+    if (isFinanceHubHref(normalizedItemPath)) {
+        return financeHubContainsUrl(normalizedItemPath, normalizedCurrentPath)
+            ? 2000 + item.length
+            : -1;
     }
 
     if (itemQuery.length > 0) {
@@ -385,7 +391,7 @@ export function isIconActive(
     return false;
 }
 
-function isSubItemActive(currentUrl: string, href: NavItem['href']): boolean {
+export function isSubItemActive(currentUrl: string, href: NavItem['href']): boolean {
     if (resolveUrl(href) === '/it') {
         const path = normalizePath(resolveUrl(currentUrl));
         return path === '/it' || path.startsWith('/it/tickets/');

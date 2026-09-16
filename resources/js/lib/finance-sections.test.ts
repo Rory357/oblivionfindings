@@ -5,6 +5,7 @@ import {
     financeHubContainsUrl,
     financeSectionForUrl,
     financeTierTwoForUrl,
+    isFinanceHubHref,
     visibleSectionTabs,
 } from './finance-sections';
 
@@ -168,6 +169,49 @@ describe('Finance hubs', () => {
         expect(financeHubContainsUrl('/governance/meetings', '/finance/bills')).toBe(
             false,
         );
+    });
+
+    it('lights exactly one hub entry on every finance page', () => {
+        // The sidebar lights every item whose match score is positive, so two
+        // hubs claiming one URL means two lit entries. Overview sits at
+        // /finance, a prefix of every other finance URL, which is how it used
+        // to light on top of the real hub on all 88 pages.
+        const hubHrefs = FINANCE_SECTIONS.map((section) => section.href);
+        const pages = [
+            '/finance',
+            '/finance/calendar',
+            '/finance/bills',
+            '/finance/bills/12',
+            '/finance/accounts',
+            '/finance/invoices',
+            '/finance/receivables/statements',
+            '/finance/bank-accounts',
+            '/finance/eftpos/batches/9',
+            '/finance/gst-returns',
+            '/finance/donor-funds/3',
+            '/finance/reports/balance-sheet',
+            '/finance/cash-flow-forecast',
+            '/finance/match-rules',
+            '/finance/integrations',
+        ];
+
+        for (const page of pages) {
+            const lit = hubHrefs.filter((href) =>
+                financeHubContainsUrl(href, page),
+            );
+            expect(lit, `hubs lit on ${page}`).toHaveLength(1);
+        }
+    });
+
+    it('recognises every hub landing URL and tab href as a hub entry', () => {
+        for (const section of FINANCE_SECTIONS) {
+            expect(isFinanceHubHref(section.href)).toBe(true);
+            for (const tab of section.tabs) {
+                expect(isFinanceHubHref(tab.href)).toBe(true);
+            }
+        }
+        expect(isFinanceHubHref('/governance/meetings')).toBe(false);
+        expect(isFinanceHubHref('/dashboard')).toBe(false);
     });
 
     it('fails closed: views without the permission are hidden', () => {

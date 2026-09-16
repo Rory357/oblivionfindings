@@ -702,21 +702,39 @@ export function financeTierTwoForUrl(
     return best ?? tab.tier2[0];
 }
 
+/** The hub a sidebar href belongs to — its landing URL or one of its tabs. */
+function hubForHref(itemHref: string): FinanceSection | undefined {
+    const itemPath = normalisePath(itemHref);
+    return FINANCE_SECTIONS.find(
+        (section) =>
+            normalisePath(section.href) === itemPath ||
+            section.tabs.some((tab) => tab.href === itemPath),
+    );
+}
+
+/**
+ * Whether a sidebar href is a finance hub entry.
+ *
+ * The sidebar lights every item whose match score is positive, and Overview
+ * sits at `/finance` — a prefix of every other finance URL — so the generic
+ * "current path starts with item path" rule would light Overview on top of the
+ * real hub on all 88 finance pages. Callers use this to route finance hrefs
+ * through {@see financeHubContainsUrl} exclusively, so exactly one hub lights.
+ */
+export function isFinanceHubHref(itemHref: string): boolean {
+    return hubForHref(itemHref) !== undefined;
+}
+
 /**
  * Sidebar matching: a nav item whose href is a hub's landing URL or one of its
  * tabs stays lit anywhere inside that hub (e.g. "Payables" stays lit on a bill
- * record).
+ * record) — and only there.
  */
 export function financeHubContainsUrl(
     itemHref: string,
     currentUrl: string,
 ): boolean {
-    const itemPath = normalisePath(itemHref);
-    const hub = FINANCE_SECTIONS.find(
-        (section) =>
-            normalisePath(section.href) === itemPath ||
-            section.tabs.some((tab) => tab.href === itemPath),
-    );
+    const hub = hubForHref(itemHref);
     if (!hub) return false;
 
     // The winning hub for the current URL, so nested finance paths light one

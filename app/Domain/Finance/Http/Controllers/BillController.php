@@ -17,6 +17,12 @@ use Inertia\Inertia;
 
 class BillController extends Controller
 {
+    /** Approved and owing — what the Unpaid, Overdue and Due-this-week meters count. */
+    private const UNPAID_STATUSES = ['approved', 'partially_paid'];
+
+    /** Not yet approved — what the Awaiting-approval meter counts. */
+    private const AWAITING_STATUSES = ['draft', 'awaiting_approval'];
+
     public function __construct(
         private AccountsPayableService $service,
     ) {}
@@ -35,8 +41,29 @@ class BillController extends Controller
             ])
             ->orderBy('bill_date', 'desc');
 
+        // The header meters each link to the list they counted, so the filters
+        // have to express "unpaid" and "awaiting approval" the way the meters
+        // define them — not just a single literal status.
         if ($request->filled('status')) {
-            $query->withStatus($request->input('status'));
+            match ($request->input('status')) {
+                'unpaid' => $query->whereIn('status', self::UNPAID_STATUSES),
+                'awaiting' => $query->whereIn('status', self::AWAITING_STATUSES),
+                default => $query->withStatus($request->input('status')),
+            };
+        }
+
+        // Due-date windows behind the Overdue and Due-this-week meters. Without
+        // these, all three money meters pointed at the same ?status=approved
+        // list and silently showed identical rows.
+        if ($request->filled('due')) {
+            $query->whereIn('status', self::UNPAID_STATUSES);
+
+            match ($request->input('due')) {
+                'overdue' => $query->whereDate('due_date', '<', now()),
+                'week' => $query->whereDate('due_date', '>=', now())
+                    ->whereDate('due_date', '<=', now()->addDays(7)),
+                default => null,
+            };
         }
 
         if ($request->filled('vendor_id')) {
@@ -69,10 +96,10 @@ class BillController extends Controller
         // Whole-register figures for the header meter row — never the current
         // page of results (DESIGN.md "Page-local counts labelled as totals").
         $allBills = FinBill::forOrganization($orgId)->get();
-        $unpaid = $allBills->whereIn('status', ['approved', 'partially_paid']);
+        $unpaid = $allBills->whereIn('status', self::UNPAID_STATUSES);
         $overdue = $unpaid->filter(fn ($b) => $b->due_date < now());
         $dueThisWeek = $unpaid->filter(fn ($b) => $b->due_date >= now() && $b->due_date <= now()->addDays(7));
-        $awaiting = $allBills->whereIn('status', ['draft', 'awaiting_approval']);
+        $awaiting = $allBills->whereIn('status', self::AWAITING_STATUSES);
         $summary = [
             'total_unpaid' => $unpaid->sum(fn ($b) => $b->total_amount - $b->amount_paid),
             'unpaid_count' => $unpaid->count(),

@@ -4,6 +4,7 @@ import {
     buildNavSearchCatalog,
     governanceActionableTabKeys,
     isIconActive,
+    isSubItemActive,
 } from './app-sidebar';
 
 describe('app sidebar workforce navigation', () => {
@@ -474,5 +475,52 @@ describe('app sidebar governance hubs', () => {
                 governance: { budgets: { approve: true } },
             }),
         ).toEqual([]);
+    });
+});
+
+describe('finance sidebar highlighting', () => {
+    const HUBS = [
+        '/finance',
+        '/finance/ledger',
+        '/finance/payables',
+        '/finance/invoices',
+        '/finance/banking',
+        '/finance/tax',
+        '/finance/reports',
+        '/finance/settings',
+    ];
+
+    // The sidebar lights every entry whose match score is positive — there is
+    // no single winner — and Overview lives at /finance, a prefix of every
+    // other finance URL. Without the finance-hub branch in matchScore the
+    // generic "starts with" rule lit Overview on top of the real hub on every
+    // finance page.
+    it.each([
+        ['/finance', '/finance'],
+        ['/finance/calendar', '/finance'],
+        ['/finance/bills', '/finance/payables'],
+        ['/finance/bills/12', '/finance/payables'],
+        ['/finance/accounts', '/finance/ledger'],
+        ['/finance/journals/4', '/finance/ledger'],
+        ['/finance/invoices', '/finance/invoices'],
+        ['/finance/receivables/statements', '/finance/invoices'],
+        ['/finance/bank-accounts', '/finance/banking'],
+        ['/finance/eftpos/batches/9', '/finance/banking'],
+        ['/finance/petty-cash', '/finance/banking'],
+        ['/finance/gst-returns', '/finance/tax'],
+        ['/finance/donor-funds/3', '/finance/tax'],
+        ['/finance/reports/balance-sheet', '/finance/reports'],
+        ['/finance/cash-flow-forecast', '/finance/reports'],
+        ['/finance/integrations', '/finance/settings'],
+        ['/finance/match-rules', '/finance/settings'],
+    ])('lights exactly one hub on %s', (url, expected) => {
+        const lit = HUBS.filter((href) => isSubItemActive(url, href));
+
+        expect(lit).toEqual([expected]);
+    });
+
+    it('lights no finance hub outside the module', () => {
+        expect(HUBS.filter((href) => isSubItemActive('/governance/meetings', href))).toEqual([]);
+        expect(HUBS.filter((href) => isSubItemActive('/dashboard', href))).toEqual([]);
     });
 });
