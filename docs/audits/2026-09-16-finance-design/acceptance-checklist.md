@@ -22,7 +22,7 @@ module-wide sweep over the 117 live files reports zero for `PageHero`,
 | `npx tsc --noEmit` | clean (exit 0) |
 | `npx vitest run resources/js --maxWorkers=2` | 2685 passed / 389 files |
 | `npx eslint resources/js/pages/finance` | clean — the `PageHero` ban reports 0 (92 at baseline) |
-| `php artisan test tests/Feature/Finance` | **450 passed, 6 failed** (from 424/26 — twenty of the inherited failures fixed; see below) |
+| `php artisan test tests/Feature/Finance` | **455 passed, 1 failed** (from 424/26 — every inherited failure resolved; the one remaining is a known flake) |
 
 ### The 26 Pest failures were not from this migration — but four were real bugs
 
@@ -59,8 +59,8 @@ produced 25 failures on one run and 26 on the next. It is cross-file
 pollution, not a regression. (See the project note on per-pid MySQL test
 databases and the MySQL 1615 "re-prepared" flake.)
 
-**Net regressions from the migration: zero.** Twenty of the 26 now pass; the
-remainder are listed at the end of this file.
+**Net regressions from the migration: zero**, and all 26 inherited failures
+are now resolved — see below for the four application bugs behind them.
 
 ## Work packages
 
@@ -258,15 +258,16 @@ Left as decisions, not defects:
 ## Pre-existing failures fixed along the way
 
 The 26 Pest failures this migration inherited were not design problems, and
-chasing them turned up four genuine application bugs. Nineteen of the 26 now
-pass; the rest are described below.
+chasing them turned up six genuine application bugs. All 26 are now resolved.
 
 | Bug | Effect | Fix |
 |---|---|---|
 | Journal numbering rejected `organization_id` 0 | Organisation 0 is this app's default — FinanceSeeder seeds its chart of accounts there, the live ledger holds 35 accounts and a sequence row under it, and the operational GL capture paths post as org 0 — so every such posting threw | `lockJournalSequence` accepts 0; the bulk and storage guards keep rejecting it (`112936903`) |
-| Evidence compared with `===` across a MySQL `json` column | MySQL normalises object key order, so a stored snapshot could never equal a rebuilt one: every governed bill was hidden from the approval picker and could never post against its approval. The same pattern in `WebhookReceiverController` defeated webhook idempotency | `AppSupportJsonEvidence::matches()` compares key/value sets, still strict about types and list order (`3b6f99620`) |
+| Evidence compared with `===` across a MySQL `json` column | MySQL normalises object key order, so a stored snapshot could never equal a rebuilt one: every governed bill was hidden from the approval picker and could never post against its approval. The same pattern in `WebhookReceiverController` defeated webhook idempotency | `App\Support\JsonEvidence::matches()` compares key/value sets, still strict about types and list order (`3b6f99620`) |
 | `JournalPosted` dispatched inside `DB::transaction` | "A journal was posted" reached listeners — and jobs they queue — before the row was durable, and still reached them when an enclosing transaction rolled back | `DB::afterCommit` (`88c6156c4`) |
 | Payment-run export fixtures built runs with no items | Not an app bug: `PaymentSettlementSiteScope` correctly hides a run whose lines the actor cannot settle, so the CSV held only its header | Fixtures build a visible run (`88c6156c4`) |
+| Re-sending an invoice sent nothing | `send()` queued the email only while the invoice was a draft, but the UI offers "Send invoice" on any unpaid invoice — so it silently did nothing and still flashed "Invoice is being sent to …" | The email goes on every send; status and journal stay draft-gated; the button reads "Resend" (`d1d2531ad`) |
+| A migration rollback could not run on a migrated database | `..._000064::down()` dropped an index that `..._000130` had already replaced, failing with "Can't DROP … check that column/key exists" and leaving the rollback half-applied | Both index drops made conditional (`d1d2531ad`) |
 
 Two test-fixture updates came with them: `BillSpendApprovalGateTest` predates
 the Governance change that made board sign-off explicit (`d8fa284d8`), so its
@@ -275,19 +276,39 @@ donor-fund bills now name the zero-rated tax rate, because `GstTaxRateResolver`
 refuses — by design — to guess between the seeded zero-rated and exempt rates
 for a line storing a bare 0.
 
-### Still failing, and why
+### What the owner decided
 
-Five pre-existing failures remain, plus one flake (six in any given run). None
-is a regression from this work, and each is a separate piece of work with its
-own domain question:
+Four of the inherited failures needed a decision rather than a guess, and were
+put to the owner:
 
-| Test | Why it still fails |
-|---|---|
-| `FixedAssetDisposalIntegrityTest` — the two `JournalPosted` timing cases | They step a hand-rolled transaction ladder and expect the event only at true level 0, while Laravel deliberately ignores `RefreshDatabase`'s wrapping transaction so `afterCommit` code is testable at all, firing one level earlier. The production semantics they describe are the ones now implemented; the gap is the harness |
-| `FinInvoiceJournalPostingTest` — send queues the email job | Expects `SendInvoiceEmailJob` pushed twice, gets once. Needs a decision about whether sending a draft should re-queue |
-| `FundingClaimJournalDispatchTest` | Timesheet approval is blocked by a newer reconciliation gate ("the completed shift has no attendance evidence") — a fixture that predates that rule |
-| `PaymentAllocationIntegrityTest` — settlement constraint migration | `down()` cannot drop an index this worktree's schema never created; a migration-state problem, not application code |
-| One flake per run, varying | Two tests fail only under full-suite contention and pass in isolation: `JournalPostingReversalInvariantTest`'s two-worker serialisation (a MySQL deadlock) and `FinancialInsightsObjectScopeTest`'s global-access case (cross-file pollution). Which one appears differs run to run — see the project note on per-pid MySQL test databases |
+| Question | Decision | Result |
+|---|---|---|
+| Should re-sending an invoice re-email it? | Follow the industry standard | The email goes on every send (the accounting-package convention); the status move and AR journal stay gated on draft→sent. Fixed a live bug on the way: the UI offered "Send invoice" on an already-sent invoice, sent nothing, and still flashed "Invoice is being sent to …" |
+| Is an approved timesheet with no clock evidence ever legitimate? | Investigate before changing anything | It is not. The rule is untouched — see below |
+| Should an old migration's `down()` tolerate later reshaping? | Make it defensive | Both index drops in `..._000064::down()` are now conditional on the index still existing |
+| What about the two JournalPosted timing tests? | Rewrite them for the harness | Both keep every guarantee that matters; the rollback case now rolls back the transaction around the disposal rather than the harness's own, which is truer to what it tests |
+
+**On the attendance gate**, the investigation found the rule should stay exactly
+as it is, and the fixture was the anomaly:
+
+- The hard stop is absolute for shift-linked timesheets, and there is **no**
+  override, force, bypass, waive or acknowledge path in
+  `TimesheetApprovalService` or the UI — `attendance_missing` appears in one
+  place, where it is raised.
+- A legitimate no-clock path already exists and is not an override: a
+  **shiftless** manual timesheet (`shift_id === null`) never reaches the
+  attendance branch. Imported and hand-entered time belongs there.
+- No live timesheet is approved without clock evidence: in the dev database the
+  only two on a completed shift with no attendance session sit at status
+  `returned` — the gate working as intended.
+
+### Still failing
+
+One test, intermittently: `JournalPostingReversalInvariantTest`'s two-worker
+serialisation case hits a MySQL deadlock under full-suite contention and passes
+on consecutive isolated runs. `FinancialInsightsObjectScopeTest`'s global-access
+case flakes the same way from cross-file pollution; which of the two appears
+differs run to run. See the project note on per-pid MySQL test databases.
 
 ## Browser walkthrough — done 2026-09-16
 
