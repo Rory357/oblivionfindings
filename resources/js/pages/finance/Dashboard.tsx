@@ -1,24 +1,16 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    ArrowDownRight,
     ArrowRight,
-    ArrowUpRight,
-    Calendar,
+    BookOpen,
     Clock,
     Coins,
     CreditCard,
-    DollarSign,
     FileText,
-    Gauge,
     Landmark,
     LayoutDashboard,
-    MapPin,
     Percent,
     Plus,
     Receipt,
-    TrendingDown,
-    TrendingUp,
-    Users,
     Wallet,
     type LucideIcon,
 } from 'lucide-react';
@@ -38,6 +30,7 @@ import {
 } from 'recharts';
 
 import {
+    FinanceSectionRail,
     NewBillDialog,
     NewInvoiceDialog,
     NewJournalDialog,
@@ -46,28 +39,38 @@ import {
     formatMoney,
     formatMoneyCompact,
 } from '@/components/finance';
-import { FinanceHubsBar } from '@/components/finance/finance-hubs-bar';
+import { chartColor } from '@/components/finance/chart-palette';
 import {
-    NeedsAttentionStrip,
-    type AttentionItem,
-} from '@/components/finance/needs-attention-strip';
-import { OverviewTabsFooter } from '@/components/finance/overview-hub';
-import { PageHero, PageLayout } from '@/components/page';
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDelta,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageHeaderViewToggle,
+    PageLayout,
+} from '@/components/page';
 import { type DonutSegment } from '@/components/rostering/donut';
 import { DonutCard } from '@/components/rostering/donut-card';
-import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
 import { PageProps, type BreadcrumbItem } from '@/types';
 
 interface MonthlyData {
@@ -86,6 +89,14 @@ interface UpcomingBill {
     vendor_name: string;
     due_date: string;
     amount_due: number;
+}
+
+interface FundingClaim {
+    reference: string;
+    funder: string;
+    period: string;
+    status: string;
+    amount: number;
 }
 
 interface RecentJournal {
@@ -124,13 +135,7 @@ interface Props extends PageProps {
     expensesByMonth: MonthlyData[];
     topExpenseCategories: ExpenseCategory[];
     revenueByFundingStream?: { name: string; amount: number }[];
-    fundingClaims?: {
-        reference: string;
-        funder: string;
-        period: string;
-        status: string;
-        amount: number;
-    }[];
+    fundingClaims?: FundingClaim[];
     fundingUtilisation?: {
         claimed_paid: number;
         awaiting_remittance: number;
@@ -167,15 +172,14 @@ interface Props extends PageProps {
     regionCount?: number;
     period?: Period;
     periodLabel?: string;
-    // Reference data for the quick-action wizard modals. Supplied by the
-    // controller in Phase B; default to empty so the modals still open.
+    // Reference data for the quick-action wizard modals.
     accounts?: RefItem[];
     costCentres?: RefItem[];
     fundingStreams?: RefItem[];
     vendors?: NamedItem[];
     clients?: NamedItem[];
     taxRates?: TaxRateItem[];
-    // Hero footer filters (real options land in Phase B).
+    // Header filter options.
     siteOptions?: NamedItem[];
     funderOptions?: NamedItem[];
     orgName?: string;
@@ -183,17 +187,27 @@ interface Props extends PageProps {
 
 type Period = 'month' | 'quarter' | 'fy';
 type Modal = null | 'journal' | 'bill' | 'invoice' | 'receipt';
-type KpiTone = 'primary' | 'success' | 'warning' | 'critical' | 'info';
+
+type AttentionItem = {
+    id: string;
+    severity: 'critical' | 'warning' | 'info';
+    icon: LucideIcon;
+    title: string;
+    body: string;
+    tag: string;
+    href?: string;
+};
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
-    { title: 'Overview' },
+    { title: 'Overview', href: '/finance' },
 ];
 
-const PERIODS: { key: Period; label: string }[] = [
-    { key: 'month', label: 'This month' },
-    { key: 'quarter', label: 'Quarter' },
-    { key: 'fy', label: 'Financial year' },
+const PERIOD_OPTIONS: { value: Period; label: string }[] = [
+    { value: 'month', label: 'This month' },
+    { value: 'quarter', label: 'Quarter' },
+    { value: 'fy', label: 'Financial year' },
 ];
 const PERIOD_LABEL: Record<Period, string> = {
     month: 'This month',
@@ -201,12 +215,15 @@ const PERIOD_LABEL: Record<Period, string> = {
     fy: 'FY2026',
 };
 
-const KPI_TILE: Record<KpiTone, string> = {
-    primary: 'bg-primary/10 text-primary',
-    success: 'bg-status-success-bg text-status-success',
-    warning: 'bg-status-warning-bg text-status-warning',
-    critical: 'bg-status-critical-bg text-status-critical',
-    info: 'bg-status-info-bg text-status-info',
+const ALL = 'all';
+
+const SEVERITY_VARIANT: Record<
+    AttentionItem['severity'],
+    'critical' | 'warning' | 'info'
+> = {
+    critical: 'critical',
+    warning: 'warning',
+    info: 'info',
 };
 
 const formatDate = (date: string) =>
@@ -221,78 +238,8 @@ function computeTrend(data: MonthlyData[]): { percent: number } | null {
     const current = data[data.length - 1].amount;
     const previous = data[data.length - 2].amount;
     if (previous === 0) return null;
+
     return { percent: ((current - previous) / Math.abs(previous)) * 100 };
-}
-
-function PulseDot() {
-    return (
-        <span className="relative inline-flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-foreground/60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-foreground" />
-        </span>
-    );
-}
-
-function KpiCard({
-    label,
-    value,
-    icon: Icon,
-    tone = 'primary',
-    delta,
-    sub,
-}: {
-    label: string;
-    value: string;
-    icon: LucideIcon;
-    tone?: KpiTone;
-    delta?: { percent: number; good: boolean } | null;
-    sub?: string;
-}) {
-    return (
-        <div className="rounded-[15px] border border-border bg-card p-4">
-            <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-muted-foreground">
-                    {label}
-                </span>
-                <span
-                    className={cn(
-                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
-                        KPI_TILE[tone],
-                    )}
-                >
-                    <Icon className="h-4 w-4" />
-                </span>
-            </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
-                {value}
-            </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11.5px]">
-                {delta ? (
-                    <span
-                        className={cn(
-                            'inline-flex items-center gap-0.5 font-bold tabular-nums',
-                            delta.good
-                                ? 'text-status-success'
-                                : 'text-status-critical',
-                        )}
-                    >
-                        {delta.percent >= 0 ? (
-                            <ArrowUpRight className="h-3 w-3" />
-                        ) : (
-                            <ArrowDownRight className="h-3 w-3" />
-                        )}
-                        {Math.abs(delta.percent).toFixed(1)}%
-                    </span>
-                ) : null}
-                {sub ? (
-                    <span className="text-muted-foreground/70">
-                        {delta ? '· ' : ''}
-                        {sub}
-                    </span>
-                ) : null}
-            </div>
-        </div>
-    );
 }
 
 export default function FinanceDashboard({
@@ -301,7 +248,6 @@ export default function FinanceDashboard({
     netProfit,
     cashBalance,
     accountsReceivable,
-    accountsPayable,
     revenueByMonth,
     expensesByMonth,
     revenueByFundingStream = [],
@@ -314,12 +260,9 @@ export default function FinanceDashboard({
     payrollAwaitingApproval,
     paydayFilingDue,
     recentJournals,
-    fundedResidents,
-    revenuePerResident,
     gstDue,
     openPeriodLabel,
     siteCount,
-    regionCount,
     accounts = [],
     costCentres = [],
     fundingStreams = [],
@@ -334,16 +277,25 @@ export default function FinanceDashboard({
 }: Props) {
     const [period, setPeriod] = useState<Period>(serverPeriod);
     const [modal, setModal] = useState<Modal>(null);
-    const [siteFilter, setSiteFilter] = useState<number[]>([]);
-    const [funderFilter, setFunderFilter] = useState<number[]>([]);
+    const [siteFilter, setSiteFilter] = useState<string>(ALL);
+    const [funderFilter, setFunderFilter] = useState<string>(ALL);
+    const [search, setSearch] = useState('');
+
+    const billCtx = useEntityContextMenu<UpcomingBill>();
+    const claimCtx = useEntityContextMenu<FundingClaim>();
+    const journalCtx = useEntityContextMenu<RecentJournal>();
+    const attentionCtx = useEntityContextMenu<AttentionItem>();
 
     // Period / filter changes → real Inertia partial reload. `only` trims the
     // payload to the period-aware metric props (ref-data closures are skipped).
     const reload = (next: {
         period?: Period;
-        site?: number[];
-        funder?: number[];
+        site?: string;
+        funder?: string;
     }) => {
+        const siteValue = next.site ?? siteFilter;
+        const funderValue = next.funder ?? funderFilter;
+
         router.reload({
             only: [
                 'totalRevenue',
@@ -373,8 +325,8 @@ export default function FinanceDashboard({
             ],
             data: {
                 period: next.period ?? period,
-                site: next.site ?? siteFilter,
-                funder: next.funder ?? funderFilter,
+                site: siteValue === ALL ? [] : [Number(siteValue)],
+                funder: funderValue === ALL ? [] : [Number(funderValue)],
             },
             preserveState: true,
             preserveScroll: true,
@@ -384,23 +336,38 @@ export default function FinanceDashboard({
         setPeriod(p);
         reload({ period: p });
     };
-    const changeSite = (v: number[]) => {
+    const changeSite = (v: string) => {
         setSiteFilter(v);
         reload({ site: v });
     };
-    const changeFunder = (v: number[]) => {
+    const changeFunder = (v: string) => {
         setFunderFilter(v);
         reload({ funder: v });
     };
 
-    // §5 donut 1 — real revenue-by-funding-stream (dollars).
-    const REVENUE_COLORS = [
-        'var(--chart-1)',
-        'var(--chart-5)',
-        'var(--chart-4)',
-        'var(--chart-2)',
-        'var(--chart-3)',
-    ];
+    /* ---------------- Derived numbers ---------------- */
+
+    const revenueTrend = computeTrend(revenueByMonth);
+    const profitTrend = computeTrend(
+        revenueByMonth.map((rev, i) => ({
+            month: rev.month,
+            amount: rev.amount - (expensesByMonth[i]?.amount ?? 0),
+        })),
+    );
+    const margin =
+        totalRevenue > 0
+            ? Math.round((netProfit / totalRevenue) * 1000) / 10
+            : 0;
+    const billsDueTotal = upcomingBillsDue.reduce(
+        (sum, b) => sum + b.amount_due,
+        0,
+    );
+    const billsDueCount = apDueWithin7?.count ?? upcomingBillsDue.length;
+    const billsDueAmount = apDueWithin7?.total ?? billsDueTotal;
+    const utilisationPct = fundingUtilisation?.utilisation_pct ?? 0;
+
+    /* ---------------- Donut segments ---------------- */
+
     const revenueStreamTotal = revenueByFundingStream.reduce(
         (sum, s) => sum + s.amount,
         0,
@@ -410,7 +377,7 @@ export default function FinanceDashboard({
               key: `fs-${i}`,
               label: s.name,
               value: s.amount,
-              color: REVENUE_COLORS[i % REVENUE_COLORS.length],
+              color: chartColor(i),
           }))
         : [
               {
@@ -421,7 +388,6 @@ export default function FinanceDashboard({
               },
           ];
 
-    // §5 donut 3 — real AR aging (point-in-time, live FinInvoice via the AR service).
     const arAgingSegments: DonutSegment[] =
         arAging && arAging.total > 0
             ? [
@@ -468,7 +434,6 @@ export default function FinanceDashboard({
               },
           ];
 
-    // §5 donut 2 — real funding-claim utilisation buckets.
     const utilSegmentsRaw: DonutSegment[] = fundingUtilisation
         ? [
               {
@@ -508,16 +473,16 @@ export default function FinanceDashboard({
               },
           ];
 
-    // §3 Needs-attention — built from REAL data; an item only appears when its
-    // metric is live. GST-due + funder-remittances are added in Phase F.
+    /* ---------------- Needs attention (real data only) ---------------- */
+
     const attentionItems: AttentionItem[] = [];
     if (arAging && arAging.d90_plus > 0) {
         attentionItems.push({
             id: 'ar90',
             severity: 'critical',
             icon: FileText,
-            title: 'AR overdue 90+ days',
-            body: 'Receivables aged past 90 days need chasing.',
+            title: 'Receivables overdue past 90 days',
+            body: 'Invoices aged past 90 days still need chasing.',
             tag: `${formatMoneyCompact(arAging.d90_plus)} · 90+ days`,
             href: '/finance/reports/aged-receivables',
         });
@@ -539,7 +504,7 @@ export default function FinanceDashboard({
             severity: 'info',
             icon: Clock,
             title: 'Payroll run awaiting approval',
-            body: `${payrollAwaitingApproval.count} run(s) not yet posted to the ledger.`,
+            body: `${payrollAwaitingApproval.count} run${payrollAwaitingApproval.count === 1 ? '' : 's'} not yet posted to the ledger.`,
             tag: formatMoneyCompact(payrollAwaitingApproval.total_gross),
         });
     }
@@ -549,8 +514,8 @@ export default function FinanceDashboard({
             severity: 'warning',
             icon: Percent,
             title: 'IRD payday filing due',
-            body: 'Posted payroll runs still owe an Employment Information filing.',
-            tag: `${paydayFilingDue.count} run(s)`,
+            body: 'Posted payroll runs still owe an employment information filing.',
+            tag: `${paydayFilingDue.count} run${paydayFilingDue.count === 1 ? '' : 's'}`,
             href: '/finance/ird-filings',
         });
     }
@@ -562,7 +527,7 @@ export default function FinanceDashboard({
             title: 'Delivered hours not yet claimed',
             body: 'Service delivered without a funding claim raised.',
             tag: `${formatMoneyCompact(fundingUtilisation.unclaimed_total)} unclaimed`,
-            href: '/finance/funding-streams',
+            href: '/finance/reports/funding-stream-summary',
         });
     }
     if (gstDue) {
@@ -575,11 +540,31 @@ export default function FinanceDashboard({
             severity: gstDue.status === 'overdue' ? 'critical' : 'warning',
             icon: Landmark,
             title: 'GST return due',
-            body: 'Period GST return filing deadline approaching.',
+            body: 'The period GST return filing deadline is approaching.',
             tag: `due ${dueLabel}`,
             href: '/finance/gst-returns',
         });
     }
+
+    /* ---------------- Scoped search over the body lists ---------------- */
+
+    const query = search.trim().toLowerCase();
+    const matches = (...parts: (string | null | undefined)[]) =>
+        query === '' ||
+        parts.some((p) => (p ?? '').toLowerCase().includes(query));
+
+    const bills = upcomingBillsDue.filter((b) =>
+        matches(b.bill_number, b.vendor_name),
+    );
+    const claims = fundingClaims.filter((c) =>
+        matches(c.reference, c.funder, c.period, c.status),
+    );
+    const journals = recentJournals.filter((j) =>
+        matches(j.journal_number, j.description, j.type),
+    );
+    const attention = attentionItems.filter((a) => matches(a.title, a.body));
+
+    /* ---------------- Charts ---------------- */
 
     const chartData = revenueByMonth.map((rev, i) => ({
         month: rev.month,
@@ -590,26 +575,6 @@ export default function FinanceDashboard({
         month: rev.month,
         profit: rev.amount - (expensesByMonth[i]?.amount ?? 0),
     }));
-
-    const revenueTrend = computeTrend(revenueByMonth);
-    const expenseTrend = computeTrend(expensesByMonth);
-    const profitTrend = computeTrend(
-        revenueByMonth.map((rev, i) => ({
-            month: rev.month,
-            amount: rev.amount - (expensesByMonth[i]?.amount ?? 0),
-        })),
-    );
-    const margin =
-        totalRevenue > 0
-            ? Math.round((netProfit / totalRevenue) * 1000) / 10
-            : 0;
-    const billsDueTotal = upcomingBillsDue.reduce(
-        (sum, b) => sum + b.amount_due,
-        0,
-    );
-
-    // Chart helpers — match the design: short-month x labels + a value label on
-    // the net-profit line's final point.
     const shortMonth = (m: string) => String(m).split(' ')[0];
     const lastProfitIdx = profitData.length - 1;
     const renderLastProfitLabel = (props: {
@@ -620,6 +585,7 @@ export default function FinanceDashboard({
     }) => {
         if (props.index !== lastProfitIdx || props.x == null || props.y == null)
             return null;
+
         return (
             <text
                 x={props.x}
@@ -627,299 +593,405 @@ export default function FinanceDashboard({
                 textAnchor="middle"
                 fontSize={12}
                 fontWeight={700}
-                fill="var(--primary)"
+                fill={chartColor(0)}
             >
                 {formatMoneyCompact(props.value ?? 0)}
             </text>
         );
     };
 
+    /* ---------------- Row actions ---------------- */
+
+    const billActions = (bill: UpcomingBill): MenuItem[] => [
+        {
+            label: 'Open bill',
+            icon: Receipt,
+            onClick: () => router.visit(`/finance/bills/${bill.id}`),
+        },
+        {
+            label: 'All bills',
+            icon: ArrowRight,
+            onClick: () => router.visit('/finance/bills'),
+        },
+    ];
+    const claimActions = (): MenuItem[] => [
+        {
+            label: 'Open funding summary',
+            icon: Coins,
+            onClick: () =>
+                router.visit('/finance/reports/funding-stream-summary'),
+        },
+    ];
+    const journalActions = (journal: RecentJournal): MenuItem[] => [
+        {
+            label: 'Open journal',
+            icon: BookOpen,
+            onClick: () => router.visit(`/finance/journals/${journal.id}`),
+        },
+        {
+            label: 'All journals',
+            icon: ArrowRight,
+            onClick: () => router.visit('/finance/journals'),
+        },
+    ];
+    const attentionActions = (item: AttentionItem): MenuItem[] =>
+        compactMenu([
+            item.href
+                ? {
+                      label: 'Open',
+                      icon: ArrowRight,
+                      onClick: () => router.visit(item.href as string),
+                  }
+                : null,
+        ]);
+
+    /* ---------------- Table columns ---------------- */
+
+    const billColumns: EntityTableColumn<UpcomingBill>[] = [
+        {
+            key: 'due',
+            label: 'Due',
+            width: '130px',
+            cell: (b) => (
+                <span className="text-muted-foreground">
+                    {formatDate(b.due_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'amount',
+            label: 'Amount',
+            width: '130px',
+            align: 'right',
+            cell: (b) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(b.amount_due)}
+                </span>
+            ),
+        },
+    ];
+
+    const claimColumns: EntityTableColumn<FundingClaim>[] = [
+        {
+            key: 'status',
+            label: 'Status',
+            width: '140px',
+            cell: (c) => <StatusBadge status={c.status} size="sm" />,
+        },
+        {
+            key: 'amount',
+            label: 'Amount',
+            width: '130px',
+            align: 'right',
+            cell: (c) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(c.amount)}
+                </span>
+            ),
+        },
+    ];
+
+    const journalColumns: EntityTableColumn<RecentJournal>[] = [
+        {
+            key: 'date',
+            label: 'Date',
+            width: '130px',
+            cell: (j) => (
+                <span className="text-muted-foreground">
+                    {formatDate(j.journal_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'type',
+            label: 'Type',
+            width: '140px',
+            cell: (j) => <StatusBadge status={j.type} size="sm" />,
+        },
+        {
+            key: 'amount',
+            label: 'Amount',
+            width: '130px',
+            align: 'right',
+            cell: (j) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(j.total_amount)}
+                </span>
+            ),
+        },
+    ];
+
+    const attentionColumns: EntityTableColumn<AttentionItem>[] = [
+        {
+            key: 'tag',
+            label: 'Detail',
+            width: '220px',
+            align: 'right',
+            cell: (a) => (
+                <EntityStatusChip variant={SEVERITY_VARIANT[a.severity]}>
+                    {a.tag}
+                </EntityStatusChip>
+            ),
+        },
+    ];
+
+    /* ---------------- Event Horizon header ---------------- */
+
+    const header = (
+        <PageHeader
+            icon={LayoutDashboard}
+            title="Finance"
+            titleChip={
+                <PageHeaderStatusChip variant="info">
+                    {openPeriodLabel
+                        ? `Period ${openPeriodLabel}`
+                        : (periodLabel ?? PERIOD_LABEL[period])}
+                </PageHeaderStatusChip>
+            }
+            subline={`${orgName} · ${siteCount ?? 0} ${
+                siteCount === 1 ? 'site' : 'sites'
+            } · ${fundingStreams.length} funding ${
+                fundingStreams.length === 1 ? 'stream' : 'streams'
+            }`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search bills, claims, journals…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={Receipt}
+                        onClick={() => setModal('bill')}
+                    >
+                        New bill
+                    </PageHeaderGlassButton>
+                    <PageHeaderGlassButton
+                        icon={FileText}
+                        onClick={() => setModal('invoice')}
+                    >
+                        New invoice
+                    </PageHeaderGlassButton>
+                    <PageHeaderGlassButton
+                        icon={Wallet}
+                        onClick={() => setModal('receipt')}
+                    >
+                        Record receipt
+                    </PageHeaderGlassButton>
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() => setModal('journal')}
+                    >
+                        New journal
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Revenue"
+                        href="/finance/reports/profit-loss"
+                        ariaLabel="View the profit and loss report"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoneyCompact(totalRevenue)}
+                        </PageHeaderMeterBig>
+                        {revenueTrend ? (
+                            <PageHeaderMeterDelta
+                                trend={
+                                    revenueTrend.percent >= 0 ? 'up' : 'down'
+                                }
+                                good={revenueTrend.percent >= 0}
+                            >
+                                {Math.abs(revenueTrend.percent).toFixed(1)}% vs
+                                previous
+                            </PageHeaderMeterDelta>
+                        ) : (
+                            <PageHeaderMeterCaption>
+                                no comparable previous period
+                            </PageHeaderMeterCaption>
+                        )}
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Net profit"
+                        tone={netProfit >= 0 ? 'success' : 'critical'}
+                        href="/finance/reports/profit-loss"
+                        ariaLabel="View net profit in the profit and loss report"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoneyCompact(netProfit)}
+                        </PageHeaderMeterBig>
+                        {profitTrend ? (
+                            <PageHeaderMeterDelta
+                                trend={profitTrend.percent >= 0 ? 'up' : 'down'}
+                                good={profitTrend.percent >= 0}
+                            >
+                                {Math.abs(profitTrend.percent).toFixed(1)}% ·{' '}
+                                {margin}% margin
+                            </PageHeaderMeterDelta>
+                        ) : (
+                            <PageHeaderMeterCaption>
+                                {margin}% margin
+                            </PageHeaderMeterCaption>
+                        )}
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Cash"
+                        href="/finance/cash-position"
+                        ariaLabel="View the cash position"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoneyCompact(cashBalance)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {cashRunwayDays != null
+                                ? `${cashRunwayDays} days runway`
+                                : 'cash on hand'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Receivables"
+                        tone={
+                            arAging && arAging.over60 > 0 ? 'warning' : 'brand'
+                        }
+                        href="/finance/reports/aged-receivables"
+                        ariaLabel="View aged receivables"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoneyCompact(accountsReceivable)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {arAging
+                                ? `${formatMoneyCompact(arAging.over60)} over 60 days`
+                                : 'outstanding invoices'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Bills due ≤ 7 days"
+                        tone={billsDueCount > 0 ? 'critical' : 'success'}
+                        href="/finance/bills"
+                        ariaLabel="View bills falling due"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoneyCompact(billsDueAmount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {billsDueCount}{' '}
+                            {billsDueCount === 1 ? 'bill' : 'bills'} approved
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Funding utilisation"
+                        value="target 90%"
+                        href="/finance/reports/funding-stream-summary"
+                        ariaLabel="View the funding stream summary"
+                    >
+                        <PageHeaderMeterBig>
+                            {utilisationPct}%
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBar percent={utilisationPct} />
+                        <PageHeaderMeterCaption>
+                            {fundingUtilisation
+                                ? `${formatMoneyCompact(fundingUtilisation.unclaimed_total)} unclaimed`
+                                : 'claimed vs delivered'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderViewToggle
+                        value={period}
+                        onChange={changePeriod}
+                        ariaLabel="Reporting period"
+                        options={PERIOD_OPTIONS}
+                    />
+                    <PageHeaderFilterSelect
+                        label="All sites"
+                        value={siteFilter}
+                        allValue={ALL}
+                        options={[
+                            { value: ALL, label: 'All sites' },
+                            ...siteOptions.map((s) => ({
+                                value: String(s.id),
+                                label: s.name,
+                            })),
+                        ]}
+                        onChange={changeSite}
+                    />
+                    <PageHeaderFilterSelect
+                        label="All funding"
+                        value={funderFilter}
+                        allValue={ALL}
+                        options={[
+                            { value: ALL, label: 'All funding' },
+                            ...funderOptions.map((f) => ({
+                                value: String(f.id),
+                                label: f.name,
+                            })),
+                        ]}
+                        onChange={changeFunder}
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Finance Dashboard" />
+            <Head title="Finance" />
 
-            <PageLayout
-                width="wide"
-                hero={
-                    <PageHero
-                        pageType="dashboard"
-                        category="finance"
-                        icon={LayoutDashboard}
-                        title={
-                            <span>
-                                <span className="mb-2 flex items-center justify-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/85 uppercase md:justify-start">
-                                    <PulseDot />
-                                    Live ledger ·{' '}
-                                    {periodLabel ?? PERIOD_LABEL[period]}
-                                </span>
-                                <span className="block">Finance Dashboard</span>
-                            </span>
-                        }
-                        description={
-                            <span>
-                                Live general ledger for{' '}
-                                <span className="font-semibold text-primary-foreground">
-                                    {orgName}
-                                </span>{' '}
-                                across{' '}
-                                <span className="font-semibold text-primary-foreground">
-                                    {siteCount ?? 0}{' '}
-                                    {siteCount === 1 ? 'site' : 'sites'}
-                                </span>{' '}
-                                and{' '}
-                                <span className="font-semibold text-primary-foreground">
-                                    {fundingStreams.length} funding{' '}
-                                    {fundingStreams.length === 1
-                                        ? 'stream'
-                                        : 'streams'}
-                                </span>
-                                .
-                            </span>
-                        }
-                        meta={[
-                            {
-                                icon: Calendar,
-                                label: openPeriodLabel
-                                    ? `Open period ${openPeriodLabel}`
-                                    : (periodLabel ?? PERIOD_LABEL[period]),
-                            },
-                            {
-                                icon: MapPin,
-                                label: `${siteCount ?? 0} sites · ${regionCount ?? 0} regions`,
-                            },
-                            {
-                                icon: Users,
-                                label: `${fundedResidents ?? 0} residents funded`,
-                            },
-                        ]}
-                        stats={[
-                            {
-                                label: 'Revenue',
-                                value: formatMoneyCompact(totalRevenue),
-                            },
-                            {
-                                label: 'Expenses',
-                                value: formatMoneyCompact(totalExpenses),
-                            },
-                            {
-                                label: 'Net profit',
-                                value: formatMoneyCompact(netProfit),
-                                tone: netProfit >= 0 ? 'success' : 'critical',
-                            },
-                            {
-                                label: 'Cash',
-                                value: formatMoneyCompact(cashBalance),
-                            },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap gap-2">
-                                <Button
-                                    size="sm"
-                                    onClick={() => setModal('journal')}
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                >
-                                    <Plus className="mr-1 h-4 w-4" /> New
-                                    Journal
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setModal('bill')}
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Plus className="mr-1 h-4 w-4" /> New Bill
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setModal('invoice')}
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <FileText className="mr-1 h-4 w-4" /> New
-                                    Invoice
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setModal('receipt')}
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Receipt className="mr-1 h-4 w-4" /> Record
-                                    Receipt
-                                </Button>
-                            </div>
-                        }
-                        footer={
-                            <div className="flex flex-col gap-1">
-                                <OverviewTabsFooter active="summary" />
-                                <div className="flex flex-col items-stretch gap-2 pb-3 md:flex-row md:items-center md:justify-between">
-                                    <div
-                                        role="group"
-                                        aria-label="Reporting period"
-                                        className="inline-flex w-fit rounded-[10px] bg-primary-foreground/15 p-[3px]"
-                                    >
-                                        {PERIODS.map((p) => (
-                                            // eslint-disable-next-line no-restricted-syntax -- segmented-control pill, not a shadcn Button
-                                            <button
-                                                key={p.key}
-                                                type="button"
-                                                aria-pressed={period === p.key}
-                                                onClick={() =>
-                                                    changePeriod(p.key)
-                                                }
-                                                className={cn(
-                                                    'frontline-focus frontline-tap rounded-md px-3 py-1 text-[12.5px] font-semibold transition-colors',
-                                                    period === p.key
-                                                        ? 'bg-primary-foreground text-primary'
-                                                        : 'text-primary-foreground/85 hover:text-primary-foreground',
-                                                )}
-                                            >
-                                                {p.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div className="flex flex-wrap items-center justify-end gap-2">
-                                        <MultiEntityFilter
-                                            label="Site"
-                                            allLabel="All sites"
-                                            items={siteOptions}
-                                            value={siteFilter}
-                                            onChange={changeSite}
-                                            onDark
-                                        />
-                                        <MultiEntityFilter
-                                            label="Funding"
-                                            allLabel="All funding"
-                                            pluralLabel="funding streams"
-                                            items={funderOptions}
-                                            value={funderFilter}
-                                            onChange={changeFunder}
-                                            onDark
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    />
-                }
-            >
-                <div className="flex flex-col gap-[18px]">
-                    {/* §2 Finance hubs quick-links */}
-                    <FinanceHubsBar />
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {/* Needs attention — built only from live metrics */}
+                    {attentionItems.length > 0 ? (
+                        <div className="flex flex-col gap-5">
+                            <ListCaption
+                                title="Needs attention"
+                                caption={`${attention.length} of ${attentionItems.length} shown`}
+                            />
+                            {attention.length === 0 ? (
+                                <EmptyState
+                                    variant="compact"
+                                    icon={Clock}
+                                    heading="Nothing matches your search"
+                                    description="Clear the search to see every open item."
+                                />
+                            ) : (
+                                <EntityTable
+                                    rows={attention}
+                                    rowKey={(a) => a.id}
+                                    identityLabel="Item"
+                                    identityWidth="2.4fr"
+                                    minWidth={640}
+                                    identity={(a) => ({
+                                        icon: a.icon,
+                                        name: a.title,
+                                        subline: a.body,
+                                    })}
+                                    columns={attentionColumns}
+                                    actionsFor={attentionActions}
+                                    onOpen={(a) =>
+                                        a.href
+                                            ? router.visit(a.href)
+                                            : undefined
+                                    }
+                                    onRowContextMenu={(e, a) => {
+                                        if (a.href) attentionCtx.open(e, a);
+                                    }}
+                                />
+                            )}
+                        </div>
+                    ) : null}
 
-                    {/* §3 Needs attention */}
-                    <NeedsAttentionStrip
-                        items={attentionItems}
-                        subtitle={`${attentionItems.length} item${attentionItems.length === 1 ? '' : 's'} need attention · AR, bills, payroll & claims`}
-                        viewAllHref="/finance/reports"
-                    />
-
-                    {/* §4 KPI cards */}
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <KpiCard
-                            label="Revenue"
-                            value={formatMoneyCompact(totalRevenue)}
-                            icon={TrendingUp}
-                            tone="success"
-                            delta={
-                                revenueTrend
-                                    ? {
-                                          percent: revenueTrend.percent,
-                                          good: revenueTrend.percent >= 0,
-                                      }
-                                    : null
-                            }
-                            sub="vs prev period"
-                        />
-                        <KpiCard
-                            label="Net profit"
-                            value={formatMoneyCompact(netProfit)}
-                            icon={DollarSign}
-                            tone="primary"
-                            delta={
-                                profitTrend
-                                    ? {
-                                          percent: profitTrend.percent,
-                                          good: profitTrend.percent >= 0,
-                                      }
-                                    : null
-                            }
-                            sub={`${margin}% margin`}
-                        />
-                        <KpiCard
-                            label="Cash position"
-                            value={formatMoneyCompact(cashBalance)}
-                            icon={Wallet}
-                            tone="info"
-                            sub={
-                                cashRunwayDays != null
-                                    ? `${cashRunwayDays} days runway`
-                                    : 'cash on hand'
-                            }
-                        />
-                        <KpiCard
-                            label="AR outstanding"
-                            value={formatMoneyCompact(accountsReceivable)}
-                            icon={FileText}
-                            tone="warning"
-                            sub={
-                                arAging
-                                    ? `${formatMoneyCompact(arAging.over60)} >60d`
-                                    : 'receivables outstanding'
-                            }
-                        />
-                        <KpiCard
-                            label="AP outstanding"
-                            value={formatMoneyCompact(accountsPayable)}
-                            icon={CreditCard}
-                            tone="critical"
-                            sub={`${apDueWithin7?.count ?? upcomingBillsDue.length} due ≤7d · ${formatMoneyCompact(apDueWithin7?.total ?? billsDueTotal)}`}
-                        />
-                        <KpiCard
-                            label="Expenses"
-                            value={formatMoneyCompact(totalExpenses)}
-                            icon={TrendingDown}
-                            tone="warning"
-                            delta={
-                                expenseTrend
-                                    ? {
-                                          percent: expenseTrend.percent,
-                                          good: expenseTrend.percent < 0,
-                                      }
-                                    : null
-                            }
-                            sub="vs prev period"
-                        />
-                        <KpiCard
-                            label="Funding utilisation"
-                            value={
-                                fundingUtilisation
-                                    ? `${fundingUtilisation.utilisation_pct}%`
-                                    : '—'
-                            }
-                            icon={Gauge}
-                            tone="primary"
-                            sub={
-                                fundingUtilisation
-                                    ? `target 90% · ${formatMoneyCompact(fundingUtilisation.unclaimed_total)} unclaimed`
-                                    : 'claimed vs delivered'
-                            }
-                        />
-                        <KpiCard
-                            label="Revenue / resident"
-                            value={
-                                revenuePerResident != null
-                                    ? formatMoneyCompact(revenuePerResident)
-                                    : '—'
-                            }
-                            icon={Users}
-                            tone="success"
-                            sub={`${fundedResidents ?? 0} funded · benchmark $6.2k`}
-                        />
-                    </div>
-
-                    {/* §5 Donut row */}
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                    {/* Funding, revenue mix and receivables ageing */}
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
                         <DonutCard
                             tone="primary"
                             title="Revenue by funding stream"
@@ -929,9 +1001,11 @@ export default function FinanceDashboard({
                             centerLabel="revenue"
                             accentKeys={[revenueStreamSegments[0]?.key ?? '']}
                             active={false}
-                            cta="View funding streams"
+                            cta="View funding summary"
                             onClick={() =>
-                                router.visit('/finance/funding-streams')
+                                router.visit(
+                                    '/finance/reports/funding-stream-summary',
+                                )
                             }
                             formatValue={(v) => formatMoneyCompact(v)}
                             showPercent
@@ -941,26 +1015,28 @@ export default function FinanceDashboard({
                             title="Funding claim utilisation"
                             subtitle="Delivered vs claimed vs paid"
                             segments={utilDonut}
-                            centerValue={`${fundingUtilisation?.utilisation_pct ?? 0}%`}
+                            centerValue={`${utilisationPct}%`}
                             centerLabel="utilised"
                             accentKeys={['paid']}
                             active={false}
-                            cta="View funding claims"
+                            cta="View funding summary"
                             onClick={() =>
-                                router.visit('/finance/funding-streams')
+                                router.visit(
+                                    '/finance/reports/funding-stream-summary',
+                                )
                             }
                             formatValue={(v) => formatMoneyCompact(v)}
                             showPercent
                         />
                         <DonutCard
                             tone="success"
-                            title="Receivables aging"
+                            title="Receivables ageing"
                             subtitle="Outstanding by age bucket"
                             segments={arAgingDonut}
                             centerValue={formatMoneyCompact(
                                 arAging?.total ?? 0,
                             )}
-                            centerLabel="AR"
+                            centerLabel="receivables"
                             accentKeys={['current']}
                             active={false}
                             cta="View aged receivables"
@@ -974,30 +1050,26 @@ export default function FinanceDashboard({
                         />
                     </div>
 
-                    {/* §6 Charts row */}
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.35fr_1fr]">
+                    {/* Trend charts */}
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.35fr_1fr]">
                         <Card>
                             <CardHeader className="flex flex-row items-start justify-between">
                                 <div>
-                                    <CardTitle className="text-base">
-                                        Net profit trend
-                                    </CardTitle>
-                                    <p className="mt-0.5 text-[11.8px] text-muted-foreground">
+                                    <CardTitle>Net profit trend</CardTitle>
+                                    <p className="text-caption mt-0.5">
                                         Rolling 6 periods · NZD
                                     </p>
                                 </div>
                                 {profitTrend ? (
-                                    <span
-                                        className={cn(
-                                            'rounded-full px-2 py-0.5 text-[11.5px] font-bold tabular-nums',
+                                    <StatusBadge
+                                        size="sm"
+                                        variant={
                                             profitTrend.percent >= 0
-                                                ? 'bg-status-success-bg text-status-success'
-                                                : 'bg-status-critical-bg text-status-critical',
-                                        )}
-                                    >
-                                        {profitTrend.percent >= 0 ? '+' : ''}
-                                        {profitTrend.percent.toFixed(1)}%
-                                    </span>
+                                                ? 'success'
+                                                : 'critical'
+                                        }
+                                        label={`${profitTrend.percent >= 0 ? '+' : ''}${profitTrend.percent.toFixed(1)}%`}
+                                    />
                                 ) : null}
                             </CardHeader>
                             <CardContent>
@@ -1025,12 +1097,16 @@ export default function FinanceDashboard({
                                                 >
                                                     <stop
                                                         offset="0%"
-                                                        stopColor="var(--primary)"
+                                                        stopColor={chartColor(
+                                                            0,
+                                                        )}
                                                         stopOpacity={0.28}
                                                     />
                                                     <stop
                                                         offset="100%"
-                                                        stopColor="var(--primary)"
+                                                        stopColor={chartColor(
+                                                            0,
+                                                        )}
                                                         stopOpacity={0.01}
                                                     />
                                                 </linearGradient>
@@ -1065,19 +1141,19 @@ export default function FinanceDashboard({
                                             <Area
                                                 type="monotone"
                                                 dataKey="profit"
-                                                stroke="var(--primary)"
+                                                stroke={chartColor(0)}
                                                 strokeWidth={2.6}
                                                 fill="url(#npGradient)"
                                                 name="Net profit"
                                                 dot={{
                                                     r: 3.5,
                                                     fill: 'var(--card)',
-                                                    stroke: 'var(--primary)',
+                                                    stroke: chartColor(0),
                                                     strokeWidth: 2,
                                                 }}
                                                 activeDot={{
                                                     r: 5,
-                                                    fill: 'var(--primary)',
+                                                    fill: chartColor(0),
                                                 }}
                                             >
                                                 <LabelList
@@ -1097,11 +1173,10 @@ export default function FinanceDashboard({
 
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">
-                                    Revenue vs expenses
-                                </CardTitle>
-                                <p className="mt-0.5 text-[11.8px] text-muted-foreground">
-                                    Last 6 periods
+                                <CardTitle>Revenue vs expenses</CardTitle>
+                                <p className="text-caption mt-0.5">
+                                    Last 6 periods ·{' '}
+                                    {formatMoneyCompact(totalExpenses)} expenses
                                 </p>
                             </CardHeader>
                             <CardContent>
@@ -1161,14 +1236,14 @@ export default function FinanceDashboard({
                                             />
                                             <Bar
                                                 dataKey="revenue"
-                                                fill="var(--primary)"
+                                                fill={chartColor(0)}
                                                 name="Revenue"
                                                 radius={[3, 3, 0, 0]}
                                                 maxBarSize={14}
                                             />
                                             <Bar
                                                 dataKey="expenses"
-                                                fill="var(--status-warning)"
+                                                fill={chartColor(3)}
                                                 name="Expenses"
                                                 radius={[3, 3, 0, 0]}
                                                 maxBarSize={14}
@@ -1180,205 +1255,209 @@ export default function FinanceDashboard({
                         </Card>
                     </div>
 
-                    {/* §7 Tables row */}
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle>
-                                    Upcoming bills due · next 7 days
-                                </CardTitle>
-                                <Button asChild variant="ghost" size="sm">
-                                    <Link href="/finance/bills">
-                                        All bills{' '}
-                                        <ArrowRight className="ml-1 h-4 w-4" />
-                                    </Link>
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                {upcomingBillsDue.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No bills due in the next 7 days.
-                                    </p>
-                                ) : (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Bill #</TableHead>
-                                                <TableHead>Vendor</TableHead>
-                                                <TableHead>Due</TableHead>
-                                                <TableHead className="text-right">
-                                                    Amount
-                                                </TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {upcomingBillsDue.map((bill) => (
-                                                <TableRow key={bill.id}>
-                                                    <TableCell>
-                                                        <Link
-                                                            href={`/finance/bills/${bill.id}`}
-                                                            className="font-semibold text-primary hover:underline"
-                                                        >
-                                                            {bill.bill_number}
-                                                        </Link>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {bill.vendor_name}
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground">
-                                                        {formatDate(
-                                                            bill.due_date,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right font-semibold tabular-nums">
-                                                        {formatMoney(
-                                                            bill.amount_due,
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                )}
-                            </CardContent>
-                        </Card>
+                    {/* Upcoming bills + funding claims */}
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                        <div className="flex flex-col gap-5">
+                            <ListCaption
+                                title="Upcoming bills due · next 7 days"
+                                caption={`${bills.length} of ${upcomingBillsDue.length} shown`}
+                                right={
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link href="/finance/bills">
+                                            All bills
+                                            <ArrowRight className="h-3.5 w-3.5" />
+                                        </Link>
+                                    </Button>
+                                }
+                            />
+                            {bills.length === 0 ? (
+                                <EmptyState
+                                    variant="compact"
+                                    icon={Receipt}
+                                    heading={
+                                        upcomingBillsDue.length === 0
+                                            ? 'No bills due in the next 7 days'
+                                            : 'No bills match your search'
+                                    }
+                                    description={
+                                        upcomingBillsDue.length === 0
+                                            ? 'Approved bills appear here as their due dates come within a week.'
+                                            : 'Clear the search to see every bill due this week.'
+                                    }
+                                />
+                            ) : (
+                                <EntityTable
+                                    rows={bills}
+                                    rowKey={(b) => b.id}
+                                    identityLabel="Bill"
+                                    minWidth={560}
+                                    identity={(b) => ({
+                                        icon: Receipt,
+                                        name: b.bill_number,
+                                        subline: b.vendor_name,
+                                    })}
+                                    hrefFor={(b) => `/finance/bills/${b.id}`}
+                                    columns={billColumns}
+                                    actionsFor={billActions}
+                                    onOpen={(b) =>
+                                        router.visit(`/finance/bills/${b.id}`)
+                                    }
+                                    onRowContextMenu={(e, b) =>
+                                        billCtx.open(e, b)
+                                    }
+                                />
+                            )}
+                        </div>
 
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="flex items-center gap-2">
-                                    Funding claims
-                                    <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10.5px] font-bold tracking-wide text-status-warning uppercase">
-                                        supported living
-                                    </span>
-                                </CardTitle>
-                                <Button asChild variant="ghost" size="sm">
-                                    <Link href="/finance/funding-streams">
-                                        All claims{' '}
-                                        <ArrowRight className="ml-1 h-4 w-4" />
-                                    </Link>
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                {fundingClaims.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No funding claims yet.
-                                    </p>
-                                ) : (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Ref</TableHead>
-                                                <TableHead>
-                                                    Funder · period
-                                                </TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="text-right">
-                                                    Amount
-                                                </TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {fundingClaims.map((claim) => (
-                                                <TableRow key={claim.reference}>
-                                                    <TableCell className="font-semibold text-primary">
-                                                        {claim.reference}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <span className="block">
-                                                            {claim.funder}
-                                                        </span>
-                                                        <span className="block text-[11px] text-muted-foreground">
-                                                            {claim.period}
-                                                        </span>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <StatusBadge
-                                                            status={
-                                                                claim.status
-                                                            }
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="text-right font-semibold tabular-nums">
-                                                        {formatMoney(
-                                                            claim.amount,
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                )}
-                            </CardContent>
-                        </Card>
+                        <div className="flex flex-col gap-5">
+                            <ListCaption
+                                title="Funding claims"
+                                caption={`${claims.length} of ${fundingClaims.length} shown`}
+                                right={
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link href="/finance/reports/funding-stream-summary">
+                                            All claims
+                                            <ArrowRight className="h-3.5 w-3.5" />
+                                        </Link>
+                                    </Button>
+                                }
+                            />
+                            {claims.length === 0 ? (
+                                <EmptyState
+                                    variant="compact"
+                                    icon={Coins}
+                                    heading={
+                                        fundingClaims.length === 0
+                                            ? 'No funding claims yet'
+                                            : 'No claims match your search'
+                                    }
+                                    description={
+                                        fundingClaims.length === 0
+                                            ? 'Claims appear here once delivered service is claimed against a funding stream.'
+                                            : 'Clear the search to see every claim.'
+                                    }
+                                />
+                            ) : (
+                                <EntityTable
+                                    rows={claims}
+                                    rowKey={(c) => c.reference}
+                                    identityLabel="Claim"
+                                    minWidth={560}
+                                    identity={(c) => ({
+                                        icon: Coins,
+                                        name: c.reference,
+                                        subline: `${c.funder} · ${c.period}`,
+                                    })}
+                                    columns={claimColumns}
+                                    actionsFor={claimActions}
+                                    onOpen={() =>
+                                        router.visit(
+                                            '/finance/reports/funding-stream-summary',
+                                        )
+                                    }
+                                    onRowContextMenu={(e, c) =>
+                                        claimCtx.open(e, c)
+                                    }
+                                />
+                            )}
+                        </div>
                     </div>
 
-                    {/* §8 Recent journals */}
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle>Recent journals</CardTitle>
-                            <Button asChild variant="ghost" size="sm">
-                                <Link href="/finance/journals">
-                                    All journals{' '}
-                                    <ArrowRight className="ml-1 h-4 w-4" />
-                                </Link>
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
-                            {recentJournals.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No journal entries yet.
-                                </p>
-                            ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Journal #</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Description</TableHead>
-                                            <TableHead>Type</TableHead>
-                                            <TableHead className="text-right">
-                                                Amount
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {recentJournals.map((journal) => (
-                                            <TableRow key={journal.id}>
-                                                <TableCell>
-                                                    <Link
-                                                        href={`/finance/journals/${journal.id}`}
-                                                        className="font-semibold text-primary hover:underline"
-                                                    >
-                                                        {journal.journal_number}
-                                                    </Link>
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground">
-                                                    {formatDate(
-                                                        journal.journal_date,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="max-w-[280px] truncate">
-                                                    {journal.description ?? '—'}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-primary capitalize">
-                                                        {journal.type}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell className="text-right font-semibold tabular-nums">
-                                                    {formatMoney(
-                                                        journal.total_amount,
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            )}
-                        </CardContent>
-                    </Card>
+                    {/* Recent journals */}
+                    <div className="flex flex-col gap-5">
+                        <ListCaption
+                            title="Recent journals"
+                            caption={`${journals.length} of ${recentJournals.length} shown`}
+                            right={
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href="/finance/journals">
+                                        All journals
+                                        <ArrowRight className="h-3.5 w-3.5" />
+                                    </Link>
+                                </Button>
+                            }
+                        />
+                        {journals.length === 0 ? (
+                            <EmptyState
+                                variant="compact"
+                                icon={BookOpen}
+                                heading={
+                                    recentJournals.length === 0
+                                        ? 'No journal entries yet'
+                                        : 'No journals match your search'
+                                }
+                                description={
+                                    recentJournals.length === 0
+                                        ? 'Post a journal to see the most recent ledger activity here.'
+                                        : 'Clear the search to see every recent journal.'
+                                }
+                            />
+                        ) : (
+                            <EntityTable
+                                rows={journals}
+                                rowKey={(j) => j.id}
+                                identityLabel="Journal"
+                                identityWidth="2.2fr"
+                                identity={(j) => ({
+                                    icon: BookOpen,
+                                    name: j.journal_number,
+                                    subline: j.description ?? '—',
+                                })}
+                                hrefFor={(j) => `/finance/journals/${j.id}`}
+                                columns={journalColumns}
+                                actionsFor={journalActions}
+                                onOpen={(j) =>
+                                    router.visit(`/finance/journals/${j.id}`)
+                                }
+                                onRowContextMenu={(e, j) =>
+                                    journalCtx.open(e, j)
+                                }
+                            />
+                        )}
+                    </div>
                 </div>
             </PageLayout>
+
+            {attentionCtx.ctx ? (
+                <EntityContextMenu
+                    x={attentionCtx.ctx.x}
+                    y={attentionCtx.ctx.y}
+                    icon={attentionCtx.ctx.record.icon}
+                    title={attentionCtx.ctx.record.title}
+                    items={attentionActions(attentionCtx.ctx.record)}
+                    onClose={attentionCtx.close}
+                />
+            ) : null}
+            {billCtx.ctx ? (
+                <EntityContextMenu
+                    x={billCtx.ctx.x}
+                    y={billCtx.ctx.y}
+                    icon={Receipt}
+                    title={billCtx.ctx.record.bill_number}
+                    items={billActions(billCtx.ctx.record)}
+                    onClose={billCtx.close}
+                />
+            ) : null}
+            {claimCtx.ctx ? (
+                <EntityContextMenu
+                    x={claimCtx.ctx.x}
+                    y={claimCtx.ctx.y}
+                    icon={Coins}
+                    title={claimCtx.ctx.record.reference}
+                    items={claimActions()}
+                    onClose={claimCtx.close}
+                />
+            ) : null}
+            {journalCtx.ctx ? (
+                <EntityContextMenu
+                    x={journalCtx.ctx.x}
+                    y={journalCtx.ctx.y}
+                    icon={BookOpen}
+                    title={journalCtx.ctx.record.journal_number}
+                    items={journalActions(journalCtx.ctx.record)}
+                    onClose={journalCtx.close}
+                />
+            ) : null}
 
             {/* Quick-action wizard modals (reused dialogs). */}
             <NewJournalDialog

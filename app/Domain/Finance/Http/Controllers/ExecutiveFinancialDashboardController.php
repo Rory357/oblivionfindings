@@ -31,9 +31,20 @@ class ExecutiveFinancialDashboardController extends Controller
         $insights = $this->insightsService->generate($scope->siteIds, $scope->clientIds);
         $siteSummaries = $this->siteDashboardService->getSiteSummaries($scope->siteIds, $from, $to);
 
+        // A real org-wide total: the header meter must not count the eight
+        // insights the page happens to render (one site can raise several
+        // over-budget insights, and the ninth onwards is sliced away).
+        $overBudgetSiteCount = collect($insights)
+            ->where('type', 'over_budget')
+            ->pluck('data.site_id')
+            ->filter()
+            ->unique()
+            ->count();
+
         return Inertia::render('finance/executive-dashboard/Index', [
             'kpis' => $kpis,
             'insights' => array_slice($insights, 0, 8),
+            'overBudgetSiteCount' => $overBudgetSiteCount,
             'siteSummaries' => $siteSummaries,
             'filters' => [
                 'from' => $from->toDateString(),

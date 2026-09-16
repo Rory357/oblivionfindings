@@ -17,9 +17,16 @@ use Inertia\Inertia;
  */
 class CashPositionController extends Controller
 {
+    /** Horizons the header's "next N days" filter may ask for. */
+    private const HORIZONS = [7, 14, 30, 60, 90];
+
     public function index(Request $request)
     {
         $orgId = $request->user()->organization_id;
+        $horizon = (int) $request->query('horizon', 30);
+        if (! in_array($horizon, self::HORIZONS, true)) {
+            $horizon = 30;
+        }
 
         $accounts = FinBankAccount::forOrganization($orgId)
             ->active()
@@ -48,7 +55,7 @@ class CashPositionController extends Controller
         $totalCash = bcadd($bankTotal, $pettyTotal, 2);
 
         $obligations = (new FinanceCalendarAggregator)
-            ->arrayForRange($orgId, now()->startOfDay(), now()->addDays(30)->endOfDay());
+            ->arrayForRange($orgId, now()->startOfDay(), now()->addDays($horizon)->endOfDay());
 
         $inflows = '0.00';
         $outflows = '0.00';
@@ -73,6 +80,10 @@ class CashPositionController extends Controller
                 'projected_30d' => (float) bcsub(bcadd($totalCash, $inflows, 2), $outflows, 2),
             ],
             'obligations' => array_slice($obligations, 0, 20),
+            // The list is capped at 20 rows; the caption needs the real total.
+            'obligationTotal' => count($obligations),
+            'horizon' => $horizon,
+            'horizonOptions' => self::HORIZONS,
             'asOf' => now()->toIso8601String(),
         ]);
     }
