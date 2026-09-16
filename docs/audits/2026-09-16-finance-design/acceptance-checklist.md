@@ -20,9 +20,9 @@ module-wide sweep over the 117 live files reports zero for `PageHero`,
 | Check | Result |
 |---|---|
 | `npx tsc --noEmit` | clean (exit 0) |
-| `npx vitest run resources/js --maxWorkers=2` | 2669 passed / 390 files |
+| `npx vitest run resources/js --maxWorkers=2` | 2685 passed / 389 files |
 | `npx eslint resources/js/pages/finance` | clean — the `PageHero` ban reports 0 (92 at baseline) |
-| `php artisan test tests/Feature/Finance` | 424 passed, 26 failed — **all 26 pre-existing, see below** |
+| `php artisan test tests/Feature/Finance` | **450 passed, 6 failed** (from 424/26 — twenty of the inherited failures fixed; see below) |
 
 ### The 26 Pest failures were not from this migration — but four were real bugs
 
@@ -59,8 +59,8 @@ produced 25 failures on one run and 26 on the next. It is cross-file
 pollution, not a regression. (See the project note on per-pid MySQL test
 databases and the MySQL 1615 "re-prepared" flake.)
 
-**Net regressions from the migration: zero.** Nineteen of the 26 now pass;
-the remaining seven are listed at the end of this file.
+**Net regressions from the migration: zero.** Twenty of the 26 now pass; the
+remainder are listed at the end of this file.
 
 ## Work packages
 
@@ -277,8 +277,9 @@ for a line storing a bare 0.
 
 ### Still failing, and why
 
-Five pre-existing failures remain, plus one flake. None is a regression from
-this work, and each is a separate piece of work with its own domain question:
+Five pre-existing failures remain, plus one flake (six in any given run). None
+is a regression from this work, and each is a separate piece of work with its
+own domain question:
 
 | Test | Why it still fails |
 |---|---|
@@ -286,7 +287,7 @@ this work, and each is a separate piece of work with its own domain question:
 | `FinInvoiceJournalPostingTest` — send queues the email job | Expects `SendInvoiceEmailJob` pushed twice, gets once. Needs a decision about whether sending a draft should re-queue |
 | `FundingClaimJournalDispatchTest` | Timesheet approval is blocked by a newer reconciliation gate ("the completed shift has no attendance evidence") — a fixture that predates that rule |
 | `PaymentAllocationIntegrityTest` — settlement constraint migration | `down()` cannot drop an index this worktree's schema never created; a migration-state problem, not application code |
-| `JournalPostingReversalInvariantTest` — two-worker serialisation | A MySQL deadlock under full-suite contention. Passes on consecutive isolated runs; genuinely flaky |
+| One flake per run, varying | Two tests fail only under full-suite contention and pass in isolation: `JournalPostingReversalInvariantTest`'s two-worker serialisation (a MySQL deadlock) and `FinancialInsightsObjectScopeTest`'s global-access case (cross-file pollution). Which one appears differs run to run — see the project note on per-pid MySQL test databases |
 
 ## Browser walkthrough — done 2026-09-16
 
