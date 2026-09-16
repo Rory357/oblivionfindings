@@ -1,28 +1,40 @@
 import {
     AuditExportDialog,
     ConfirmDialog,
-    TaxTabsFooter,
-    useRowContextMenu,
-    type RowCtxItem,
+    FinanceSectionRail,
 } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyList } from '@/components/ui/empty-state';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { FinancePeriodFilter } from '@/components/finance/finance-period-filter';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    EmptyValue,
+    EntityChip,
+    EntityContextMenu,
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { Download, FileText, History, Plus, Trash2 } from 'lucide-react';
+import { Download, History, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 
 interface AuditExport {
@@ -49,38 +61,50 @@ interface PaginatedExports {
     links: Array<{ url: string | null; label: string; active: boolean }>;
     current_page: number;
     last_page: number;
+    total: number;
+}
+
+/** Org-wide totals — never the page in front of you. */
+interface Summary {
+    exports: number;
+    completed: number;
+    generating: number;
+    failed: number;
+    total_bytes: number;
+}
+
+interface Filters {
+    status?: string;
+    from?: string;
+    to?: string;
 }
 
 interface PageProps {
     exports: PaginatedExports;
+    summary: Summary;
+    filters: Filters;
     canManage: boolean;
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance' },
-    { title: 'Audit Exports', href: '/finance/audit-exports' },
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'All statuses' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'generating', label: 'Generating' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'failed', label: 'Failed' },
 ];
 
-const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('en-NZ', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Tax & compliance', href: '/finance/tax' },
+    { title: 'Audit exports', href: '/finance/audit-exports' },
+];
 
-const formatDateTime = (date: string | null) =>
-    date
-        ? new Date(date).toLocaleString('en-NZ', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-          })
-        : '-';
+const shortDate = (value: string) => formatDateOnly(value.slice(0, 10), value);
 
 const formatFileSize = (bytes: number | null) => {
-    if (!bytes) return '-';
+    if (!bytes) return null;
     const units = ['B', 'KB', 'MB', 'GB'];
     let i = 0;
     let size = bytes;
@@ -91,24 +115,48 @@ const formatFileSize = (bytes: number | null) => {
     return `${size.toFixed(1)} ${units[i]}`;
 };
 
-const getSections = (exp: AuditExport): string[] => {
-    const sections: string[] = [];
-    if (exp.include_journals) sections.push('Journals');
-    if (exp.include_bank_reconciliations) sections.push('Bank Recon');
-    if (exp.include_ap) sections.push('AP');
-    if (exp.include_ar) sections.push('AR');
-    if (exp.include_gst) sections.push('GST');
-    if (exp.include_fixed_assets) sections.push('Assets');
-    return sections;
-};
+const SECTION_LABELS: [keyof AuditExport, string][] = [
+    ['include_journals', 'Journals'],
+    ['include_bank_reconciliations', 'Bank reconciliations'],
+    ['include_ap', 'Payables'],
+    ['include_ar', 'Receivables'],
+    ['include_gst', 'GST'],
+    ['include_fixed_assets', 'Fixed assets'],
+];
+
+const sectionsFor = (exp: AuditExport): string[] =>
+    SECTION_LABELS.filter(([key]) => Boolean(exp[key])).map(
+        ([, label]) => label,
+    );
 
 export default function AuditExportsIndex({
     exports: exportData,
+    summary,
+    filters,
     canManage = false,
 }: PageProps) {
     const [createOpen, setCreateOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<AuditExport | null>(null);
     const [deleting, setDeleting] = useState(false);
+
+    const status = filters.status ?? 'all';
+    const from = filters.from ?? '';
+    const to = filters.to ?? '';
+
+    const apply = (next: Filters) => {
+        const merged: Filters = { status, from, to, ...next };
+        const params: Record<string, string> = {};
+        Object.entries(merged).forEach(([key, value]) => {
+            if (value && value !== 'all') params[key] = value;
+        });
+        router.get('/finance/audit-exports', params, { preserveState: true });
+    };
+
+    const clearFilters = () => {
+        router.get('/finance/audit-exports', {}, { preserveState: true });
+    };
+
+    const hasFilters = status !== 'all' || Boolean(from) || Boolean(to);
 
     const confirmDelete = () => {
         if (!deleteTarget) return;
@@ -119,17 +167,16 @@ export default function AuditExportsIndex({
         });
     };
 
-    // Right-click row menu — mirrors the row's existing inline actions (no row navigation, so no Open).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (exp: AuditExport): RowCtxItem[] => {
-        const items: RowCtxItem[] = [];
+    const ctx = useEntityContextMenu<AuditExport>();
+
+    /** The ONE menu feeding both the kebab and the right-click menu. */
+    const actionsFor = (exp: AuditExport): MenuItem[] => {
+        const items: MenuItem[] = [];
         if (exp.status === 'completed') {
             items.push({
-                kind: 'item',
                 label: 'Download',
                 icon: Download,
-                tone: 'success',
-                onSelect: () =>
+                onClick: () =>
                     window.location.assign(
                         `/finance/audit-exports/${exp.id}/download`,
                     ),
@@ -137,242 +184,262 @@ export default function AuditExportsIndex({
         }
         if (canManage) {
             items.push({
-                kind: 'item',
-                label: 'Delete',
+                label: 'Delete export',
                 icon: Trash2,
-                tone: 'critical',
-                onSelect: () => setDeleteTarget(exp),
+                danger: true,
+                onClick: () => setDeleteTarget(exp),
             });
         }
         return items;
     };
 
-    const completedCount = exportData.data.filter(
-        (e) => e.status === 'completed',
-    ).length;
-    const generatingCount = exportData.data.filter(
-        (e) => e.status === 'generating',
-    ).length;
-    const failedCount = exportData.data.filter(
-        (e) => e.status === 'failed',
-    ).length;
+    const columns: EntityTableColumn<AuditExport>[] = [
+        {
+            key: 'period',
+            label: 'Period',
+            width: '210px',
+            cell: (exp) => (
+                <span className="whitespace-nowrap text-muted-foreground">
+                    {shortDate(exp.period_from)} – {shortDate(exp.period_to)}
+                </span>
+            ),
+        },
+        {
+            key: 'sections',
+            label: 'Sections',
+            width: '1.4fr',
+            cell: (exp) => {
+                const sections = sectionsFor(exp);
+                if (sections.length === 0) return <EmptyValue />;
+                return (
+                    <span className="flex flex-wrap gap-1">
+                        {sections.map((section) => (
+                            <EntityChip key={section}>{section}</EntityChip>
+                        ))}
+                    </span>
+                );
+            },
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '130px',
+            cell: (exp) => <StatusBadge status={exp.status} />,
+        },
+        {
+            key: 'size',
+            label: 'Size',
+            width: '110px',
+            align: 'right',
+            cell: (exp) => {
+                const size = formatFileSize(exp.file_size_bytes);
+                return size ? (
+                    <span className="tabular-nums">{size}</span>
+                ) : (
+                    <EmptyValue />
+                );
+            },
+        },
+        {
+            key: 'created',
+            label: 'Created',
+            width: '200px',
+            cell: (exp) => (
+                <span className="whitespace-nowrap text-muted-foreground">
+                    {formatDateTime(exp.created_at)}
+                </span>
+            ),
+        },
+    ];
+
+    const totalSize = formatFileSize(summary.total_bytes);
+
+    const header = (
+        <PageHeader
+            icon={History}
+            title="Audit exports"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={summary.failed > 0 ? 'critical' : 'success'}
+                >
+                    {summary.completed} ready
+                </PageHeaderStatusChip>
+            }
+            subline={`Tax & compliance · ${summary.exports} export${
+                summary.exports === 1 ? '' : 's'
+            } for external auditors${totalSize ? ` · ${totalSize} stored` : ''}`}
+            actions={
+                canManage ? (
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() => setCreateOpen(true)}
+                    >
+                        New export
+                    </PageHeaderPrimaryButton>
+                ) : undefined
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Exports"
+                        href="/finance/audit-exports"
+                        ariaLabel="View every audit export"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.exports}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {hasFilters
+                                ? `matching this filter`
+                                : `generated all time`}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Ready to download"
+                        tone="success"
+                        href="/finance/audit-exports"
+                        ariaLabel="View completed audit exports"
+                    >
+                        <PageHeaderMeterDonut
+                            percent={
+                                summary.exports === 0
+                                    ? 0
+                                    : (summary.completed / summary.exports) *
+                                      100
+                            }
+                            caption={`${summary.completed} of ${summary.exports} complete`}
+                        />
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Generating"
+                        tone={summary.generating > 0 ? 'warning' : 'brand'}
+                        href="/finance/audit-exports"
+                        ariaLabel="View audit exports still generating"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.generating}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            still being packaged
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Failed"
+                        tone={summary.failed > 0 ? 'critical' : 'brand'}
+                        href="/finance/audit-exports"
+                        ariaLabel="View failed audit exports"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.failed}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            need generating again
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={status}
+                        allValue="all"
+                        options={STATUS_OPTIONS}
+                        onChange={(value) => apply({ status: value })}
+                    />
+                    <FinancePeriodFilter
+                        url="/finance/audit-exports"
+                        from={from}
+                        to={to}
+                        idPrefix="audit-exports-period"
+                        onApply={(range) =>
+                            apply({ from: range.from, to: range.to })
+                        }
+                    />
+                    {hasFilters ? (
+                        <PageHeaderFilterButton icon={X} onClick={clearFilters}>
+                            Clear filters
+                        </PageHeaderFilterButton>
+                    ) : null}
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Audit Exports" />
+            <Head title="Audit exports" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={History}
-                        title="Audit Exports"
-                        description="Generate audit trail reports for external auditors"
-                        stats={[
-                            { label: 'Total', value: exportData.data.length },
-                            { label: 'Completed', value: completedCount },
-                            { label: 'Generating', value: generatingCount },
-                            { label: 'Failed', value: failedCount },
-                        ]}
-                        actions={
-                            canManage && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => setCreateOpen(true)}
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Export
-                                </Button>
-                            )
-                        }
-                        footer={<TaxTabsFooter active="audit-exports" />}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Exports"
+                        caption={`${exportData.data.length} of ${summary.exports} shown`}
                     />
-                }
-            >
-                {/* Table */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>All Exports</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Export Name</TableHead>
-                                    <TableHead>Period</TableHead>
-                                    <TableHead>Sections</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Size</TableHead>
-                                    <TableHead>Created</TableHead>
-                                    <TableHead className="text-right">
-                                        Actions
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {exportData.data.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="p-0">
-                                            <EmptyList
-                                                icon={History}
-                                                itemName="audit export"
-                                                title="No audit exports yet"
-                                                description="Generate an audit trail report for your auditors to get started."
-                                                className="border-0"
-                                                action={
-                                                    canManage ? (
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                setCreateOpen(
-                                                                    true,
-                                                                )
-                                                            }
-                                                        >
-                                                            New audit export
-                                                        </Button>
-                                                    ) : undefined
-                                                }
-                                            />
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    exportData.data.map((exp) => {
-                                        return (
-                                            <TableRow
-                                                key={exp.id}
-                                                onContextMenu={rowMenu.open(
-                                                    rowMenuItems(exp),
-                                                )}
-                                            >
-                                                <TableCell className="font-medium">
-                                                    {exp.export_name}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-sm">
-                                                        {formatDate(
-                                                            exp.period_from,
-                                                        )}{' '}
-                                                        -{' '}
-                                                        {formatDate(
-                                                            exp.period_to,
-                                                        )}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {getSections(exp).map(
-                                                            (s) => (
-                                                                <Badge
-                                                                    key={s}
-                                                                    variant="outline"
-                                                                    className="text-xs"
-                                                                >
-                                                                    {s}
-                                                                </Badge>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <StatusBadge
-                                                        status={exp.status}
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="text-sm">
-                                                    {formatFileSize(
-                                                        exp.file_size_bytes,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="text-sm">
-                                                        {formatDateTime(
-                                                            exp.created_at,
-                                                        )}
-                                                    </div>
-                                                    {exp.created_by && (
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {
-                                                                exp.created_by
-                                                                    .name
-                                                            }
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        {exp.status ===
-                                                            'completed' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                asChild
-                                                            >
-                                                                <a
-                                                                    href={`/finance/audit-exports/${exp.id}/download`}
-                                                                >
-                                                                    <Download className="mr-1 h-4 w-4" />
-                                                                    Download
-                                                                </a>
-                                                            </Button>
-                                                        )}
-                                                        {canManage && (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                aria-label={`Delete ${exp.export_name}`}
-                                                                onClick={() =>
-                                                                    setDeleteTarget(
-                                                                        exp,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })
-                                )}
-                            </TableBody>
-                        </Table>
 
-                        {/* Pagination */}
-                        {exportData.last_page > 1 && (
-                            <div className="mt-4 flex items-center justify-center gap-1">
-                                {exportData.links.map((link, i) => (
-                                    <Button
-                                        key={i}
-                                        variant={
-                                            link.active ? 'default' : 'outline'
-                                        }
-                                        size="sm"
-                                        disabled={!link.url}
-                                        onClick={() =>
-                                            link.url &&
-                                            router.get(
-                                                link.url,
-                                                {},
-                                                { preserveState: true },
-                                            )
-                                        }
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {rowMenu.element}
+                    {exportData.data.length === 0 ? (
+                        hasFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                title="No audit exports match your filters"
+                            />
+                        ) : (
+                            <EmptyList
+                                icon={History}
+                                itemName="audit export"
+                                title="No audit exports yet"
+                                description="Generate an audit trail report for your auditors to get started."
+                                action={
+                                    canManage ? (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setCreateOpen(true)}
+                                        >
+                                            New audit export
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
+                        )
+                    ) : (
+                        <>
+                            <EntityTable
+                                rows={exportData.data}
+                                rowKey={(exp) => exp.id}
+                                identityLabel="Export"
+                                minWidth={1180}
+                                identity={(exp) => ({
+                                    icon: History,
+                                    name: exp.export_name,
+                                    subline: exp.created_by?.name,
+                                })}
+                                columns={columns}
+                                actionsFor={actionsFor}
+                                onRowContextMenu={(e, exp) => ctx.open(e, exp)}
+                            />
+                            <LaravelPagination
+                                links={exportData.links}
+                                lastPage={exportData.last_page}
+                            />
+                        </>
+                    )}
+                </div>
             </PageLayout>
+
+            {ctx.ctx ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={History}
+                    title={ctx.ctx.record.export_name}
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
 
             {canManage && (
                 <AuditExportDialog

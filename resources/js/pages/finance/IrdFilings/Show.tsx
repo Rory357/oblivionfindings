@@ -1,12 +1,33 @@
-import { ConfirmDialog, formatMoney } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    ConfirmDialog,
+    FinanceSectionRail,
+    formatMoney,
+} from '@/components/finance';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { AlertCircle, CheckCircle, FileText, Send, Shield } from 'lucide-react';
+import {
+    AlertCircle,
+    CheckCircle,
+    FileText,
+    Landmark,
+    Send,
+    Shield,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type GstReturn = {
@@ -39,25 +60,11 @@ type PageProps = {
     filing: Filing;
 };
 
-const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
+const shortDate = (value: string) => formatDateOnly(value.slice(0, 10), value);
 
-const formatDateTime = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-const filingTypeLabels: Record<string, string> = {
-    gst: 'GST Return',
-    payday: 'Payday Filing',
+const FILING_TYPE_LABELS: Record<string, string> = {
+    gst: 'GST return',
+    payday: 'Payday filing',
     rlwt: 'RLWT',
     rwt: 'RWT',
     aim: 'AIM',
@@ -66,32 +73,60 @@ const filingTypeLabels: Record<string, string> = {
     ir7: 'IR7',
 };
 
-const filingDataLabels: Record<string, string> = {
-    return_type: 'Return Type',
-    period_from: 'Period From',
-    period_to: 'Period To',
-    ird_period: 'IRD Period',
-    filing_frequency: 'Filing Frequency',
-    accounting_basis: 'Accounting Basis',
-    total_sales: 'Total Sales & Income (Box 5)',
-    zero_rated_supplies: 'Zero-Rated Supplies (Box 6)',
-    taxable_sales: 'Taxable Sales (Box 7)',
-    gst_collected: 'GST on Sales (Box 8)',
-    output_adjustments: 'Output Adjustments (Box 9)',
-    total_gst_collected: 'Total GST Collected (Box 10)',
-    total_purchases: 'Total Purchases & Expenses (Box 11)',
-    gst_paid: 'GST on Purchases (Box 12)',
-    input_adjustments: 'Input Adjustments (Box 13)',
-    total_gst_credit: 'Total GST Credit (Box 14)',
-    gst_payable: 'GST Payable/Refundable (Box 15)',
+const FILING_DATA_LABELS: Record<string, string> = {
+    return_type: 'Return type',
+    period_from: 'Period from',
+    period_to: 'Period to',
+    ird_period: 'IRD period',
+    filing_frequency: 'Filing frequency',
+    accounting_basis: 'Accounting basis',
+    total_sales: 'Total sales and income (box 5)',
+    zero_rated_supplies: 'Zero-rated supplies (box 6)',
+    taxable_sales: 'Taxable sales (box 7)',
+    gst_collected: 'GST on sales (box 8)',
+    output_adjustments: 'Output adjustments (box 9)',
+    total_gst_collected: 'Total GST collected (box 10)',
+    total_purchases: 'Total purchases and expenses (box 11)',
+    gst_paid: 'GST on purchases (box 12)',
+    input_adjustments: 'Input adjustments (box 13)',
+    total_gst_credit: 'Total GST credit (box 14)',
+    gst_payable: 'GST payable or refundable (box 15)',
+};
+
+const MONETARY_KEYS = [
+    'total_sales',
+    'zero_rated_supplies',
+    'taxable_sales',
+    'gst_collected',
+    'output_adjustments',
+    'total_gst_collected',
+    'total_purchases',
+    'gst_paid',
+    'input_adjustments',
+    'total_gst_credit',
+    'gst_payable',
+];
+
+const STATUS_CHIP: Record<string, StatusVariant> = {
+    draft: 'neutral',
+    validated: 'info',
+    submitted: 'warning',
+    accepted: 'success',
+    rejected: 'critical',
+    error: 'critical',
 };
 
 export default function IrdFilingShow({ filing }: PageProps) {
+    const typeLabel =
+        FILING_TYPE_LABELS[filing.filing_type] ?? filing.filing_type;
+
     const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
         { title: 'Finance', href: '/finance' },
-        { title: 'IRD E-Filing', href: '/finance/ird-filings' },
+        { title: 'Tax & compliance', href: '/finance/tax' },
+        { title: 'IRD filings', href: '/finance/ird-filings' },
         {
-            title: `${filingTypeLabels[filing.filing_type]} - ${formatDate(filing.period_to)}`,
+            title: `${typeLabel} — ${shortDate(filing.period_to)}`,
             href: `/finance/ird-filings/${filing.id}`,
         },
     ];
@@ -101,15 +136,22 @@ export default function IrdFilingShow({ filing }: PageProps) {
         filing.status === 'validated' || filing.status === 'error';
     const amount = Number(filing.total_amount);
     const isRefund = amount < 0;
+    // `simulated` arrives as a JSON boolean inside ird_response, so compare loosely.
+    const rawSimulated: unknown = filing.ird_response?.simulated;
+    const isSimulated =
+        rawSimulated === true ||
+        rawSimulated === 'true' ||
+        rawSimulated === 1 ||
+        rawSimulated === '1';
 
     const [confirmSubmit, setConfirmSubmit] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    function handleValidate() {
+    const handleValidate = () => {
         router.post(`/finance/ird-filings/${filing.id}/validate`);
-    }
+    };
 
-    function handleSubmit() {
+    const handleSubmit = () => {
         router.post(
             `/finance/ird-filings/${filing.id}/submit`,
             {},
@@ -119,335 +161,349 @@ export default function IrdFilingShow({ filing }: PageProps) {
                 onSuccess: () => setConfirmSubmit(false),
             },
         );
-    }
+    };
+
+    const gstReturnHref = filing.gst_return
+        ? `/finance/gst-returns/${filing.gst_return.id}`
+        : '/finance/gst-returns';
+
+    const moneyFromData = (key: string) => {
+        const raw = filing.filing_data?.[key];
+        return raw == null || raw === '' ? null : Number(raw);
+    };
+
+    const totalSales = moneyFromData('total_sales');
+    const gstCollected = moneyFromData('total_gst_collected');
+    const gstCredit = moneyFromData('total_gst_credit');
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/finance/ird-filings"
+            icon={Landmark}
+            title={typeLabel}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={STATUS_CHIP[filing.status] ?? 'neutral'}
+                >
+                    {filing.status.charAt(0).toUpperCase() +
+                        filing.status.slice(1)}
+                </PageHeaderStatusChip>
+            }
+            subline={[
+                `${shortDate(filing.period_from)} – ${shortDate(filing.period_to)}`,
+                filing.ird_reference
+                    ? `Reference ${filing.ird_reference}`
+                    : 'Not yet submitted',
+                filing.created_by
+                    ? `Created by ${filing.created_by.name}`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                <>
+                    {canValidate ? (
+                        <PageHeaderGlassButton
+                            icon={CheckCircle}
+                            onClick={handleValidate}
+                        >
+                            Validate
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {canSubmit ? (
+                        <PageHeaderPrimaryButton
+                            icon={Send}
+                            onClick={() => setConfirmSubmit(true)}
+                        >
+                            Submit to IRD
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label={isRefund ? 'Refund due' : 'Amount owing'}
+                        tone={isRefund ? 'success' : 'warning'}
+                        href={gstReturnHref}
+                        ariaLabel="View the source GST return"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(Math.abs(amount))}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {isRefund ? 'due back from IRD' : 'payable to IRD'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    {totalSales !== null ? (
+                        <PageHeaderMeterBlock
+                            label="Total sales"
+                            href={gstReturnHref}
+                            ariaLabel="View the source GST return"
+                        >
+                            <PageHeaderMeterBig>
+                                {formatMoney(totalSales)}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                declared for the period
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ) : null}
+
+                    {gstCollected !== null ? (
+                        <PageHeaderMeterBlock
+                            label="GST collected"
+                            tone="success"
+                            href={gstReturnHref}
+                            ariaLabel="View the source GST return"
+                        >
+                            <PageHeaderMeterBig>
+                                {formatMoney(gstCollected)}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                output tax on sales
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ) : null}
+
+                    {gstCredit !== null ? (
+                        <PageHeaderMeterBlock
+                            label="GST credit"
+                            href={gstReturnHref}
+                            ariaLabel="View the source GST return"
+                        >
+                            <PageHeaderMeterBig>
+                                {formatMoney(gstCredit)}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                input tax on purchases
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ) : null}
+
+                    <PageHeaderMeterBlock
+                        label="Submission"
+                        href="/finance/ird-filings"
+                        ariaLabel="View every IRD filing"
+                    >
+                        <PageHeaderMeterBig>
+                            {filing.submitted_at ? 'Sent' : 'Not sent'}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {filing.submitted_at
+                                ? formatDateTime(filing.submitted_at)
+                                : 'waiting to be submitted'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head
-                title={`IRD Filing - ${filingTypeLabels[filing.filing_type]}`}
-            />
+            <Head title={`IRD filing — ${typeLabel}`} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/ird-filings"
-                        title={
-                            <span className="flex flex-wrap items-center gap-3">
-                                {filingTypeLabels[filing.filing_type] ??
-                                    filing.filing_type}
-                                <StatusBadge status={filing.status} />
-                            </span>
-                        }
-                        description={
-                            <>
-                                {formatDate(filing.period_from)} &ndash;{' '}
-                                {formatDate(filing.period_to)}
-                                {filing.created_by && (
-                                    <span className="mt-1 block text-sm">
-                                        Created by {filing.created_by.name}
-                                    </span>
-                                )}
-                            </>
-                        }
-                        actions={
-                            <>
-                                {canValidate && (
-                                    <Button
-                                        variant="outline"
-                                        onClick={handleValidate}
-                                    >
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        Validate
-                                    </Button>
-                                )}
-                                {canSubmit && (
-                                    <Button
-                                        onClick={() => setConfirmSubmit(true)}
-                                    >
-                                        <Send className="mr-2 h-4 w-4" />
-                                        Submit to IRD
-                                    </Button>
-                                )}
-                            </>
-                        }
-                    />
-                }
-            >
-                {/* Error Message */}
-                {filing.error_message && (
-                    <Card className="border-destructive/50 bg-destructive/5">
-                        <CardContent className="flex items-start gap-3 py-4">
-                            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                            <div>
-                                <p className="font-medium text-destructive">
-                                    Submission Error
-                                </p>
-                                <p className="text-sm text-destructive/80">
-                                    {filing.error_message}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Submission Info */}
-                {filing.submitted_at && (
-                    <Card className="border-status-success/30 bg-status-success">
-                        <CardContent className="flex items-start gap-3 py-4">
-                            <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-success" />
-                            <div>
-                                <p className="font-medium text-status-success dark:text-status-success">
-                                    Submitted to IRD
-                                </p>
-                                <p className="text-sm text-status-success dark:text-status-success">
-                                    Submitted on{' '}
-                                    {formatDateTime(filing.submitted_at)}
-                                    {filing.ird_reference && (
-                                        <>
-                                            {' '}
-                                            | Reference:{' '}
-                                            <span className="font-mono">
-                                                {filing.ird_reference}
-                                            </span>
-                                        </>
-                                    )}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Summary */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Shield className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>Filing Summary</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Filing Type
-                                </p>
-                                <p className="font-medium">
-                                    {filingTypeLabels[filing.filing_type] ??
-                                        filing.filing_type}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Period
-                                </p>
-                                <p className="font-medium">
-                                    {formatDate(filing.period_from)} &ndash;{' '}
-                                    {formatDate(filing.period_to)}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Amount
-                                </p>
-                                <p
-                                    className={`font-mono font-semibold tabular-nums ${isRefund ? 'text-status-success' : 'text-status-critical'}`}
-                                >
-                                    {formatMoney(Math.abs(amount))}
-                                    {isRefund ? ' (Refund)' : ''}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    IRD Reference
-                                </p>
-                                <p className="font-mono">
-                                    {filing.ird_reference ??
-                                        'Not yet submitted'}
-                                </p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Filing Data */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>Filing Data</CardTitle>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                            Data that will be submitted to IRD Gateway Services
-                        </p>
-                    </CardHeader>
-                    <CardContent>
-                        {filing.filing_data ? (
-                            <div className="space-y-6">
-                                {/* Monetary Fields */}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {filing.error_message ? (
+                        <Card className="border-status-critical/40">
+                            <CardContent className="flex items-start gap-3 py-4">
+                                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
                                 <div>
-                                    <h3 className="mb-3 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-                                        Return Data
-                                    </h3>
-                                    <div className="space-y-2">
-                                        {Object.entries(filing.filing_data)
-                                            .filter(
-                                                ([key]) =>
-                                                    key in filingDataLabels,
-                                            )
-                                            .map(([key, value]) => {
-                                                const isMonetary = [
-                                                    'total_sales',
-                                                    'zero_rated_supplies',
-                                                    'taxable_sales',
-                                                    'gst_collected',
-                                                    'output_adjustments',
-                                                    'total_gst_collected',
-                                                    'total_purchases',
-                                                    'gst_paid',
-                                                    'input_adjustments',
-                                                    'total_gst_credit',
-                                                    'gst_payable',
-                                                ].includes(key);
+                                    <p className="font-medium text-status-critical">
+                                        Submission problem
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {filing.error_message}
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : null}
 
-                                                const isHighlight =
-                                                    key === 'gst_payable';
+                    {filing.submitted_at ? (
+                        <Card className="border-status-success/40">
+                            <CardContent className="flex items-start gap-3 py-4">
+                                <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-success" />
+                                <div className="flex flex-col gap-1">
+                                    <p className="flex items-center gap-2 font-medium">
+                                        Sent to IRD
+                                        {isSimulated ? (
+                                            <StatusBadge
+                                                variant="warning"
+                                                size="sm"
+                                            >
+                                                Test filing
+                                            </StatusBadge>
+                                        ) : null}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Sent{' '}
+                                        {formatDateTime(filing.submitted_at)}
+                                        {filing.ird_reference
+                                            ? ` · reference ${filing.ird_reference}`
+                                            : ''}
+                                        {isSimulated
+                                            ? ' · this was a test filing, not a real one — file it through myIR as well'
+                                            : ''}
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : null}
 
-                                                return (
-                                                    <div
-                                                        key={key}
-                                                        className={`flex items-center justify-between rounded-lg border p-3 ${
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-muted-foreground" />
+                                <CardTitle className="text-section-title">
+                                    Filing data
+                                </CardTitle>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                The figures this filing sends to Inland Revenue.
+                            </p>
+                        </CardHeader>
+                        <CardContent>
+                            {filing.filing_data ? (
+                                <div className="flex flex-col gap-2">
+                                    {Object.entries(filing.filing_data)
+                                        .filter(
+                                            ([key]) =>
+                                                key in FILING_DATA_LABELS,
+                                        )
+                                        .map(([key, value]) => {
+                                            const isMonetary =
+                                                MONETARY_KEYS.includes(key);
+                                            const isHighlight =
+                                                key === 'gst_payable';
+
+                                            return (
+                                                <div
+                                                    key={key}
+                                                    className={`flex items-center justify-between rounded-lg border p-3 ${
+                                                        isHighlight
+                                                            ? 'border-primary bg-primary/5'
+                                                            : ''
+                                                    }`}
+                                                >
+                                                    <span className="text-sm text-foreground">
+                                                        {FILING_DATA_LABELS[
+                                                            key
+                                                        ] ?? key}
+                                                    </span>
+                                                    <span
+                                                        className={`text-sm tabular-nums ${
                                                             isHighlight
-                                                                ? 'border-primary bg-primary/5'
+                                                                ? 'font-semibold'
                                                                 : ''
                                                         }`}
                                                     >
-                                                        <span className="text-sm text-foreground">
-                                                            {filingDataLabels[
-                                                                key
-                                                            ] ?? key}
-                                                        </span>
-                                                        <span
-                                                            className={`font-mono text-sm tabular-nums ${
-                                                                isHighlight
-                                                                    ? 'font-semibold'
-                                                                    : ''
-                                                            } ${
-                                                                isMonetary &&
-                                                                isHighlight
-                                                                    ? Number(
-                                                                          value,
-                                                                      ) >= 0
-                                                                        ? 'text-status-critical'
-                                                                        : 'text-status-success'
-                                                                    : ''
-                                                            }`}
-                                                        >
-                                                            {isMonetary
-                                                                ? formatMoney(
-                                                                      Number(
-                                                                          value,
-                                                                      ),
-                                                                  )
-                                                                : String(value)}
-                                                        </span>
-                                                    </div>
-                                                );
-                                            })}
-                                    </div>
+                                                        {isMonetary
+                                                            ? formatMoney(
+                                                                  Number(value),
+                                                              )
+                                                            : String(value)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
                                 </div>
-                            </div>
-                        ) : (
-                            <p className="py-4 text-center text-muted-foreground">
-                                No filing data available.
-                            </p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* IRD Response */}
-                {filing.ird_response && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>IRD Response</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-2">
-                                {Object.entries(filing.ird_response).map(
-                                    ([key, value]) => (
-                                        <div
-                                            key={key}
-                                            className="flex items-center justify-between rounded-lg border p-3"
-                                        >
-                                            <span className="text-sm text-foreground capitalize">
-                                                {key.replace(/_/g, ' ')}
-                                            </span>
-                                            <span className="font-mono text-sm">
-                                                {String(value)}
-                                            </span>
-                                        </div>
-                                    ),
-                                )}
-                            </div>
+                            ) : (
+                                <p className="py-4 text-center text-muted-foreground">
+                                    No filing data available.
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
-                )}
 
-                {/* Linked GST Return */}
-                {filing.gst_return && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Linked GST Return</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="font-medium">
-                                        Period:{' '}
-                                        {formatDate(
-                                            filing.gst_return.period_start,
-                                        )}{' '}
-                                        &ndash;{' '}
-                                        {formatDate(
-                                            filing.gst_return.period_end,
-                                        )}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        IRD Period:{' '}
-                                        {filing.gst_return.ird_period} | GST
-                                        Payable:{' '}
-                                        {formatMoney(
-                                            Number(
+                    {filing.ird_response ? (
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center gap-2">
+                                    <Shield className="h-5 w-5 text-muted-foreground" />
+                                    <CardTitle className="text-section-title">
+                                        IRD response
+                                    </CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex flex-col gap-2">
+                                    {Object.entries(filing.ird_response).map(
+                                        ([key, value]) => (
+                                            <div
+                                                key={key}
+                                                className="flex items-center justify-between rounded-lg border p-3"
+                                            >
+                                                <span className="text-sm text-foreground first-letter:uppercase">
+                                                    {key.replace(/_/g, ' ')}
+                                                </span>
+                                                <span className="text-sm">
+                                                    {String(value)}
+                                                </span>
+                                            </div>
+                                        ),
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : null}
+
+                    {filing.gst_return ? (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-section-title">
+                                    Linked GST return
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <p className="font-medium">
+                                            {shortDate(
+                                                filing.gst_return.period_start,
+                                            )}{' '}
+                                            –{' '}
+                                            {shortDate(
+                                                filing.gst_return.period_end,
+                                            )}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                            IRD period{' '}
+                                            {filing.gst_return.ird_period} · GST
+                                            payable{' '}
+                                            {formatMoney(
                                                 filing.gst_return.gst_payable,
-                                            ),
-                                        )}
-                                    </p>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            router.visit(gstReturnHref)
+                                        }
+                                    >
+                                        Open return
+                                    </Button>
                                 </div>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        router.visit(
-                                            `/finance/gst-returns/${filing.gst_return!.id}`,
-                                        )
-                                    }
-                                >
-                                    View Return
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                            </CardContent>
+                        </Card>
+                    ) : null}
+                </div>
             </PageLayout>
 
             <ConfirmDialog
                 variant="default"
                 open={confirmSubmit}
                 onClose={() => setConfirmSubmit(false)}
-                title="Submit filing to IRD?"
-                description="This transmits the filing data to Inland Revenue. Only simulated submissions are made unless a live IRD gateway is configured."
-                confirmText="Submit to IRD"
+                title="Send this filing to IRD?"
+                description="This sends the filing figures to Inland Revenue. Until a live IRD connection is set up it records a test filing instead, so you still need to file through myIR."
+                confirmText="Send to IRD"
                 processing={submitting}
                 onConfirm={handleSubmit}
             />

@@ -38,6 +38,18 @@ class GstReturnController extends Controller
             $query->whereYear('period_end', $year);
         }
 
+        // Org-wide totals for the CURRENT filter — the header meters must never
+        // read the page in front of you (DESIGN.md "page-local counts as totals").
+        $totals = (clone $query)
+            ->selectRaw('COUNT(*) as returns_count')
+            ->selectRaw('COALESCE(SUM(total_gst_collected), 0) as gst_collected')
+            ->selectRaw('COALESCE(SUM(total_gst_paid), 0) as gst_paid')
+            ->selectRaw('COALESCE(SUM(gst_payable), 0) as gst_payable')
+            ->selectRaw("SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_count")
+            ->selectRaw("SUM(CASE WHEN status = 'filed' THEN 1 ELSE 0 END) as filed_count")
+            ->reorder()
+            ->first();
+
         $gstReturns = $query->orderByDesc('period_end')
             ->orderByDesc('id')
             ->paginate(25)
@@ -46,6 +58,14 @@ class GstReturnController extends Controller
         return Inertia::render('finance/gst-returns/Index', [
             'gstReturns' => $gstReturns,
             'filters' => $request->only(['status', 'year']),
+            'summary' => [
+                'returns' => (int) ($totals->returns_count ?? 0),
+                'gst_collected' => (float) ($totals->gst_collected ?? 0),
+                'gst_paid' => (float) ($totals->gst_paid ?? 0),
+                'gst_payable' => (float) ($totals->gst_payable ?? 0),
+                'draft' => (int) ($totals->draft_count ?? 0),
+                'filed' => (int) ($totals->filed_count ?? 0),
+            ],
         ]);
     }
 

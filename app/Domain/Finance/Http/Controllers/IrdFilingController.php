@@ -38,6 +38,17 @@ class IrdFilingController extends Controller
             $query->ofStatus($request->input('status'));
         }
 
+        // Org-wide totals for the CURRENT filter — the header meters must never
+        // read the page in front of you (DESIGN.md "page-local counts as totals").
+        $totals = (clone $query)
+            ->selectRaw('COUNT(*) as filings_count')
+            ->selectRaw("SUM(CASE WHEN status IN ('accepted', 'submitted') THEN 1 ELSE 0 END) as filed_count")
+            ->selectRaw("SUM(CASE WHEN status IN ('draft', 'validated') THEN 1 ELSE 0 END) as pending_count")
+            ->selectRaw("SUM(CASE WHEN status IN ('rejected', 'error') THEN 1 ELSE 0 END) as problem_count")
+            ->selectRaw("COALESCE(SUM(CASE WHEN status IN ('accepted', 'submitted') THEN ABS(total_amount) ELSE 0 END), 0) as filed_amount")
+            ->reorder()
+            ->first();
+
         $filings = $query
             ->with('createdBy:id,name')
             ->orderByDesc('created_at')
@@ -72,6 +83,13 @@ class IrdFilingController extends Controller
             'availableGstReturns' => $availableGstReturns,
             'availablePayrollRuns' => $availablePayrollRuns,
             'filters' => $request->only(['filing_type', 'status']),
+            'summary' => [
+                'filings' => (int) ($totals->filings_count ?? 0),
+                'filed' => (int) ($totals->filed_count ?? 0),
+                'pending' => (int) ($totals->pending_count ?? 0),
+                'problems' => (int) ($totals->problem_count ?? 0),
+                'filed_amount' => (float) ($totals->filed_amount ?? 0),
+            ],
         ]);
     }
 

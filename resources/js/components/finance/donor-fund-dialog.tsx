@@ -23,6 +23,33 @@ import {
 export type DonorFundGlAccount = { id: number; code: string; name: string };
 export type DonorFundFundingStream = { id: number; name: string };
 
+/** An existing fund to prefill the wizard with (edit mode). */
+export type EditableDonorFund = {
+    id: number;
+    fund_code: string;
+    fund_name: string;
+    donor_name: string | null;
+    donor_contact?: string | null;
+    fund_type: string;
+    gl_account_id?: number | string | null;
+    funding_stream_id?: number | string | null;
+    budget_amount: number | string | null;
+    start_date: string | null;
+    end_date: string | null;
+    restrictions?: string | null;
+    reporting_requirements?: string | null;
+    next_report_due: string | null;
+    is_restricted: boolean;
+    status?: string;
+};
+
+const FUND_STATUSES = [
+    { value: 'active', label: 'Active' },
+    { value: 'fully_spent', label: 'Fully spent' },
+    { value: 'expired', label: 'Expired' },
+    { value: 'returned', label: 'Returned' },
+];
+
 const FUND_TYPES = [
     { value: 'grant', label: 'Grant' },
     { value: 'donation', label: 'Donation' },
@@ -57,24 +84,33 @@ const fundTypeLabel = (v: string) =>
     FUND_TYPES.find((t) => t.value === v)?.label ?? v;
 
 /**
- * Donor Fund wizard — create a donor-restricted fund as a stepper modal
- * (Fund → Accounting & dates → Review). Posts to `finance.donor-funds.store`
- * (CREATE-ONLY here; fund details are edited from the fund's own page). No GL
- * journal is posted on creation — receipts and expenditures post the trust
- * journals later — so there's no posting preview.
+ * Donor Fund wizard — create or edit a donor-restricted fund as a stepper modal
+ * (Fund → Accounting & dates → Review). Posts to `finance.donor-funds.store`,
+ * or PUTs to `finance.donor-funds.update` when a `fund` is passed (W8: the
+ * update route existed and was tested but had no UI). No GL journal is posted
+ * here — receipts and expenditures post the trust journals later — so there's
+ * no posting preview. The fund code is immutable: the update endpoint doesn't
+ * accept it, so edit mode shows it read-only.
+ *
+ * Edit mode seeds `useForm` from `fund` at mount, so render the dialog with
+ * `key={fund.id}` when the same instance can edit different funds.
  */
 export function DonorFundDialog({
     open,
     onClose,
     glAccounts,
     fundingStreams,
+    fund,
 }: {
     open: boolean;
     onClose: () => void;
     /** Active liability/equity GL accounts the fund can map to. */
     glAccounts: DonorFundGlAccount[];
     fundingStreams: DonorFundFundingStream[];
+    /** Pass an existing fund to open the wizard in edit mode. */
+    fund?: EditableDonorFund | null;
 }) {
+    const isEdit = !!fund;
     const wizard = useWizard(STEPS.length);
     const { index, goTo, next, back, isFirst, isLast, reset } = wizard;
     const [succeeded, setSucceeded] = useState(false);
@@ -94,22 +130,53 @@ export function DonorFundDialog({
         reporting_requirements: string;
         next_report_due: string;
         is_restricted: boolean;
-    }>({
-        fund_code: '',
-        fund_name: '',
-        donor_name: '',
-        donor_contact: '',
-        fund_type: 'grant',
-        gl_account_id: '',
-        funding_stream_id: '',
-        budget_amount: '',
-        start_date: '',
-        end_date: '',
-        restrictions: '',
-        reporting_requirements: '',
-        next_report_due: '',
-        is_restricted: true,
-    });
+        status: string;
+    }>(
+        fund
+            ? {
+                  fund_code: fund.fund_code ?? '',
+                  fund_name: fund.fund_name ?? '',
+                  donor_name: fund.donor_name ?? '',
+                  donor_contact: fund.donor_contact ?? '',
+                  fund_type: fund.fund_type ?? 'grant',
+                  gl_account_id:
+                      fund.gl_account_id != null
+                          ? String(fund.gl_account_id)
+                          : '',
+                  funding_stream_id:
+                      fund.funding_stream_id != null
+                          ? String(fund.funding_stream_id)
+                          : '',
+                  budget_amount:
+                      fund.budget_amount != null
+                          ? String(fund.budget_amount)
+                          : '',
+                  start_date: fund.start_date ?? '',
+                  end_date: fund.end_date ?? '',
+                  restrictions: fund.restrictions ?? '',
+                  reporting_requirements: fund.reporting_requirements ?? '',
+                  next_report_due: fund.next_report_due ?? '',
+                  is_restricted: fund.is_restricted,
+                  status: fund.status ?? 'active',
+              }
+            : {
+                  fund_code: '',
+                  fund_name: '',
+                  donor_name: '',
+                  donor_contact: '',
+                  fund_type: 'grant',
+                  gl_account_id: '',
+                  funding_stream_id: '',
+                  budget_amount: '',
+                  start_date: '',
+                  end_date: '',
+                  restrictions: '',
+                  reporting_requirements: '',
+                  next_report_due: '',
+                  is_restricted: true,
+                  status: 'active',
+              },
+    );
     const { data, setData, processing, errors } = form;
 
     const glOptions = glAccounts.map((a) => ({
@@ -130,7 +197,9 @@ export function DonorFundDialog({
     const datesValid =
         !data.start_date || !data.end_date || data.end_date >= data.start_date;
     const fundValid =
-        !!data.fund_code.trim() && !!data.fund_name.trim() && !!data.fund_type;
+        (isEdit || !!data.fund_code.trim()) &&
+        !!data.fund_name.trim() &&
+        !!data.fund_type;
     const accountingValid = datesValid;
     const allValid = fundValid && accountingValid;
 
@@ -150,37 +219,55 @@ export function DonorFundDialog({
     };
 
     const submit = () => {
-        form.transform((d) => ({
-            fund_code: d.fund_code,
-            fund_name: d.fund_name,
-            donor_name: d.donor_name || null,
-            donor_contact: d.donor_contact || null,
-            fund_type: d.fund_type,
-            gl_account_id: d.gl_account_id || null,
-            funding_stream_id: d.funding_stream_id || null,
-            budget_amount: d.budget_amount === '' ? null : d.budget_amount,
-            start_date: d.start_date || null,
-            end_date: d.end_date || null,
-            restrictions: d.restrictions || null,
-            reporting_requirements: d.reporting_requirements || null,
-            next_report_due: d.next_report_due || null,
-            is_restricted: d.is_restricted,
-        }));
-        form.post('/finance/donor-funds', {
+        // The update endpoint doesn't accept `fund_code` (the code is immutable
+        // once the fund exists) but does accept `status`; create is the reverse.
+        form.transform((d) => {
+            const shared = {
+                fund_name: d.fund_name,
+                donor_name: d.donor_name || null,
+                donor_contact: d.donor_contact || null,
+                fund_type: d.fund_type,
+                gl_account_id: d.gl_account_id || null,
+                funding_stream_id: d.funding_stream_id || null,
+                budget_amount: d.budget_amount === '' ? null : d.budget_amount,
+                start_date: d.start_date || null,
+                end_date: d.end_date || null,
+                restrictions: d.restrictions || null,
+                reporting_requirements: d.reporting_requirements || null,
+                next_report_due: d.next_report_due || null,
+                is_restricted: d.is_restricted,
+            };
+
+            return isEdit
+                ? { ...shared, status: d.status }
+                : { ...shared, fund_code: d.fund_code };
+        });
+
+        const opts = {
             preserveScroll: true,
             onSuccess: () => setSucceeded(true),
             onError: () => goTo(0),
-        });
+        };
+
+        if (isEdit && fund) {
+            form.put(`/finance/donor-funds/${fund.id}`, opts);
+        } else {
+            form.post('/finance/donor-funds', opts);
+        }
     };
 
     return (
         <WizardShell
             open={open}
             onClose={close}
-            title="New donor fund"
-            description="Add a donor-restricted fund for grants and donations"
+            title={isEdit ? 'Edit donor fund' : 'New donor fund'}
+            description={
+                isEdit
+                    ? 'Update this fund’s details, dates and reporting'
+                    : 'Add a donor-restricted fund for grants and donations'
+            }
             railIcon={HandHeart}
-            railTitle="New Fund"
+            railTitle={isEdit ? 'Edit fund' : 'New fund'}
             railSub="Donor funds"
             steps={STEPS}
             stepIndex={index}
@@ -190,16 +277,26 @@ export function DonorFundDialog({
             success={
                 succeeded ? (
                     <WizardSuccessPane
-                        title={`${data.fund_name || 'Donor fund'} created`}
-                        blurb="The fund is ready. Open it to record receipts, expenditure, and generate reports."
+                        title={
+                            isEdit
+                                ? `${data.fund_name || 'Donor fund'} updated`
+                                : `${data.fund_name || 'Donor fund'} created`
+                        }
+                        blurb={
+                            isEdit
+                                ? 'The fund details have been saved.'
+                                : 'The fund is ready. Open it to record receipts, expenditure, and generate reports.'
+                        }
                         actions={
                             <>
-                                <Button
-                                    variant="outline"
-                                    onClick={startAnother}
-                                >
-                                    Add another
-                                </Button>
+                                {!isEdit && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={startAnother}
+                                    >
+                                        Add another
+                                    </Button>
+                                )}
                                 <Button onClick={close}>Done</Button>
                             </>
                         }
@@ -236,7 +333,7 @@ export function DonorFundDialog({
                             onClick={submit}
                             disabled={processing || !allValid}
                         >
-                            Create fund
+                            {isEdit ? 'Save changes' : 'Create fund'}
                         </Button>
                     )}
                 </>
@@ -252,7 +349,8 @@ export function DonorFundDialog({
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <Field
                             label="Fund code"
-                            required
+                            required={!isEdit}
+                            hint={isEdit ? 'set on creation' : undefined}
                             error={errors.fund_code}
                         >
                             <Input
@@ -261,6 +359,8 @@ export function DonorFundDialog({
                                     setData('fund_code', e.target.value)
                                 }
                                 placeholder="e.g. GNT-2026-001"
+                                readOnly={isEdit}
+                                disabled={isEdit}
                             />
                         </Field>
                         <Field
@@ -417,9 +517,19 @@ export function DonorFundDialog({
                                 }
                             />
                         </Field>
+                        {isEdit && (
+                            <Field label="Fund status" error={errors.status}>
+                                <SelectInput
+                                    value={data.status}
+                                    onChange={(v) => setData('status', v)}
+                                    placeholder="Select status"
+                                    options={FUND_STATUSES}
+                                />
+                            </Field>
+                        )}
                         <Field
                             label="Next report due"
-                            span
+                            span={!isEdit}
                             hint="optional"
                             error={errors.next_report_due}
                         >
@@ -472,8 +582,12 @@ export function DonorFundDialog({
                 <div>
                     <StepHead
                         icon={ListChecks}
-                        title="Review & create"
-                        blurb="Creates the fund — record receipts and expenditure from its page afterwards."
+                        title={isEdit ? 'Review & save' : 'Review & create'}
+                        blurb={
+                            isEdit
+                                ? 'Saves the fund details. Receipts and expenditure are unaffected.'
+                                : 'Creates the fund — record receipts and expenditure from its page afterwards.'
+                        }
                     />
                     <ReviewCard icon={CalendarClock} title="Donor fund">
                         <ReviewRow label="Code" value={data.fund_code || '—'} />
@@ -495,6 +609,16 @@ export function DonorFundDialog({
                             label="Restricted"
                             value={data.is_restricted ? 'Yes' : 'No'}
                         />
+                        {isEdit && (
+                            <ReviewRow
+                                label="Status"
+                                value={
+                                    FUND_STATUSES.find(
+                                        (s) => s.value === data.status,
+                                    )?.label ?? data.status
+                                }
+                            />
+                        )}
                         <ReviewRow label="GL account" value={glLabel} />
                         {data.funding_stream_id && (
                             <ReviewRow
@@ -511,7 +635,7 @@ export function DonorFundDialog({
                     </ReviewCard>
                     {processing && (
                         <p className="mt-3 text-[13px] text-muted-foreground">
-                            Creating…
+                            {isEdit ? 'Saving…' : 'Creating…'}
                         </p>
                     )}
                 </div>

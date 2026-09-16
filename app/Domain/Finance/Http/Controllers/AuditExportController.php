@@ -15,7 +15,17 @@ class AuditExportController extends Controller
     {
         $orgId = $request->user()->organization_id;
 
-        $exports = FinAuditExport::forOrganization($orgId)
+        // Org-wide totals for the CURRENT filter — the header meters must never
+        // read the page in front of you (DESIGN.md "page-local counts as totals").
+        $totals = $this->filtered(FinAuditExport::forOrganization($orgId), $request)
+            ->selectRaw('COUNT(*) as exports_count')
+            ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_count")
+            ->selectRaw("SUM(CASE WHEN status IN ('pending', 'generating') THEN 1 ELSE 0 END) as generating_count")
+            ->selectRaw("SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count")
+            ->selectRaw('COALESCE(SUM(file_size_bytes), 0) as total_bytes')
+            ->first();
+
+        $exports = $this->filtered(FinAuditExport::forOrganization($orgId), $request)
             ->with('createdBy:id,name')
             ->orderBy('created_at', 'desc')
             ->paginate(20)
@@ -23,10 +33,42 @@ class AuditExportController extends Controller
 
         return Inertia::render('finance/audit-exports/Index', [
             'exports' => $exports,
+            'summary' => [
+                'exports' => (int) ($totals->exports_count ?? 0),
+                'completed' => (int) ($totals->completed_count ?? 0),
+                'generating' => (int) ($totals->generating_count ?? 0),
+                'failed' => (int) ($totals->failed_count ?? 0),
+                'total_bytes' => (int) ($totals->total_bytes ?? 0),
+            ],
+            'filters' => $request->only(['status', 'from', 'to']),
             // Creating/deleting exports needs finance.admin (index only needs
             // finance.reports.view) — gates the New Export modal + delete action.
             'canManage' => (bool) $request->user()->canDo('finance.admin'),
         ]);
+    }
+
+    /**
+     * Status + covered-period filters, so the Audit exports rail view has real
+     * filter pills like every other view (DESIGN.md "filterless rail tabs").
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<FinAuditExport>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<FinAuditExport>
+     */
+    private function filtered($query, Request $request)
+    {
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('from')) {
+            $query->whereDate('period_to', '>=', $request->date('from'));
+        }
+
+        if ($request->filled('to')) {
+            $query->whereDate('period_from', '<=', $request->date('to'));
+        }
+
+        return $query;
     }
 
     public function store(Request $request)

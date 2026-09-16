@@ -1,37 +1,44 @@
+import { FinanceSectionRail, formatMoney } from '@/components/finance';
 import {
-    TaxTabsFooter,
-    formatMoney,
-    useRowContextMenu,
-    type RowCtxItem,
-} from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
+    EmptyValue,
+    EntityChip,
+    EntityContextMenu,
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
-import {
-    CheckCircle,
-    Clock,
-    DollarSign,
-    Download,
-    Eye,
-    Landmark,
-    Send,
-    Shield,
-} from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { Download, Eye, Landmark, Plus, Users, X } from 'lucide-react';
 import { useState } from 'react';
+
+import {
+    type GstReturnOption,
+    NewGstFilingDialog,
+    NewPaydayFilingDialog,
+    type PayrollRunOption,
+} from './_dialogs';
 
 type Filing = {
     id: number;
@@ -47,34 +54,28 @@ type Filing = {
     created_at: string;
 };
 
-type GstReturn = {
-    id: number;
-    period_start: string;
-    period_end: string;
-    gst_payable: string;
-    status: string;
-    ird_period: string;
-};
-
 type PaginatedData = {
     data: Filing[];
     links: { url: string | null; label: string; active: boolean }[];
     current_page: number;
     last_page: number;
+    total: number;
 };
 
-type PayrollRun = {
-    id: number;
-    period_start: string;
-    period_end: string;
-    total_gross: string | null;
-    status: string;
+/** Org-wide totals for the CURRENT filter — never the page in front of you. */
+type Summary = {
+    filings: number;
+    filed: number;
+    pending: number;
+    problems: number;
+    filed_amount: number;
 };
 
 type PageProps = {
     filings: PaginatedData;
-    availableGstReturns: GstReturn[];
-    availablePayrollRuns: PayrollRun[];
+    availableGstReturns: GstReturnOption[];
+    availablePayrollRuns: PayrollRunOption[];
+    summary: Summary;
     filters: {
         filing_type?: string;
         status?: string;
@@ -82,29 +83,17 @@ type PageProps = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
-    { title: 'IRD Filings', href: '/finance/ird-filings' },
+    { title: 'Tax & compliance', href: '/finance/tax' },
+    { title: 'IRD filings', href: '/finance/ird-filings' },
 ];
 
-const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
+const shortDate = (value: string) => formatDateOnly(value.slice(0, 10), value);
 
-const formatDateTime = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-const filingTypeLabels: Record<string, string> = {
-    gst: 'GST Return',
-    payday: 'Payday Filing',
+const FILING_TYPE_LABELS: Record<string, string> = {
+    gst: 'GST return',
+    payday: 'Payday filing',
     rlwt: 'RLWT',
     rwt: 'RWT',
     aim: 'AIM',
@@ -113,36 +102,36 @@ const filingTypeLabels: Record<string, string> = {
     ir7: 'IR7',
 };
 
+const TYPE_OPTIONS = [
+    { value: 'all', label: 'All types' },
+    { value: 'gst', label: 'GST' },
+    { value: 'payday', label: 'Payday' },
+];
+
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'All statuses' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'validated', label: 'Validated' },
+    { value: 'submitted', label: 'Submitted' },
+    { value: 'accepted', label: 'Accepted' },
+    { value: 'rejected', label: 'Rejected' },
+    { value: 'error', label: 'Error' },
+];
+
 export default function IrdFilingsIndex({
     filings,
     availableGstReturns,
     availablePayrollRuns,
+    summary,
     filters,
 }: PageProps) {
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [selectedGstReturn, setSelectedGstReturn] = useState<string>('');
-    const [selectedPayrollRun, setSelectedPayrollRun] = useState<string>('');
+    const [gstDialogOpen, setGstDialogOpen] = useState(false);
+    const [paydayDialogOpen, setPaydayDialogOpen] = useState(false);
 
-    const createForm = useForm({
-        ird_number: '',
-    });
-    const paydayForm = useForm({
-        ird_number: '',
-    });
+    const filingType = filters.filing_type ?? 'all';
+    const status = filters.status ?? 'all';
 
-    // KPI calculations
-    const allFilings = filings.data;
-    const filedCount = allFilings.filter(
-        (f) => f.status === 'accepted' || f.status === 'submitted',
-    ).length;
-    const pendingCount = allFilings.filter(
-        (f) => f.status === 'draft' || f.status === 'validated',
-    ).length;
-    const totalFiledAmount = allFilings
-        .filter((f) => f.status === 'accepted' || f.status === 'submitted')
-        .reduce((sum, f) => sum + Math.abs(Number(f.total_amount)), 0);
-
-    function applyFilter(key: string, value: string | undefined) {
+    const applyFilter = (key: string, value: string | undefined) => {
         const params: Record<string, string> = { ...filters };
         if (value && value !== 'all') {
             params[key] = value;
@@ -150,565 +139,341 @@ export default function IrdFilingsIndex({
             delete params[key];
         }
         router.get('/finance/ird-filings', params, { preserveState: true });
-    }
+    };
 
     const clearFilters = () => {
         router.get('/finance/ird-filings', {}, { preserveState: true });
     };
 
-    const hasFilters = Boolean(
-        (filters.filing_type && filters.filing_type !== 'all') ||
-        (filters.status && filters.status !== 'all'),
-    );
+    const hasFilters = filingType !== 'all' || status !== 'all';
 
-    function handleCreateFiling(e: React.FormEvent) {
-        e.preventDefault();
-        if (!selectedGstReturn) return;
-        createForm.post(`/finance/ird-filings/from-gst/${selectedGstReturn}`);
-    }
+    const exportUrl = `/finance/ird-filings/export?${new URLSearchParams(
+        Object.entries({
+            filing_type: filters.filing_type ?? '',
+            status: filters.status ?? '',
+        }).filter(([, v]) => v) as [string, string][],
+    ).toString()}`;
 
-    function handleCreatePaydayFiling(e: React.FormEvent) {
-        e.preventDefault();
-        if (!selectedPayrollRun) return;
-        paydayForm.post(
-            `/finance/ird-filings/from-payroll/${selectedPayrollRun}`,
-        );
-    }
+    const ctx = useEntityContextMenu<Filing>();
 
-    // Right-click row menu — mirrors the row's existing navigation (Open).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (filing: Filing): RowCtxItem[] => [
+    const actionsFor = (filing: Filing): MenuItem[] => [
         {
-            kind: 'item',
-            label: 'Open',
+            label: 'Open filing',
             icon: Eye,
-            onSelect: () => router.visit(`/finance/ird-filings/${filing.id}`),
+            onClick: () => router.visit(`/finance/ird-filings/${filing.id}`),
         },
     ];
 
+    const columns: EntityTableColumn<Filing>[] = [
+        {
+            key: 'period',
+            label: 'Period',
+            width: '1fr',
+            cell: (filing) => (
+                <span className="whitespace-nowrap text-muted-foreground">
+                    {shortDate(filing.period_from)} –{' '}
+                    {shortDate(filing.period_to)}
+                </span>
+            ),
+        },
+        {
+            key: 'amount',
+            label: 'Amount',
+            width: '160px',
+            align: 'right',
+            cell: (filing) => {
+                const amount = Number(filing.total_amount);
+                return (
+                    <span className="font-semibold tabular-nums">
+                        {formatMoney(Math.abs(amount))}
+                        {amount < 0 ? ' refund' : ''}
+                    </span>
+                );
+            },
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '130px',
+            cell: (filing) => <StatusBadge status={filing.status} />,
+        },
+        {
+            key: 'reference',
+            label: 'IRD reference',
+            width: '190px',
+            cell: (filing) =>
+                filing.ird_reference ? (
+                    <span className="truncate tabular-nums">
+                        {filing.ird_reference}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'submitted',
+            label: 'Submitted',
+            width: '190px',
+            cell: (filing) =>
+                filing.submitted_at ? (
+                    <span className="whitespace-nowrap text-muted-foreground">
+                        {formatDateTime(filing.submitted_at)}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'created_by',
+            label: 'Created by',
+            width: '170px',
+            cell: (filing) =>
+                filing.created_by ? (
+                    <span className="truncate">{filing.created_by.name}</span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            icon={Landmark}
+            title="IRD filings"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={summary.pending > 0 ? 'warning' : 'success'}
+                >
+                    {summary.pending} pending
+                </PageHeaderStatusChip>
+            }
+            subline={`Tax & compliance · ${summary.filings} filing${
+                summary.filings === 1 ? '' : 's'
+            } in this view · ${summary.filed} sent to IRD`}
+            actions={
+                <>
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={() => {
+                            window.location.href = exportUrl;
+                        }}
+                    >
+                        Export CSV
+                    </PageHeaderGlassButton>
+                    <PageHeaderGlassButton
+                        icon={Users}
+                        onClick={() => setPaydayDialogOpen(true)}
+                    >
+                        New payday filing
+                    </PageHeaderGlassButton>
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() => setGstDialogOpen(true)}
+                    >
+                        New GST filing
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Filings"
+                        href="/finance/ird-filings"
+                        ariaLabel="View every IRD filing"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.filings}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {hasFilters ? 'matching this filter' : 'all time'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Sent to IRD"
+                        tone="success"
+                        href="/finance/ird-filings?status=submitted"
+                        ariaLabel="View submitted IRD filings"
+                    >
+                        <PageHeaderMeterDonut
+                            percent={
+                                summary.filings === 0
+                                    ? 0
+                                    : (summary.filed / summary.filings) * 100
+                            }
+                            caption={`${summary.filed} of ${summary.filings} lodged`}
+                        />
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Pending"
+                        tone={summary.pending > 0 ? 'warning' : 'brand'}
+                        href="/finance/ird-filings?status=draft"
+                        ariaLabel="View draft IRD filings"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.pending}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            drafted or validated, not yet sent
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Needs attention"
+                        tone={summary.problems > 0 ? 'critical' : 'brand'}
+                        href="/finance/ird-filings?status=rejected"
+                        ariaLabel="View rejected IRD filings"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.problems}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            rejected or errored
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Value filed"
+                        href="/finance/gst-returns"
+                        ariaLabel="View GST returns"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.filed_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            declared across sent filings
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Type"
+                        value={filingType}
+                        allValue="all"
+                        options={TYPE_OPTIONS}
+                        onChange={(value) => applyFilter('filing_type', value)}
+                    />
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={status}
+                        allValue="all"
+                        options={STATUS_OPTIONS}
+                        onChange={(value) => applyFilter('status', value)}
+                    />
+                    {hasFilters ? (
+                        <PageHeaderFilterButton icon={X} onClick={clearFilters}>
+                            Clear filters
+                        </PageHeaderFilterButton>
+                    ) : null}
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="IRD Filings" />
+            <Head title="IRD filings" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Landmark}
-                        title="IRD Filings"
-                        description="Prepare and submit IRD e-filings directly to Inland Revenue"
-                        stats={[
-                            { label: 'Filed', value: filedCount },
-                            { label: 'Pending', value: pendingCount },
-                            {
-                                label: 'Total filed',
-                                value: formatMoney(totalFiledAmount),
-                            },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button size="sm" variant="outline" asChild>
-                                    <a
-                                        href={`/finance/ird-filings/export?${new URLSearchParams(Object.entries({ filing_type: filters.filing_type ?? '', status: filters.status ?? '' }).filter(([, v]) => v)).toString()}`}
-                                    >
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Export CSV
-                                    </a>
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        setShowCreateForm(!showCreateForm)
-                                    }
-                                >
-                                    <Send className="mr-1.5 h-4 w-4" />
-                                    New Filing
-                                </Button>
-                            </div>
-                        }
-                        footer={<TaxTabsFooter active="ird-filings" />}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Filings"
+                        caption={`${filings.data.length} of ${summary.filings} shown`}
                     />
-                }
-            >
-                {/* KPI Cards */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-success">
-                                <CheckCircle className="h-5 w-5 text-status-success" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Filed
-                                </p>
-                                <p className="text-2xl font-bold">
-                                    {filedCount}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-warning">
-                                <Clock className="h-5 w-5 text-status-warning" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Pending
-                                </p>
-                                <p className="text-2xl font-bold">
-                                    {pendingCount}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                                <DollarSign className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Total Filed Amount
-                                </p>
-                                <p className="font-mono text-2xl font-bold tabular-nums">
-                                    {formatMoney(totalFiledAmount)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
 
-                {/* Create Filing Form */}
-                {showCreateForm && availableGstReturns.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Create Filing from GST Return</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <form
-                                onSubmit={handleCreateFiling}
-                                className="space-y-4"
-                            >
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>GST Return</Label>
-                                        <Select
-                                            value={selectedGstReturn}
-                                            onValueChange={setSelectedGstReturn}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a GST return" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {availableGstReturns.map(
-                                                    (ret) => (
-                                                        <SelectItem
-                                                            key={ret.id}
-                                                            value={String(
-                                                                ret.id,
-                                                            )}
-                                                        >
-                                                            Period{' '}
-                                                            {ret.ird_period}:{' '}
-                                                            {formatDate(
-                                                                ret.period_start,
-                                                            )}{' '}
-                                                            &ndash;{' '}
-                                                            {formatDate(
-                                                                ret.period_end,
-                                                            )}{' '}
-                                                            (
-                                                            {formatMoney(
-                                                                Number(
-                                                                    ret.gst_payable,
-                                                                ),
-                                                            )}
-                                                            )
-                                                        </SelectItem>
-                                                    ),
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="ird_number">
-                                            IRD Number
-                                        </Label>
-                                        <Input
-                                            id="ird_number"
-                                            value={createForm.data.ird_number}
-                                            onChange={(e) =>
-                                                createForm.setData(
-                                                    'ird_number',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="e.g. 12-345-678"
-                                            maxLength={11}
-                                        />
-                                        {createForm.errors.ird_number && (
-                                            <p className="text-sm text-destructive">
-                                                {createForm.errors.ird_number}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex justify-end gap-3">
+                    {filings.data.length === 0 ? (
+                        hasFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                title="No filings match your filters"
+                            />
+                        ) : (
+                            <EmptyList
+                                icon={Landmark}
+                                itemName="filing"
+                                title="No filings yet"
+                                description="Create a filing from a GST return or a posted payroll run to get started."
+                                action={
                                     <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setShowCreateForm(false)}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        type="submit"
-                                        disabled={
-                                            !selectedGstReturn ||
-                                            !createForm.data.ird_number ||
-                                            createForm.processing
-                                        }
-                                    >
-                                        Create Filing
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {showCreateForm && availableGstReturns.length === 0 && (
-                    <Card>
-                        <CardContent className="py-6">
-                            <p className="text-center text-muted-foreground">
-                                No GST returns available for filing. Prepare a
-                                GST return first.
-                            </p>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Create Payday Filing Form */}
-                {showCreateForm && availablePayrollRuns.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>
-                                Create Payday Filing from Payroll Run
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <form
-                                onSubmit={handleCreatePaydayFiling}
-                                className="space-y-4"
-                            >
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Payroll Run</Label>
-                                        <Select
-                                            value={selectedPayrollRun}
-                                            onValueChange={
-                                                setSelectedPayrollRun
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a posted payroll run" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {availablePayrollRuns.map(
-                                                    (run) => (
-                                                        <SelectItem
-                                                            key={run.id}
-                                                            value={String(
-                                                                run.id,
-                                                            )}
-                                                        >
-                                                            {formatDate(
-                                                                run.period_start,
-                                                            )}{' '}
-                                                            &ndash;{' '}
-                                                            {formatDate(
-                                                                run.period_end,
-                                                            )}
-                                                            {run.total_gross !=
-                                                            null
-                                                                ? ` (${formatMoney(Number(run.total_gross))})`
-                                                                : ''}
-                                                        </SelectItem>
-                                                    ),
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="payday_ird_number">
-                                            IRD Number
-                                        </Label>
-                                        <Input
-                                            id="payday_ird_number"
-                                            value={paydayForm.data.ird_number}
-                                            onChange={(e) =>
-                                                paydayForm.setData(
-                                                    'ird_number',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="e.g. 12-345-678"
-                                            maxLength={11}
-                                        />
-                                        {paydayForm.errors.ird_number && (
-                                            <p className="text-sm text-destructive">
-                                                {paydayForm.errors.ird_number}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex justify-end gap-3">
-                                    <Button
-                                        type="submit"
-                                        disabled={
-                                            !selectedPayrollRun ||
-                                            !paydayForm.data.ird_number ||
-                                            paydayForm.processing
-                                        }
-                                    >
-                                        Create Payday Filing
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Filings List */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Shield className="h-5 w-5 text-muted-foreground" />
-                                <CardTitle>Filings</CardTitle>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Select
-                                    value={filters.filing_type ?? 'all'}
-                                    onValueChange={(v) =>
-                                        applyFilter('filing_type', v)
-                                    }
-                                >
-                                    <SelectTrigger
-                                        className="w-[150px]"
-                                        aria-label="Filter by type"
-                                    >
-                                        <SelectValue placeholder="Type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All Types
-                                        </SelectItem>
-                                        <SelectItem value="gst">GST</SelectItem>
-                                        <SelectItem value="payday">
-                                            Payday
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Select
-                                    value={filters.status ?? 'all'}
-                                    onValueChange={(v) =>
-                                        applyFilter('status', v)
-                                    }
-                                >
-                                    <SelectTrigger
-                                        className="w-[150px]"
-                                        aria-label="Filter by status"
-                                    >
-                                        <SelectValue placeholder="Status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All Statuses
-                                        </SelectItem>
-                                        <SelectItem value="draft">
-                                            Draft
-                                        </SelectItem>
-                                        <SelectItem value="validated">
-                                            Validated
-                                        </SelectItem>
-                                        <SelectItem value="submitted">
-                                            Submitted
-                                        </SelectItem>
-                                        <SelectItem value="accepted">
-                                            Accepted
-                                        </SelectItem>
-                                        <SelectItem value="rejected">
-                                            Rejected
-                                        </SelectItem>
-                                        <SelectItem value="error">
-                                            Error
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b text-left text-muted-foreground">
-                                        <th className="pr-4 pb-3 font-medium">
-                                            Type
-                                        </th>
-                                        <th className="pr-4 pb-3 font-medium">
-                                            Period
-                                        </th>
-                                        <th className="pr-4 pb-3 text-right font-medium">
-                                            Amount
-                                        </th>
-                                        <th className="pr-4 pb-3 font-medium">
-                                            Status
-                                        </th>
-                                        <th className="pr-4 pb-3 font-medium">
-                                            IRD Reference
-                                        </th>
-                                        <th className="pr-4 pb-3 font-medium">
-                                            Submitted
-                                        </th>
-                                        <th className="pb-3 font-medium">
-                                            Created
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filings.data.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={7} className="p-0">
-                                                {hasFilters ? (
-                                                    <EmptySearch
-                                                        onClear={clearFilters}
-                                                        title="No filings match your filters"
-                                                        className="border-0"
-                                                    />
-                                                ) : (
-                                                    <EmptyList
-                                                        icon={Landmark}
-                                                        itemName="filing"
-                                                        title="No filings yet"
-                                                        description="Create a filing from a GST return to get started."
-                                                        className="border-0"
-                                                        action={
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    setShowCreateForm(
-                                                                        true,
-                                                                    )
-                                                                }
-                                                            >
-                                                                New filing
-                                                            </Button>
-                                                        }
-                                                    />
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        filings.data.map((filing) => {
-                                            const amount = Number(
-                                                filing.total_amount,
-                                            );
-
-                                            return (
-                                                <tr
-                                                    key={filing.id}
-                                                    className="cursor-pointer border-b last:border-0 hover:bg-muted/50"
-                                                    onClick={() =>
-                                                        router.visit(
-                                                            `/finance/ird-filings/${filing.id}`,
-                                                        )
-                                                    }
-                                                    onContextMenu={rowMenu.open(
-                                                        rowMenuItems(filing),
-                                                    )}
-                                                >
-                                                    <td className="py-3 pr-4">
-                                                        {filingTypeLabels[
-                                                            filing.filing_type
-                                                        ] ?? filing.filing_type}
-                                                    </td>
-                                                    <td className="py-3 pr-4">
-                                                        {formatDate(
-                                                            filing.period_from,
-                                                        )}{' '}
-                                                        &ndash;{' '}
-                                                        {formatDate(
-                                                            filing.period_to,
-                                                        )}
-                                                    </td>
-                                                    <td
-                                                        className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${amount >= 0 ? 'text-status-critical' : 'text-status-success'}`}
-                                                    >
-                                                        {formatMoney(
-                                                            Math.abs(amount),
-                                                        )}
-                                                        {amount < 0
-                                                            ? ' (Refund)'
-                                                            : ''}
-                                                    </td>
-                                                    <td className="py-3 pr-4">
-                                                        <StatusBadge
-                                                            status={
-                                                                filing.status
-                                                            }
-                                                        />
-                                                    </td>
-                                                    <td className="py-3 pr-4 font-mono text-xs">
-                                                        {filing.ird_reference ??
-                                                            '-'}
-                                                    </td>
-                                                    <td className="py-3 pr-4">
-                                                        {filing.submitted_at
-                                                            ? formatDateTime(
-                                                                  filing.submitted_at,
-                                                              )
-                                                            : '-'}
-                                                    </td>
-                                                    <td className="py-3">
-                                                        {filing.created_by
-                                                            ?.name ?? '-'}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {filings.last_page > 1 && (
-                            <div className="mt-4 flex items-center justify-center gap-1">
-                                {filings.links.map((link, i) => (
-                                    <Button
-                                        key={i}
-                                        variant={
-                                            link.active ? 'default' : 'outline'
-                                        }
                                         size="sm"
-                                        disabled={!link.url}
-                                        onClick={() =>
-                                            link.url && router.visit(link.url)
-                                        }
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {rowMenu.element}
+                                        onClick={() => setGstDialogOpen(true)}
+                                    >
+                                        New GST filing
+                                    </Button>
+                                }
+                            />
+                        )
+                    ) : (
+                        <>
+                            <EntityTable
+                                rows={filings.data}
+                                rowKey={(filing) => filing.id}
+                                identityLabel="Filing"
+                                minWidth={1180}
+                                identity={(filing) => ({
+                                    icon: Landmark,
+                                    name:
+                                        FILING_TYPE_LABELS[
+                                            filing.filing_type
+                                        ] ?? filing.filing_type,
+                                    subline: filing.error_message ?? undefined,
+                                    extra: (
+                                        <EntityChip>
+                                            {filing.filing_type.toUpperCase()}
+                                        </EntityChip>
+                                    ),
+                                })}
+                                hrefFor={(filing) =>
+                                    `/finance/ird-filings/${filing.id}`
+                                }
+                                columns={columns}
+                                actionsFor={actionsFor}
+                                onOpen={(filing) =>
+                                    router.visit(
+                                        `/finance/ird-filings/${filing.id}`,
+                                    )
+                                }
+                                onRowContextMenu={(e, filing) =>
+                                    ctx.open(e, filing)
+                                }
+                            />
+                            <LaravelPagination
+                                links={filings.links}
+                                lastPage={filings.last_page}
+                            />
+                        </>
+                    )}
+                </div>
             </PageLayout>
+
+            {ctx.ctx ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Landmark}
+                    title={
+                        FILING_TYPE_LABELS[ctx.ctx.record.filing_type] ??
+                        ctx.ctx.record.filing_type
+                    }
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
+
+            <NewGstFilingDialog
+                open={gstDialogOpen}
+                onClose={() => setGstDialogOpen(false)}
+                gstReturns={availableGstReturns}
+            />
+            <NewPaydayFilingDialog
+                open={paydayDialogOpen}
+                onClose={() => setPaydayDialogOpen(false)}
+                payrollRuns={availablePayrollRuns}
+            />
         </AppLayout>
     );
 }

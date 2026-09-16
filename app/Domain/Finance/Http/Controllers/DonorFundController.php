@@ -46,6 +46,13 @@ class DonorFundController extends Controller
             'fund_code' => $fund->fund_code,
             'fund_name' => $fund->fund_name,
             'donor_name' => $fund->donor_name,
+            // Carried so the row's Edit action can prefill DonorFundDialog
+            // without a second round-trip (W8).
+            'donor_contact' => $fund->donor_contact,
+            'gl_account_id' => $fund->gl_account_id,
+            'funding_stream_id' => $fund->funding_stream_id,
+            'restrictions' => $fund->restrictions,
+            'reporting_requirements' => $fund->reporting_requirements,
             'fund_type' => $fund->fund_type,
             'total_received' => (float) $fund->total_received,
             'total_spent' => (float) $fund->total_spent,
@@ -221,22 +228,43 @@ class DonorFundController extends Controller
             'createdBy:id,name',
         );
 
-        $transactions = $fund->transactions()
+        $canManage = (bool) $request->user()->canDo('finance.admin');
+
+        $transactionRecords = $fund->transactions()
             ->with('createdBy:id,name', 'journal:id,journal_number')
             ->orderByDesc('transaction_date')
             ->orderByDesc('created_at')
             ->limit(100)
-            ->get()
-            ->map(fn ($txn) => [
-                'id' => $txn->id,
-                'transaction_date' => $txn->transaction_date->toDateString(),
-                'type' => $txn->type,
-                'description' => $txn->description,
-                'amount' => (float) $txn->amount,
-                'reference' => $txn->reference,
-                'journal_number' => $txn->journal?->journal_number,
-                'created_by' => $txn->createdBy?->name,
-            ]);
+            ->get();
+
+        // Which originals already carry a reversal — the service allows exactly
+        // one, so the row's Reverse action has to disappear afterwards (W8).
+        $reversedIds = FinDonorFundTransaction::query()
+            ->where('fund_id', $fund->id)
+            ->whereNotNull('reversal_of_transaction_id')
+            ->pluck('reversal_of_transaction_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $transactions = $transactionRecords->map(fn ($txn) => [
+            'id' => $txn->id,
+            'transaction_date' => $txn->transaction_date->toDateString(),
+            'type' => $txn->type,
+            'description' => $txn->description,
+            'amount' => (float) $txn->amount,
+            'reference' => $txn->reference,
+            'journal_number' => $txn->journal?->journal_number,
+            'created_by' => $txn->createdBy?->name,
+            // Reversal eligibility, mirroring DonorFundService::reverseTransaction.
+            'is_reversal' => $txn->reversal_of_transaction_id !== null,
+            'is_reversed' => in_array((int) $txn->id, $reversedIds, true),
+            'can_reverse' => $canManage
+                && $txn->reversal_of_transaction_id === null
+                && $txn->journal_id !== null
+                && in_array($txn->type, ['receipt', 'expenditure'], true)
+                && (float) $txn->amount > 0
+                && ! in_array((int) $txn->id, $reversedIds, true),
+        ]);
 
         $reports = $fund->reports()
             ->orderByDesc('period_to')
@@ -257,7 +285,6 @@ class DonorFundController extends Controller
                     : null,
             ]);
 
-        $canManage = (bool) $request->user()->canDo('finance.admin');
         $expenseAccounts = $canManage
             ? FinAccount::forOrganization($orgId)
                 ->active()
@@ -307,6 +334,9 @@ class DonorFundController extends Controller
                 'fund_name' => $fund->fund_name,
                 'donor_name' => $fund->donor_name,
                 'donor_contact' => $fund->donor_contact,
+                // Raw ids so the header's Edit action can prefill DonorFundDialog (W8).
+                'gl_account_id' => $fund->gl_account_id,
+                'funding_stream_id' => $fund->funding_stream_id,
                 'fund_type' => $fund->fund_type,
                 'total_received' => (float) $fund->total_received,
                 'total_spent' => (float) $fund->total_spent,
@@ -354,6 +384,9 @@ class DonorFundController extends Controller
             'expenseAccounts' => $expenseAccounts,
             'bankAccounts' => $bankAccounts,
             'eligibleBills' => $eligibleBills,
+            // Reference data for the Edit action's DonorFundDialog.
+            'glAccounts' => $canManage ? $this->fundGlAccounts($orgId) : [],
+            'fundingStreams' => $canManage ? $this->fundFundingStreams($orgId) : [],
             // Receipts/expenditure post under finance.admin — gate the modals to match.
             'canManage' => $canManage,
         ]);

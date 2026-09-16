@@ -1,4 +1,11 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { FinanceSectionRail } from '@/components/finance';
+import {
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+} from '@/components/lists';
+import { PageHeader, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,9 +17,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
+import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { CalendarDays, FileText } from 'lucide-react';
+import { CalendarDays, Check, FileText } from 'lucide-react';
 import { useState } from 'react';
 
 type FilingPeriod = {
@@ -31,35 +41,32 @@ type PageProps = {
     currentYear: number;
 };
 
-const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
+const shortDate = (value: string) => formatDateOnly(value.slice(0, 10), value);
 
-const frequencyLabels: Record<string, string> = {
+const FREQUENCY_LABELS: Record<string, string> = {
     monthly: 'Monthly',
-    two_monthly: 'Two-Monthly',
-    six_monthly: 'Six-Monthly',
+    two_monthly: 'Two-monthly',
+    six_monthly: 'Six-monthly',
 };
 
-const basisLabels: Record<string, string> = {
-    invoice: 'Invoice Basis',
-    payments: 'Payments Basis',
-    hybrid: 'Hybrid Basis',
+const BASIS_LABELS: Record<string, string> = {
+    invoice: 'Invoice basis',
+    payments: 'Payments basis',
+    hybrid: 'Hybrid basis',
 };
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Tax & compliance', href: '/finance/tax' },
+    { title: 'GST returns', href: '/finance/gst-returns' },
+    { title: 'Prepare return', href: '/finance/gst-returns/prepare' },
+];
 
 export default function GstReturnPrepare({
     filingDates,
     currentYear,
 }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'GST Returns', href: '/finance/gst-returns' },
-        { title: 'Prepare Return', href: '/finance/gst-returns/prepare' },
-    ];
-
     const { data, setData, post, processing, errors } = useForm({
         period_start: '',
         period_end: '',
@@ -69,68 +76,116 @@ export default function GstReturnPrepare({
 
     const [selectedFrequency, setSelectedFrequency] = useState<string>('');
 
-    function handleFrequencyChange(value: string) {
+    const handleFrequencyChange = (value: string) => {
         setSelectedFrequency(value);
         setData('filing_frequency', value);
-    }
+    };
 
-    function handlePeriodSelect(period: FilingPeriod) {
+    const handlePeriodSelect = (period: FilingPeriod) => {
         setData((prev) => ({
             ...prev,
             period_start: period.period_start,
             period_end: period.period_end,
         }));
-    }
+    };
 
-    function handleSubmit(e: React.FormEvent) {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         post('/finance/gst-returns');
-    }
+    };
 
     const activePeriods = selectedFrequency
         ? (filingDates[selectedFrequency as keyof typeof filingDates] ?? [])
         : [];
 
+    const isSelected = (period: FilingPeriod) =>
+        data.period_start === period.period_start &&
+        data.period_end === period.period_end;
+
+    const periodActions = (period: FilingPeriod): MenuItem[] => [
+        {
+            label: 'Use this period',
+            icon: Check,
+            onClick: () => handlePeriodSelect(period),
+        },
+    ];
+
+    const periodColumns: EntityTableColumn<FilingPeriod>[] = [
+        {
+            key: 'ird_period',
+            label: 'IRD period',
+            width: '160px',
+            cell: (p) => (
+                <span className="text-muted-foreground tabular-nums">
+                    {p.ird_period}
+                </span>
+            ),
+        },
+        {
+            key: 'due_date',
+            label: 'Due date',
+            width: '180px',
+            cell: (p) => (
+                <span className="whitespace-nowrap">
+                    {shortDate(p.due_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'selected',
+            label: 'Selected',
+            width: '140px',
+            cell: (p) =>
+                isSelected(p) ? (
+                    <StatusBadge variant="success">Selected</StatusBadge>
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/finance/gst-returns"
+            icon={FileText}
+            title="Prepare GST return"
+            subline={`Tax & compliance · choose a filing frequency and period · ${currentYear} filing calendar`}
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Prepare GST Return" />
+            <Head title="Prepare GST return" />
 
-            <PageLayout
-                width="narrow"
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/gst-returns"
-                        title="Prepare GST Return"
-                        description="Select your filing frequency and period to prepare a new GST return"
-                    />
-                }
-            >
-                <form onSubmit={handleSubmit} className="space-y-6">
+            <PageLayout hero={header}>
+                <form onSubmit={handleSubmit} className="flex flex-col gap-5">
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-2">
                                 <FileText className="h-5 w-5 text-muted-foreground" />
-                                <CardTitle>Return Details</CardTitle>
+                                <CardTitle className="text-section-title">
+                                    Return details
+                                </CardTitle>
                             </div>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="flex flex-col gap-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label htmlFor="filing_frequency">
-                                        Filing Frequency
+                                        Filing frequency
                                     </Label>
                                     <Select
                                         value={data.filing_frequency}
                                         onValueChange={handleFrequencyChange}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger id="filing_frequency">
                                             <SelectValue placeholder="Select frequency" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {Object.entries(
-                                                frequencyLabels,
+                                                FREQUENCY_LABELS,
                                             ).map(([value, label]) => (
                                                 <SelectItem
                                                     key={value}
@@ -150,7 +205,7 @@ export default function GstReturnPrepare({
 
                                 <div className="space-y-2">
                                     <Label htmlFor="basis">
-                                        Accounting Basis
+                                        Accounting basis
                                     </Label>
                                     <Select
                                         value={data.basis}
@@ -158,11 +213,11 @@ export default function GstReturnPrepare({
                                             setData('basis', v)
                                         }
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger id="basis">
                                             <SelectValue placeholder="Select basis" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {Object.entries(basisLabels).map(
+                                            {Object.entries(BASIS_LABELS).map(
                                                 ([value, label]) => (
                                                     <SelectItem
                                                         key={value}
@@ -185,7 +240,7 @@ export default function GstReturnPrepare({
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label htmlFor="period_start">
-                                        Period Start
+                                        Period start
                                     </Label>
                                     <Input
                                         id="period_start"
@@ -207,7 +262,7 @@ export default function GstReturnPrepare({
 
                                 <div className="space-y-2">
                                     <Label htmlFor="period_end">
-                                        Period End
+                                        Period end
                                     </Label>
                                     <Input
                                         id="period_end"
@@ -231,93 +286,31 @@ export default function GstReturnPrepare({
                     </Card>
 
                     {selectedFrequency && activePeriods.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center gap-2">
-                                    <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                                    <CardTitle>
-                                        {currentYear} Filing Calendar (
-                                        {frequencyLabels[selectedFrequency]})
-                                    </CardTitle>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b text-left text-muted-foreground">
-                                                <th className="pr-4 pb-3 font-medium">
-                                                    Period
-                                                </th>
-                                                <th className="pr-4 pb-3 font-medium">
-                                                    IRD Period
-                                                </th>
-                                                <th className="pr-4 pb-3 font-medium">
-                                                    Due Date
-                                                </th>
-                                                <th className="pb-3 font-medium"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {activePeriods.map((period, i) => {
-                                                const isSelected =
-                                                    data.period_start ===
-                                                        period.period_start &&
-                                                    data.period_end ===
-                                                        period.period_end;
-
-                                                return (
-                                                    <tr
-                                                        key={i}
-                                                        className={`cursor-pointer border-b transition-colors last:border-0 ${
-                                                            isSelected
-                                                                ? 'bg-primary/5'
-                                                                : 'hover:bg-muted/50'
-                                                        }`}
-                                                        onClick={() =>
-                                                            handlePeriodSelect(
-                                                                period,
-                                                            )
-                                                        }
-                                                    >
-                                                        <td className="py-3 pr-4">
-                                                            {formatDate(
-                                                                period.period_start,
-                                                            )}{' '}
-                                                            &ndash;{' '}
-                                                            {formatDate(
-                                                                period.period_end,
-                                                            )}
-                                                        </td>
-                                                        <td className="py-3 pr-4 font-mono text-muted-foreground">
-                                                            {period.ird_period}
-                                                        </td>
-                                                        <td className="py-3 pr-4">
-                                                            {formatDate(
-                                                                period.due_date,
-                                                            )}
-                                                        </td>
-                                                        <td className="py-3 text-right">
-                                                            {isSelected && (
-                                                                <span className="text-xs font-medium text-primary">
-                                                                    Selected
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <div className="flex flex-col gap-5">
+                            <ListCaption
+                                title={`${currentYear} filing calendar`}
+                                caption={`${FREQUENCY_LABELS[selectedFrequency]} · select a period to fill the dates above`}
+                            />
+                            <EntityTable
+                                rows={activePeriods}
+                                rowKey={(p) => p.ird_period}
+                                identityLabel="Period"
+                                minWidth={840}
+                                identity={(p) => ({
+                                    icon: CalendarDays,
+                                    name: `${shortDate(p.period_start)} – ${shortDate(p.period_end)}`,
+                                })}
+                                columns={periodColumns}
+                                actionsFor={periodActions}
+                                onOpen={handlePeriodSelect}
+                            />
+                        </div>
                     )}
 
                     <div className="flex justify-end">
-                        <Button type="submit" disabled={processing} size="lg">
+                        <Button type="submit" disabled={processing}>
                             <FileText className="mr-2 h-4 w-4" />
-                            Prepare Return
+                            Prepare return
                         </Button>
                     </div>
                 </form>

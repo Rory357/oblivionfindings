@@ -1,5 +1,5 @@
 import { router, usePage } from '@inertiajs/react';
-import { Building2, Download, Landmark, Receipt } from 'lucide-react';
+import { Download, Landmark, Receipt } from 'lucide-react';
 
 import {
     FinanceTabs,
@@ -9,11 +9,12 @@ import {
 } from './finance-tabs';
 
 /**
- * Canonical Tax & Compliance hub tabs. Mirrors the Ledger/Banking hubs
- * (heterogeneous permissions): GST returns is `finance.tax.view`, IRD filings is
- * `finance.tax.manage`, and audit exports is `finance.reports.view`. The legacy
- * consolidation definition is retained for its unreachable page contract but
- * remains hidden while the unsupported product boundary is quarantined.
+ * Legacy Tax & Compliance tab strip. The live tax pages now ride
+ * `<FinanceSectionRail />` (WP0, `lib/finance-sections.ts`); the only remaining
+ * consumer is the quarantined Consolidation surface, which keeps its own tab id
+ * so its page contract still type-checks. The `consolidation` TAB was removed in
+ * WP7 (decision D9, W16): it was `requires: () => false`, so it never rendered
+ * and every route under it 404s via RejectUnsupportedConsolidation.
  */
 export type TaxTabId =
     | 'gst-returns'
@@ -54,23 +55,13 @@ export const TAX_TABS: TaxTabDef[] = [
         href: '/finance/audit-exports',
         requires: (c) => !!c?.finance?.reports?.view,
     },
-    {
-        id: 'consolidation',
-        label: 'Consolidation',
-        icon: Building2,
-        tone: 'violet',
-        href: '/finance/consolidation',
-        requires: () => false,
-    },
 ];
 
 /**
- * The Tax & Compliance tab strip, rendered in each tax sub-page's PageHero
- * `footer` slot (the Rostering pattern). Tabs SPA-navigate across the sub-routes so
- * the hub feels like one surface while each page keeps its own controller + bespoke
- * hero. Tabs are filtered to what the user can open (the active tab is always
- * shown). Drop into every tax Index page:
- * `<PageHero … footer={<TaxTabsFooter active="…" />} />`.
+ * The Tax & Compliance tab strip. Retained only for the quarantined
+ * Consolidation page; new and migrated pages use `<FinanceSectionRail />` in the
+ * Event Horizon header instead. Tabs are filtered to what the user can open (the
+ * active tab is always shown) and SPA-navigate across the sub-routes.
  */
 export function TaxTabsFooter({ active }: { active: TaxTabId }) {
     const page = usePage();
