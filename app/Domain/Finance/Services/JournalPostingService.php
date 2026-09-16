@@ -306,7 +306,11 @@ class JournalPostingService
         if (DB::transactionLevel() < 1) {
             throw new RuntimeException('The journal sequence mutex must be acquired inside a database transaction.');
         }
-        if ($organizationId === null || $organizationId < 1) {
+        // Organisation 0 is a real organisation here, not a sentinel: this app
+        // is single-tenant, FinanceSeeder seeds the default chart of accounts
+        // under org 0, and there is no organizations table to make 0 invalid.
+        // Only an unknown (null) or negative organisation is rejected.
+        if ($organizationId === null || $organizationId < 0) {
             throw new InvalidArgumentException('An organisation is required to allocate a journal number.');
         }
 

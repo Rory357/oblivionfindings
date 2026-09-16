@@ -110,7 +110,9 @@ class FixedAssetService
      */
     public function runDepreciation(?int $orgId, string $depreciationDate): array
     {
-        if ($orgId === null || $orgId < 1) {
+        // Organisation 0 is a real organisation here — see the note on
+        // JournalPostingService::lockJournalSequence().
+        if ($orgId === null || $orgId < 0) {
             throw new InvalidArgumentException('An organisation is required to run fixed-asset depreciation.');
         }
 
@@ -365,7 +367,7 @@ class FixedAssetService
         $organizationId = $asset->organization_id === null
             ? null
             : (int) $asset->organization_id;
-        if ($organizationId === null || $organizationId < 1) {
+        if ($organizationId === null || $organizationId < 0) {
             throw new InvalidArgumentException('An organisation is required to dispose of a fixed asset.');
         }
 

@@ -14,6 +14,7 @@ use App\Services\Integration\Exceptions\CapabilityUnavailable;
 use App\Services\Integration\Exceptions\WebhookBindingUnavailable;
 use App\Services\Integration\Exceptions\WebhookRejected;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Support\JsonEvidence;
 use App\Services\Integration\ProviderWebhookBindingGuard;
 use App\Support\SafeOperationalData;
 use Carbon\CarbonImmutable;
@@ -229,7 +230,10 @@ class WebhookReceiverController extends Controller
             && $existing->source_app === $event->sourceApp
             && $existing->severity === $event->severity
             && $existing->event_type === $event->eventType
-            && ($existing->normalized_payload ?? []) === $evidence;
+            // normalized_payload is a MySQL json column, which normalises object
+            // key order on the way out, so this compares order-insensitively —
+            // otherwise a replayed webhook never matches its stored event.
+            && JsonEvidence::matches($existing->normalized_payload ?? [], $evidence);
     }
 
     /**

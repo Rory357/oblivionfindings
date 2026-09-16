@@ -6,6 +6,7 @@ use App\Domain\Finance\Models\FinBillLine;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Services\AccountsPayableService;
+use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\SpendApproval;
 use App\Domain\Governance\Models\SpendApprovalDecision;
 use App\Domain\Governance\Services\SpendApprovalCommandService;
@@ -120,10 +121,48 @@ function sag_billPayload(FinBill $bill, ?int $approvalId): array
     ];
 }
 
+/**
+ * A passed board resolution that covers $amount. Spend at or above the category
+ * threshold needs one (SpendApprovalCommandService::assertApprovalAuthority):
+ * voting finished ('closed'), result 'carried', and a cost impact stating at
+ * least the requested amount. One resolution can authorise only one approval,
+ * so each call makes its own.
+ */
+function sag_boardResolution(User $proposer, string $amount): Resolution
+{
+    return Resolution::create([
+        'resolution_reference' => 'RES-'.strtoupper(Str::random(8)),
+        'title' => 'Board authority for capital spend',
+        'exact_motion' => 'That the Board approves capital spend up to the stated amount.',
+        'purpose' => 'decision',
+        'context' => 'Authority for the bill under test.',
+        'options' => [
+            ['label' => 'Approve', 'description' => 'Proceed', 'benefits' => 'Continuity', 'drawbacks' => 'Capital outlay'],
+            ['label' => 'Defer', 'description' => 'Defer', 'benefits' => 'Preserves cash', 'drawbacks' => 'Delay'],
+        ],
+        'recommendation' => 'Management recommends approval.',
+        'cost_impact' => ['amount' => (float) $amount, 'currency' => 'NZD', 'funding_source' => 'Capital', 'is_none' => false],
+        'risk_impact' => ['level' => 'low', 'description' => 'Low residual risk'],
+        'voting_threshold' => 'simple_majority',
+        'status' => 'closed',
+        'outcome' => 'carried',
+        'version_number' => 1,
+        'proposed_by' => $proposer->id,
+        'proposed_at' => now()->subDay(),
+    ]);
+}
+
 function sag_governedApproval(FinBill $bill, Site $site, string $amount = '20000.00'): SpendApproval
 {
     $requester = sag_actor($site, ['governance.spend.view', 'governance.spend.request']);
-    $decider = sag_actor($site, ['governance.spend.view', 'governance.spend.approve']);
+    // The decider must also be able to open the resolution they cite: the
+    // command service conceals an approval whose resolution the actor cannot
+    // view (assertApprovalAuthority -> conceal()).
+    $decider = sag_actor($site, [
+        'governance.spend.view',
+        'governance.spend.approve',
+        'governance.resolutions.view',
+    ]);
     $service = app(SpendApprovalCommandService::class);
     $approval = $service->create($requester, [
         'title' => 'Independent bill authority '.$bill->id,
@@ -137,12 +176,20 @@ function sag_governedApproval(FinBill $bill, Site $site, string $amount = '20000
     ]);
     $submitted = $service->submit($requester, $approval->id, $approval->version);
 
-    return $service->decide($decider, $submitted->id, SpendApproval::STATUS_APPROVED, [
+    // $20,000 of CAPEX is over the board threshold, so the decision carries the
+    // resolution the board passed. (Added when Governance made board sign-off
+    // explicit; this AP-side test predates that gate.)
+    $decision = [
         'decision_key' => (string) Str::uuid(),
         'expected_version' => $submitted->version,
         'expected_content_digest' => $submitted->content_digest,
         'decision_notes' => 'Independent evidence-based approval.',
-    ]);
+    ];
+    if ($submitted->requires_board) {
+        $decision['resolution_id'] = sag_boardResolution($decider, $amount)->id;
+    }
+
+    return $service->decide($decider, $submitted->id, SpendApproval::STATUS_APPROVED, $decision);
 }
 
 beforeEach(function (): void {
