@@ -2,21 +2,26 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\BindsItBrowserActor;
 use App\Models\ItTicket;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreItProblemRequest extends FormRequest
 {
+    use BindsItBrowserActor;
+
     public function authorize(): bool
     {
-        return (bool) $this->user()?->canDo('it.manage');
+        return $this->hasCurrentBrowserActor() && (bool) $this->user()?->canDo('it.manage');
     }
 
     /** @return array<string, array<int, mixed>> */
     public function rules(): array
     {
         return [
+            ...$this->browserActorRules(),
+            'wizard' => ['sometimes', 'boolean'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
             'category' => ['required', Rule::in(ItTicket::CATEGORIES)],

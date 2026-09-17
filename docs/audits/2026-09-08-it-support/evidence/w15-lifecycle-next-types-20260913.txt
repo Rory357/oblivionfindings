@@ -1,0 +1,32 @@
+resources/js/components/today-retirement.test.tsx(84,64): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/today-retirement.test.tsx(87,65): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/today-retirement.test.tsx(93,25): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/pages/Governance/Actions/Show.tsx(314,57): error TS2322: Type '{ children: string; className: string; }' is not assignable to type 'IntrinsicAttributes & { children: ReactNode; }'.
+  Property 'className' does not exist on type 'IntrinsicAttributes & { children: ReactNode; }'.
+resources/js/pages/Governance/Actions/Show.tsx(323,57): error TS2322: Type '{ children: string; className: string; }' is not assignable to type 'IntrinsicAttributes & { children: ReactNode; }'.
+  Property 'className' does not exist on type 'IntrinsicAttributes & { children: ReactNode; }'.
+resources/js/pages/Governance/Compliance/Index.tsx(97,22): error TS2304: Cannot find name 'PageHero'.
+resources/js/pages/Governance/Policies/Attestations.tsx(144,37): error TS2322: Type '"warning" | "neutral"' is not assignable to type 'PageHeaderMeterTone | undefined'.
+  Type '"neutral"' is not assignable to type 'PageHeaderMeterTone | undefined'.
+resources/js/pages/Governance/Policies/Index.tsx(92,37): error TS2322: Type '"warning" | "neutral"' is not assignable to type 'PageHeaderMeterTone | undefined'.
+  Type '"neutral"' is not assignable to type 'PageHeaderMeterTone | undefined'.
+resources/js/pages/Governance/Policies/Show.tsx(115,57): error TS2322: Type '{ children: string; className: string; }' is not assignable to type 'IntrinsicAttributes & { children: ReactNode; }'.
+  Property 'className' does not exist on type 'IntrinsicAttributes & { children: ReactNode; }'.
+resources/js/pages/Governance/Risks/Committee.tsx(94,37): error TS2322: Type '"critical" | "neutral"' is not assignable to type 'PageHeaderMeterTone | undefined'.
+  Type '"neutral"' is not assignable to type 'PageHeaderMeterTone | undefined'.
+resources/js/pages/Governance/Risks/Index.tsx(139,37): error TS2322: Type '"critical" | "neutral"' is not assignable to type 'PageHeaderMeterTone | undefined'.
+  Type '"neutral"' is not assignable to type 'PageHeaderMeterTone | undefined'.
+resources/js/pages/Governance/Risks/Trends.tsx(122,37): error TS2322: Type '"critical" | "neutral"' is not assignable to type 'PageHeaderMeterTone | undefined'.
+  Type '"neutral"' is not assignable to type 'PageHeaderMeterTone | undefined'.

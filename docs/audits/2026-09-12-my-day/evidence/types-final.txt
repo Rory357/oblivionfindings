@@ -1,0 +1,1 @@
+resources/js/pages/my-day/index.tsx(903,41): error TS2339: Property 'timesheets' does not exist on type '{ staff?: { availabilityUpdateSelf?: boolean | undefined; } | undefined; }'.

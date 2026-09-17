@@ -1,0 +1,114 @@
+{
+  "10": [
+    "Not tested",
+    "Core work query and action-version regressions pass. The full Vote/Read/Act/Know-to-receipt journey with errors, recovery, reassignment and return state is not independently established."
+  ],
+  "11": [
+    "Failed",
+    "Actual Sites SiteCalendar reuse and all five view controls are present. The current combined regression has two Sites credential/vendor reminder failures; full calendar error/revocation/timezone matrix remains unverified."
+  ],
+  "12": [
+    "Failed",
+    "Inline paper reading and voting work with an empty follow-up relation, but adding one canonical paper action makes the meeting GET return 500 on nonexistent assignee relationship. Full-pack and action continuity remain incomplete."
+  ],
+  "13": [
+    "Failed",
+    "Frozen terms render in context and stable owner choices are now supplied. Supporting-document rows in the inline paper have no open/download control, so full informed evidence access before voting is not delivered."
+  ],
+  "14": [
+    "Not tested",
+    "Missing versions, borrowed private evidence and relevant terminal-state probes reject correctly. Full source-linked carried-close, reassignment, evidence upload/completion and implementation lifecycle is not independently established."
+  ],
+  "15": [
+    "Failed",
+    "Generic unbound approvals now reject, but a resolution bound to a 6000 increase approves a changed decrease and reduces the line to 94000. Two existing budget contract tests also fail."
+  ],
+  "16": [
+    "Not tested",
+    "Future invalid compliance evidence is rejected and previous targeted probes improve. Full risk/compliance provenance, currency, verification and recoverable user journeys remain unverified."
+  ],
+  "17": [
+    "Failed",
+    "Generic unrelated proposals now reject, but approval of the staff-wellbeing strategic plan still approves a Property strategic plan through the title fallback."
+  ],
+  "18": [
+    "Not tested",
+    "Retested CEO/private-meeting denials and expired committee boundaries hold. Complete authorized preparation, release/revocation, appraisal and historical privacy workflow remains unverified; D2 remains external."
+  ],
+  "19": [
+    "Not tested",
+    "Future-policy attestation and explicit document-capability regressions now pass. Complete versioned assignment denominators, byte-hash upload/download, revocation and old-receipt lifecycle remain unverified."
+  ],
+  "20": [
+    "Not tested",
+    "Actual UI Yes response now succeeds; fractional ratings and inactive respondents reject. Full membership/interests/evaluation lifecycle and approved instruments remain unverified."
+  ],
+  "21": [
+    "Not tested",
+    "No representative supported-living assurance dataset/provenance and period-change walkthrough was completed in this pass. Existing operational content gates remain."
+  ],
+  "22": [
+    "Failed",
+    "65 PageHeader usages and zero PageHero references confirm progress. Nineteen standalone Create/Edit files remain, with only one WizardShell file; full form, reading, action, NZ date and focus/error contracts remain incomplete."
+  ],
+  "23": [
+    "Not tested",
+    "Invalid escalation recipient rejects and failed transport retries correctly. Full reminders, queued audience/recipient lifecycle and infrequent-user help comprehension remain unverified."
+  ],
+  "24": [
+    "Failed",
+    "The integrated suite is not green and new authority, pack-discovery, count and populated-meeting defects reproduce. Fresh build/source evidence does not establish full release acceptance."
+  ],
+  "25": [
+    "Not tested",
+    "Shared wizard/focus/header tests pass 15/15. The member 1366x768 sample does not establish every retained desktop keyboard, contrast, light/dark, zoom and recovery state; chair layout verification was not completed in this pass."
+  ],
+  "26": [
+    "Failed",
+    "Exact approval body/subject/direction bindings still fail; discovery and direct visibility disagree for safe packs. Concurrency, evidence, derived audience and canonical boundary acceptance is not complete."
+  ],
+  "27": [
+    "Blocked",
+    "Actual organisational constitution/trust deed and D1/D2/D3 authority/content sign-off remain external release gates. Industry practice and synthetic fixtures cannot supply that approval."
+  ],
+  "28": [
+    "Not tested",
+    "Representative human board-member comprehension testing has not occurred; synthetic agent browser checks cannot substitute for it."
+  ],
+  "01": [
+    "Failed",
+    "Combined regression exits 1 (three Governance and two Sites failures); types exits 2 outside Governance. Build and all 15 shared UI tests pass. Existing E2E checks do not cover a populated meeting/action journey."
+  ],
+  "02": [
+    "Failed",
+    "Nested private-pack and denied Records regressions now pass. Home still counts a confidential agenda item that the member meeting correctly excludes (1 versus 0); complete derived-audience coverage remains unfinished."
+  ],
+  "03": [
+    "Failed",
+    "Frozen quorum calculations now agree, but a motion restricted to another body activates the board profile. Exact authority/body/version binding is still required; D1 remains an external gate."
+  ],
+  "04": [
+    "Not tested",
+    "Retested opening electorate, rules and parent quorum are stable, and a synthetic in-context browser vote produces a receipt. Full duplicate/stale/cast-conflict-close races and closed-decision lifecycle are not independently established."
+  ],
+  "05": [
+    "Not tested",
+    "Missing/stale-version approval remains rejected without approving unseen content. Complete review, sign, archive, correction, replay and concurrent-editor lifecycle remains unverified."
+  ],
+  "06": [
+    "Failed",
+    "Private nested pack download now denies correctly. A safe distributed pack containing paper 2999 disappears when hidden paper 2 exists. Full reading/edition/attachment contract remains incomplete."
+  ],
+  "07": [
+    "Failed",
+    "The prior risk-category mismatch is repaired, but 128 authorized priorities are reduced to 100 while Show all retains the full claim. Complete canonical obligation/last-page reconciliation remains open."
+  ],
+  "08": [
+    "Not tested",
+    "Financial unavailable states remain explicit, and core retained fixes pass. Full failure/recovery, period races, revocation/cache and historical-link matrix was not independently exercised in this audit."
+  ],
+  "09": [
+    "Failed",
+    "The real ordinary member now has four Governance links. Home still foregrounds administrative readiness links and the truncated board priority list; concise member/meeting context remains incomplete."
+  ]
+}

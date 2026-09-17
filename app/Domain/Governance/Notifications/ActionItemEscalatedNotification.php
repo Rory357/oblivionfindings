@@ -3,10 +3,13 @@
 namespace App\Domain\Governance\Notifications;
 
 use App\Domain\Governance\Models\ActionItem;
+use App\Domain\Governance\Support\GovernanceLabels;
+use App\Domain\Governance\Support\GovernanceWording;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
+/** Tells an action's owner the overdue sweep raised it with the board. */
 class ActionItemEscalatedNotification extends Notification
 {
     use Queueable;
@@ -22,15 +25,19 @@ class ActionItemEscalatedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $title = $this->actionItem->title;
+        $due = GovernanceLabels::date($this->actionItem->due_date?->toDateString());
+        $overdueDays = GovernanceWording::daysFromToday($this->actionItem->due_date?->toDateString());
+
         return (new MailMessage)
-            ->subject("Action Item Escalated: {$this->actionItem->action_reference}")
-            ->line('An action item assigned to you has been escalated due to being overdue.')
-            ->line('')
-            ->line("**{$this->actionItem->description}**")
-            ->line("Due Date: {$this->actionItem->due_date->format('j F Y')}")
-            ->line("Days Overdue: " . now()->diffInDays($this->actionItem->due_date) . " days")
-            ->action('View Action Item', url("/governance/actions/{$this->actionItem->id}"))
-            ->line('Please complete this action item or contact the board chair if you need assistance.');
+            ->subject("Overdue action raised with the board: {$title}")
+            ->line('An action you own is overdue, so it has been raised with the board automatically.')
+            ->line("**{$title}**")
+            ->line("Due: {$due}".($overdueDays !== null && $overdueDays < 0
+                ? ' ('.GovernanceWording::count(abs($overdueDays), 'day').' overdue)'
+                : ''))
+            ->action('Open the action', url("/governance/actions/{$this->actionItem->id}"))
+            ->line('Please update its progress or mark it as done. If you need help, contact the board chair.');
     }
 
     public function toArray(object $notifiable): array

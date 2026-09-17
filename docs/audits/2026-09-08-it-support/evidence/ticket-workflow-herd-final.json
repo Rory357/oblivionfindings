@@ -1,0 +1,14 @@
+{
+  "verified_at": "2026-09-13T06:04:46.9966376Z",
+  "manifest_sha256": "39b9420c6e0aace482bd5b8491aac75e345335644519dfc7ee4222dd876d29f9",
+  "app_asset": "assets/app-1if2QQuE.js",
+  "ticket_asset": "assets/show-jmsaHrlO.js",
+  "hot_present": false,
+  "list_url": "https://oblivionfindings.test/it?tab=tickets",
+  "ticket_url": "https://oblivionfindings.test/it/tickets/6",
+  "normal_app_modal_observed": true,
+  "existing_session_unchanged": true,
+  "ticket_records_saved_in_herd": false,
+  "browser_console_errors": 0,
+  "verification_tab_closed": true
+}

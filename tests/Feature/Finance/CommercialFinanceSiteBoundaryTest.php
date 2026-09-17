@@ -98,8 +98,10 @@ it('Site-scopes Billing entries and Client picker options', function () {
         ]);
     }
 
+    // The Billing index is now the entries register (the standalone
+    // /billing/entries page was retired and redirects here).
     $this->actingAs($user)
-        ->get(route('finance.billing.entries'))
+        ->get(route('finance.billing.index'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('entries.total', 1)

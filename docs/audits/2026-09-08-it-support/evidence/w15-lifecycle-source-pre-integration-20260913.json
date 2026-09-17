@@ -1,0 +1,482 @@
+{
+  "captured_utc": "2026-09-13T04:27:07.4332802Z",
+  "purpose": "Read-only W15 source checkpoint before coordinated Git integration; prepared session-memory patches remain unapplied.",
+  "files": [
+    {
+      "path": "app/Domain/Hr/Services/OnboardingService.php",
+      "sha256": "94CBC8064C705309FFEE87E1B66176ACEC3AEB54365FC728995AE2D9C95CC3F5"
+    },
+    {
+      "path": "app/Domain/It/Services/ItSetupCommandService.php",
+      "sha256": "7EEDB9425F01ACCDA56089768DE1651EDD8C3E0106F106C8DD9D0C83E622248D"
+    },
+    {
+      "path": "app/Domain/It\\Enums\\ItTicketDraftPurpose.php",
+      "sha256": "28B38C8BE6C651150FA94F8B6F7607990D2DBE3BCAF9EF5C124BD83C25522C50"
+    },
+    {
+      "path": "app/Domain/It\\Exceptions\\ItTicketDraftException.php",
+      "sha256": "72239016866F9BD680C97545E7FB9874681C98BF508CD5904922D9D8801DF980"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItAutomationScheduleCatalog.php",
+      "sha256": "B87D2088079FA889E76F96BFBA72D21C6D5B2BB1CAA2883A234D63DE11A597E8"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItCatalogAccessService.php",
+      "sha256": "9701BEA317E1CD1614BF6CAA464C86027D677859A0011A6EED28A225107C20B9"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItCatalogAttachmentService.php",
+      "sha256": "14C34322FAB07B06E17ADF626802531F340B003692DFF6B6F227A9586658B66C"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItCatalogFieldOptionService.php",
+      "sha256": "DB4D960330C24E78743F867850A1B5420F292B63BC871347DEE89FFFF80DE90F"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItCatalogManagementService.php",
+      "sha256": "16E2AFDFD9709477498ED0042CE31BF079E2CAD191E3776A03D1937D0596BEC3"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItCatalogSubmissionService.php",
+      "sha256": "EE791635215A13792447CD3F63687DAB2E51EDF04842367FF1589C8F588E6514"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItCatalogueDraftAdapter.php",
+      "sha256": "549E6EB60A09BD6F5B9B3917CFC62CC2632D0F2FCBACEBE3E72C72C01B97DD23"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningAccessService.php",
+      "sha256": "B47080DA1A06F547AD4536439D097A0520586A4E3C1C844B93997A0EDE3AA61C"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningCanonicalTargetService.php",
+      "sha256": "A71F0EF2FFD87921046CC007AD0F5E7E3B99D9684B6D10B0EC7B1848E85C8BFC"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningCommandService.php",
+      "sha256": "FE48094C26F352DE43E862F7A5557887B1DFA252EA70432425A6261346AC82C4"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningHrSourceService.php",
+      "sha256": "BDD638BD0035F558650D8E0071FCADA2790A3DD0593B3025CBB6958DA3DBAF92"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningReadinessService.php",
+      "sha256": "51E354341B724717E767CCAAA0874C43EC75A7E1A50AA9CBF9A68A255C4D6CDA"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningRequestLifecycleService.php",
+      "sha256": "E887F01B050CEEC8473C3C74CD844A650211CFB1BCB2B8D9098E94BB5DD3CC0D"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningResponsibilityService.php",
+      "sha256": "304FD7F19AAE01A657D55CEBFE960C1A5043E697191A67A710BF2ED917DB491C"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningTemplatePublicationService.php",
+      "sha256": "EA116D8BBAC2D2CA7110084086E2A678391B5174627CCACAA54368B009976BB2"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningTemplateService.php",
+      "sha256": "73C4F4EBDA729F53A43063B007DC667CB2E1A37EB7923E9213CC25B2489F3F5A"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningTemplateVersionService.php",
+      "sha256": "A295341C1DF8D2155942293172E74F1E1BA775C3FD084B07FB8C815617F1E769"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningTrackingService.php",
+      "sha256": "CBF0759FB157C6DB5E6D114FF17185779AF8084E6A9BDD6583B06C7F55586A4F"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningWorkflowLifecycleService.php",
+      "sha256": "855DEB8A18001B94863C53EC22B75483A6D1CCF7E0436FCE68B4F5EE2D83ECBE"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItProvisioningWorkflowService.php",
+      "sha256": "63D632531B1A850FAB02923E084BE8D98252697CE5DAE2228BB55CC452B7CFAD"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItTicketDraftAttachmentService.php",
+      "sha256": "701700113669D88677FCDA6558BB6CDCAE9036D4454394C681FAF9D84170C0DA"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItTicketDraftPayload.php",
+      "sha256": "FFB5AEFD20387B80DFAE7D7D28C0F1CBDC331B8F17764678CDF547A83649CA2F"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItTicketDraftPruner.php",
+      "sha256": "F4341DEAA00A68183FCF10CC5B83324E1353EFEF61AD88A21EC7135E579C4B87"
+    },
+    {
+      "path": "app/Domain/It\\Services\\ItTicketDraftService.php",
+      "sha256": "709C82B016C1CE1E8128B0CBE3329A9B8E8B80A7B799958FF5ED0FF4D097960C"
+    },
+    {
+      "path": "app/Http/Controllers/Hr/EmployeeProfileController.php",
+      "sha256": "30D86414BCAEA7D86E856A415AA99A7F859E812166BC4388DBE3454292DE8260"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+      "sha256": "71BE60CA708486087695B7BB2AA4767ABC7682D7DC879653665FEE83AB92B4CC"
+    },
+    {
+      "path": "app/Http/Controllers/It\\ItCatalogController.php",
+      "sha256": "9D8FAE6CBC8B7888AC56D7DB6CB996E5C4346945878FC5D931D3E3FC6301F306"
+    },
+    {
+      "path": "app/Http/Controllers/It\\ItCatalogFieldOptionController.php",
+      "sha256": "A9284D908847B27DF865DE42402B86895FEBE432D13301DD2D4B7255822D8F31"
+    },
+    {
+      "path": "app/Http/Controllers/It\\ItCatalogRequestedForOptionController.php",
+      "sha256": "70EC597FA36BEF344A82DFC5936ED2775960E27639DD5227D8F306E5394AE8E4"
+    },
+    {
+      "path": "app/Http/Controllers/It\\ItProvisioningController.php",
+      "sha256": "A1479710E651AFD8D97E12C68EB435AA498D1B938AF6D8CEDAF797CF3674709F"
+    },
+    {
+      "path": "app/Http/Controllers/It\\ItProvisioningTrackingController.php",
+      "sha256": "0158868DAC8DE5DEF17F014D9A28D46F2CD406BFCA26F72535186272D4055615"
+    },
+    {
+      "path": "app/Http/Controllers/It\\ItProvisioningWorkspaceController.php",
+      "sha256": "1DED867406E0CE5F9675EAD20C961272A8CA3D82C36ADD320EE857D3DE476BFA"
+    },
+    {
+      "path": "app/Http/Controllers/It\\ItTicketDraftController.php",
+      "sha256": "FD833A501D303D69AC0D85F87B5D5E7B3FF0C4BCE3D86C4A2AB0CA7D70788F97"
+    },
+    {
+      "path": "app/Http/Requests/It\\ApproveProvisioningRequestRequest.php",
+      "sha256": "3441DA8F0CD964EA95481C52D7617B30304C42733ED56EFE66D840AFFE974280"
+    },
+    {
+      "path": "app/Http/Requests/It\\AssignProvisioningRequestRequest.php",
+      "sha256": "4C1489A3447139C96964335D21C88BFBC0DAACC2FB5F081D54E49743A8084B0F"
+    },
+    {
+      "path": "app/Http/Requests/It\\BulkProvisioningActionRequest.php",
+      "sha256": "BFAE728C0D9905C70454A6C53FDA26554A9AD6455CD81B5C92E29EFC0251A98C"
+    },
+    {
+      "path": "app/Http/Requests/It\\CancelProvisioningRequestRequest.php",
+      "sha256": "C10D20422A29B6393DFFF578C72EFA5AA077BAF7D3B4ED8C75BED494F92DF932"
+    },
+    {
+      "path": "app/Http/Requests/It\\FailProvisioningRequestRequest.php",
+      "sha256": "6C49B3675937724297E64DD4B02850AB033DCA86C798EABD7A896177994BCC42"
+    },
+    {
+      "path": "app/Http/Requests/It\\FulfilProvisioningRequestRequest.php",
+      "sha256": "909A14BAAB95861A75EC3DDEC4244261EF54D3850C3A212F16C30022AEC2F50D"
+    },
+    {
+      "path": "app/Http/Requests/It\\RecoverCatalogSubmissionRequest.php",
+      "sha256": "8515A19B31EE22891DE83A64884D039AD55180C41B96B711564CC477299AD349"
+    },
+    {
+      "path": "app/Http/Requests/It\\SaveItCatalogItemRequest.php",
+      "sha256": "FA8E05F3B365270C3EFA294F8CE3E7FF642D417DCDEE6989E7A2CE125FFA6796"
+    },
+    {
+      "path": "app/Http/Requests/It\\SearchItCatalogFieldOptionsRequest.php",
+      "sha256": "2CDD8A44210FDCBB2E494869803BA08DAE8BC55E7DE8C2419EC28BA0A3C26966"
+    },
+    {
+      "path": "app/Http/Requests/It\\StoreCatalogRequest.php",
+      "sha256": "1C7DB39C7D1CFF5F593004E5B1DFAADA7B7F647D8946AE10B60CD7B024A56A8B"
+    },
+    {
+      "path": "app/Http/Requests/It\\StoreItProvisioningTemplateRequest.php",
+      "sha256": "A934ACE5BAA7CCD9DEEA188C06DEA6391D3D86948671D8890F8B8B50F77332FC"
+    },
+    {
+      "path": "app/Http/Requests/It\\StoreProvisioningRequestRequest.php",
+      "sha256": "D593BFB62ACCD26743DCECCDC43524193C98BDE8C115DE7A3AE8D0A63E0EAB5D"
+    },
+    {
+      "path": "app/Http/Requests/It\\UnpublishItCatalogItemRequest.php",
+      "sha256": "154F240A3EEF84EC52B0EBB29F7694EE99681D5DB3A7F65E91008041162D0860"
+    },
+    {
+      "path": "app/Models\\ItCatalogItem.php",
+      "sha256": "74D017AF83DE2C0CD1699861682106BB5F306D09127834C67C51AE3452904324"
+    },
+    {
+      "path": "app/Models\\ItCatalogSubmission.php",
+      "sha256": "B4AD63B1680989A5B0D4A214D76862477A30F9EB59088E4CACD95A97F413EF6E"
+    },
+    {
+      "path": "app/Models\\ItCatalogVersion.php",
+      "sha256": "997460AB4EDC1465D09E09FFAE9956F4114864E8035FFF825F8EA8E673BF84E0"
+    },
+    {
+      "path": "app/Models\\ItProvisioningRequest.php",
+      "sha256": "A1A1BC9A25595EACDEBB12EA6AC9E0381BAB8551AD6D067F74B3B38F9847A1EC"
+    },
+    {
+      "path": "app/Models\\ItProvisioningTemplate.php",
+      "sha256": "1C468AAA4C0970594DE99563C9B71A7F122364DE42BDFE358C26CE89E8F1F819"
+    },
+    {
+      "path": "app/Models\\ItProvisioningTemplateTask.php",
+      "sha256": "163C6E73D69D1DB579D5D544324480CCECC79E793697CAE1DE2278DB9EDAAF9D"
+    },
+    {
+      "path": "app/Models\\ItProvisioningTemplateVersion.php",
+      "sha256": "EDCFAD0A662C6C347B16F7CCC340D90796B3816373F4C86A0699C195B391EE06"
+    },
+    {
+      "path": "app/Models\\ItProvisioningWorkflow.php",
+      "sha256": "3BCEEECC2A92E4BF03C8DEBAAF88CCC0BD1B8731063D8E8FC5135C1BB0D71342"
+    },
+    {
+      "path": "app/Models\\ItTicketDraft.php",
+      "sha256": "18781DFF630CAE2EBD347B0CCFBDC9F03AFB21FC01226C12D134CE31E2BD7140"
+    },
+    {
+      "path": "app/Services/Tasks/Providers\\ItProvisioningTaskProvider.php",
+      "sha256": "64FD5A2050A8ABE16BF36C4B27C65D27D3AD2ACCA231B8AA700BA27DE11EC1F9"
+    },
+    {
+      "path": "database/migrations\\2026_07_02_100001_create_it_provisioning_tables.php",
+      "sha256": "B72A4285B6B50AADE328675588F8C4B9F564B172EB6FD519E595BE0776FDE213"
+    },
+    {
+      "path": "database/migrations\\2026_07_18_200002_create_it_service_catalogue.php",
+      "sha256": "60FB9057D9FE429A9E51BDD064ACA5EB14036948E64393A8F38412E7BFB58A95"
+    },
+    {
+      "path": "database/migrations\\2026_07_18_200007_create_it_provisioning_templates.php",
+      "sha256": "6C2024EE874D2B3C541602A6576890AA253DDE836D56CEB15005D817CF224082"
+    },
+    {
+      "path": "database/migrations\\2026_07_21_100006_create_monitoring_storage_catalog.php",
+      "sha256": "1A46C5C63254274A379826149333AE98351C9E59B2323760FF1AA927694DE1E8"
+    },
+    {
+      "path": "database/migrations\\2026_09_12_000035_version_it_catalogue_publications.php",
+      "sha256": "9A4D8E565E793EDD4857803D47F2B16CC88A745752A8F9BAC065682AD9C59EB0"
+    },
+    {
+      "path": "database/migrations\\2026_09_12_000036_bind_catalogue_setup_commands.php",
+      "sha256": "621ECA8BBA5660F6662E61A8EFB8278A4D7BD1702AB5D7A84FCF34F90E3CBF73"
+    },
+    {
+      "path": "database/migrations\\2026_09_12_000037_scope_it_catalogue_sites.php",
+      "sha256": "3EFA51AEBEF72F7549D6B30B0573395BF959A3BB70A05B81DAD59DBBDBECB4AD"
+    },
+    {
+      "path": "database/migrations\\2026_09_12_000038_version_it_provisioning_templates.php",
+      "sha256": "7665E8B74C58D611E0450B790441037850282F559E5ABCAF917224056DD5B153"
+    },
+    {
+      "path": "database/migrations\\2026_09_12_000039_bind_provisioning_template_setup_commands.php",
+      "sha256": "57D54B85F9451C387B2D0D5F21FE1209969D2DEF531F73CEC1C521DA8BF0EC14"
+    },
+    {
+      "path": "database/migrations\\2026_09_12_000070_add_catalogue_field_to_it_attachments.php",
+      "sha256": "9662785A3E1CD8768387C67A5DFBA4ABFA1C3CACA14B7AE9BF8E04093F36099A"
+    },
+    {
+      "path": "database/migrations\\2026_09_13_000080_complete_it_provisioning_lifecycle.php",
+      "sha256": "705CECAC5F3C6E525EB7BBD168BD128291A65065DC72DFB33B559723EF8A6C55"
+    },
+    {
+      "path": "resources/js/components/it/specialist-record-list.tsx",
+      "sha256": "8F96A9E7653441CE4FF52BD76417839545D80FD57E5758DF26AEB721370759B2"
+    },
+    {
+      "path": "resources/js/components/it\\__tests__\\catalogue-draft-recovery.test.tsx",
+      "sha256": "4226BCB1A374B2F990C8EE0C049A57F4101970728BE46B1EFEA458AAF2A83BBA"
+    },
+    {
+      "path": "resources/js/components/it\\__tests__\\catalogue-entity-picker.test.tsx",
+      "sha256": "26359A02512902A515511DAB0CF7C96295065568AA3941AE4F3F7BBA9C4AE36D"
+    },
+    {
+      "path": "resources/js/components/it\\__tests__\\catalogue-request-wizard.test.tsx",
+      "sha256": "52D2C38D2DE6F840F20290BAC869ABD8C11D824A96B0E4E036BE3B9A5FBB8E72"
+    },
+    {
+      "path": "resources/js/components/it\\__tests__\\catalogue-submission-contract.test.ts",
+      "sha256": "6AC1413B23283D269423E30E1D7F5DBCD1D4B5B229DDA6F4B70B246B5AA97114"
+    },
+    {
+      "path": "resources/js/components/it\\__tests__\\it-catalogue-management.test.tsx",
+      "sha256": "6BCF28D7F512AC787C2346974AD279CECCF90B0144CEDD669016AA8673273C75"
+    },
+    {
+      "path": "resources/js/components/it\\__tests__\\it-provisioning-templates.test.tsx",
+      "sha256": "79AB2684C3683A2CF90EEDAD7BEF5DECEF8C61FBFAB9569425B1C8D86B38D3A1"
+    },
+    {
+      "path": "resources/js/components/it\\__tests__\\provisioning-cancel-dialog.test.tsx",
+      "sha256": "9E8A8CD2520DC9718E27B2C7BBDB358CE6509FD0F30715EAC2A0AF23D843ED00"
+    },
+    {
+      "path": "resources/js/components/it\\__tests__\\provisioning-request-files.test.tsx",
+      "sha256": "0F7719F201DA1FFA09BA18159BBB64D22451AE4AF874C6B7110B8E116B924265"
+    },
+    {
+      "path": "resources/js/components/it\\__tests__\\provisioning-tracking.test.tsx",
+      "sha256": "38DA4937922EF234C543016B71447D629327C2732FDAF614D2D5ADBBCE33400B"
+    },
+    {
+      "path": "resources/js/components/it\\__tests__\\use-catalogue-submission.test.ts",
+      "sha256": "D498CF0C000A1C937CA2A9A85439C5DBCD5A9327A6251F238102360A9BBEFB6F"
+    },
+    {
+      "path": "resources/js/components/it\\__tests__\\use-provisioning-command.test.tsx",
+      "sha256": "6C4A9E3F861F891020DD706CAAA608CB2D7D74F6F8E20E4F44D8771F302A2B82"
+    },
+    {
+      "path": "resources/js/components/it\\catalogue-attachments.tsx",
+      "sha256": "0A099AEDD42B9DF5B8C80FF59A9C75C12EA4998C7AC05FB7694229C8AC702572"
+    },
+    {
+      "path": "resources/js/components/it\\catalogue-entity-picker.tsx",
+      "sha256": "8013D5E0F5AE2E696150E03C1F636D1CBC46C497EC99D86A028B4792B7BA0FEC"
+    },
+    {
+      "path": "resources/js/components/it\\catalogue-request-fields.tsx",
+      "sha256": "C3E43967FC5172140CFF9CAA669483B383C5BBF07B0AF5321AEE49F7E38F6FB7"
+    },
+    {
+      "path": "resources/js/components/it\\catalogue-request-wizard.tsx",
+      "sha256": "59430513B9DC8AFABDB020932C6C861C5F9C13623A422FE4110FBB508ACA2694"
+    },
+    {
+      "path": "resources/js/components/it\\catalogue-submission-contract.ts",
+      "sha256": "41762DD1D3203DD4B6F18BCEA9AE8FAFC8CCC814B05D10A0AD4E8EDDCA471463"
+    },
+    {
+      "path": "resources/js/components/it\\it-catalogue-management.tsx",
+      "sha256": "B185B4220BCBC89F5036B44E1473DB0D621381E274C2CB934BCAF6E217100486"
+    },
+    {
+      "path": "resources/js/components/it\\it-provisioning-list.tsx",
+      "sha256": "F06EB3CEAFD8A65A097C4BB4CC77273F97CE4A71980FB86A88BA178159C76AAA"
+    },
+    {
+      "path": "resources/js/components/it\\it-provisioning-templates.tsx",
+      "sha256": "FD15631D8CF0F727FD839ECF6ABA4E9B5860227DDC634B8F02394D03CD701755"
+    },
+    {
+      "path": "resources/js/components/it\\it-service-catalogue.tsx",
+      "sha256": "8BDB4AC943E931C5F2FEC1F517440DF1AC13E9ED61DC48BE08D3F67F5039BF08"
+    },
+    {
+      "path": "resources/js/components/it\\my-provisioning-list.tsx",
+      "sha256": "3B2BABB775D02B863E1D07069544AFF9C990883BDFCBFFAAE0FC0E00EC0798D3"
+    },
+    {
+      "path": "resources/js/components/it\\provisioning-cancel-dialog.tsx",
+      "sha256": "E7808790119976115DD28ED01D5DD4415B0D1E750669351C1DC78E3BA2AD3D06"
+    },
+    {
+      "path": "resources/js/components/it\\provisioning-command-dialog.tsx",
+      "sha256": "47DD2E71A8EA6D5342C84FCB57D00DC0A089D9AC77435936F200D0949372B8DB"
+    },
+    {
+      "path": "resources/js/components/it\\provisioning-launch-dialog.tsx",
+      "sha256": "9C553E848AEF00A81280625FDB199D3B591E4DB47B4059AB83165A7FAF769CFE"
+    },
+    {
+      "path": "resources/js/components/it\\provisioning-manual-dialog.tsx",
+      "sha256": "F7C75654CDA5B8B6097ABA76DB703EAB42ED95FC79B19997654E9DF1DCE16C61"
+    },
+    {
+      "path": "resources/js/components/it\\provisioning-picker.tsx",
+      "sha256": "524BF772EC90582F57206438345EC6886D7F170CA19C27EF06F4DBE85E3106F1"
+    },
+    {
+      "path": "resources/js/components/it\\provisioning-request-files.tsx",
+      "sha256": "C003D1E6BAC1D0B902D0423A62D5D438EB584EA882945A6BCB24B8E332EDB5BE"
+    },
+    {
+      "path": "resources/js/components/it\\provisioning-workspace.tsx",
+      "sha256": "5C6280E190F9ED3C9890DA53EB494BEE6ACB37E205C2C268AB1768268E727496"
+    },
+    {
+      "path": "resources/js/components/it\\use-catalogue-draft.ts",
+      "sha256": "2CBBA4809E6A1272088A6F0B50C347387149009710BF81970CA004C0A0E5F53A"
+    },
+    {
+      "path": "resources/js/components/it\\use-catalogue-submission.ts",
+      "sha256": "95D77F35549C09F69F41B50A024E02D47FB61286AE7C00DD84E1A5B5B8D70C3F"
+    },
+    {
+      "path": "resources/js/components/it\\use-provisioning-command.ts",
+      "sha256": "9FD605E796B3E56835D05D43600745B5991173B503E5CA0C01CD7D436687E9BA"
+    },
+    {
+      "path": "resources/js/hooks/it-ticket-draft-memory.ts",
+      "sha256": "3E00CCFC3E6A56D0B02ABD8CDAC383B09E5D14329F483BEB88EBD3397F755027"
+    },
+    {
+      "path": "resources/js/hooks/use-it-ticket-draft.ts",
+      "sha256": "DABA48276E883CCBEEF666788B4C0C2CC2D6232C0AD58B61C56A16B055E7DE28"
+    },
+    {
+      "path": "resources/js/pages/it\\provisioning\\index.tsx",
+      "sha256": "A0A39A47378DD749DB04FEB3C23722A70E74A76916D4E6D42DC9CCED3DFBF30C"
+    },
+    {
+      "path": "resources/js/pages/it\\provisioning\\show.tsx",
+      "sha256": "44C8BEFF31A3785897CB7C6B1DD3A3BE71B09B344C645000991C2EC9A0407CB4"
+    },
+    {
+      "path": "resources/js/pages/it\\provisioning\\task.tsx",
+      "sha256": "CC5A61BF701DDBE30868C93C42A35CFD2EDE4203E9314524A8FD8F8165A62A3F"
+    },
+    {
+      "path": "resources/js/pages/it\\provisioning\\template.tsx",
+      "sha256": "E9563B5BCFBF24C0D4C6CB9BF552F2199D8156EC8745B80FFB1CC41DC63E22F0"
+    },
+    {
+      "path": "resources/js/pages/it\\provisioning\\workflow.tsx",
+      "sha256": "8E9638E0800FEE2598A4B7280BA3276462C170C3823C9450B40331FB68DB7229"
+    },
+    {
+      "path": "tests/Feature/It\\ItCatalogAttachmentTest.php",
+      "sha256": "434F444F7ED2957CE63137EFB5E068AD7E70AFFD464F41BC5F1EFC865BF9F40D"
+    },
+    {
+      "path": "tests/Feature/It\\ItCatalogueDraftTest.php",
+      "sha256": "8BD6AAA248C77CE590E044D7FEA1B065F61D8390D3230B5EE90C1E5AA66D4C18"
+    },
+    {
+      "path": "tests/Feature/It\\ItProvisioningBulkTest.php",
+      "sha256": "FBBEB14E5B943E7F7DECC0C4066CF31AF10A20CFACA8A84C72A69C9BD15F0DD5"
+    },
+    {
+      "path": "tests/Feature/It\\ItProvisioningTemplateCommandTest.php",
+      "sha256": "49DF0E7F0562D2BF1771FFD538EF3804DCAEC766FC9099122769C38C95FAA990"
+    },
+    {
+      "path": "tests/Feature/It\\ItProvisioningTest.php",
+      "sha256": "3E91FD91C7E0456DACD75CD0B6E661036D78224B0A77FD702575AACA7CEF209F"
+    },
+    {
+      "path": "tests/Feature/It\\ItProvisioningWorkflowTest.php",
+      "sha256": "7859723DAD6DBAFFBE916FF2B9BC15EA3FDB2091307707EDD3BE60CF9223B307"
+    },
+    {
+      "path": "tests/Feature/It\\ItServiceCatalogTest.php",
+      "sha256": "A041119B43AA2E0BE33F846610C02E0C36B2122861C4265F807C5A25F45D388C"
+    },
+    {
+      "path": "tests/Feature/It\\ItTicketDraftAttachmentTest.php",
+      "sha256": "9F3A4251B06525ADD34F3D9BDBEE693A38EEC58872343EBB600900C113166428"
+    },
+    {
+      "path": "tests/Feature/It\\ItTicketDraftTest.php",
+      "sha256": "A591C541405701E73DEC8C98F7B51F4A59B39B66BD4EF2563B149F37B983B24E"
+    }
+  ]
+}

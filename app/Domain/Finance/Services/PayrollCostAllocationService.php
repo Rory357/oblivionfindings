@@ -10,6 +10,7 @@ use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayrollRunItem;
 use App\Domain\Hr\Models\HrPayslip;
 use App\Models\Timesheet;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -239,19 +240,16 @@ class PayrollCostAllocationService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Shared Allocation Engine                                           */
+    /*  Shared Allocation Engine */
     /* ------------------------------------------------------------------ */
 
     /**
      * Allocate amounts for each payroll run item using timesheet-based attribution.
      *
-     * @param  \Illuminate\Support\Collection  $items  HrPayrollRunItem collection
+     * @param  Collection  $items  HrPayrollRunItem collection
      * @param  callable  $amountResolver  fn(HrPayrollRunItem) => string amount
-     * @param  int  $journalId
-     * @param  int  $journalLineId
      * @param  string  $eventType  'payroll_cost' or 'employer_oncost'
      * @param  mixed  $eventDate
-     * @param  int|null  $tenantId
      * @return array{allocated_count: int, total_amount: string, skipped: int}
      */
     private function allocateItemAmounts(
@@ -367,7 +365,7 @@ class PayrollCostAllocationService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Dimension Resolution (unchanged logic from PR8)                    */
+    /*  Dimension Resolution (unchanged logic from PR8) */
     /* ------------------------------------------------------------------ */
 
     private function resolveDimensions(HrPayrollRunItem $item, ?int $tenantId): array
@@ -399,7 +397,7 @@ class PayrollCostAllocationService
             }
 
             $minutes = max($ts->starts_at->diffInMinutes($ts->ends_at) - (int) $ts->break_minutes, 0);
-            $key = ($ts->shift_site_id ?? 0) . ':' . ($ts->client_id ?? 0);
+            $key = ($ts->shift_site_id ?? 0).':'.($ts->client_id ?? 0);
 
             if (! isset($groups[$key])) {
                 $groups[$key] = [
@@ -476,7 +474,7 @@ class PayrollCostAllocationService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     private function validateJournal(HrPayrollRun $payrollRun): void

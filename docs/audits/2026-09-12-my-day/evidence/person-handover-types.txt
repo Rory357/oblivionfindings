@@ -1,0 +1,11 @@
+resources/js/components/it/it-wizards.tsx(3248,117): error TS2741: Property 'placeholder' is missing in type '{ value: string; onChange: (value: string) => void; options: { value: string; label: string; }[]; }' but required in type '{ value: string; onChange: (v: string) => void; placeholder: string; options: { value: string; label: string; }[]; ariaLabel?: string | undefined; }'.
+resources/js/pages/it/knowledge-access.test.tsx(186,65): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/pages/it/knowledge-access.test.tsx(206,59): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.

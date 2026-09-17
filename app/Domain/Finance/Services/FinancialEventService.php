@@ -60,7 +60,7 @@ class FinancialEventService
      *     source_updated_at?: string,
      *     created_by?: int|null,
      * }  $data
-     * @return FinFinancialEvent  The posted financial event (with journal_id populated).
+     * @return FinFinancialEvent The posted financial event (with journal_id populated).
      *
      * @throws RuntimeException If amount is zero/negative, accounts not found, or posting fails.
      */
@@ -228,7 +228,7 @@ class FinancialEventService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Private                                                            */
+    /*  Private */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -329,7 +329,7 @@ class FinancialEventService
         if (! $account) {
             throw new RuntimeException(
                 "GL account '{$code}' not found (or inactive) for organisation #{$orgId}. "
-                . 'Ensure the chart of accounts includes the required operational expense accounts.'
+                .'Ensure the chart of accounts includes the required operational expense accounts.'
             );
         }
 

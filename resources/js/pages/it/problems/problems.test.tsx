@@ -24,13 +24,21 @@ vi.mock('@inertiajs/react', () => ({
         </a>
     ),
     router: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
-    usePage: () => ({ props: { itNavigation: [] }, url: '/it/problems' }),
+    usePage: () => ({
+        props: { itNavigation: [], auth: { user: { id: 7 } } },
+        url: '/it/problems',
+    }),
     useForm: (initial: Record<string, unknown>) => ({
         data: initial,
         setData: vi.fn(),
         post: vi.fn(),
         patch: vi.fn(),
         reset: vi.fn(),
+        resetAndClearErrors: vi.fn(),
+        setDefaults: vi.fn(),
+        clearErrors: vi.fn(),
+        transform: vi.fn(),
+        isDirty: false,
         processing: false,
         errors: {},
     }),
@@ -44,6 +52,7 @@ const ticket = {
     status: 'in_progress',
     workflow_state: 'known_error',
     href: '/it/tickets/42',
+    lock_version: 1,
 };
 
 describe('IT problem management workspaces', () => {
@@ -69,10 +78,9 @@ describe('IT problem management workspaces', () => {
         expect(
             screen.getByRole('heading', { name: 'Problems & known errors' }),
         ).toBeVisible();
-        expect(screen.getByRole('link', { name: /IT-000042/ })).toHaveAttribute(
-            'href',
-            '/it/problems/7',
-        );
+        expect(
+            screen.getByRole('link', { name: 'Repeated VPN failures' }),
+        ).toHaveAttribute('href', '/it/problems/7');
         expect(
             screen.getByRole('button', { name: /New problem/i }),
         ).toBeVisible();
@@ -112,7 +120,7 @@ describe('IT problem management workspaces', () => {
         );
         expect(
             screen.getByRole('link', {
-                name: /Open canonical ticket workspace/i,
+                name: 'Open ticket',
             }),
         ).toHaveAttribute('href', '/it/tickets/42');
         expect(screen.getByText('Root cause')).toBeVisible();

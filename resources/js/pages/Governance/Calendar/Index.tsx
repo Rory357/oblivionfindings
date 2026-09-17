@@ -4,17 +4,27 @@ import {
     GOVERNANCE_CALENDAR_SOURCES,
 } from '@/lib/governance-calendar-adapter';
 import SiteCalendar from '@/pages/sites/calendar/SiteCalendar';
+import type { SourceDef } from '@/pages/sites/calendar/_parts';
 import { PageProps } from '@/types';
 import { Head } from '@inertiajs/react';
 import { useMemo } from 'react';
 
 interface Props extends PageProps {
+    /** Sources the viewer may see (server-filtered by register permission). */
+    sources?: SourceDef[];
     initialSources?: string[];
     canCreate: boolean;
     committeeOptions?: { value: string; label: string }[];
 }
 
+/**
+ * Governance calendar — the shared Site Calendar (DESIGN.md "Calendars —
+ * always the Site Calendar style") fed by the Governance adapter. Only the
+ * sources whose registers the viewer can open are offered; the header keeps
+ * a way back to Governance Home because its rail carries the calendar views.
+ */
 export default function GovernanceCalendarIndex({
+    sources,
     initialSources,
     canCreate,
     committeeOptions,
@@ -22,11 +32,16 @@ export default function GovernanceCalendarIndex({
     const adapter = useMemo(
         () =>
             createGovernanceCalendarAdapter({
+                title: 'Calendar',
                 initialSources,
-                sourceFilters: GOVERNANCE_CALENDAR_SOURCES,
+                sourceFilters: sources ?? GOVERNANCE_CALENDAR_SOURCES,
                 committeeOptions,
+                backLink: {
+                    href: '/governance/dashboard',
+                    label: 'Governance home',
+                },
             }),
-        [initialSources, committeeOptions],
+        [sources, initialSources, committeeOptions],
     );
 
     return (
@@ -37,7 +52,7 @@ export default function GovernanceCalendarIndex({
                 { title: 'Calendar', href: '/governance/calendar' },
             ]}
         >
-            <Head title="Governance Calendar" />
+            <Head title="Calendar" />
             <SiteCalendar
                 context="page"
                 scope="global"

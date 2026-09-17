@@ -22,7 +22,8 @@ class CredentialReminderProvider extends ObligationProvider
 
     public function obligations(array $siteIds, Carbon $start, Carbon $end): array
     {
-        if ($siteIds === []) {
+        $actor = auth()->user()?->fresh();
+        if ($siteIds === [] || ! $actor instanceof \App\Models\User) {
             return [];
         }
 
@@ -33,8 +34,10 @@ class CredentialReminderProvider extends ObligationProvider
 
         $items = [];
 
-        $credentials = SiteCredential::query()
+        // Calendar capability and token feeds never substitute for vault access.
+        $credentials = app(\App\Services\Sites\SiteCredentialAccess::class)->query($actor)
             ->whereIn('site_id', $siteIds)
+            ->when(\Illuminate\Support\Facades\Schema::hasColumn('site_credentials', 'retired_at'), fn ($query) => $query->whereNull('retired_at'))
             ->with('site:id,name,type')
             ->get();
 

@@ -126,6 +126,14 @@ class Resolution extends Model
         return $this->hasMany(MeetingAgendaItem::class);
     }
 
+    /**
+     * Explicit records (and revisions) this paper was authored to approve.
+     */
+    public function authorityBindings(): HasMany
+    {
+        return $this->hasMany(GovernanceResolutionBinding::class);
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'draft';
@@ -161,27 +169,42 @@ class Resolution extends Model
         return empty($this->governance_meeting_id);
     }
 
+    /**
+     * For decision papers go to a vote. For discussion / For information
+     * papers are shared with members and never voted on.
+     */
+    public function isDecisionPaper(): bool
+    {
+        return ($this->purpose ?? 'decision') === 'decision';
+    }
+
+    /**
+     * What still stops this paper being published. Messages match the
+     * authoring wizard's plain wording (vocabulary.md).
+     *
+     * @return array<string, string>
+     */
     public function validateForPublication(): array
     {
         $errors = [];
 
         if (empty(trim((string) $this->title))) {
-            $errors['title'] = 'Resolution title is required.';
+            $errors['title'] = 'Give the resolution a title.';
         }
 
         $motion = trim((string) ($this->exact_motion ?? ''));
         if (empty($motion)) {
-            $errors['exact_motion'] = 'The exact motion (operative text voted upon) is required.';
+            $errors['exact_motion'] = 'Write the resolution wording — the exact words the board votes on.';
         }
 
         $context = trim((string) ($this->context ?? ''));
         if (empty($context)) {
-            $errors['context'] = 'Background context and justification (why now) are required.';
+            $errors['context'] = 'Explain why this is before the board now.';
         }
 
         $purpose = $this->purpose ?? 'decision';
         if (! in_array($purpose, ['decision', 'discussion', 'information'], true)) {
-            $errors['purpose'] = 'A valid paper purpose (decision, discussion, or information) must be specified.';
+            $errors['purpose'] = 'Choose whether this paper is for decision, for discussion or for information.';
         }
 
         if ($purpose === 'decision') {
@@ -189,11 +212,17 @@ class Resolution extends Model
             $validOptions = array_filter($options, fn ($opt) => ! empty(trim((string) ($opt['label'] ?? ''))));
 
             if (count($validOptions) < 2 && empty(trim((string) ($this->single_option_reason ?? '')))) {
-                $errors['options'] = 'At least two substantive options must be evaluated for consequential decisions, or a specific justification provided why only a single option applies.';
+                $errors['options'] = "Describe at least two options the board could choose, or explain why there's only one option.";
             }
 
             if (empty(trim((string) ($this->recommendation ?? '')))) {
-                $errors['recommendation'] = 'A management recommendation and supporting rationale are required for decision papers.';
+                $errors['recommendation'] = "Add management's recommendation and the reason for it.";
+            }
+
+            // A vote outside a meeting has no meeting to close it: members
+            // need to know when voting ends.
+            if ($this->isOutOfSession() && empty($this->deadline)) {
+                $errors['deadline'] = 'Set a voting deadline — votes outside a meeting (written resolutions) need one.';
             }
         }
 
@@ -202,7 +231,7 @@ class Resolution extends Model
         $hasCostDetails = ! empty($costImpact['amount']) || ! empty($costImpact['funding_source']) || ! empty($costImpact['budget_source']) || ! empty($costImpact['description']);
         $isExplicitNone = ! empty($costImpact['is_none']) || (isset($costImpact['has_cost']) && $costImpact['has_cost'] === false);
         if (! $hasCostDetails && ! $isExplicitNone) {
-            $errors['cost_impact'] = 'Financial implications must be specified (amount and funding source, or explicit confirmation of no financial cost).';
+            $errors['cost_impact'] = "Say what it will cost and where the money comes from, or confirm there's no cost.";
         }
 
         // Risk / Safety / Equity implications
@@ -210,10 +239,58 @@ class Resolution extends Model
         $hasRisk = ! empty($riskImpact['level']) || ! empty($riskImpact['description']) || ! empty($this->service_user_implications) || ! empty($this->risk_equity_implications);
         $isRiskNone = ! empty($riskImpact['is_none']) || (isset($riskImpact['level']) && $riskImpact['level'] === 'none');
         if (! $hasRisk && ! $isRiskNone) {
-            $errors['risk_impact'] = 'Safety, service-user, and risk/equity implications must be documented (or marked not applicable).';
+            $errors['risk_impact'] = 'Describe the effect on the people we support and safety, and the risks and fairness.';
         }
 
         return $errors;
+    }
+
+    /**
+     * Written resolutions (no meeting) follow the board's "written votes need
+     * everyone's agreement" rule when their voting rules say so — the rule
+     * frozen at open wins, otherwise the linked or active profile.
+     */
+    public function writtenUnanimityApplies(?GovernanceVotingProfile $fallbackProfile = null): bool
+    {
+        if (! $this->isOutOfSession()) {
+            return false;
+        }
+
+        if (isset($this->paper_snapshot['voting_profile']) && is_array($this->paper_snapshot['voting_profile'])) {
+            return ! empty($this->paper_snapshot['voting_profile']['written_unanimity_required']);
+        }
+
+        $profile = $this->voting_profile_id ? GovernanceVotingProfile::find($this->voting_profile_id) : null;
+        if (! $profile) {
+            $profile = $fallbackProfile;
+        }
+        if (! $profile) {
+            $committeeId = $this->board_committee_id ?? $this->meeting?->board_committee_id;
+            $profile = app(GovernanceVotingProfileService::class)->getActiveProfile($committeeId ? 'committee' : 'board', $committeeId);
+        }
+
+        return (bool) $profile?->written_unanimity_required;
+    }
+
+    /**
+     * The voting rule the outcome engine actually applies:
+     *   - `unanimous` — everyone entitled votes For (also used for written
+     *     resolutions when the voting rules require everyone's agreement);
+     *   - `two_thirds` (stored as `two_thirds` or `special`) — at least
+     *     two-thirds of the votes cast are For;
+     *   - anything else — more For than Against.
+     */
+    public function appliedThreshold(?GovernanceVotingProfile $fallbackProfile = null): string
+    {
+        if ($this->voting_threshold === 'unanimous' || $this->writtenUnanimityApplies($fallbackProfile)) {
+            return 'unanimous';
+        }
+
+        return match ($this->voting_threshold) {
+            'two_thirds', 'special' => 'two_thirds',
+            null, '' => 'simple_majority',
+            default => (string) $this->voting_threshold,
+        };
     }
 
     public function freezePaperSnapshot(): array
@@ -241,6 +318,18 @@ class Resolution extends Model
             'deadline' => $this->deadline?->toIso8601String(),
             'governance_meeting_id' => $this->governance_meeting_id,
             'board_committee_id' => $this->board_committee_id,
+            'authority_bindings' => $this->authorityBindings()
+                ->orderBy('id')
+                ->get()
+                ->map(fn (GovernanceResolutionBinding $binding) => [
+                    'subject_type' => $binding->subject_type,
+                    'subject_id' => $binding->subject_id,
+                    'subject_revision' => $binding->subject_revision,
+                    'subject_fingerprint' => $binding->subject_fingerprint,
+                    'bound_terms' => $binding->bound_terms,
+                ])
+                ->values()
+                ->all(),
             'frozen_at' => now()->toIso8601String(),
         ];
 
@@ -281,8 +370,9 @@ class Resolution extends Model
 
     public function openForVoting(?\DateTime $deadline = null): void
     {
-        if (empty($this->paper_snapshot)) {
-            $this->freezePaperSnapshot();
+        $snapshot = $this->paper_snapshot;
+        if (empty($snapshot)) {
+            $snapshot = $this->freezePaperSnapshot();
         }
 
         $electorate = $this->captureElectorateSnapshot();
@@ -292,6 +382,7 @@ class Resolution extends Model
             'opened_at' => now(),
             'deadline' => $deadline ?? $this->deadline,
             'electorate_at_open' => $electorate,
+            'paper_snapshot' => $snapshot,
         ]);
     }
 
@@ -307,12 +398,18 @@ class Resolution extends Model
         // Electorate snapshot: use frozen electorate at open or resolve current
         $electorateMembers = $this->electorate_at_open ?? $this->captureElectorateSnapshot();
 
+        $appliedThreshold = $this->appliedThreshold();
+
         $snapshot = [
             'resolution_id' => $this->id,
             'resolution_reference' => $this->resolution_reference,
             'title' => $this->title,
             'closed_at' => now()->toIso8601String(),
             'threshold' => $this->voting_threshold,
+            // The rule the outcome was actually decided by (a written
+            // resolution may need everyone's agreement).
+            'applied_threshold' => $appliedThreshold,
+            'written_unanimity_applied' => $appliedThreshold === 'unanimous' && $this->voting_threshold !== 'unanimous',
             'quorum_required' => (bool) $this->quorum_required,
             'quorum_met' => $isQuorumMet ?? true,
             'quorum_details' => $quorumSnapshot,
@@ -326,6 +423,7 @@ class Resolution extends Model
                 'vote' => $v->vote,
                 'method' => $v->voting_method,
                 'conflict_declared' => (bool) $v->conflict_declared,
+                'vote_note' => $v->vote_note,
                 'voted_at' => $v->voted_at?->toIso8601String(),
             ])->all(),
             'conflicts' => $conflicts->map(fn ($c) => [
@@ -381,21 +479,31 @@ class Resolution extends Model
                 continue;
             }
 
-            // Resolve valid assignee user
+            // Resolve valid assignee user: prefer stable ID, and only resolve by name if exactly one user matches
             $assigneeId = $action['assigned_to'] ?? $action['assignee_id'] ?? null;
-            if (! $assigneeId || ! \App\Models\User::where('id', $assigneeId)->exists()) {
-                if (! empty($action['assignee_name'])) {
-                    $matchedUser = \App\Models\User::where('name', $action['assignee_name'])->first();
-                    if ($matchedUser) {
-                        $assigneeId = $matchedUser->id;
-                    }
-                }
-            }
-            if (! $assigneeId || ! \App\Models\User::where('id', $assigneeId)->exists()) {
-                $assigneeId = $this->proposed_by ?? auth()->id() ?? 1;
+            if ($assigneeId && ! \App\Models\User::where('id', $assigneeId)->exists()) {
+                $assigneeId = null;
             }
 
-            $title = $action['title'] ?? ('Follow-up from ' . ($this->resolution_reference ?: "Resolution #{$this->id}"));
+            if (! $assigneeId && ! empty($action['assignee_name'])) {
+                $matchedUsers = \App\Models\User::where('name', $action['assignee_name'])->get();
+                if ($matchedUsers->count() === 1) {
+                    $assigneeId = $matchedUsers->first()->id;
+                } elseif ($matchedUsers->count() > 1) {
+                    throw new \DomainException("More than one person is called {$action['assignee_name']}, so the follow-up action can't be given to the right person. Choose the person responsible for each follow-up action.");
+                }
+            }
+
+            if (! $assigneeId || ! \App\Models\User::where('id', $assigneeId)->exists()) {
+                $label = trim((string) ($action['title'] ?? $action['description'] ?? ''));
+                throw new \DomainException(
+                    $label !== ''
+                        ? "The follow-up action \"{$label}\" doesn't have a person responsible for it, so it can't be created. Choose who is responsible for each follow-up action."
+                        : "A follow-up action doesn't have a person responsible for it, so it can't be created. Choose who is responsible for each follow-up action."
+                );
+            }
+
+            $title = $action['title'] ?? ('Follow-up from '.($this->title ?: 'a resolution'));
             $description = $action['description'] ?? $title;
 
             $createdActions[] = ActionItem::create([
@@ -417,6 +525,58 @@ class Resolution extends Model
         return $createdActions;
     }
 
+    /**
+     * The frozen paper as a safe presentation payload: the snapshot's copy of
+     * the supporting documents never carries their storage paths.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function presentPaperSnapshot(): ?array
+    {
+        $snapshot = $this->paper_snapshot;
+        if (! is_array($snapshot)) {
+            return null;
+        }
+
+        if (is_array($snapshot['attachments'] ?? null)) {
+            $snapshot['attachments'] = collect($snapshot['attachments'])
+                ->filter(fn ($row) => is_array($row))
+                ->map(fn (array $row) => \Illuminate\Support\Arr::except($row, ['path']))
+                ->values()
+                ->all();
+        }
+
+        return $snapshot;
+    }
+
+    /**
+     * Supporting documents as a safe presentation payload (never the stored
+     * path). A download URL is issued only when the caller has confirmed the
+     * viewer can pass the download route's gates.
+     *
+     * @return array<int, array{id: ?string, original_name: string, mime_type: ?string, size_bytes: ?int, uploaded_at: ?string, uploaded_by_name: ?string, download_url: ?string}>
+     */
+    public function presentAttachments(bool $canDownload = true): array
+    {
+        $existing = is_array($this->attachments) ? $this->attachments : [];
+
+        return collect($existing)
+            ->filter(fn ($row) => is_array($row))
+            ->map(fn (array $row) => [
+                'id' => $row['id'] ?? null,
+                'original_name' => $row['original_name'] ?? 'attachment',
+                'mime_type' => $row['mime_type'] ?? null,
+                'size_bytes' => isset($row['size_bytes']) ? (int) $row['size_bytes'] : null,
+                'uploaded_at' => $row['uploaded_at'] ?? null,
+                'uploaded_by_name' => $row['uploaded_by_name'] ?? null,
+                'download_url' => $canDownload && isset($row['id'])
+                    ? "/governance/resolutions/{$this->id}/attachments/{$row['id']}/download"
+                    : null,
+            ])
+            ->values()
+            ->all();
+    }
+
     public function actionItems(): HasMany
     {
         return $this->hasMany(ActionItem::class, 'source_id')
@@ -429,27 +589,68 @@ class Resolution extends Model
     public function markImplemented(?string $notes = null, ?string $noActionReason = null): void
     {
         if ($this->outcome !== 'carried') {
-            throw new \DomainException("Cannot implement resolution with outcome '{$this->outcome}'. Only carried resolutions can be marked as implemented.");
+            throw new \DomainException('Only resolutions that passed can be marked as done. This one\'s result is: '.\App\Domain\Governance\Support\GovernanceLabels::label('resolution_outcome', $this->outcome).'.');
         }
 
         $actions = $this->actionItems()->get();
         $incompleteActions = $actions->filter(fn ($a) => $a->status !== 'complete');
 
         if ($incompleteActions->isNotEmpty() && empty($noActionReason)) {
-            throw new \DomainException("Cannot mark resolution as implemented: {$incompleteActions->count()} follow-up action(s) remain uncompleted. All actions must be completed or an authorised no-action reason provided.");
+            $count = $incompleteActions->count();
+            $phrase = $count === 1 ? '1 follow-up action is' : "{$count} follow-up actions are";
+            throw new \DomainException("{$phrase} still open. Finish them first, or say why the resolution is done anyway.");
         }
 
         if ($actions->isEmpty() && empty($noActionReason) && empty($notes)) {
-            $notes = 'Marked as implemented by governance authority.';
+            $notes = 'Marked as done.';
         }
 
-        $outcomeNote = $noActionReason 
-            ? "Implemented (Authorised no-action reason: {$noActionReason})" . ($notes ? " - {$notes}" : "")
+        $outcomeNote = $noActionReason
+            ? "Done while follow-up actions were still open, because: {$noActionReason}".($notes ? " — {$notes}" : '')
             : ($notes ?? $this->outcome_notes);
 
         $this->update([
             'status' => 'implemented',
             'outcome_notes' => $outcomeNote,
+        ]);
+    }
+
+    /**
+     * Share a For discussion / For information paper with members: the
+     * wording becomes final (saved copy) and the paper waits for the board
+     * to talk about or note it. It never goes to a vote.
+     */
+    public function publishToMembers(): void
+    {
+        if ($this->isDecisionPaper()) {
+            throw new \DomainException('This paper is for decision, so it goes to a vote. Use "Publish & open voting" instead.');
+        }
+
+        if (! $this->isDraft()) {
+            throw new \DomainException('Only a draft paper can be published to members.');
+        }
+
+        if (empty($this->paper_snapshot)) {
+            $this->freezePaperSnapshot();
+        }
+
+        $this->update([
+            'status' => 'proposed',
+            'published_at' => $this->published_at ?? now(),
+            'published_by' => $this->published_by ?? auth()->id() ?? $this->proposed_by,
+        ]);
+    }
+
+    /** Mark a published For discussion / For information paper as done (no vote). */
+    public function markDoneWithoutVote(?string $notes = null): void
+    {
+        if ($this->isDecisionPaper() || $this->status !== 'proposed') {
+            throw new \DomainException('Only a published paper that is for discussion or for information can be marked as done without a vote.');
+        }
+
+        $this->update([
+            'status' => 'implemented',
+            'outcome_notes' => $notes ?? $this->outcome_notes,
         ]);
     }
 
@@ -473,6 +674,16 @@ class Resolution extends Model
         ];
     }
 
+    /**
+     * The outcome under the rule in appliedThreshold():
+     *   - no_quorum when quorum is required and not met;
+     *   - unanimous: carried only if every entitled voter (frozen electorate)
+     *     voted For — any Against, abstention or step-aside defeats it;
+     *   - two_thirds (`two_thirds` / `special`): carried if at least
+     *     two-thirds of the votes cast (For + Against) are For; abstentions
+     *     and members who stepped aside don't count; no For votes → defeated;
+     *   - otherwise: carried if more For than Against.
+     */
     public function determineOutcome(array $summary, ?bool $isQuorumMet = null, ?int $totalEntitled = null): string
     {
         if ($this->quorum_required && $isQuorumMet === false) {
@@ -485,19 +696,9 @@ class Resolution extends Model
         $conflicts = (int) ($summary['conflicts'] ?? 0);
         $totalCast = $for + $against;
 
-        $isWrittenUnanimityRequired = false;
-        if ($this->isOutOfSession()) {
-            $profile = $this->voting_profile_id ? GovernanceVotingProfile::find($this->voting_profile_id) : null;
-            if (! $profile) {
-                $committeeId = $this->board_committee_id ?? $this->meeting?->board_committee_id;
-                $profile = app(GovernanceVotingProfileService::class)->getActiveProfile($committeeId ? 'committee' : 'board', $committeeId);
-            }
-            if ($profile && $profile->written_unanimity_required) {
-                $isWrittenUnanimityRequired = true;
-            }
-        }
+        $rule = $this->appliedThreshold();
 
-        if ($this->voting_threshold === 'unanimous' || $isWrittenUnanimityRequired) {
+        if ($rule === 'unanimous') {
             // Unanimous requires assent from ALL entitled voters in the frozen electorate
             $entitledCount = $totalEntitled;
             if ($entitledCount === null) {
@@ -521,9 +722,11 @@ class Resolution extends Model
             return 'defeated';
         }
 
-        return match ($this->voting_threshold) {
+        return match ($rule) {
             'two_thirds' => ($for * 3 >= $totalCast * 2) && ($for > 0) ? 'carried' : 'defeated',
-            'simple_majority' => $for > $against ? 'carried' : 'defeated',
+            // NZ special-resolution level (e.g. Companies Act 1993 s2, common in
+            // trust deeds): at least 75% of the For and Against votes are For.
+            'three_quarters' => ($for * 4 >= $totalCast * 3) && ($for > 0) ? 'carried' : 'defeated',
             default => $for > $against ? 'carried' : 'defeated',
         };
     }

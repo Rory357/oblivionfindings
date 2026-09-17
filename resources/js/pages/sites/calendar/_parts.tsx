@@ -64,12 +64,20 @@ export interface SourceDef {
     group: string;
     icon: string;
     origin: string;
+    /**
+     * Optional plain description of where an entry comes from (e.g. "Board or
+     * committee meeting"). When omitted the calendar shows its default
+     * "Manual entry" / "Auto-synced …" wording.
+     */
+    note?: string;
 }
 
 export type Decorated = CalendarItem & {
     _start: Date;
     _end: Date | null;
     typeLabel?: string | null;
+    /** Optional wording for the status chip (e.g. "Minutes due"); the tone still follows `status`. */
+    statusLabel?: string | null;
 };
 
 /* ---- icons -------------------------------------------------------------- */
@@ -319,9 +327,12 @@ const TONE: Record<string, string> = {
 
 export function StatusBadge({
     status,
+    label,
     className = '',
 }: {
     status: string;
+    /** Overrides the status wording only; the tone still follows `status`. */
+    label?: string | null;
     className?: string;
 }) {
     const s = STATUSES[status] ?? STATUSES.scheduled;
@@ -330,7 +341,7 @@ export function StatusBadge({
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] leading-none font-medium ${TONE[s.tone]} ${className}`}
         >
             {status === 'overdue' && <AlertTriangle className="h-3 w-3" />}
-            {s.label}
+            {label || s.label}
         </span>
     );
 }
@@ -1486,6 +1497,7 @@ export function AgendaView({
                                     {e.owner && <Avatar person={e.owner} />}
                                     <StatusBadge
                                         status={e.status}
+                                        label={e.statusLabel}
                                         className="hidden sm:inline-flex"
                                     />
                                 </GuardrailButton>

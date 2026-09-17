@@ -1,29 +1,58 @@
-import { formatMoney, PriceBookDialog } from '@/components/finance';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    ConfirmDialog,
+    FinanceSectionRail,
+    formatMoney,
+    PriceBookDialog,
+    PriceBookItemDialog,
+    type EditablePriceBookItem,
+} from '@/components/finance';
+import {
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterCheck,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
-import { CalendarDays, Pencil, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import {
+    BookOpen,
+    Pencil,
+    Plus,
+    Power,
+    Tag,
+    Trash2,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+const ALL = '__all';
 
 type PriceBookItem = {
     id: number;
     service_code: string | null;
     name: string;
+    description: string | null;
     unit: string;
-    rate: number;
+    rate: number | string;
     rate_type: string;
     category: string | null;
     is_active: boolean;
@@ -43,351 +72,351 @@ type Props = {
     canManage: boolean;
 };
 
-function formatDate(d: string | null): string {
-    if (!d) return '-';
-    return new Date(d).toLocaleDateString('en-NZ', {
+function formatDate(value: string | null): string {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString('en-NZ', {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
     });
 }
 
-export default function PriceBookShow({
-    price_book,
-    canManage = false,
-}: Props) {
+export default function PriceBookShow({ price_book, canManage = false }: Props) {
     const [editOpen, setEditOpen] = useState(false);
-    const [showItemForm, setShowItemForm] = useState(false);
-    const itemForm = useForm({
-        service_code: '',
-        name: '',
-        unit: 'hour',
-        rate: '',
-        rate_type: 'fixed',
-        category: '',
-        is_active: true,
-    });
+    const [itemOpen, setItemOpen] = useState(false);
+    const [editItem, setEditItem] = useState<EditablePriceBookItem | null>(null);
+    const [removeItem, setRemoveItem] = useState<PriceBookItem | null>(null);
+    const [removing, setRemoving] = useState(false);
+    const [search, setSearch] = useState('');
+    const [unit, setUnit] = useState(ALL);
+    const [activeOnly, setActiveOnly] = useState(false);
+    const ctxMenu = useEntityContextMenu<PriceBookItem>();
 
-    const handleAddItem = (e: React.FormEvent) => {
-        e.preventDefault();
-        itemForm.post(`/finance/price-books/${price_book.id}/items`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                itemForm.reset();
-                setShowItemForm(false);
-            },
+    const items = useMemo(() => price_book.items ?? [], [price_book.items]);
+    const activeItems = items.filter((item) => item.is_active);
+
+    const unitOptions = useMemo(
+        () => [
+            { value: ALL, label: 'Any unit' },
+            ...Array.from(new Set(items.map((item) => item.unit))).map(
+                (value) => ({
+                    value,
+                    label: value.charAt(0).toUpperCase() + value.slice(1),
+                }),
+            ),
+        ],
+        [items],
+    );
+
+    const rows = useMemo(() => {
+        const term = search.trim().toLowerCase();
+        return items.filter((item) => {
+            if (
+                term &&
+                !item.name.toLowerCase().includes(term) &&
+                !(item.service_code ?? '').toLowerCase().includes(term)
+            )
+                return false;
+            if (unit !== ALL && item.unit !== unit) return false;
+            if (activeOnly && !item.is_active) return false;
+            return true;
         });
+    }, [items, search, unit, activeOnly]);
+
+    const hasFilters = Boolean(search.trim()) || unit !== ALL || activeOnly;
+
+    const clearFilters = () => {
+        setSearch('');
+        setUnit(ALL);
+        setActiveOnly(false);
     };
 
-    const items = price_book.items ?? [];
+    const averageRate = activeItems.length
+        ? activeItems.reduce((total, item) => total + Number(item.rate), 0) /
+          activeItems.length
+        : 0;
 
-    return (
-        <AppLayout>
-            <Head title={price_book.name} />
-            <PageHero
-                category="finance"
-                variant="compact"
-                title={price_book.name}
-                description={price_book.description ?? ''}
-                backHref="/finance/price-books"
-            />
-            <PageShell>
-                {/* Header info */}
-                <div className="flex flex-wrap items-center gap-2">
-                    {price_book.is_default && (
-                        <Badge variant="default">Default</Badge>
-                    )}
-                    {price_book.effective_from && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <CalendarDays className="h-3 w-3" />
-                            {formatDate(price_book.effective_from)} —{' '}
-                            {formatDate(price_book.effective_to)}
-                        </span>
-                    )}
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Receivables', href: '/finance/invoices' },
+        { title: 'Price books', href: '/finance/price-books' },
+        { title: price_book.name },
+    ];
+
+    const toggleActive = (item: PriceBookItem) =>
+        router.put(
+            `/finance/price-books/${price_book.id}/items/${item.id}`,
+            { is_active: !item.is_active },
+            { preserveScroll: true },
+        );
+
+    const actionsFor = (item: PriceBookItem): MenuItem[] =>
+        compactMenu(
+            canManage
+                ? [
+                      {
+                          label: 'Edit rate',
+                          icon: Pencil,
+                          onClick: () =>
+                              setEditItem({
+                                  id: item.id,
+                                  service_code: item.service_code,
+                                  name: item.name,
+                                  unit: item.unit,
+                                  rate: item.rate,
+                                  description: item.description,
+                              }),
+                      },
+                      {
+                          label: item.is_active ? 'Deactivate' : 'Reactivate',
+                          icon: Power,
+                          onClick: () => toggleActive(item),
+                      },
+                      { separator: true },
+                      {
+                          label: 'Remove rate',
+                          icon: Trash2,
+                          danger: true,
+                          onClick: () => setRemoveItem(item),
+                      },
+                  ]
+                : [],
+        );
+
+    const columns: EntityTableColumn<PriceBookItem>[] = [
+        {
+            key: 'unit',
+            label: 'Unit',
+            width: '0.6fr',
+            cell: (item) => (
+                <span className="capitalize">{item.unit}</span>
+            ),
+        },
+        {
+            key: 'rate',
+            label: 'Rate (NZD)',
+            width: '0.8fr',
+            align: 'right',
+            cell: (item) => (
+                <span className="font-medium tabular-nums">
+                    {formatMoney(item.rate)}
+                </span>
+            ),
+        },
+        {
+            key: 'rate_type',
+            label: 'Rate type',
+            width: '0.7fr',
+            cell: (item) => (
+                <span className="capitalize text-muted-foreground">
+                    {item.rate_type}
+                </span>
+            ),
+        },
+        {
+            key: 'category',
+            label: 'Category',
+            width: '0.9fr',
+            cell: (item) => item.category ?? '—',
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '0.7fr',
+            cell: (item) => (
+                <EntityStatusChip
+                    variant={item.is_active ? 'success' : 'neutral'}
+                >
+                    {item.is_active ? 'Active' : 'Inactive'}
+                </EntityStatusChip>
+            ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            icon={BookOpen}
+            backHref="/finance/price-books"
+            title={price_book.name}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={price_book.is_active ? 'success' : 'neutral'}
+                >
+                    {price_book.is_active ? 'Active' : 'Inactive'}
+                </PageHeaderStatusChip>
+            }
+            subline={`${price_book.description ?? 'Rate card'} · effective ${formatDate(
+                price_book.effective_from,
+            )} – ${formatDate(price_book.effective_to)}${
+                price_book.is_default ? ' · default book' : ''
+            }`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search rates…"
+                    />
                     {canManage && (
-                        <div className="ml-auto flex gap-1">
-                            <Button
-                                size="sm"
-                                variant="outline"
+                        <>
+                            <PageHeaderGlassButton
+                                icon={Pencil}
                                 onClick={() => setEditOpen(true)}
                             >
-                                <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
-                            </Button>
-                        </div>
+                                Edit book
+                            </PageHeaderGlassButton>
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
+                                onClick={() => setItemOpen(true)}
+                            >
+                                Add rate item
+                            </PageHeaderPrimaryButton>
+                        </>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Rate items"
+                        href="/finance/price-books"
+                        ariaLabel="Back to the price-book register"
+                    >
+                        <PageHeaderMeterBig>{items.length}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            In this book
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Active rates"
+                        tone="success"
+                        href="/finance/price-books?status=active"
+                        ariaLabel="View active price books"
+                    >
+                        <PageHeaderMeterBig>
+                            {activeItems.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Available to quote
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Average rate"
+                        href="/finance/quotes"
+                        ariaLabel="View quotes built from these rates"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(averageRate)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Across active rates
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Effective to"
+                        href="/finance/price-books"
+                        ariaLabel="View every price book"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatDate(price_book.effective_to)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {price_book.effective_to
+                                ? 'Rates expire on this date'
+                                : 'No end date set'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        icon={Tag}
+                        label="Unit"
+                        value={unit}
+                        allValue={ALL}
+                        options={unitOptions}
+                        onChange={setUnit}
+                    />
+                    <PageHeaderFilterCheck
+                        label="Active only"
+                        checked={activeOnly}
+                        onChange={setActiveOnly}
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title={price_book.name} />
+
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Rate items"
+                        caption={`${rows.length} of ${items.length} shown`}
+                    />
+
+                    {rows.length === 0 ? (
+                        hasFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                title="No rates match your filters"
+                            />
+                        ) : (
+                            <EmptyList
+                                icon={BookOpen}
+                                itemName="rate item"
+                                title="No rate items yet"
+                                description="Add the priced services this book covers so quotes can be built from it."
+                                action={
+                                    canManage ? (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setItemOpen(true)}
+                                        >
+                                            Add rate item
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
+                        )
+                    ) : (
+                        <EntityTable
+                            rows={rows}
+                            rowKey={(item) => item.id}
+                            identityLabel="Rate item"
+                            identity={(item) => ({
+                                icon: Tag,
+                                name: item.name,
+                                subline: item.service_code ?? 'No service code',
+                            })}
+                            columns={columns}
+                            actionsFor={actionsFor}
+                            onRowContextMenu={ctxMenu.open}
+                            mutedFor={(item) => !item.is_active}
+                            minWidth={960}
+                        />
                     )}
                 </div>
+            </PageLayout>
 
-                {/* Items table */}
-                <div className="mt-6">
-                    <div className="mb-3 flex items-center justify-between">
-                        <h3 className="text-sm font-semibold">
-                            Items ({items.length})
-                        </h3>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setShowItemForm(!showItemForm)}
-                        >
-                            <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Item
-                        </Button>
-                    </div>
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={Tag}
+                    title={ctxMenu.ctx.record.name}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
 
-                    {/* Add Item Form */}
-                    {showItemForm && (
-                        <Card className="mb-4 border-dashed border-primary bg-primary/10 dark:border-primary/30 dark:bg-primary/20">
-                            <CardContent className="p-4">
-                                <form
-                                    onSubmit={handleAddItem}
-                                    className="space-y-3"
-                                >
-                                    <div className="grid gap-3 sm:grid-cols-3">
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">
-                                                Service Code
-                                            </Label>
-                                            <Input
-                                                value={
-                                                    itemForm.data.service_code
-                                                }
-                                                onChange={(e) =>
-                                                    itemForm.setData(
-                                                        'service_code',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="e.g. SVC-001"
-                                                className="h-8 text-sm"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">
-                                                Name *
-                                            </Label>
-                                            <Input
-                                                value={itemForm.data.name}
-                                                onChange={(e) =>
-                                                    itemForm.setData(
-                                                        'name',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="e.g. Personal Care"
-                                                className="h-8 text-sm"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">
-                                                Category
-                                            </Label>
-                                            <Input
-                                                value={itemForm.data.category}
-                                                onChange={(e) =>
-                                                    itemForm.setData(
-                                                        'category',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="e.g. Core Supports"
-                                                className="h-8 text-sm"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid gap-3 sm:grid-cols-3">
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">
-                                                Unit
-                                            </Label>
-                                            <Select
-                                                value={itemForm.data.unit}
-                                                onValueChange={(v) =>
-                                                    itemForm.setData('unit', v)
-                                                }
-                                            >
-                                                <SelectTrigger className="h-8 text-xs">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {[
-                                                        'hour',
-                                                        'day',
-                                                        'each',
-                                                        'km',
-                                                        'week',
-                                                    ].map((u) => (
-                                                        <SelectItem
-                                                            key={u}
-                                                            value={u}
-                                                            className="capitalize"
-                                                        >
-                                                            {u}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">
-                                                Rate (NZD) *
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={itemForm.data.rate}
-                                                onChange={(e) =>
-                                                    itemForm.setData(
-                                                        'rate',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="0.00"
-                                                className="h-8 text-sm"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">
-                                                Rate Type
-                                            </Label>
-                                            <Select
-                                                value={itemForm.data.rate_type}
-                                                onValueChange={(v) =>
-                                                    itemForm.setData(
-                                                        'rate_type',
-                                                        v,
-                                                    )
-                                                }
-                                            >
-                                                <SelectTrigger className="h-8 text-xs">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {[
-                                                        'fixed',
-                                                        'variable',
-                                                        'tiered',
-                                                    ].map((t) => (
-                                                        <SelectItem
-                                                            key={t}
-                                                            value={t}
-                                                            className="capitalize"
-                                                        >
-                                                            {t}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            type="submit"
-                                            size="sm"
-                                            disabled={itemForm.processing}
-                                        >
-                                            Add Item
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() =>
-                                                setShowItemForm(false)
-                                            }
-                                        >
-                                            Cancel
-                                        </Button>
-                                    </div>
-                                </form>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Items List */}
-                    <Card>
-                        <CardContent className="p-0">
-                            {items.length === 0 ? (
-                                <p className="py-8 text-center text-sm text-muted-foreground">
-                                    No items added yet. Add items to define
-                                    service rates.
-                                </p>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b text-left text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                                <th className="px-4 py-2">
-                                                    Service Code
-                                                </th>
-                                                <th className="px-4 py-2">
-                                                    Name
-                                                </th>
-                                                <th className="px-4 py-2">
-                                                    Unit
-                                                </th>
-                                                <th className="px-4 py-2 text-right">
-                                                    Rate (NZD)
-                                                </th>
-                                                <th className="px-4 py-2">
-                                                    Rate Type
-                                                </th>
-                                                <th className="px-4 py-2">
-                                                    Category
-                                                </th>
-                                                <th className="px-4 py-2 text-center">
-                                                    Active
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {items.map((item) => (
-                                                <tr
-                                                    key={item.id}
-                                                    className="border-b last:border-0"
-                                                >
-                                                    <td className="px-4 py-2 text-xs text-muted-foreground">
-                                                        {item.service_code ??
-                                                            '-'}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-xs font-medium">
-                                                        {item.name}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-xs text-muted-foreground capitalize">
-                                                        {item.unit}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-right text-xs tabular-nums">
-                                                        {formatMoney(item.rate)}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-xs text-muted-foreground capitalize">
-                                                        {item.rate_type}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-xs text-muted-foreground">
-                                                        {item.category ?? '-'}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-center">
-                                                        <Badge
-                                                            variant={
-                                                                item.is_active
-                                                                    ? 'default'
-                                                                    : 'outline'
-                                                            }
-                                                            className="text-[10px]"
-                                                        >
-                                                            {item.is_active
-                                                                ? 'Active'
-                                                                : 'Inactive'}
-                                                        </Badge>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            </PageShell>
-
-            {/* Mounted only while open so each edit starts from fresh props. */}
             {canManage && editOpen && (
                 <PriceBookDialog
                     open
@@ -402,6 +431,52 @@ export default function PriceBookShow({
                     }}
                 />
             )}
+
+            {canManage && (
+                <PriceBookItemDialog
+                    open={itemOpen}
+                    onClose={() => setItemOpen(false)}
+                    priceBookId={price_book.id}
+                />
+            )}
+
+            {canManage && editItem && (
+                <PriceBookItemDialog
+                    key={editItem.id}
+                    open
+                    onClose={() => setEditItem(null)}
+                    priceBookId={price_book.id}
+                    item={editItem}
+                />
+            )}
+
+            <ConfirmDialog
+                variant="destructive"
+                open={removeItem !== null}
+                onClose={() => setRemoveItem(null)}
+                title="Remove this rate item?"
+                description={
+                    removeItem
+                        ? `“${removeItem.name}” is removed from ${price_book.name}. Quotes already built from it keep their prices. Deactivate it instead if you only want to stop new use.`
+                        : ''
+                }
+                confirmText="Remove rate"
+                processing={removing}
+                onConfirm={() => {
+                    if (!removeItem) return;
+                    router.delete(
+                        `/finance/price-books/${price_book.id}/items/${removeItem.id}`,
+                        {
+                            preserveScroll: true,
+                            onStart: () => setRemoving(true),
+                            onFinish: () => {
+                                setRemoving(false);
+                                setRemoveItem(null);
+                            },
+                        },
+                    );
+                }}
+            />
         </AppLayout>
     );
 }

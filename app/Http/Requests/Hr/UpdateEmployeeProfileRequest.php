@@ -94,7 +94,7 @@ class UpdateEmployeeProfileRequest extends FormRequest
             'hourly_rate' => [Rule::prohibitedIf(! $canManageFinancial), 'nullable', 'numeric', 'min:0'],
             'annual_salary' => [Rule::prohibitedIf(! $canManageFinancial), 'nullable', 'numeric', 'min:0'],
             'pay_frequency' => [Rule::prohibitedIf(! $canManageFinancial), 'nullable', 'string', Rule::in(['weekly', 'fortnightly', 'monthly'])],
-            'start_date' => ['nullable', 'date'],
+            'start_date' => ['sometimes', 'required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'probation_end_date' => ['nullable', 'date'],
             'termination_reason' => ['nullable', 'string', 'max:1000'],

@@ -6,7 +6,7 @@ require __DIR__.'/w06-draft-browser-runtime.php';
 try {
     $context = w06BrowserGuard(true);
     w06BrowserRequire(PHP_SAPI === 'cli-server' && ($_SERVER['REMOTE_ADDR'] ?? '') === '127.0.0.1'
-        && ($_SERVER['HTTP_HOST'] ?? '') === '127.0.0.1:8766', 'Unexpected server host or client.');
+        && ($_SERVER['HTTP_HOST'] ?? '') === '127.0.0.1:'.$context['port'], 'Unexpected server host or client.');
     $public = realpath(W06_BROWSER_CHECKOUT.'/public');
     w06BrowserRequire($public !== false && ! is_file($public.'/hot')
         && ! is_file(W06_BROWSER_CHECKOUT.'/storage/framework/maintenance.php')
@@ -27,7 +27,7 @@ try {
         header('Content-Type: application/json');
         header('Cache-Control: no-store, private');
         echo json_encode(['checkout' => W06_BROWSER_CHECKOUT, 'database' => \Illuminate\Support\Facades\DB::scalar('SELECT DATABASE()'),
-            'token' => $context['token'], 'storage_root' => $context['storage'], 'app_environment' => app()->environment(),
+            'token' => $context['token'], 'port' => $context['port'], 'storage_root' => $context['storage'], 'app_environment' => app()->environment(),
             'csrf_testing_bypass' => app()->runningUnitTests(), 'asset_manifest_sha256' => $context['asset_manifest_sha256'],
             'draft_recovery_enabled' => app(\App\Domain\It\Services\ItTicketDraftService::class)->enabled(),
             'retention_values_are_synthetic' => true, 'mail_driver' => config('mail.default'), 'queue_driver' => config('queue.default'),

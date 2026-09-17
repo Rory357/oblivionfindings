@@ -1,6 +1,6 @@
 {
-    "checked_at": "2026-09-12T23:57:13+00:00",
-    "database": "oblivion_gov_review2_runtime_20260913_39488",
+    "checked_at": "2026-09-13T01:36:26+00:00",
+    "database": "oblivion_gov_review2_runtime_20260913_33616",
     "cases": {
         "no_approved_profile_opens": {
             "exception": "DomainException",
@@ -22,7 +22,7 @@
                 "decision_snapshot": {
                     "title": "Test Resolution",
                     "outcome": "carried",
-                    "closed_at": "2026-09-12T23:57:13+00:00",
+                    "closed_at": "2026-09-13T01:36:26+00:00",
                     "conflicts": [],
                     "threshold": "simple_majority",
                     "electorate": [
@@ -71,7 +71,7 @@
                             "id": 1,
                             "vote": "for",
                             "method": "electronic",
-                            "voted_at": "2026-09-12T23:57:13+00:00",
+                            "voted_at": "2026-09-13T01:36:26+00:00",
                             "board_member_id": 1,
                             "board_member_name": "Review Chair",
                             "conflict_declared": false
@@ -80,7 +80,7 @@
                             "id": 2,
                             "vote": "for",
                             "method": "electronic",
-                            "voted_at": "2026-09-12T23:57:13+00:00",
+                            "voted_at": "2026-09-13T01:36:26+00:00",
                             "board_member_id": 3,
                             "board_member_name": "Review Alex Morgan",
                             "conflict_declared": false
@@ -89,13 +89,13 @@
                             "id": 3,
                             "vote": "abstain",
                             "method": "electronic",
-                            "voted_at": "2026-09-12T23:57:13+00:00",
+                            "voted_at": "2026-09-13T01:36:26+00:00",
                             "board_member_id": 4,
                             "board_member_name": "Review Finance",
                             "conflict_declared": false
                         }
                     ],
-                    "resolution_reference": "RES-HRZBOW"
+                    "resolution_reference": "RES-04SLMB"
                 }
             },
             "electorate_at_open": [
@@ -192,7 +192,7 @@
         },
         "completed_action_reopens": {
             "exception": "DomainException",
-            "message": "Evidence file 'test.pdf' does not exist or has not been uploaded."
+            "message": "Evidence file 'test.pdf' does not exist or has not been uploaded to managed storage."
         },
         "stale_minutes_approval_from_ui_payload": {
             "reviewer_saw_version": 1,
@@ -262,13 +262,13 @@
                 "source": "decisions",
                 "group": "auto",
                 "title": "[Vote deadline] Test Resolution",
-                "start": "2026-09-11T14:30:00+00:00",
-                "end": "2026-09-11T14:30:00+00:00",
+                "start": "2026-09-12T14:30:00+00:00",
+                "end": "2026-09-12T14:30:00+00:00",
                 "allDay": false,
                 "status": "completed",
                 "owner": null,
                 "room": null,
-                "ref": "RES-WLB9FB",
+                "ref": "RES-LGGTTH",
                 "site": null,
                 "link": "/governance/resolutions/12",
                 "editable": false,
@@ -281,13 +281,13 @@
                 "source": "decisions",
                 "group": "auto",
                 "title": "[Vote deadline] Test Resolution",
-                "start": "2026-09-11T14:30:00+00:00",
-                "end": "2026-09-11T14:30:00+00:00",
+                "start": "2026-09-12T14:30:00+00:00",
+                "end": "2026-09-12T14:30:00+00:00",
                 "allDay": false,
                 "status": "cancelled",
                 "owner": null,
                 "room": null,
-                "ref": "RES-ZUZKWY",
+                "ref": "RES-02LFTP",
                 "site": null,
                 "link": "/governance/resolutions/13",
                 "editable": false,

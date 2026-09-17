@@ -1,0 +1,238 @@
+- link "Skip to main content":
+  - /url: "#main-content"
+- banner:
+  - generic: Sunday
+  - generic: 13 September 2026
+  - link "Oblivion Care — home":
+    - /url: /dashboard
+    - generic: Oblivion Care
+    - generic: blivionCare
+  - button "Search or jump to a page":
+    - generic: Search or jump to…
+    - generic: Ctrl
+    - text: K
+  - button "Ask about a client" [disabled]:
+  - button "Notifications":
+  - button "Announcements":
+  - button "Open user menu for Review Alex Morgan":
+    - img "Review Alex Morgan"
+- navigation "Primary navigation":
+  - link "My Day":
+    - /url: /my-day
+    - generic: My Day
+  - link "My Calendar":
+    - /url: /my-calendar
+    - generic: My Calendar
+  - link "All Tasks":
+    - /url: /tasks
+    - generic: All Tasks
+    - generic: 9+
+  - button "IT & Support menu":
+    - generic: IT & Support
+  - button "Governance menu" [expanded]:
+    - generic: Governance
+  - group "Governance navigation":
+    - link "Home":
+      - /url: /governance/dashboard
+      - generic: Home
+    - link "My work":
+      - /url: /governance/my-work
+      - generic: My work
+    - link "Calendar":
+      - /url: /governance/calendar
+      - generic: Calendar
+    - link "Records":
+      - /url: /governance/records
+      - generic: Records
+  - button "Reporting menu":
+    - generic: Reporting
+  - link "Settings":
+    - /url: /settings
+    - generic: Settings
+- button "Collapse sidebar" [expanded]:
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - link "Home":
+        - /url: /dashboard
+      - link "Governance":
+        - /url: /governance/dashboard
+      - link "Calendar" [disabled]
+  - heading "Governance calendar" [level=1]
+  - generic: 1 overdue
+  - paragraph: Board meetings, decisions, obligations, and policy reviews
+  - searchbox "Search entries, sites…"
+  - generic: /
+  - button "Notifications (2)":
+  - generic: "2"
+  - button "More options":
+  - button "View this period in the agenda":
+    - generic: Viewing
+    - generic: 3 entries
+    - generic: "13"
+    - generic: September
+    - generic: "2026"
+    - generic: Sunday, 13 September 2026
+  - button "View the coming week":
+    - generic: Next 7 days
+    - generic: "2"
+    - generic: upcoming from today
+  - button "View completed entries in the agenda":
+    - generic: Done / approved
+    - generic: 0%
+    - text: 0 of 3
+    - text: this period
+  - button "View overdue entries in the agenda":
+    - generic: Overdue
+    - generic: "1"
+    - generic: past their due date
+  - button "View pending entries in the agenda":
+    - generic: To approve
+    - generic: "0"
+    - generic: awaiting sign-off
+  - link "Open My Work":
+    - /url: /governance/my-work
+    - generic: Mine
+    - generic: "0"
+    - generic: you own or attend
+  - button "Previous period":
+  - button "Jump to date":
+    - text: September 2026
+  - button "Next period":
+  - button "Today"
+  - button "Display":
+    - text: Display
+  - tablist "Calendar view":
+    - tab "Month" [selected]:
+      - generic: Month
+    - tab "Week":
+      - generic: Week
+    - tab "Day":
+      - generic: Day
+    - tab "Agenda":
+      - generic: Agenda
+    - tab "Timeline":
+      - generic: Timeline
+    - button "Find a view":
+      - generic: Find
+  - button "Meetings" [pressed]: Meetings
+  - button "Decisions" [pressed]: Decisions
+  - button "Obligations" [pressed]: Obligations
+  - button "Policies" [pressed]: Policies
+  - generic "All calendar times are shown in New Zealand time":
+    - text: Times in NZT
+  - columnheader "Sunday": Sun
+  - columnheader "Monday": Mon
+  - columnheader "Tuesday": Tue
+  - columnheader "Wednesday": Wed
+  - columnheader "Thursday": Thu
+  - columnheader "Friday": Fri
+  - columnheader "Saturday": Sat
+  - grid "September 2026":
+    - row "Sunday 30 August 2026, no entries Monday 31 August 2026, no entries Tuesday 1 September 2026, no entries Wednesday 2 September 2026, no entries Thursday 3 September 2026, no entries Friday 4 September 2026, no entries Saturday 5 September 2026, no entries":
+      - gridcell "Sunday 30 August 2026, no entries":
+        - generic: "30"
+      - gridcell "Monday 31 August 2026, no entries":
+        - generic: "31"
+      - gridcell "Tuesday 1 September 2026, no entries":
+        - generic: "1"
+      - gridcell "Wednesday 2 September 2026, no entries":
+        - generic: "2"
+      - gridcell "Thursday 3 September 2026, no entries":
+        - generic: "3"
+      - gridcell "Friday 4 September 2026, no entries":
+        - generic: "4"
+      - gridcell "Saturday 5 September 2026, no entries":
+        - generic: "5"
+    - row "Sunday 6 September 2026, no entries Monday 7 September 2026, no entries Tuesday 8 September 2026, no entries Wednesday 9 September 2026, no entries Thursday 10 September 2026, no entries Friday 11 September 2026, no entries Saturday 12 September 2026, 1 entry":
+      - gridcell "Sunday 6 September 2026, no entries":
+        - generic: "6"
+      - gridcell "Monday 7 September 2026, no entries":
+        - generic: "7"
+      - gridcell "Tuesday 8 September 2026, no entries":
+        - generic: "8"
+      - gridcell "Wednesday 9 September 2026, no entries":
+        - generic: "9"
+      - gridcell "Thursday 10 September 2026, no entries":
+        - generic: "10"
+      - gridcell "Friday 11 September 2026, no entries":
+        - generic: "11"
+      - gridcell "Saturday 12 September 2026, 1 entry":
+        - generic: "12"
+        - button "Review annual assurance":
+          - generic: Review annual assurance
+    - row "Sunday 13 September 2026, no entries Monday 14 September 2026, no entries Tuesday 15 September 2026, no entries Wednesday 16 September 2026, 1 entry Thursday 17 September 2026, no entries Friday 18 September 2026, 1 entry Saturday 19 September 2026, no entries":
+      - gridcell "Sunday 13 September 2026, no entries":
+        - generic: "13"
+      - gridcell "Monday 14 September 2026, no entries":
+        - generic: "14"
+      - gridcell "Tuesday 15 September 2026, no entries":
+        - generic: "15"
+      - gridcell "Wednesday 16 September 2026, 1 entry":
+        - generic: "16"
+        - button "8pm [Vote deadline] Review equipment renewal":
+          - generic: 8pm
+          - generic: "[Vote deadline] Review equipment renewal"
+      - gridcell "Thursday 17 September 2026, no entries":
+        - generic: "17"
+      - gridcell "Friday 18 September 2026, 1 entry":
+        - generic: "18"
+        - button "10am Review September Board":
+          - generic: 10am
+          - generic: Review September Board
+      - gridcell "Saturday 19 September 2026, no entries":
+        - generic: "19"
+    - row "Sunday 20 September 2026, no entries Monday 21 September 2026, no entries Tuesday 22 September 2026, no entries Wednesday 23 September 2026, no entries Thursday 24 September 2026, no entries Friday 25 September 2026, no entries Saturday 26 September 2026, no entries":
+      - gridcell "Sunday 20 September 2026, no entries":
+        - generic: "20"
+      - gridcell "Monday 21 September 2026, no entries":
+        - generic: "21"
+      - gridcell "Tuesday 22 September 2026, no entries":
+        - generic: "22"
+      - gridcell "Wednesday 23 September 2026, no entries":
+        - generic: "23"
+      - gridcell "Thursday 24 September 2026, no entries":
+        - generic: "24"
+      - gridcell "Friday 25 September 2026, no entries":
+        - generic: "25"
+      - gridcell "Saturday 26 September 2026, no entries":
+        - generic: "26"
+    - row "Sunday 27 September 2026, no entries Monday 28 September 2026, no entries Tuesday 29 September 2026, no entries Wednesday 30 September 2026, no entries Thursday 1 October 2026, no entries Friday 2 October 2026, no entries Saturday 3 October 2026, no entries":
+      - gridcell "Sunday 27 September 2026, no entries":
+        - generic: "27"
+      - gridcell "Monday 28 September 2026, no entries":
+        - generic: "28"
+      - gridcell "Tuesday 29 September 2026, no entries":
+        - generic: "29"
+      - gridcell "Wednesday 30 September 2026, no entries":
+        - generic: "30"
+      - gridcell "Thursday 1 October 2026, no entries":
+        - generic: "1"
+      - gridcell "Friday 2 October 2026, no entries":
+        - generic: "2"
+      - gridcell "Saturday 3 October 2026, no entries":
+        - generic: "3"
+  - complementary:
+    - generic: Sunday
+    - generic: "13"
+    - generic: September 2026
+    - text: No more entries scheduled today.
+    - generic: Needs attention
+    - generic: "1"
+    - button "Review annual assurance Overdue · 1d":
+      - generic: Review annual assurance
+      - generic: Overdue · 1d
+    - generic: Today's schedule
+    - generic: 0 entries
+    - generic: Nothing on today.
+    - generic: Up next
+    - button "Wed 8pm [Vote deadline] Review equipment renewal Decisions":
+      - generic: Wed 8pm
+      - generic: "[Vote deadline] Review equipment renewal"
+      - generic: Decisions
+    - button "Fri 10am Review September Board Meetings RC":
+      - generic: Fri 10am
+      - generic: Review September Board
+      - generic: Meetings
+      - generic "Review Chair": RC
+- region "Notifications alt+T"

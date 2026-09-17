@@ -13,10 +13,13 @@ class BoardMemberInterest extends Model
 
     protected $fillable = [
         'board_member_id', 'interest_type', 'entity_name', 'description',
-        'nature', 'declared_at', 'ceased_at', 'is_current', 'notes', 'recorded_by',
+        'nature', 'started_on', 'declared_at', 'ceased_at', 'is_current', 'notes', 'recorded_by',
     ];
 
     protected $casts = [
+        // When the interest itself began (the form's "From").
+        'started_on' => 'date',
+        // The day it was declared to the board.
         'declared_at' => 'date',
         'ceased_at' => 'date',
         'is_current' => 'boolean',

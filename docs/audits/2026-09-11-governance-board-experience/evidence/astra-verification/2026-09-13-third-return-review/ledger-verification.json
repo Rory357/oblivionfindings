@@ -1,0 +1,20 @@
+{
+  "task_third_entries": 24,
+  "acceptance_count": 28,
+  "acceptance_third_entries": 28,
+  "status_counts": [
+    {
+      "Name": "Blocked",
+      "Count": 1
+    },
+    {
+      "Name": "Failed",
+      "Count": 23
+    },
+    {
+      "Name": "Not tested",
+      "Count": 4
+    }
+  ],
+  "task_count": 24
+}

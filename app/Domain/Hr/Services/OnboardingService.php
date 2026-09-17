@@ -521,14 +521,16 @@ class OnboardingService
     /**
      * Cancel or archive a checklist without deleting it (append-only history).
      */
-    public function setChecklistStatus(HrOnboardingChecklist $checklist, string $status): HrOnboardingChecklist
+    public function setChecklistStatus(HrOnboardingChecklist $checklist, string $status, ?User $actor = null): HrOnboardingChecklist
     {
-        return DB::transaction(function () use ($checklist, $status): HrOnboardingChecklist {
+        return DB::transaction(function () use ($checklist, $status, $actor): HrOnboardingChecklist {
+            HrEmployeeProfile::withTrashed()->whereKey($checklist->employee_profile_id)->lockForUpdate()->firstOrFail();
             $locked = HrOnboardingChecklist::query()->lockForUpdate()->findOrFail($checklist->getKey());
             $locked->update([
                 'status' => $status,
                 'completed_at' => $status === 'completed' ? ($locked->completed_at ?? now()) : $locked->completed_at,
             ]);
+            app(\App\Domain\It\Services\ItProvisioningHrSourceService::class)->sync($locked, $actor ?? auth()->user());
 
             return $locked->fresh();
         });
@@ -1342,6 +1344,7 @@ class OnboardingService
                     'status' => $status,
                     'completed_at' => $lockedChecklist->completed_at,
                 ]);
+                app(\App\Domain\It\Services\ItProvisioningHrSourceService::class)->sync($lockedChecklist, $actor);
 
                 return $lockedChecklist->fresh();
             }
@@ -1391,6 +1394,7 @@ class OnboardingService
                 ]);
                 $profile->update(['end_date' => $newEndDate]);
                 $this->coverage->syncOffboarding($lockedChecklist->fresh(), $actor);
+                app(\App\Domain\It\Services\ItProvisioningHrSourceService::class)->sync($lockedChecklist, $actor);
 
                 return $lockedChecklist->fresh();
             }

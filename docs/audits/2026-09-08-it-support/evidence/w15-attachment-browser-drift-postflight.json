@@ -1,0 +1,14 @@
+{
+  "source_count": 449,
+  "changed_sources": [
+    {
+      "path": "routes/web.php",
+      "sha256": "58422a6294fc5afe6e59a8dc6eefc6dd4dc62695a348317e3edf31e8d335b49f"
+    }
+  ],
+  "design_count": 10,
+  "changed_design": [],
+  "current_manifest": "5adf20a6a25d1c9483c5605b29f4aaffcc55c6f7bebb2c6e7772bea0c96617d9",
+  "browser_manifest": "507ea8955a48a1e578997f97b1683d2f5a89afb999861ff17eb940b54d6a4323",
+  "browser_verification_interrupted": true
+}

@@ -33,7 +33,16 @@ export function EmptyState({
     variant = 'default',
 }: EmptyStateProps) {
     const resolvedTitle = heading || title || 'Nothing here yet';
-    const IconComponent = typeof Icon === 'function' ? Icon : null;
+    // lucide icons are forwardRef/memo objects, not plain functions, so a
+    // `typeof === 'function'` check alone left every empty state iconless.
+    const IconComponent =
+        typeof Icon === 'function' ||
+        (typeof Icon === 'object' &&
+            Icon !== null &&
+            !isValidElement(Icon) &&
+            '$$typeof' in Icon)
+            ? (Icon as LucideIcon)
+            : null;
     const iconNode = isValidElement(Icon)
         ? Icon
         : IconComponent

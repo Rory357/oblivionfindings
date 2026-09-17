@@ -44,6 +44,33 @@ class BoardPackPresenterTest extends TestCase
         $this->assertSame('finance_report', $normalized['manifest_sections'][0]['id']);
         $this->assertCount(1, $normalized['content_sections']);
         $this->assertSame('finance_report', $normalized['content_sections'][0]['key']);
-        $this->assertSame('Variance 2.5%', $normalized['content_sections'][0]['summary']);
+        // "Variance" on its own is banned wording (vocabulary.md).
+        $this->assertSame('Difference from budget: 2.5%', $normalized['content_sections'][0]['summary']);
+        $this->assertSame('Finance summary', $normalized['content_sections'][0]['title']);
+        $this->assertSame('Finance summary', $normalized['manifest_sections'][0]['title']);
+    }
+
+    public function test_it_uses_plain_section_names_and_counts(): void
+    {
+        $presenter = new BoardPackPresenter();
+
+        $normalized = $presenter->normalizeManifest([
+            'manifest_sections' => [
+                ['id' => 'cover', 'title' => 'Cover & Meeting Overview', 'type' => 'auto', 'included' => true],
+                ['id' => 'res_4', 'title' => 'Paper: Approve the 2026/27 budget', 'type' => 'paper', 'included' => true],
+            ],
+            'content_sections' => [
+                'agenda' => [['title' => 'Welcome'], ['title' => 'Finance']],
+                'resolutions' => ['items' => [['id' => 4, 'title' => 'Approve the 2026/27 budget']]],
+                'ceo_report' => ['status' => 'submitted'],
+            ],
+        ]);
+
+        $this->assertSame('Meeting details', $normalized['manifest_sections'][0]['title']);
+        $this->assertSame('Approve the 2026/27 budget', $normalized['manifest_sections'][1]['title']);
+        $this->assertSame('2 agenda items', $normalized['content_sections'][0]['summary']);
+        $this->assertSame('Resolutions', $normalized['content_sections'][1]['title']);
+        $this->assertSame('1 resolution', $normalized['content_sections'][1]['summary']);
+        $this->assertSame('Waiting for the board', $normalized['content_sections'][2]['summary']);
     }
 }

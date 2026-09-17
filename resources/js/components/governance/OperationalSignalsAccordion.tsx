@@ -1,11 +1,12 @@
+import { Link } from '@inertiajs/react';
+import { ArrowRight, Layers } from 'lucide-react';
+
 import {
     Accordion,
     AccordionContent,
     AccordionItem,
     AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
@@ -13,9 +14,10 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
-import { Link } from '@inertiajs/react';
-import { ArrowRight, Layers } from 'lucide-react';
+
+import { CockpitCardStatus, isCardStatusKnown } from './CockpitCardStatus';
 
 interface CockpitCard {
     key: string;
@@ -31,13 +33,17 @@ interface OperationalSignalsAccordionProps {
     cardsByKey: Record<string, CockpitCard | undefined>;
 }
 
-const OPERATIONAL_KEYS = [
+/**
+ * The day-to-day areas shown here for context. Privacy, incidents,
+ * safeguarding and spending sit in Board assurance instead, so no card
+ * appears twice on Home.
+ */
+export const OPERATIONAL_KEYS = [
     'client_safety',
     'operational_safety',
     'workforce',
     'control_room',
     'it_cyber',
-    'safeguarding',
     'fleet_assets',
     'hs_backbone',
 ];
@@ -49,75 +55,48 @@ const TONE_VALUE: Record<string, string> = {
     muted: 'text-muted-foreground',
 };
 
-const STATUS_BADGE: Record<string, string> = {
-    critical:
-        'border-status-critical/30 bg-status-critical-bg text-status-critical',
-    warning:
-        'border-status-warning/30 bg-status-warning-bg text-status-warning',
-    good: 'border-status-success/30 bg-status-success-bg text-status-success',
-    unknown: 'border-border bg-muted text-muted-foreground',
-};
-
 function SignalCard({ card }: { card: CockpitCard }) {
     return (
-        <Card
-            unstyled
-            className="space-y-3 rounded-lg border border-border bg-card p-4"
-        >
+        <li className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
             <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">
                         {card.title}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                        {card.description}
-                    </p>
+                    <p className="text-caption">{card.description}</p>
                 </div>
-                <Badge
-                    className={cn(
-                        'border text-[10px] uppercase',
-                        STATUS_BADGE[card.status] ?? STATUS_BADGE.unknown,
-                    )}
-                >
-                    {card.status}
-                </Badge>
+                <CockpitCardStatus status={card.status} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-                {card.metrics.slice(0, 4).map((m) => (
+            <dl className="grid grid-cols-2 gap-2">
+                {card.metrics.map((m) => (
                     <div key={m.label} className="rounded-md bg-muted/60 p-2">
-                        <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                            {m.label}
-                        </p>
-                        <p
+                        <dt className="text-caption">{m.label}</dt>
+                        <dd
                             className={cn(
-                                'mt-0.5 text-base font-semibold',
+                                'mt-0.5 text-sm font-semibold tabular-nums',
                                 TONE_VALUE[m.tone] ?? TONE_VALUE.default,
                             )}
                         >
                             {m.value}
-                        </p>
+                        </dd>
                     </div>
                 ))}
-            </div>
-            <Button
-                asChild
-                size="sm"
-                variant="ghost"
-                className="w-full justify-between"
+            </dl>
+            <Link
+                href={card.href}
+                className="inline-flex items-center gap-1 self-start text-xs font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-                <Link href={card.href}>
-                    Open {card.title}
-                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                </Link>
-            </Button>
-        </Card>
+                Open {card.title.toLowerCase()}
+                <ArrowRight className="size-3.5" aria-hidden="true" />
+            </Link>
+        </li>
     );
 }
 
 /**
- * Collapsed-by-default accordion preserving the original operational widgets
- * (client safety, workforce, control room, fleet, H&S backbone). These remain
- * accessible but no longer fight board priorities for attention.
+ * Collapsed by default: care safety, staff, the control room, IT, vehicles
+ * and health and safety — context for meeting managers, with every figure
+ * named in plain words. Not shown to ordinary members.
  */
 export function OperationalSignalsAccordion({
     cardsByKey,
@@ -129,55 +108,67 @@ export function OperationalSignalsAccordion({
 
     const criticals = available.filter((c) => c.status === 'critical').length;
     const warnings = available.filter((c) => c.status === 'warning').length;
+    const unavailable = available.filter(
+        (c) => !isCardStatusKnown(c.status),
+    ).length;
+    // "No concerns" only when every area actually reported and none alert.
+    const allClear = criticals === 0 && warnings === 0 && unavailable === 0;
 
     return (
         <Card data-dusk="cockpit-operational-signals">
             <Accordion type="single" collapsible defaultValue="">
                 <AccordionItem value="ops" className="border-0">
-                    <CardHeader className="pb-0">
+                    <CardHeader>
                         <AccordionTrigger className="px-0 hover:no-underline">
-                            <div className="flex w-full items-center gap-3">
+                            <div className="flex w-full flex-wrap items-center gap-3">
                                 <div className="rounded-md bg-muted p-2">
                                     <Layers
-                                        className="h-4 w-4 text-muted-foreground"
+                                        className="size-4 text-muted-foreground"
                                         aria-hidden="true"
                                     />
                                 </div>
-                                <div className="text-left">
-                                    <CardTitle className="text-base">
-                                        Operational Signals
+                                <div className="min-w-0 text-left">
+                                    <CardTitle className="text-section-title">
+                                        Service, safety and people
                                     </CardTitle>
                                     <CardDescription>
-                                        Service safety, workforce, controls,
-                                        fleet and H&amp;S backbone — for
-                                        context.
+                                        Care safety, staff, the control room,
+                                        IT, vehicles and health and safety —
+                                        figures for this month.
                                     </CardDescription>
                                 </div>
-                                <div className="ml-auto flex items-center gap-2">
+                                <div className="ml-auto flex flex-wrap items-center gap-2">
                                     {criticals > 0 && (
-                                        <Badge className="border border-status-critical/30 bg-status-critical-bg text-status-critical">
-                                            {criticals} critical
-                                        </Badge>
+                                        <StatusBadge variant="critical">
+                                            {criticals} need action
+                                        </StatusBadge>
                                     )}
                                     {warnings > 0 && (
-                                        <Badge className="border border-status-warning/30 bg-status-warning-bg text-status-warning">
-                                            {warnings} warning
-                                        </Badge>
+                                        <StatusBadge variant="warning">
+                                            {warnings} to watch
+                                        </StatusBadge>
                                     )}
-                                    {criticals === 0 && warnings === 0 && (
-                                        <Badge className="border border-status-success/30 bg-status-success-bg text-status-success">
-                                            All clear
-                                        </Badge>
+                                    {unavailable > 0 && (
+                                        <StatusBadge variant="neutral">
+                                            {unavailable} not available
+                                        </StatusBadge>
+                                    )}
+                                    {allClear && (
+                                        <StatusBadge variant="success">
+                                            No concerns
+                                        </StatusBadge>
                                     )}
                                 </div>
                             </div>
                         </AccordionTrigger>
                     </CardHeader>
                     <AccordionContent>
-                        <CardContent className="grid gap-3 pt-3 md:grid-cols-2 xl:grid-cols-3">
-                            {available.map((card) => (
-                                <SignalCard key={card.key} card={card} />
-                            ))}
+                        <CardContent className="pt-3">
+                            <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                {available.map((card) => (
+                                    <SignalCard key={card.key} card={card} />
+                                ))}
+                            </ul>
                         </CardContent>
                     </AccordionContent>
                 </AccordionItem>

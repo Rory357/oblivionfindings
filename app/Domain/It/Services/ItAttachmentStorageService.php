@@ -5,6 +5,7 @@ namespace App\Domain\It\Services;
 use App\Domain\It\Data\ItAttachmentStorageReservation;
 use App\Models\ItAttachment;
 use App\Models\ItAttachmentStorageIntent;
+use App\Models\ItCatalogSubmission;
 use App\Models\ItTicket;
 use App\Models\ItTicketComment;
 use App\Models\ItTicketDraft;
@@ -20,12 +21,12 @@ use LogicException;
 final class ItAttachmentStorageService
 {
     /** @return array<int, ItAttachmentStorageReservation> */
-    public function reserveDirect(ItTicket|ItTicketComment $parent, array $attachments, User $actor): array
+    public function reserveDirect(ItTicket|ItTicketComment|ItCatalogSubmission $parent, array $attachments, User $actor): array
     {
         return app(ItAttachmentStorageIntentService::class)->reserveDirect($parent, $attachments, $actor);
     }
 
-    public function storeReservedDirect(ItTicket|ItTicketComment $parent, array $attachments, User $actor, array $reservations, array &$storedPaths): void
+    public function storeReservedDirect(ItTicket|ItTicketComment|ItCatalogSubmission $parent, array $attachments, User $actor, array $reservations, array &$storedPaths): void
     {
         app(ItAttachmentStorageIntentService::class)->storeReservedDirect($parent, $attachments, $actor, $reservations, $storedPaths);
     }

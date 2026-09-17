@@ -1,0 +1,17 @@
+resources/js/components/today-retirement.test.tsx(84,64): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/today-retirement.test.tsx(87,65): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/today-retirement.test.tsx(93,25): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/pages/it/knowledge/show.test.tsx(43,17): error TS2352: Conversion of type '{ id: number; title: string; body: string; category: string; audience: string; status: string; owner_user_id: number; owner: string; review_due_at: string; published_at: string; lock_version: number; ... 8 more ...; working_copy: { ...; }; }' to type 'KbRow' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: number; title: string; body: string; category: string; audience: string; status: string; owner_user_id: number; owner: string; review_due_at: string; published_at: string; lock_version: number; ... 8 more ...; working_copy: { ...; }; }' is missing the following properties from type 'KbRow': slug, site_scope, views, helpful_yes, and 9 more.

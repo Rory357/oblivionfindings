@@ -21,9 +21,13 @@ class RiskHeatmapSnapshot extends Model
         'by_category' => 'array',
     ];
 
+    /**
+     * A monthly record of the register: every risk still on it (open or
+     * accepted by the board), counted by its score after controls.
+     */
     public static function capture(): self
     {
-        $risks = RiskRegisterEntry::active()->get();
+        $risks = RiskRegisterEntry::query()->current()->get();
 
         $cells = [];
         for ($l = 1; $l <= 5; $l++) {
@@ -46,14 +50,16 @@ class RiskHeatmapSnapshot extends Model
         ])->toArray();
 
         return static::create([
-            'snapshot_date' => now()->toDateString(),
+            // The NZ calendar date it was taken (the schedule runs at 06:00 NZ).
+            'snapshot_date' => ComplianceObligation::nzToday(),
             'heatmap_data' => ['cells' => $cells],
             'summary' => [
                 'critical' => $risks->where('residual_score', '>=', 20)->count(),
                 'high' => $risks->whereBetween('residual_score', [15, 19])->count(),
                 'medium' => $risks->whereBetween('residual_score', [10, 14])->count(),
                 'low' => $risks->where('residual_score', '<', 10)->count(),
-                'above_appetite' => $risks->where('within_appetite', false)->count(),
+                // Above the board's limit and not accepted by the board.
+                'above_appetite' => $risks->where('within_appetite', false)->where('status', '!=', RiskRegisterEntry::ACCEPTED_STATUS)->count(),
             ],
             'by_category' => $byCategory,
             'captured_by' => auth()->id(),

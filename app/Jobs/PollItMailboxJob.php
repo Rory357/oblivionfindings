@@ -23,7 +23,7 @@ use RuntimeException;
 use Throwable;
 
 /**
- * E4 — the email-in pull ingress (mirrors SyncCalendarJob). For every
+ * E4 — the email-in pull ingress. For every
  * connected support-mailbox connection: pull unread mail, feed each message
  * through InboundEmailIngestor (new ticket or threaded reply), then mark it
  * read so the next poll doesn't see it again. Messages whose message_id was

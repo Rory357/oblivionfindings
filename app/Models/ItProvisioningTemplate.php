@@ -28,17 +28,25 @@ class ItProvisioningTemplate extends Model
         'updated_by_user_id',
         'lock_version',
         'current_version_id',
+        'published_version_id',
+        'published_at',
     ];
 
     protected $casts = [
         'selection_priority' => 'integer',
         'is_active' => 'boolean',
         'lock_version' => 'integer',
+        'published_at' => 'datetime',
     ];
 
     public function currentVersion(): BelongsTo
     {
         return $this->belongsTo(ItProvisioningTemplateVersion::class, 'current_version_id');
+    }
+
+    public function publishedVersion(): BelongsTo
+    {
+        return $this->belongsTo(ItProvisioningTemplateVersion::class, 'published_version_id');
     }
 
     public function tasks(): HasMany

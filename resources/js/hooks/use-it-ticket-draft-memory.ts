@@ -498,6 +498,7 @@ export function useItTicketDraftMemory(options: Options) {
             pendingUpload: value.pendingUpload && {
                 uuid: value.pendingUpload.uploadUuid,
                 revision: value.pendingUpload.revision,
+                catalogueField: value.pendingUpload.catalogueField,
                 name: value.pendingUpload.file.name,
                 size: value.pendingUpload.file.size,
                 modified: value.pendingUpload.file.lastModified,

@@ -143,11 +143,14 @@ class DashboardAggregatorService
 
     public function getTopRisks(int $limit = 10): array
     {
-        $baseQuery = RiskRegisterEntry::active();
+        // Same population and bands as the risk register's header counts:
+        // current risks (open, plus those the board has accepted), graded on
+        // the risk after controls — so "critical" here equals the register.
+        $baseQuery = RiskRegisterEntry::query()->current();
         $totalCount = (clone $baseQuery)->count();
-        $criticalCount = (clone $baseQuery)->where('residual_score', '>=', 20)->count();
-        $highCount = (clone $baseQuery)->whereBetween('residual_score', [15, 19])->count();
-        $mediumCount = (clone $baseQuery)->whereBetween('residual_score', [10, 14])->count();
+        $criticalCount = (clone $baseQuery)->severity('critical')->count();
+        $highCount = (clone $baseQuery)->severity('high')->count();
+        $mediumCount = (clone $baseQuery)->severity('medium')->count();
         $aboveAppetiteCount = (clone $baseQuery)->where('within_appetite', false)->count();
 
         $risks = (clone $baseQuery)
@@ -680,13 +683,37 @@ class DashboardAggregatorService
         };
     }
 
+    /**
+     * When each source's records last changed — read from the data, never
+     * invented. A source that can't be read is left out, and the card then
+     * says "Update time not available" (GovernancePresenter::freshnessFor).
+     *
+     * @return array<string, string>
+     */
     protected function getDataFreshness(): array
     {
-        return [
-            'risks' => now()->toIso8601String(),
-            'incidents' => now()->subMinutes(5)->toIso8601String(),
-            'control_room' => now()->subMinutes(1)->toIso8601String(),
-            'compliance' => now()->subHour()->toIso8601String(),
+        $sources = [
+            'risks' => RiskRegisterEntry::class,
+            'incidents' => ClientIncident::class,
+            'control_room' => ControlRoomAlert::class,
+            'compliance' => ComplianceObligation::class,
         ];
+
+        $freshness = [];
+        foreach ($sources as $key => $model) {
+            try {
+                $latest = $model::query()->max('updated_at');
+            } catch (\Throwable $e) {
+                Log::warning("Governance data freshness unavailable for {$key}", ['error' => $e->getMessage()]);
+
+                continue;
+            }
+
+            if ($latest !== null) {
+                $freshness[$key] = Carbon::parse($latest, 'UTC')->toIso8601String();
+            }
+        }
+
+        return $freshness;
     }
 }

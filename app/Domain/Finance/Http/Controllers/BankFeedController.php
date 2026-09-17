@@ -190,14 +190,26 @@ class BankFeedController extends Controller
                 'duration_ms' => $log->duration_ms,
             ]);
 
+        // Server-side totals for the header meters — the page must never label a
+        // count taken from the current page of logs as a total.
+        $summary = [
+            'total' => (int) $feed->logs()->count(),
+            'successful' => (int) $feed->logs()->where('status', 'success')->count(),
+            'failed' => (int) $feed->logs()->where('status', 'failed')->count(),
+            'imported' => (int) $feed->logs()->sum('transactions_imported'),
+            'last_synced_at' => $feed->last_sync_at?->format('Y-m-d H:i'),
+        ];
+
         return Inertia::render('finance/bank-feeds/Logs', [
             'feed' => [
                 'id' => $feed->id,
                 'provider' => $feed->provider,
+                'bank_account_id' => $feed->bank_account_id,
                 'bank_account_name' => $feed->bankAccount?->name,
                 'bank_name' => $feed->bankAccount?->bank_name,
             ],
             'logs' => $logs,
+            'summary' => $summary,
         ]);
     }
 }

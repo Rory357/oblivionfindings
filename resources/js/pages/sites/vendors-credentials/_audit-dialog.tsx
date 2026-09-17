@@ -14,6 +14,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import {
     AlertTriangle,
@@ -44,10 +45,62 @@ const ACTION_META: Record<
     view_list: { label: 'Viewed list', icon: Eye, tone: 'neutral' },
     reveal: { label: 'Revealed', icon: Eye, tone: 'info' },
     copy: { label: 'Copied', icon: Copy, tone: 'neutral' },
+    copy_intent: { label: 'Copy authorized', icon: Copy, tone: 'info' },
+    copy_reported_succeeded: {
+        label: 'Clipboard success reported',
+        icon: Copy,
+        tone: 'success',
+    },
+    copy_reported_failed: {
+        label: 'Clipboard failure reported',
+        icon: Copy,
+        tone: 'critical',
+    },
+    reauth_failed: {
+        label: 'Identity confirmation failed',
+        icon: ShieldCheck,
+        tone: 'critical',
+    },
+    reauth_success: {
+        label: 'Identity confirmed',
+        icon: ShieldCheck,
+        tone: 'success',
+    },
+    external_attestation: {
+        label: 'External change attested',
+        icon: RefreshCcw,
+        tone: 'info',
+    },
+    external_replacement: {
+        label: 'External replacement recorded',
+        icon: RefreshCcw,
+        tone: 'info',
+    },
+    stored_replacement: {
+        label: 'Stored value replaced',
+        icon: Pencil,
+        tone: 'warning',
+    },
+    recovered_storage: {
+        label: 'Stored version recovered',
+        icon: History,
+        tone: 'warning',
+    },
+    storage_key_maintenance: {
+        label: 'Encryption key maintained',
+        icon: KeyRound,
+        tone: 'neutral',
+    },
+    retire: { label: 'Retired', icon: Trash2, tone: 'warning' },
+    restore: { label: 'Restored', icon: History, tone: 'info' },
     totp_code: { label: 'Viewed OTP', icon: KeyRound, tone: 'neutral' },
     create: { label: 'Created', icon: Plus, tone: 'success' },
     edit: { label: 'Updated', icon: Pencil, tone: 'warning' },
-    rotate: { label: 'Rotated', icon: RefreshCcw, tone: 'info' },
+    rotate: {
+        label: 'Legacy rotation record',
+        icon: RefreshCcw,
+        tone: 'neutral',
+    },
     totp_setup: {
         label: 'Authenticator set',
         icon: ShieldCheck,
@@ -81,29 +134,17 @@ type AuditRow = {
     target_type: string;
     site_name: string;
     ip: string;
-    result: 'ok' | 'denied';
+    result: 'ok' | 'denied' | 'failed' | 'intent';
 };
 
 function actionMeta(action: string) {
     return (
         ACTION_META[action] ?? {
-            label: action,
+            label: action.replaceAll('_', ' '),
             icon: History,
             tone: 'neutral' as AuditTone,
         }
     );
-}
-
-function formatDateTime(iso: string) {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString('en-NZ', {
-        day: '2-digit',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    });
 }
 
 export function AuditLogDialog({
@@ -204,10 +245,18 @@ export function AuditLogDialog({
         tone: AuditTone;
     }[] = [
         { label: 'Reveals', value: count('reveal'), icon: Eye, tone: 'info' },
-        { label: 'Copies', value: count('copy'), icon: Copy, tone: 'neutral' },
         {
-            label: 'Rotations',
-            value: count('rotate'),
+            label: 'Copy reports',
+            value:
+                count('copy_reported_succeeded') +
+                count('copy_reported_failed'),
+            icon: Copy,
+            tone: 'neutral',
+        },
+        {
+            label: 'External changes',
+            value:
+                count('external_attestation') + count('external_replacement'),
             icon: RefreshCcw,
             tone: 'success',
         },
@@ -492,10 +541,19 @@ export function AuditLogDialog({
                                                         <Badge
                                                             variant="outline"
                                                             className={
-                                                                TONE_BADGE.critical
+                                                                row.result ===
+                                                                'intent'
+                                                                    ? TONE_BADGE.info
+                                                                    : TONE_BADGE.critical
                                                             }
                                                         >
-                                                            Denied
+                                                            {row.result ===
+                                                            'intent'
+                                                                ? 'Intent recorded'
+                                                                : row.result ===
+                                                                    'failed'
+                                                                  ? 'Reported failure'
+                                                                  : 'Denied'}
                                                         </Badge>
                                                     )}
                                                 </td>

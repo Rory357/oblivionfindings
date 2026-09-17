@@ -1,0 +1,6 @@
+public/build-gov-audit4-20260913/assets/show-BEYyj3rR.js                                   286.66 kB │ gzip:  80.44 kB
+public/build-gov-audit4-20260913/assets/index-DfvOXeCg.js                                  317.15 kB │ gzip:  88.05 kB
+public/build-gov-audit4-20260913/assets/show-RXtmbsk9.js                                   318.28 kB │ gzip:  95.14 kB
+public/build-gov-audit4-20260913/assets/vendor-charts-DxVDTmNl.js                          398.57 kB │ gzip: 115.53 kB
+public/build-gov-audit4-20260913/assets/app-CO5NRHR5.js                                    479.48 kB │ gzip:  79.81 kB
+✓ built in 4m 29s

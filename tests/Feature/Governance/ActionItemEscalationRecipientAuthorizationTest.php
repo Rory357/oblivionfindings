@@ -87,9 +87,11 @@ class ActionItemEscalationRecipientAuthorizationTest extends TestCase
 
         foreach ($actions as $key => $action) {
             $action->refresh();
+            // Automatic escalations record no person — never the owner.
             expect($action->escalated_at)->not->toBeNull()
-                ->and($action->escalated_by)->toBe($action->assigned_to)
-                ->and($action->escalation_reason)->toBe('Automatically escalated due to overdue status')
+                ->and($action->escalated_by)->toBeNull()
+                ->and($action->escalation_reason)->toBe(ActionItem::AUTOMATIC_ESCALATION_REASON)
+                ->and($action->wasEscalatedAutomatically())->toBeTrue()
                 ->and($action->priority)->toBe($key === 'central' ? 'medium' : 'high');
         }
     }

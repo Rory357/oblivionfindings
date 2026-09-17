@@ -1,0 +1,49 @@
+{
+  "schema_version": 2,
+  "id": "10000000-0000-4000-8000-000000000048",
+  "title": "Blank drawing",
+  "pages": [
+    {
+      "id": "10000000-0000-4000-8000-00000000004c",
+      "name": "Blank drawing",
+      "subtitle": "Build something clear. Choose a shape from the library.",
+      "width": 1080,
+      "height": 680,
+      "orientation": "landscape",
+      "paper": "a3",
+      "scale": "1:1",
+      "background": "#ffffff",
+      "grid": {
+        "enabled": true,
+        "size": 10,
+        "snap": true
+      },
+      "layers": [
+        {
+          "id": "10000000-0000-4000-8000-000000000049",
+          "name": "Diagram",
+          "visible": true,
+          "locked": false,
+          "print": true
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000004a",
+          "name": "Notes & callouts",
+          "visible": true,
+          "locked": false,
+          "print": true
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000004b",
+          "name": "Lanes & structure",
+          "visible": true,
+          "locked": true,
+          "print": true
+        }
+      ],
+      "groups": [],
+      "nodes": [],
+      "edges": []
+    }
+  ]
+}

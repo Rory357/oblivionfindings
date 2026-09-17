@@ -1,10 +1,18 @@
-import { ReportsTabsFooter } from '@/components/finance';
+import { chartColor } from '@/components/finance/chart-palette';
+import { FinancePeriodFilter } from '@/components/finance/finance-period-filter';
 import { formatMoney } from '@/components/finance/money';
-import { PageHero, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+    FinanceReportPage,
+    ReportCard,
+    reportRangeLabel,
+} from '@/components/finance/report-page';
+import {
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+} from '@/components/page';
 import {
     Table,
     TableBody,
@@ -13,18 +21,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem, PageProps } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import {
-    Banknote,
-    DollarSign,
-    Printer,
-    RefreshCw,
-    TrendingDown,
-    TrendingUp,
-} from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { PageProps } from '@/types';
+import { router } from '@inertiajs/react';
+import { PieChart as PieChartIcon, Printer } from 'lucide-react';
+import { useMemo } from 'react';
 import {
     Bar,
     BarChart,
@@ -61,340 +61,244 @@ interface Props extends PageProps {
     data: ReportData;
 }
 
-const formatPct = (pct: number) => pct.toFixed(1) + '%';
+const URL = '/finance/reports/funding-stream-summary';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance' },
-    { title: 'Reports', href: '/finance/reports/funding-stream-summary' },
-    {
-        title: 'Funding Stream Summary',
-        href: '/finance/reports/funding-stream-summary',
-    },
-];
+const REVENUE_COLOUR = chartColor(0);
+const EXPENSE_COLOUR = chartColor(1);
+
+const formatPct = (pct: number) => `${pct.toFixed(1)}%`;
+
+const truncate = (value: string, max: number) =>
+    value.length > max ? `${value.substring(0, max)}…` : value;
 
 export default function FundingStreamSummary({
     startDate,
     endDate,
     data,
 }: Props) {
-    const [start, setStart] = useState(startDate ?? '');
-    const [end, setEnd] = useState(endDate ?? '');
-
-    const handleGenerate = () => {
-        router.get(
-            '/finance/reports/funding-stream-summary',
-            {
-                start_date: start,
-                end_date: end,
-            },
-            { preserveState: true },
-        );
-    };
-
     const overallMarginPct =
         data.totals.revenue > 0
             ? (data.totals.net_margin / data.totals.revenue) * 100
             : 0;
 
+    const inMargin = data.totals.net_margin >= 0;
+
+    const loseMoney = data.streams.filter((s) => s.net_margin < 0).length;
+
     const chartData = useMemo(
         () =>
             data.streams.map((s) => ({
-                name:
-                    s.name.length > 18
-                        ? s.name.substring(0, 18) + '...'
-                        : s.name,
+                name: truncate(s.name, 18),
                 Revenue: s.revenue,
                 Expenses: s.expenses,
             })),
         [data.streams],
     );
 
-    return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Funding Stream Summary" />
-
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Banknote}
-                        title="Funding Stream Summary"
-                        description="Revenue, expenses and margin by funding stream."
-                        stats={[
-                            {
-                                label: 'Revenue',
-                                value: formatMoney(data.totals.revenue),
-                            },
-                            {
-                                label: 'Expenses',
-                                value: formatMoney(data.totals.expenses),
-                            },
-                            {
-                                label: 'Net Margin',
-                                value: formatMoney(data.totals.net_margin),
-                            },
-                            {
-                                label: 'Margin %',
-                                value: formatPct(overallMarginPct),
-                            },
-                        ]}
-                        actions={
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.print()}
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Printer className="mr-1 h-4 w-4" />
-                                Print
-                            </Button>
-                        }
-                        footer={<ReportsTabsFooter active="funding-summary" />}
-                    />
-                }
+    const meters = (
+        <>
+            <PageHeaderMeterBlock
+                label="Revenue"
+                tone="success"
+                href="/finance/invoices"
+                ariaLabel="View invoices"
             >
-                {/* Date filter */}
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex flex-wrap items-end gap-4">
-                            <div className="space-y-1">
-                                <Label htmlFor="start_date">Start Date</Label>
-                                <Input
-                                    id="start_date"
-                                    type="date"
-                                    value={start}
-                                    onChange={(e) => setStart(e.target.value)}
-                                    className="w-44"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="end_date">End Date</Label>
-                                <Input
-                                    id="end_date"
-                                    type="date"
-                                    value={end}
-                                    onChange={(e) => setEnd(e.target.value)}
-                                    className="w-44"
-                                />
-                            </div>
-                            <Button onClick={handleGenerate} className="gap-2">
-                                <RefreshCw className="h-4 w-4" />
-                                Generate
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                <PageHeaderMeterBig>
+                    {formatMoney(data.totals.revenue)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {data.streams.length} funding streams
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Expenses"
+                href="/finance/bills"
+                ariaLabel="View bills"
+            >
+                <PageHeaderMeterBig>
+                    {formatMoney(data.totals.expenses)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    Attributed to a funding stream
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label={inMargin ? 'Net margin' : 'Net shortfall'}
+                tone={inMargin ? 'success' : 'critical'}
+                href="/finance/reports/profit-loss"
+                ariaLabel="View the profit and loss statement"
+            >
+                <PageHeaderMeterBig>
+                    {formatMoney(data.totals.net_margin)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {loseMoney > 0
+                        ? `${loseMoney} streams running at a loss`
+                        : 'Every stream covering its costs'}
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Overall margin"
+                tone={inMargin ? 'success' : 'critical'}
+                href="/finance/funding-streams"
+                ariaLabel="View funding streams"
+            >
+                <PageHeaderMeterDonut
+                    percent={overallMarginPct}
+                    caption={
+                        data.totals.revenue > 0
+                            ? `${formatMoney(data.totals.net_margin)} of ${formatMoney(data.totals.revenue)}`
+                            : 'No revenue in this period'
+                    }
+                />
+            </PageHeaderMeterBlock>
+        </>
+    );
 
-                {/* KPI Cards */}
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <p className="text-sm text-muted-foreground">
-                                        Total Revenue
-                                    </p>
-                                    <p className="text-2xl font-bold text-status-success tabular-nums dark:text-status-success">
-                                        {formatMoney(data.totals.revenue)}
-                                    </p>
-                                </div>
-                                <div className="rounded-lg bg-muted p-3">
-                                    <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <p className="text-sm text-muted-foreground">
-                                        Total Expenses
-                                    </p>
-                                    <p className="text-2xl font-bold text-status-critical tabular-nums dark:text-status-critical">
-                                        {formatMoney(data.totals.expenses)}
-                                    </p>
-                                </div>
-                                <div className="rounded-lg bg-muted p-3">
-                                    <TrendingDown className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <p className="text-sm text-muted-foreground">
-                                        Overall Margin
-                                    </p>
-                                    <p
-                                        className={`text-2xl font-bold tabular-nums ${overallMarginPct >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}
-                                    >
-                                        {formatPct(overallMarginPct)}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {formatMoney(data.totals.net_margin)}{' '}
-                                        net
-                                    </p>
-                                </div>
-                                <div className="rounded-lg bg-muted p-3">
-                                    <DollarSign className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+    return (
+        <FinanceReportPage
+            icon={PieChartIcon}
+            title="Funding summary"
+            headTitle="Funding stream summary"
+            periodLabel={reportRangeLabel(startDate, endDate)}
+            subline={`Revenue, expenses and margin by funding stream · ${data.streams.length} streams with activity`}
+            actions={
+                <PageHeaderGlassButton
+                    icon={Printer}
+                    onClick={() => window.print()}
+                >
+                    Print
+                </PageHeaderGlassButton>
+            }
+            meters={meters}
+            filters={
+                <FinancePeriodFilter
+                    url={URL}
+                    from={startDate ?? ''}
+                    to={endDate ?? ''}
+                    idPrefix="funding-summary-period"
+                    onApply={({ from, to }) =>
+                        router.get(
+                            URL,
+                            { start_date: from, end_date: to },
+                            { preserveScroll: true },
+                        )
+                    }
+                />
+            }
+        >
+            {data.streams.length > 0 && (
+                <ReportCard
+                    title="Revenue vs expenses by funding stream"
+                    scroll={false}
+                >
+                    <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={chartData}
+                                margin={{
+                                    top: 5,
+                                    right: 20,
+                                    left: 20,
+                                    bottom: 5,
+                                }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                <YAxis tickFormatter={(v) => formatMoney(v)} />
+                                <Tooltip
+                                    formatter={(value) =>
+                                        formatMoney(value as number)
+                                    }
+                                />
+                                <Legend />
+                                <Bar
+                                    dataKey="Revenue"
+                                    fill={REVENUE_COLOUR}
+                                    radius={[4, 4, 0, 0]}
+                                />
+                                <Bar
+                                    dataKey="Expenses"
+                                    fill={EXPENSE_COLOUR}
+                                    radius={[4, 4, 0, 0]}
+                                />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </ReportCard>
+            )}
 
-                {/* Chart */}
-                {data.streams.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Revenue vs Expenses by Funding Stream
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-72">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={chartData}
-                                        margin={{
-                                            top: 5,
-                                            right: 20,
-                                            left: 20,
-                                            bottom: 5,
-                                        }}
+            <ReportCard title="Funding stream performance">
+                {data.streams.length === 0 ? (
+                    <p className="py-8 text-center text-muted-foreground">
+                        No funding stream activity for the selected period.
+                    </p>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Funding stream</TableHead>
+                                <TableHead className="text-right">
+                                    Revenue
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Expenses
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Net margin
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Margin %
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {data.streams.map((stream, idx) => (
+                                <TableRow key={idx}>
+                                    <TableCell className="font-medium">
+                                        {stream.name}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums">
+                                        {formatMoney(stream.revenue)}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums">
+                                        {formatMoney(stream.expenses)}
+                                    </TableCell>
+                                    <TableCell
+                                        className={`text-right font-semibold tabular-nums ${stream.net_margin >= 0 ? 'text-status-success' : 'text-status-critical'}`}
                                     >
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis
-                                            dataKey="name"
-                                            tick={{ fontSize: 12 }}
-                                        />
-                                        <YAxis
-                                            tickFormatter={(v) =>
-                                                formatMoney(v)
-                                            }
-                                        />
-                                        <Tooltip
-                                            formatter={(value) =>
-                                                formatMoney(value as number)
-                                            }
-                                        />
-                                        <Legend />
-                                        <Bar
-                                            dataKey="Revenue"
-                                            fill="var(--status-success)"
-                                            radius={[4, 4, 0, 0]}
-                                        />
-                                        <Bar
-                                            dataKey="Expenses"
-                                            fill="var(--status-critical)"
-                                            radius={[4, 4, 0, 0]}
-                                        />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                        {formatMoney(stream.net_margin)}
+                                    </TableCell>
+                                    <TableCell
+                                        className={`text-right tabular-nums ${stream.margin_pct >= 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                    >
+                                        {formatPct(stream.margin_pct)}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                            <TableRow className="border-t-2 font-bold">
+                                <TableCell>Totals</TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                    {formatMoney(data.totals.revenue)}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                    {formatMoney(data.totals.expenses)}
+                                </TableCell>
+                                <TableCell
+                                    className={`text-right tabular-nums ${inMargin ? 'text-status-success' : 'text-status-critical'}`}
+                                >
+                                    {formatMoney(data.totals.net_margin)}
+                                </TableCell>
+                                <TableCell
+                                    className={`text-right tabular-nums ${inMargin ? 'text-status-success' : 'text-status-critical'}`}
+                                >
+                                    {formatPct(overallMarginPct)}
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
                 )}
-
-                {/* Table */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Funding Stream Performance</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {data.streams.length === 0 ? (
-                            <p className="py-8 text-center text-muted-foreground">
-                                No funding stream data for the selected period.
-                            </p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>
-                                                Funding Stream
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Revenue
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Expenses
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Net Margin
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Margin %
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {data.streams.map((stream, idx) => (
-                                            <TableRow key={idx}>
-                                                <TableCell className="font-medium">
-                                                    {stream.name}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums">
-                                                    {formatMoney(
-                                                        stream.revenue,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums">
-                                                    {formatMoney(
-                                                        stream.expenses,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell
-                                                    className={`text-right font-mono font-semibold tabular-nums ${stream.net_margin >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}
-                                                >
-                                                    {formatMoney(
-                                                        stream.net_margin,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell
-                                                    className={`text-right font-mono tabular-nums ${stream.margin_pct >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}
-                                                >
-                                                    {formatPct(
-                                                        stream.margin_pct,
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                        <TableRow className="border-t-2 font-bold">
-                                            <TableCell>Totals</TableCell>
-                                            <TableCell className="text-right font-mono tabular-nums">
-                                                {formatMoney(
-                                                    data.totals.revenue,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono tabular-nums">
-                                                {formatMoney(
-                                                    data.totals.expenses,
-                                                )}
-                                            </TableCell>
-                                            <TableCell
-                                                className={`text-right font-mono tabular-nums ${data.totals.net_margin >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}
-                                            >
-                                                {formatMoney(
-                                                    data.totals.net_margin,
-                                                )}
-                                            </TableCell>
-                                            <TableCell
-                                                className={`text-right font-mono tabular-nums ${overallMarginPct >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}
-                                            >
-                                                {formatPct(overallMarginPct)}
-                                            </TableCell>
-                                        </TableRow>
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </PageLayout>
-        </AppLayout>
+            </ReportCard>
+        </FinanceReportPage>
     );
 }

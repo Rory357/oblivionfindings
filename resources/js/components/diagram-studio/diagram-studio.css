@@ -1,0 +1,799 @@
+.ds-studio,
+.ds-dialog {
+    --ds-surface: var(--card, #fff);
+    --ds-ground: var(--muted, #f3f1f7);
+    --ds-ink: var(--foreground, #302b48);
+    --ds-muted: var(--muted-foreground, #716a80);
+    --ds-line: var(--border, #e3dfec);
+    --ds-accent: var(--primary, #6855cf);
+    --ds-soft: var(--accent, #f0ecfc);
+    color: var(--ds-ink);
+    font-family: var(--font-sans, 'Instrument Sans', 'Segoe UI', sans-serif);
+    font-size: 13px;
+    line-height: 1.45;
+    box-sizing: border-box;
+}
+.ds-studio *,
+.ds-dialog * {
+    box-sizing: border-box;
+}
+.ds-studio {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 820px;
+    max-height: calc(100dvh - 100px);
+    min-height: 500px;
+    min-width: 0;
+    border: 1px solid var(--ds-line);
+    border-radius: 12px;
+    background: var(--ds-surface);
+    overflow: hidden;
+    position: relative;
+}
+.ds-studio button,
+.ds-dialog button,
+.ds-studio input,
+.ds-dialog input,
+.ds-studio textarea,
+.ds-dialog textarea,
+.ds-studio select,
+.ds-dialog select {
+    font: inherit;
+    color: inherit;
+    max-width: 100%;
+}
+.ds-studio button,
+.ds-dialog button {
+    cursor: pointer;
+}
+.ds-studio button:disabled,
+.ds-dialog button:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+.ds-studio button:focus-visible,
+.ds-dialog button:focus-visible,
+.ds-studio [role='button']:focus-visible,
+.ds-dialog input:focus-visible,
+.ds-studio input:focus-visible,
+.ds-studio select:focus-visible,
+.ds-dialog select:focus-visible,
+.ds-studio textarea:focus-visible,
+.ds-dialog textarea:focus-visible {
+    outline: 3px solid #a795e8;
+    outline-offset: 2px;
+}
+.ds-studio svg,
+.ds-dialog svg {
+    flex-shrink: 0;
+}
+.ds-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 15px 20px;
+    background: var(--sidebar, #29243d);
+    color: var(--sidebar-foreground, #faf8ff);
+    min-width: 0;
+}
+.ds-heading-title {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    min-width: 0;
+}
+.ds-heading-title > div {
+    min-width: 0;
+}
+.ds-heading-title span {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.6px;
+    opacity: 0.7;
+}
+.ds-heading-title strong {
+    display: block;
+    font-size: 17px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ds-button-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+.ds-command {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    border: 0;
+    border-radius: 6px;
+    padding: 6px 9px;
+    background: transparent;
+    white-space: nowrap;
+}
+.ds-command:hover {
+    background: var(--ds-soft);
+}
+.ds-command[aria-pressed='true'] {
+    background: var(--ds-soft);
+    color: var(--ds-accent);
+}
+.ds-heading .ds-command:hover {
+    background: #ffffff18;
+}
+.ds-tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 3px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--ds-line);
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+.ds-tabs > button {
+    border: 0;
+    background: transparent;
+    padding: 10px 14px;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    font-weight: 500;
+}
+.ds-tabs > button[aria-pressed='true'] {
+    border-bottom-color: var(--ds-accent);
+    color: var(--ds-accent);
+}
+.ds-tabs .ds-file {
+    color: var(--ds-accent);
+    font-weight: 600;
+}
+.ds-ribbon {
+    min-height: 67px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--ds-line);
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+.ds-ribbon-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 3px;
+    padding-right: 13px;
+    margin-right: 5px;
+    border-right: 1px solid var(--ds-line);
+}
+.ds-ribbon-note {
+    color: var(--ds-muted);
+}
+.ds-swatch {
+    display: inline-block;
+    width: 19px;
+    height: 19px;
+    border: 2px solid;
+    border-radius: 4px;
+    margin-right: 6px;
+}
+.ds-context-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 5px 14px;
+    background: var(--ds-ground);
+    border-bottom: 1px solid var(--ds-line);
+    min-height: 39px;
+    flex-shrink: 0;
+}
+.ds-context-bar span {
+    font-size: 12px;
+}
+.ds-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    min-height: 30px;
+}
+.ds-check input {
+    accent-color: var(--ds-accent);
+    margin: 0;
+    width: 14px;
+    height: 14px;
+}
+.ds-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    position: relative;
+}
+.ds-layout[data-left='true'] {
+    grid-template-columns: 218px minmax(0, 1fr);
+}
+.ds-layout[data-right='true'] {
+    grid-template-columns: minmax(0, 1fr) 270px;
+}
+.ds-layout[data-left='true'][data-right='true'] {
+    grid-template-columns: 218px minmax(0, 1fr) 270px;
+}
+.ds-panel {
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--ds-surface);
+    z-index: 5;
+}
+.ds-left {
+    border-right: 1px solid var(--ds-line);
+}
+.ds-right {
+    border-left: 1px solid var(--ds-line);
+}
+.ds-panel > header {
+    padding: 9px 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--ds-line);
+    min-height: 45px;
+}
+.ds-panel > header strong {
+    text-transform: capitalize;
+    font-size: 13px;
+}
+.ds-panel-body {
+    padding: 14px;
+    overflow: auto;
+    min-height: 0;
+}
+.ds-stencils {
+    overflow: auto;
+    min-height: 0;
+    padding: 12px;
+}
+.ds-search {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 13px;
+    padding: 0 8px;
+    border: 1px solid var(--ds-line);
+    border-radius: 7px;
+}
+.ds-search input {
+    border: 0;
+    background: transparent;
+    width: 100%;
+    padding: 7px 0;
+    min-width: 0;
+    outline-offset: 0;
+}
+.ds-stencil-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    border: 0;
+    padding: 10px 0;
+    background: transparent;
+    font-weight: 600;
+    text-align: left;
+}
+.ds-stencil-heading[aria-expanded='true'] svg {
+    transform: rotate(90deg);
+}
+.ds-stencils section > p {
+    color: var(--ds-muted);
+    font-size: 11px;
+    margin: 0 0 9px;
+}
+.ds-stencils section {
+    border-bottom: 1px solid var(--ds-line);
+}
+.ds-stencil-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    padding-bottom: 12px;
+}
+.ds-stencil-grid > button {
+    border: 1px solid var(--ds-line);
+    border-radius: 7px;
+    background: var(--ds-surface);
+    padding: 8px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    min-height: 77px;
+}
+.ds-stencil-grid > button:hover {
+    background: var(--ds-soft);
+    border-color: #c0b4e2;
+}
+.ds-stencil-grid svg {
+    width: 61px;
+    height: 37px;
+}
+.ds-stencil-grid span {
+    font-size: 11px;
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+.ds-canvas-area {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    background: #eeecf2;
+}
+.ds-viewport {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: #c2bacf transparent;
+}
+.ds-viewport[data-tool='pan'] {
+    cursor: grab;
+}
+.ds-viewport[data-tool='ink'],
+.ds-viewport[data-tool='rectangle'],
+.ds-viewport[data-tool='connect'] {
+    cursor: crosshair;
+}
+.ds-paper-wrap {
+    padding: 36px;
+    position: relative;
+}
+.ds-paper {
+    display: block;
+    background: white;
+    box-shadow: 0 4px 20px #342d4217;
+    touch-action: none;
+    overflow: visible;
+}
+.ds-paper [role='button'] {
+    cursor: pointer;
+}
+.ds-selection-outline {
+    pointer-events: none;
+}
+.ds-ruler {
+    position: absolute;
+    left: 36px;
+    top: 13px;
+    height: 16px;
+    border-bottom: 1px solid #c5bece;
+    font-size: 9px;
+    color: #8a8295;
+    pointer-events: none;
+}
+.ds-ruler > span {
+    position: absolute;
+    border-left: 1px solid #c5bece;
+    height: 16px;
+    padding-left: 3px;
+    line-height: 12px;
+}
+.ds-canvas-hint {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #29243d;
+    color: white;
+    padding: 8px 15px;
+    border-radius: 7px;
+    max-width: 90%;
+    box-shadow: 0 3px 10px #0002;
+}
+.ds-minimap {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    width: 133px;
+    height: 84px;
+    background: #fff;
+    border: 1px solid #c8bfd8;
+    box-shadow: 0 3px 14px #302b481c;
+    border-radius: 6px;
+    cursor: crosshair;
+}
+.ds-panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--ds-line);
+    padding: 0 10px;
+}
+.ds-panel-tabs button {
+    flex: 1;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    padding: 9px 2px;
+    font-size: 12px;
+}
+.ds-panel-tabs button[aria-pressed='true'] {
+    border-color: var(--ds-accent);
+    color: var(--ds-accent);
+}
+.ds-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 12px;
+    min-width: 0;
+}
+.ds-field > span,
+.ds-field > label {
+    font-size: 11px;
+    color: var(--ds-muted);
+    font-weight: 500;
+}
+.ds-field input,
+.ds-field select,
+.ds-field textarea {
+    width: 100%;
+    border: 1px solid var(--ds-line);
+    border-radius: 6px;
+    background: var(--ds-surface);
+    padding: 7px 9px;
+    min-height: 34px;
+    min-width: 0;
+}
+.ds-field textarea {
+    resize: vertical;
+    line-height: 1.5;
+}
+.ds-field input[type='color'] {
+    padding: 4px;
+    height: 34px;
+}
+.ds-field input[type='range'] {
+    padding: 0;
+    accent-color: var(--ds-accent);
+}
+.ds-fields-two {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 10px;
+}
+.ds-inspector-fields,
+.ds-page-settings,
+.ds-data-tools fieldset {
+    padding: 0;
+    border: 0;
+    min-width: 0;
+    margin: 0;
+}
+.ds-inspector-fields > .ds-button-row {
+    margin-bottom: 13px;
+}
+.ds-empty {
+    padding: 14px 5px;
+    color: var(--ds-muted);
+}
+.ds-empty strong {
+    display: block;
+    color: var(--ds-ink);
+    font-size: 15px;
+}
+.ds-empty p {
+    line-height: 1.65;
+}
+.ds-page-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 42px;
+    border-top: 1px solid var(--ds-line);
+    flex-shrink: 0;
+    padding-right: 10px;
+    min-width: 0;
+}
+.ds-page-tabs {
+    display: flex;
+    align-items: stretch;
+    overflow: auto;
+    min-width: 0;
+}
+.ds-page-tabs > button:not(.ds-command) {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 11px 15px;
+    border: 0;
+    border-right: 1px solid var(--ds-line);
+    background: transparent;
+    white-space: nowrap;
+    font-size: 12px;
+}
+.ds-page-tabs > button[aria-pressed='true'] {
+    color: var(--ds-accent);
+    background: var(--ds-soft);
+    box-shadow: inset 0 -2px var(--ds-accent);
+}
+.ds-page-tabs span {
+    font-size: 10px;
+    opacity: 0.6;
+}
+.ds-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 3px 13px;
+    min-height: 34px;
+    background: var(--ds-ground);
+    border-top: 1px solid var(--ds-line);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+.ds-status > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ds-status > .ds-button-row {
+    flex-shrink: 0;
+}
+.ds-status button {
+    border: 0;
+    background: transparent;
+    font-size: 11px;
+}
+.ds-dialog {
+    background: var(--ds-surface);
+    max-height: 85dvh;
+    overflow: auto;
+    max-width: calc(100vw - 32px) !important;
+    width: 540px !important;
+}
+.ds-dialog-wide {
+    width: 860px !important;
+}
+.ds-dialog h2 {
+    font-size: 20px;
+    line-height: 1.3;
+    margin: 0 0 5px;
+    font-weight: 600;
+}
+.ds-dialog h3 {
+    font-size: 14px;
+    margin: 17px 0 9px;
+}
+.ds-dialog p {
+    color: var(--ds-muted);
+    line-height: 1.6;
+}
+.ds-dialog button[data-slot='dialog-close'] {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+}
+.ds-dialog .ds-stencils {
+    max-height: 60dvh;
+}
+.ds-dialog .ds-stencil-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.ds-template-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+.ds-template-grid > button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    text-align: left;
+    border: 1px solid var(--ds-line);
+    border-radius: 9px;
+    background: var(--ds-surface);
+    padding: 18px;
+    min-height: 155px;
+}
+.ds-template-grid > button:hover {
+    border-color: #b8a9dc;
+    background: var(--ds-soft);
+}
+.ds-template-grid strong {
+    font-size: 13px;
+}
+.ds-template-grid span {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--ds-accent);
+}
+.ds-template-grid p {
+    font-size: 11px;
+    margin: 0;
+}
+.ds-file-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+.ds-file-actions > .ds-field,
+.ds-file-actions > p {
+    grid-column: 1/-1;
+}
+.ds-page-tools {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+}
+.ds-page-row {
+    padding: 7px 0;
+    border-bottom: 1px solid var(--ds-line);
+}
+.ds-page-row > button {
+    max-width: 100%;
+    white-space: normal;
+    text-align: left;
+}
+.ds-layer-tools p,
+.ds-data-tools p {
+    font-size: 11px;
+    color: var(--ds-muted);
+    line-height: 1.6;
+}
+.ds-layer-row {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--ds-line);
+}
+.ds-layer-row > .ds-check {
+    font-weight: 500;
+}
+.ds-layer-tools > button {
+    margin-top: 14px;
+}
+.ds-property-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.ds-property-row > .ds-field {
+    flex: 1;
+    min-width: 0;
+}
+.ds-data-tools h3 {
+    font-size: 13px;
+    margin: 18px 0 8px;
+}
+.ds-data-tools h3:first-child {
+    margin-top: 0;
+}
+.ds-data-tools fieldset + fieldset {
+    border-top: 1px solid var(--ds-line);
+    padding-top: 17px;
+    margin-top: 20px;
+}
+.ds-data-tools .ds-button-row {
+    margin-bottom: 10px;
+}
+.ds-notice {
+    border: 1px solid #cfe4db;
+    background: #eff8f2;
+    border-radius: 7px;
+    padding: 11px;
+    color: #2d6a53 !important;
+}
+.ds-validation ul {
+    padding-left: 15px;
+}
+.ds-validation button {
+    white-space: normal;
+    text-align: left;
+    line-height: 1.5;
+}
+.ds-studio[data-compact='true'] .ds-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+}
+.ds-studio[data-compact='true'] .ds-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: min(300px, 85%);
+    box-shadow: 0 5px 20px #302b4826;
+}
+.ds-studio[data-compact='true'] .ds-left {
+    left: 0;
+}
+.ds-studio[data-compact='true'] .ds-right {
+    right: 0;
+}
+.ds-studio[data-compact='true'] .ds-heading {
+    padding: 12px;
+}
+.ds-studio[data-compact='true'] .ds-heading-title strong {
+    font-size: 14px;
+}
+.ds-studio[data-compact='true'] .ds-ribbon {
+    gap: 4px;
+    padding: 7px;
+    min-height: 58px;
+}
+.ds-studio[data-compact='true'] .ds-ribbon-group {
+    padding-right: 4px;
+    margin-right: 0;
+}
+.ds-studio[data-compact='true'] .ds-command {
+    font-size: 11px;
+    padding: 5px 6px;
+}
+.ds-studio[data-compact='true'] .ds-minimap {
+    width: 100px;
+    height: 64px;
+}
+.ds-studio[data-focus='true'] {
+    max-height: calc(100dvh - 50px);
+}
+@media (max-width: 600px) {
+    .ds-template-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .ds-page-tools {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .ds-dialog .ds-stencil-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .ds-file-actions {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .ds-file-actions > button {
+        white-space: normal;
+    }
+    .ds-studio {
+        min-height: 500px;
+        max-height: calc(100dvh - 30px);
+    }
+    .ds-context-bar {
+        padding: 4px 8px;
+        flex-wrap: wrap;
+    }
+    .ds-heading-title svg {
+        display: none;
+    }
+    .ds-heading-title strong {
+        max-width: 180px;
+    }
+}
+@media (pointer: coarse) {
+    .ds-studio button,
+    .ds-dialog button,
+    .ds-studio .ds-check,
+    .ds-dialog .ds-check {
+        min-height: 44px;
+    }
+    .ds-studio input,
+    .ds-studio textarea,
+    .ds-studio select,
+    .ds-dialog input,
+    .ds-dialog textarea,
+    .ds-dialog select {
+        font-size: 16px;
+    }
+    .ds-stencil-grid > button {
+        min-height: 85px;
+    }
+}

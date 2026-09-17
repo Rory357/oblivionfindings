@@ -1,17 +1,21 @@
-import { ReportsTabsFooter } from '@/components/finance';
 import { chartColor } from '@/components/finance/chart-palette';
 import { formatMoney } from '@/components/finance/money';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    FinanceReportPage,
+    ReportCard,
+} from '@/components/finance/report-page';
+import {
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderStatusChip,
+} from '@/components/page';
+import { EmptyList } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import {
     Table,
     TableBody,
@@ -20,15 +24,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import AppLayout from '@/layouts/app-layout';
-import { Head, router, usePage } from '@inertiajs/react';
-import {
-    BarChart3,
-    DollarSign,
-    RefreshCw,
-    TrendingDown,
-    TrendingUp,
-} from 'lucide-react';
+import { router, usePage } from '@inertiajs/react';
+import { BarChart3, Printer, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
     Bar,
@@ -41,6 +38,8 @@ import {
     YAxis,
 } from 'recharts';
 
+type VarianceColor = 'green' | 'yellow' | 'red';
+
 type LineItem = {
     id: number;
     description: string;
@@ -50,7 +49,7 @@ type LineItem = {
     actual_amount: number;
     variance_amount: number;
     variance_pct: number;
-    variance_color: 'green' | 'yellow' | 'red';
+    variance_color: VarianceColor;
     variance_explained: boolean;
     variance_explanation: string | null;
 };
@@ -60,7 +59,7 @@ type CategorySubtotals = {
     actual_amount: number;
     variance_amount: number;
     variance_pct: number;
-    variance_color: 'green' | 'yellow' | 'red';
+    variance_color: VarianceColor;
     utilization_pct: number;
 };
 
@@ -105,19 +104,39 @@ type PageProps = {
     flash?: { success?: string };
 };
 
+const URL = '/finance/reports/budget-vs-actuals';
+
 const formatPct = (pct: number) => `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
 
-const varianceColorClasses: Record<string, string> = {
-    green: 'text-status-success bg-status-success-bg dark:text-status-success',
-    yellow: 'text-status-warning bg-status-warning-bg dark:text-status-warning',
-    red: 'text-status-critical bg-status-critical-bg dark:text-status-critical',
+/**
+ * One variance scale for the whole page: the server's green/yellow/red
+ * becomes a StatusBadge variant, a text token and a bar token — replacing
+ * the five ad-hoc colour systems this page used to carry.
+ */
+const VARIANCE_VARIANT: Record<VarianceColor, StatusVariant> = {
+    green: 'success',
+    yellow: 'warning',
+    red: 'critical',
 };
 
-const varianceBadgeClasses: Record<string, string> = {
-    green: 'bg-status-success-bg text-status-success border-status-success/30 dark:bg-status-success-bg dark:text-status-success dark:border-status-success/30',
-    yellow: 'bg-status-warning-bg text-status-warning border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
-    red: 'bg-status-critical-bg text-status-critical border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical dark:border-status-critical/30',
+const VARIANCE_TEXT: Record<VarianceColor, string> = {
+    green: 'text-status-success',
+    yellow: 'text-status-warning',
+    red: 'text-status-critical',
 };
+
+const VARIANCE_BAR: Record<VarianceColor, string> = {
+    green: 'bg-status-success',
+    yellow: 'bg-status-warning',
+    red: 'bg-status-critical',
+};
+
+const varianceColorFor = (variancePct: number): VarianceColor =>
+    Math.abs(variancePct) >= 10
+        ? 'red'
+        : Math.abs(variancePct) >= 5
+          ? 'yellow'
+          : 'green';
 
 const categoryLabels: Record<string, string> = {
     staffing: 'Staffing',
@@ -129,24 +148,31 @@ const categoryLabels: Record<string, string> = {
     other: 'Other',
 };
 
-function ProgressBar({ value, color }: { value: number; color: string }) {
+/** A line item's utilisation — 0 when it carries no budget. */
+const utilisationOf = (item: LineItem) =>
+    item.budget_amount !== 0
+        ? (item.actual_amount / item.budget_amount) * 100
+        : 0;
+
+function ProgressBar({
+    value,
+    color,
+}: {
+    value: number;
+    color: VarianceColor;
+}) {
     const capped = Math.min(Math.max(value, 0), 150);
-    const barColor =
-        color === 'red'
-            ? 'bg-status-critical'
-            : color === 'yellow'
-              ? 'bg-status-warning'
-              : 'bg-status-success';
     const overBudget = value > 100;
 
     return (
         <div className="flex items-center gap-2">
-            <div className="relative h-2 w-24 overflow-hidden rounded-full bg-muted">
-                {overBudget && (
-                    <div className="absolute inset-0 h-full w-full bg-muted" />
-                )}
+            <div
+                className="relative h-2 w-24 overflow-hidden rounded-full bg-muted"
+                role="img"
+                aria-label={`${value.toFixed(0)}% of budget used`}
+            >
                 <div
-                    className={`absolute inset-y-0 left-0 h-full rounded-full transition-all ${barColor}`}
+                    className={`absolute inset-y-0 left-0 h-full rounded-full transition-all ${VARIANCE_BAR[color]}`}
                     style={{
                         width: `${Math.min(capped, 100) * (100 / (overBudget ? 150 : 100))}%`,
                     }}
@@ -161,49 +187,10 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
                     />
                 )}
             </div>
-            <span className="w-12 text-right text-xs text-muted-foreground tabular-nums">
+            <span className="w-12 text-right text-caption tabular-nums">
                 {value.toFixed(0)}%
             </span>
         </div>
-    );
-}
-
-function SummaryCard({
-    title,
-    value,
-    subtitle,
-    icon: Icon,
-    color,
-}: {
-    title: string;
-    value: string;
-    subtitle?: string;
-    icon: React.ElementType;
-    color?: string;
-}) {
-    return (
-        <Card>
-            <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">{title}</p>
-                        <p
-                            className={`text-2xl font-bold tabular-nums ${color || ''}`}
-                        >
-                            {value}
-                        </p>
-                        {subtitle && (
-                            <p className="text-xs text-muted-foreground">
-                                {subtitle}
-                            </p>
-                        )}
-                    </div>
-                    <div className="rounded-lg bg-muted p-3">
-                        <Icon className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
     );
 }
 
@@ -215,26 +202,17 @@ export default function BudgetVsActuals({
     const { flash } = usePage<PageProps>().props;
     const [syncing, setSyncing] = useState(false);
 
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        {
-            title: 'Budget vs Actuals',
-            href: '/finance/reports/budget-vs-actuals',
-        },
-    ];
+    const { totals, categories } = report;
+    const hasBudget = !!report.budget;
 
     const handleBudgetChange = (value: string) => {
-        router.get(
-            '/finance/reports/budget-vs-actuals',
-            { budget_id: value },
-            { preserveState: true },
-        );
+        router.get(URL, { budget_id: value }, { preserveState: true });
     };
 
     const handleSync = () => {
         setSyncing(true);
         router.post(
-            '/finance/reports/budget-vs-actuals/sync',
+            `${URL}/sync`,
             {},
             {
                 preserveScroll: true,
@@ -243,172 +221,191 @@ export default function BudgetVsActuals({
         );
     };
 
-    const { totals, categories } = report;
-    const hasBudget = !!report.budget;
+    const overallColor = varianceColorFor(totals.variance_pct);
 
-    const overallColor =
-        Math.abs(totals.variance_pct) >= 10
-            ? 'text-status-critical'
-            : Math.abs(totals.variance_pct) >= 5
-              ? 'text-status-warning'
-              : 'text-status-success';
+    const remaining = totals.budget_amount - totals.actual_amount;
+    const overBudget = remaining < 0;
 
-    const chartData = useMemo(
+    const needsReview = useMemo(
         () =>
-            categories.map((cat) => {
-                const label = categoryLabels[cat.name] || cat.name;
-                return {
-                    name: label,
-                    Budget: cat.subtotals.budget_amount,
-                    Actual: cat.subtotals.actual_amount,
-                };
-            }),
+            categories.reduce(
+                (count, category) =>
+                    count +
+                    category.line_items.filter(
+                        (item) =>
+                            !item.variance_explained &&
+                            Math.abs(item.variance_pct) >= 5,
+                    ).length,
+                0,
+            ),
         [categories],
     );
 
-    return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Budget vs Actuals" />
+    const lineItemCount = useMemo(
+        () =>
+            categories.reduce(
+                (count, category) => count + category.line_items.length,
+                0,
+            ),
+        [categories],
+    );
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={BarChart3}
-                        title="Budget vs Actuals"
-                        description={
-                            report.budget
-                                ? `${report.budget.title || 'Budget'} - FY${report.budget.fiscal_year}`
-                                : 'Compare budgeted amounts against actual GL transactions.'
-                        }
-                        stats={
-                            hasBudget
-                                ? [
-                                      {
-                                          label: 'Budget',
-                                          value: formatMoney(
-                                              totals.budget_amount,
-                                          ),
-                                      },
-                                      {
-                                          label: 'Actual',
-                                          value: formatMoney(
-                                              totals.actual_amount,
-                                          ),
-                                      },
-                                      {
-                                          label: 'Variance',
-                                          value: formatPct(totals.variance_pct),
-                                      },
-                                      {
-                                          label: 'Utilisation',
-                                          value: `${totals.utilization_pct.toFixed(1)}%`,
-                                      },
-                                  ]
-                                : undefined
-                        }
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Select
-                                    value={selectedBudgetId?.toString() ?? ''}
-                                    onValueChange={handleBudgetChange}
-                                >
-                                    <SelectTrigger className="w-[220px] border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20">
-                                        <SelectValue placeholder="Select a budget" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {budgets.map((b) => (
-                                            <SelectItem
-                                                key={b.id}
-                                                value={b.id.toString()}
-                                            >
-                                                <span className="flex items-center gap-2">
-                                                    {b.label}
-                                                    {b.status ===
-                                                        'approved' && (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="border-status-success/30 bg-status-success-bg text-xs text-status-success"
-                                                        >
-                                                            Approved
-                                                        </Badge>
-                                                    )}
-                                                </span>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+    const chartData = useMemo(
+        () =>
+            categories.map((cat) => ({
+                name: categoryLabels[cat.name] || cat.name,
+                Budget: cat.subtotals.budget_amount,
+                Actual: cat.subtotals.actual_amount,
+            })),
+        [categories],
+    );
 
-                                <Button
-                                    variant="outline"
-                                    onClick={handleSync}
-                                    disabled={syncing}
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <RefreshCw
-                                        className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`}
-                                    />
-                                    Sync Actuals
-                                </Button>
-                            </div>
-                        }
-                        footer={
-                            <ReportsTabsFooter active="budget-vs-actuals" />
-                        }
-                    />
-                }
+    const budgetHref = report.budget
+        ? `/governance/budgets/${report.budget.id}`
+        : '/governance/budgets';
+
+    const meters = hasBudget ? (
+        <>
+            <PageHeaderMeterBlock
+                label="Total budget"
+                href={budgetHref}
+                ariaLabel="View the budget in Governance"
             >
-                {/* Flash message */}
-                {flash?.success && (
-                    <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-sm text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success">
-                        {flash.success}
-                    </div>
-                )}
+                <PageHeaderMeterBig>
+                    {formatMoney(totals.budget_amount)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    FY{report.budget!.fiscal_year} · {lineItemCount} line items
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Actual spend"
+                tone={overBudget ? 'warning' : 'brand'}
+                href="/finance/journals"
+                ariaLabel="View the posted journals behind the actuals"
+            >
+                <PageHeaderMeterBig>
+                    {formatMoney(totals.actual_amount)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterBar percent={totals.utilization_pct} />
+                <PageHeaderMeterCaption>
+                    {overBudget
+                        ? `${formatMoney(Math.abs(remaining))} over ${formatMoney(totals.budget_amount)}`
+                        : `${formatMoney(remaining)} left of ${formatMoney(totals.budget_amount)}`}
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Variance"
+                tone={
+                    overallColor === 'green'
+                        ? 'success'
+                        : overallColor === 'yellow'
+                          ? 'warning'
+                          : 'critical'
+                }
+                href="/finance/journals"
+                ariaLabel="View the posted journals behind the variance"
+            >
+                <PageHeaderMeterBig>
+                    {formatPct(totals.variance_pct)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {formatMoney(totals.variance_amount)} against budget
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Needs an explanation"
+                tone={needsReview > 0 ? 'warning' : 'success'}
+                href={budgetHref}
+                ariaLabel="View the budget, where variance explanations are recorded"
+            >
+                <PageHeaderMeterBig>{needsReview}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    Line items off budget by 5% or more
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+        </>
+    ) : undefined;
 
-                {/* Summary cards */}
-                {hasBudget && (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <SummaryCard
-                            title="Total Budget"
-                            value={formatMoney(totals.budget_amount)}
-                            subtitle={`FY${report.budget!.fiscal_year}`}
-                            icon={DollarSign}
-                        />
-                        <SummaryCard
-                            title="Total Actual"
-                            value={formatMoney(totals.actual_amount)}
-                            subtitle="From posted journals"
-                            icon={BarChart3}
-                        />
-                        <SummaryCard
-                            title="Overall Variance"
-                            value={formatPct(totals.variance_pct)}
-                            subtitle={formatMoney(totals.variance_amount)}
-                            icon={
-                                totals.variance_amount >= 0
-                                    ? TrendingUp
-                                    : TrendingDown
-                            }
-                            color={overallColor}
-                        />
-                        <SummaryCard
-                            title="Budget Utilisation"
-                            value={`${totals.utilization_pct.toFixed(1)}%`}
-                            subtitle={`${formatMoney(totals.actual_amount)} of ${formatMoney(totals.budget_amount)}`}
-                            icon={BarChart3}
-                        />
-                    </div>
-                )}
+    return (
+        <FinanceReportPage
+            icon={BarChart3}
+            title="Budget vs actuals"
+            chip={
+                report.budget ? (
+                    <PageHeaderStatusChip
+                        variant={
+                            report.budget.status === 'approved'
+                                ? 'success'
+                                : 'neutral'
+                        }
+                    >
+                        FY{report.budget.fiscal_year}
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="neutral">
+                        No budget selected
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={
+                report.budget
+                    ? `${report.budget.title || 'Budget'} · ${categories.length} categories · actuals from posted journals`
+                    : 'Budgeted amounts compared against actual ledger transactions'
+            }
+            actions={
+                <>
+                    <PageHeaderGlassButton
+                        icon={Printer}
+                        onClick={() => window.print()}
+                    >
+                        Print
+                    </PageHeaderGlassButton>
+                    <PageHeaderGlassButton
+                        icon={RefreshCw}
+                        onClick={handleSync}
+                        disabled={syncing}
+                    >
+                        {syncing ? 'Syncing actuals…' : 'Sync actuals'}
+                    </PageHeaderGlassButton>
+                </>
+            }
+            meters={meters}
+            filters={
+                <PageHeaderFilterSelect
+                    label="Budget"
+                    value={selectedBudgetId ? String(selectedBudgetId) : ''}
+                    allValue=""
+                    options={budgets.map((b) => ({
+                        value: String(b.id),
+                        label: b.label,
+                    }))}
+                    onChange={handleBudgetChange}
+                />
+            }
+        >
+            {flash?.success && (
+                <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-sm text-status-success">
+                    {flash.success}
+                </div>
+            )}
 
-                {/* Budget vs Actual chart */}
-                {hasBudget && categories.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Budget vs Actual by Category
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
+            {syncing ? (
+                <LoadingState message="Syncing actuals from the posted journals…" />
+            ) : !hasBudget ? (
+                <EmptyList
+                    icon={BarChart3}
+                    itemName="budget"
+                    title="No budget found"
+                    description="Pick a budget from the header, or create an approved budget in the Governance module to compare against."
+                />
+            ) : (
+                <>
+                    {categories.length > 0 && (
+                        <ReportCard
+                            title="Budget vs actual by category"
+                            scroll={false}
+                        >
                             <div className="h-72">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart
@@ -449,108 +446,80 @@ export default function BudgetVsActuals({
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
-                        </CardContent>
-                    </Card>
-                )}
+                        </ReportCard>
+                    )}
 
-                {/* Main report table */}
-                {hasBudget ? (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Budget Line Items by Category</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[300px]">
-                                            Description
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Budget
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Actual
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Variance ($)
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Variance (%)
-                                        </TableHead>
-                                        <TableHead className="text-center">
-                                            Status
-                                        </TableHead>
-                                        <TableHead>Utilisation</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {categories.map((category) => (
-                                        <CategorySection
-                                            key={category.name}
-                                            category={category}
+                    <ReportCard
+                        title="Budget line items by category"
+                        caption={`${lineItemCount} line items across ${categories.length} categories`}
+                    >
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-[300px]">
+                                        Description
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Budget
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Actual
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Variance ($)
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Variance (%)
+                                    </TableHead>
+                                    <TableHead className="text-center">
+                                        Status
+                                    </TableHead>
+                                    <TableHead>Utilisation</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {categories.map((category) => (
+                                    <CategorySection
+                                        key={category.name}
+                                        category={category}
+                                    />
+                                ))}
+                                <TableRow className="border-t-2 bg-muted/50 font-bold">
+                                    <TableCell className="font-bold">
+                                        Grand total
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums">
+                                        {formatMoney(totals.budget_amount)}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums">
+                                        {formatMoney(totals.actual_amount)}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums">
+                                        {formatMoney(totals.variance_amount)}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums">
+                                        <span
+                                            className={
+                                                VARIANCE_TEXT[overallColor]
+                                            }
+                                        >
+                                            {formatPct(totals.variance_pct)}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell />
+                                    <TableCell>
+                                        <ProgressBar
+                                            value={totals.utilization_pct}
+                                            color={overallColor}
                                         />
-                                    ))}
-                                    {/* Grand total row */}
-                                    <TableRow className="border-t-2 bg-muted/50 font-bold">
-                                        <TableCell className="font-bold">
-                                            Grand Total
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono tabular-nums">
-                                            {formatMoney(totals.budget_amount)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono tabular-nums">
-                                            {formatMoney(totals.actual_amount)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono tabular-nums">
-                                            {formatMoney(
-                                                totals.variance_amount,
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono tabular-nums">
-                                            <span className={overallColor}>
-                                                {formatPct(totals.variance_pct)}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell />
-                                        <TableCell>
-                                            <ProgressBar
-                                                value={totals.utilization_pct}
-                                                color={
-                                                    Math.abs(
-                                                        totals.variance_pct,
-                                                    ) >= 10
-                                                        ? 'red'
-                                                        : Math.abs(
-                                                                totals.variance_pct,
-                                                            ) >= 5
-                                                          ? 'yellow'
-                                                          : 'green'
-                                                }
-                                            />
-                                        </TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <Card>
-                        <CardContent className="py-12 text-center">
-                            <DollarSign className="mx-auto h-12 w-12 text-muted-foreground/40" />
-                            <h3 className="mt-4 text-lg font-medium">
-                                No budget found
-                            </h3>
-                            <p className="mt-2 text-sm text-muted-foreground">
-                                Select a budget from the dropdown above, or
-                                create an approved budget in the Governance
-                                module to get started.
-                            </p>
-                        </CardContent>
-                    </Card>
-                )}
-            </PageLayout>
-        </AppLayout>
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </ReportCard>
+                </>
+            )}
+        </FinanceReportPage>
     );
 }
 
@@ -560,112 +529,83 @@ function CategorySection({ category }: { category: Category }) {
 
     return (
         <>
-            {/* Category header */}
             <TableRow className="bg-muted/30 hover:bg-muted/40">
                 <TableCell colSpan={7} className="text-sm font-semibold">
                     {label}
                 </TableCell>
             </TableRow>
 
-            {/* Line items */}
             {category.line_items.map((item) => (
                 <TableRow key={item.id}>
                     <TableCell className="pl-8">
-                        <div>
-                            <span className="text-sm">{item.description}</span>
-                            {item.account_code && (
-                                <span className="ml-2 font-mono text-xs text-muted-foreground">
-                                    ({item.account_code})
-                                </span>
-                            )}
-                        </div>
+                        <span className="text-sm">{item.description}</span>
+                        {item.account_code && (
+                            <span className="ml-2 font-mono text-xs text-muted-foreground">
+                                ({item.account_code})
+                            </span>
+                        )}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm tabular-nums">
+                    <TableCell className="text-right text-sm tabular-nums">
                         {formatMoney(item.budget_amount)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm tabular-nums">
+                    <TableCell className="text-right text-sm tabular-nums">
                         {formatMoney(item.actual_amount)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm tabular-nums">
-                        <span
-                            className={
-                                varianceColorClasses[
-                                    item.variance_color
-                                ]?.split(' ')[0] || ''
-                            }
-                        >
-                            {formatMoney(item.variance_amount)}
-                        </span>
+                    <TableCell
+                        className={`text-right text-sm tabular-nums ${VARIANCE_TEXT[item.variance_color]}`}
+                    >
+                        {formatMoney(item.variance_amount)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm tabular-nums">
-                        <Badge
-                            variant="outline"
-                            className={`text-xs ${varianceBadgeClasses[item.variance_color] || ''}`}
+                    <TableCell className="text-right text-sm tabular-nums">
+                        <StatusBadge
+                            size="sm"
+                            variant={VARIANCE_VARIANT[item.variance_color]}
                         >
                             {formatPct(item.variance_pct)}
-                        </Badge>
+                        </StatusBadge>
                     </TableCell>
                     <TableCell className="text-center">
                         {item.variance_explained ? (
-                            <Badge
-                                variant="outline"
-                                className="border-status-info/30 bg-status-info-bg text-xs text-status-info dark:bg-status-info-bg dark:text-status-info"
-                            >
+                            <StatusBadge size="sm" variant="info">
                                 Explained
-                            </Badge>
+                            </StatusBadge>
                         ) : Math.abs(item.variance_pct) >= 5 ? (
-                            <Badge
-                                variant="outline"
-                                className="border-status-warning/30 bg-status-warning-bg text-xs text-status-warning dark:bg-status-warning-bg dark:text-status-warning"
-                            >
-                                Review
-                            </Badge>
+                            <StatusBadge size="sm" variant="warning">
+                                Needs a reason
+                            </StatusBadge>
                         ) : null}
                     </TableCell>
                     <TableCell>
                         <ProgressBar
-                            value={
-                                item.budget_amount !== 0
-                                    ? (item.actual_amount /
-                                          item.budget_amount) *
-                                      100
-                                    : 0
-                            }
+                            value={utilisationOf(item)}
                             color={item.variance_color}
                         />
                     </TableCell>
                 </TableRow>
             ))}
 
-            {/* Category subtotal */}
             <TableRow className="border-t bg-muted/10 font-medium">
                 <TableCell className="pl-8 text-sm text-muted-foreground italic">
-                    {label} Subtotal
+                    {label} subtotal
                 </TableCell>
-                <TableCell className="text-right font-mono text-sm font-semibold tabular-nums">
+                <TableCell className="text-right text-sm font-semibold tabular-nums">
                     {formatMoney(subtotals.budget_amount)}
                 </TableCell>
-                <TableCell className="text-right font-mono text-sm font-semibold tabular-nums">
+                <TableCell className="text-right text-sm font-semibold tabular-nums">
                     {formatMoney(subtotals.actual_amount)}
                 </TableCell>
-                <TableCell className="text-right font-mono text-sm font-semibold tabular-nums">
-                    <span
-                        className={
-                            varianceColorClasses[
-                                subtotals.variance_color
-                            ]?.split(' ')[0] || ''
-                        }
-                    >
-                        {formatMoney(subtotals.variance_amount)}
-                    </span>
+                <TableCell
+                    className={`text-right text-sm font-semibold tabular-nums ${VARIANCE_TEXT[subtotals.variance_color]}`}
+                >
+                    {formatMoney(subtotals.variance_amount)}
                 </TableCell>
-                <TableCell className="text-right font-mono text-sm tabular-nums">
-                    <Badge
-                        variant="outline"
-                        className={`text-xs ${varianceBadgeClasses[subtotals.variance_color] || ''}`}
+                <TableCell className="text-right text-sm tabular-nums">
+                    <StatusBadge
+                        size="sm"
+                        variant={VARIANCE_VARIANT[subtotals.variance_color]}
                     >
                         {formatPct(subtotals.variance_pct)}
-                    </Badge>
+                    </StatusBadge>
                 </TableCell>
                 <TableCell />
                 <TableCell>

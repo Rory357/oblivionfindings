@@ -1,7 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { useFinanceTab } from './finance-tabs';
 import { formatMoney, formatMoneyCompact } from './money';
 import { journalBalance } from './posting-preview';
 import { useWizard } from './wizard';
@@ -62,17 +61,6 @@ describe('journalBalance — double-entry balance check', () => {
 
     it('an all-zero journal is not "balanced" (nothing to post)', () => {
         expect(journalBalance([{ accountName: 'A' }]).balanced).toBe(false);
-    });
-});
-
-describe('useFinanceTab', () => {
-    it('defaults to the given tab and switches', () => {
-        const { result } = renderHook(() =>
-            useFinanceTab('summary', { syncUrl: false }),
-        );
-        expect(result.current[0]).toBe('summary');
-        act(() => result.current[1]('executive'));
-        expect(result.current[0]).toBe('executive');
     });
 });
 

@@ -1,31 +1,32 @@
+import { FinanceSectionRail } from '@/components/finance';
 import { chartColor } from '@/components/finance/chart-palette';
+import { FinancePeriodFilter } from '@/components/finance/finance-period-filter';
 import { formatMoney } from '@/components/finance/money';
-import { OverviewTabsFooter } from '@/components/finance/overview-hub';
-import { PageHero, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
+import {
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { StatusBadge } from '@/components/ui/status-badge';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import {
-    ArrowDown,
-    ArrowUp,
-    BarChart3,
-    CalendarDays,
-    ExternalLink,
-} from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { ArrowUpRight, BarChart3, Building2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
     Bar,
@@ -86,15 +87,18 @@ type Props = {
     categoryKeys: Array<{ key: string; label: string }>;
 };
 
-type SortKey = 'site' | 'total_cost' | 'variance_pct' | 'top_category';
+type SortKey = 'cost' | 'variance' | 'name' | 'category';
+
+const ALL = 'all';
 
 const money = (value: string | number) => formatMoney(Number(value));
 const pct = (value: string | number) => `${Number(value).toFixed(1)}%`;
-const numericSortValue = (row: SiteRow, key: SortKey) => {
-    if (key === 'total_cost') return Number(row.total_cost);
-    if (key === 'variance_pct') return Number(row.budget.variance_pct);
 
-    return 0;
+const BUDGET_LABEL: Record<string, string> = {
+    over_budget: 'Over budget',
+    approaching: 'Approaching',
+    under_budget: 'Under budget',
+    on_track: 'On track',
 };
 
 const budgetVariant = (
@@ -112,14 +116,31 @@ const budgetVariant = (
     }
 };
 
-const statusBadge = (status: string) => (
-    <StatusBadge
-        variant={budgetVariant(status)}
-        size="sm"
-        label={status === 'on_track' ? 'On Track' : undefined}
-        status={status}
-    />
-);
+const budgetLabel = (status: string) =>
+    BUDGET_LABEL[status] ??
+    status.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+    { value: 'cost', label: 'Highest cost' },
+    { value: 'variance', label: 'Worst budget variance' },
+    { value: 'name', label: 'Site name' },
+    { value: 'category', label: 'Top category' },
+];
+
+const BUDGET_OPTIONS = [
+    { value: ALL, label: 'All budgets' },
+    { value: 'over_budget', label: 'Over budget' },
+    { value: 'approaching', label: 'Approaching' },
+    { value: 'under_budget', label: 'Under budget' },
+    { value: 'on_track', label: 'On track' },
+];
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Overview', href: '/finance' },
+    { title: 'By site', href: '/finance/sites' },
+];
 
 export default function SitesFinancialOverview({
     filters,
@@ -127,418 +148,388 @@ export default function SitesFinancialOverview({
     sites,
     categoryKeys,
 }: Props) {
-    const [from, setFrom] = useState(filters.from);
-    const [to, setTo] = useState(filters.to);
-    const [sort, setSort] = useState<{
-        key: SortKey;
-        direction: 'asc' | 'desc';
-    }>({ key: 'total_cost', direction: 'desc' });
+    const [search, setSearch] = useState('');
+    const [budget, setBudget] = useState<string>(ALL);
+    const [sort, setSort] = useState<SortKey>('cost');
 
-    const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'By site' },
-    ];
+    const ctxMenu = useEntityContextMenu<SiteRow>();
 
-    const sortedSites = useMemo(() => {
-        return [...sites].sort((a, b) => {
-            const dir = sort.direction === 'asc' ? 1 : -1;
+    const visibleSites = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        const rows = sites.filter((row) => {
+            const matchesSearch =
+                query === '' ||
+                row.site.name.toLowerCase().includes(query) ||
+                (row.site.region ?? '').toLowerCase().includes(query) ||
+                (row.top_category?.label ?? '').toLowerCase().includes(query);
+            const matchesBudget =
+                budget === ALL || row.budget.status === budget;
 
-            if (sort.key === 'site') {
-                return a.site.name.localeCompare(b.site.name) * dir;
+            return matchesSearch && matchesBudget;
+        });
+
+        return [...rows].sort((a, b) => {
+            if (sort === 'name') {
+                return a.site.name.localeCompare(b.site.name);
             }
-
-            if (sort.key === 'top_category') {
+            if (sort === 'category') {
+                return (a.top_category?.label ?? '').localeCompare(
+                    b.top_category?.label ?? '',
+                );
+            }
+            if (sort === 'variance') {
                 return (
-                    (a.top_category?.label ?? '').localeCompare(
-                        b.top_category?.label ?? '',
-                    ) * dir
+                    Number(b.budget.variance_pct) -
+                    Number(a.budget.variance_pct)
                 );
             }
 
-            return (
-                (numericSortValue(a, sort.key) -
-                    numericSortValue(b, sort.key)) *
-                dir
-            );
+            return Number(b.total_cost) - Number(a.total_cost);
         });
-    }, [sites, sort]);
+    }, [sites, search, budget, sort]);
 
-    const chartData = useMemo(() => {
-        return sortedSites.map((row) => {
-            const data: Record<string, string | number> = {
-                site: row.site.name,
-            };
+    const chartData = useMemo(
+        () =>
+            visibleSites.map((row) => {
+                const data: Record<string, string | number> = {
+                    site: row.site.name,
+                };
 
-            row.categories.forEach((category) => {
-                data[category.key] = Number(category.amount);
-            });
+                row.categories.forEach((category) => {
+                    data[category.key] = Number(category.amount);
+                });
 
-            return data;
-        });
-    }, [sortedSites]);
+                return data;
+            }),
+        [visibleSites],
+    );
 
-    const submitFilters = () => {
-        router.get(
-            '/finance/sites',
-            { from, to },
-            { preserveScroll: true, preserveState: false },
-        );
-    };
+    const topSpender = kpis.top_spenders[0] ?? null;
 
-    const updateSort = (key: SortKey) => {
-        setSort((current) => ({
-            key,
-            direction:
-                current.key === key && current.direction === 'desc'
-                    ? 'asc'
-                    : 'desc',
-        }));
-    };
+    const actionsFor = (row: SiteRow): MenuItem[] => [
+        {
+            label: 'Open site dashboard',
+            icon: ArrowUpRight,
+            onClick: () => router.visit(row.dashboard_url),
+        },
+    ];
+
+    const columns: EntityTableColumn<SiteRow>[] = [
+        {
+            key: 'total_cost',
+            label: 'Total cost',
+            width: '150px',
+            align: 'right',
+            cell: (row) => (
+                <span className="font-semibold tabular-nums">
+                    {money(row.total_cost)}
+                </span>
+            ),
+        },
+        {
+            key: 'budget',
+            label: 'vs budget',
+            width: '190px',
+            align: 'right',
+            cell: (row) => (
+                <span className="flex items-center justify-end gap-2">
+                    <span className="font-semibold tabular-nums">
+                        {pct(row.budget.variance_pct)}
+                    </span>
+                    <EntityStatusChip
+                        variant={budgetVariant(row.budget.status)}
+                    >
+                        {budgetLabel(row.budget.status)}
+                    </EntityStatusChip>
+                </span>
+            ),
+        },
+        {
+            key: 'top_category',
+            label: 'Top category',
+            width: '1.2fr',
+            cell: (row) =>
+                row.top_category ? (
+                    <span className="min-w-0">
+                        <span className="block truncate font-medium">
+                            {row.top_category.label}
+                        </span>
+                        <span className="block text-[11.5px] text-muted-foreground tabular-nums">
+                            {money(row.top_category.amount)}
+                        </span>
+                    </span>
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+        {
+            key: 'trend',
+            label: 'Trend',
+            width: '140px',
+            cell: (row) => (
+                <Sparkline
+                    values={row.trend.map((point) => Number(point.amount))}
+                />
+            ),
+        },
+    ];
+
+    /* ---------------- Event Horizon header ---------------- */
+
+    const header = (
+        <PageHeader
+            icon={Building2}
+            title="By site"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={kpis.sites_over_budget > 0 ? 'warning' : 'success'}
+                >
+                    {kpis.sites_over_budget} over budget
+                </PageHeaderStatusChip>
+            }
+            subline={`Cost, budget variance and category mix · ${kpis.site_count} ${
+                kpis.site_count === 1 ? 'site' : 'sites'
+            } · ${categoryKeys.length} cost ${
+                categoryKeys.length === 1 ? 'category' : 'categories'
+            }`}
+            actions={
+                <PageHeaderSearch
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search sites, regions, categories…"
+                />
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Total cost"
+                        href="/finance/reports/profit-loss"
+                        ariaLabel="View the profit and loss report"
+                    >
+                        <PageHeaderMeterBig>
+                            {money(kpis.total_cost)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            across {kpis.site_count}{' '}
+                            {kpis.site_count === 1 ? 'site' : 'sites'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Sites over budget"
+                        tone={
+                            kpis.sites_over_budget > 0 ? 'warning' : 'success'
+                        }
+                        ariaLabel="Show only sites that are over budget"
+                        onClick={() => setBudget('over_budget')}
+                    >
+                        <PageHeaderMeterBig>
+                            {kpis.sites_over_budget}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            past their category budget
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Avg cost per site"
+                        ariaLabel="Show every site in the comparison"
+                        onClick={() => setBudget(ALL)}
+                    >
+                        <PageHeaderMeterBig>
+                            {money(kpis.avg_cost_per_site)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            for the selected period
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Sites"
+                        href="/finance/executive-dashboard"
+                        ariaLabel="View the executive financial dashboard"
+                    >
+                        <PageHeaderMeterBig>
+                            {kpis.site_count}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            houses and facilities in scope
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    {topSpender ? (
+                        <PageHeaderMeterBlock
+                            label="Top spender"
+                            href={topSpender.dashboard_url}
+                            ariaLabel={`Open the financial dashboard for ${topSpender.site.name}`}
+                        >
+                            <PageHeaderMeterBig>
+                                {money(topSpender.total_cost)}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {topSpender.site.name}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                </>
+            }
+            filters={
+                <>
+                    <FinancePeriodFilter
+                        url="/finance/sites"
+                        from={filters.from}
+                        to={filters.to}
+                        idPrefix="by-site-period"
+                    />
+                    <PageHeaderFilterSelect
+                        label="All budgets"
+                        value={budget}
+                        allValue={ALL}
+                        options={BUDGET_OPTIONS}
+                        onChange={setBudget}
+                    />
+                    <PageHeaderFilterSelect
+                        label="Sort"
+                        value={sort}
+                        allValue="cost"
+                        options={SORT_OPTIONS}
+                        onChange={(v) => setSort(v as SortKey)}
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Site Financials" />
+            <Head title="Finance by site" />
 
-            <PageLayout
-                width="wide"
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={BarChart3}
-                        title="All-Sites Comparison"
-                        description={`Cost, budget variance and category mix across ${kpis.site_count} ${kpis.site_count === 1 ? 'site' : 'sites'} for the selected period.`}
-                        stats={[
-                            {
-                                label: 'Total cost',
-                                value: money(kpis.total_cost),
-                            },
-                            {
-                                label: 'Sites over budget',
-                                value: kpis.sites_over_budget,
-                                tone:
-                                    kpis.sites_over_budget > 0
-                                        ? 'warning'
-                                        : undefined,
-                            },
-                            {
-                                label: 'Avg cost / site',
-                                value: money(kpis.avg_cost_per_site),
-                            },
-                            { label: 'Sites', value: kpis.site_count },
-                        ]}
-                        footer={<OverviewTabsFooter active="by-site" />}
-                        actions={
-                            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                                <div className="space-y-1.5">
-                                    <Label>From</Label>
-                                    <Input
-                                        type="date"
-                                        value={from}
-                                        onChange={(event) =>
-                                            setFrom(event.target.value)
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label>To</Label>
-                                    <Input
-                                        type="date"
-                                        value={to}
-                                        onChange={(event) =>
-                                            setTo(event.target.value)
-                                        }
-                                    />
-                                </div>
-                                <Button
-                                    type="button"
-                                    className="self-end"
-                                    onClick={submitFilters}
-                                >
-                                    <CalendarDays className="h-4 w-4" />
-                                    Apply
-                                </Button>
-                            </div>
-                        }
-                    />
-                }
-            >
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">
-                            Cost by Site and Category
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {chartData.length > 0 && categoryKeys.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={360}>
-                                <BarChart
-                                    data={chartData}
-                                    margin={{
-                                        top: 12,
-                                        right: 16,
-                                        left: 8,
-                                        bottom: 56,
-                                    }}
-                                >
-                                    <CartesianGrid
-                                        strokeDasharray="3 3"
-                                        className="stroke-muted"
-                                    />
-                                    <XAxis
-                                        dataKey="site"
-                                        angle={-30}
-                                        textAnchor="end"
-                                        interval={0}
-                                        height={72}
-                                        className="text-xs"
-                                    />
-                                    <YAxis
-                                        tickFormatter={(value) =>
-                                            `$${Number(value / 1000).toFixed(0)}k`
-                                        }
-                                        className="text-xs"
-                                    />
-                                    <Tooltip
-                                        formatter={(value) =>
-                                            money(Number(value))
-                                        }
-                                    />
-                                    <Legend />
-                                    {categoryKeys.map((category, index) => (
-                                        <Bar
-                                            key={category.key}
-                                            dataKey={category.key}
-                                            name={category.label}
-                                            stackId="cost"
-                                            fill={chartColor(index)}
-                                        />
-                                    ))}
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <EmptyState
-                                icon={BarChart3}
-                                heading="No cost data for this period"
-                                description="Costs appear once journals post against site cost centres inside the selected date range."
-                            />
-                        )}
-                    </CardContent>
-                </Card>
-
-                {kpis.top_spenders.length > 0 && (
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">
-                                Top Spenders
-                            </CardTitle>
+                            <CardTitle>Cost by site and category</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                                {kpis.top_spenders.map((row, index) => (
-                                    <li
-                                        key={row.site.id}
-                                        className="flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-2"
+                            {chartData.length > 0 && categoryKeys.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={360}>
+                                    <BarChart
+                                        data={chartData}
+                                        margin={{
+                                            top: 12,
+                                            right: 16,
+                                            left: 8,
+                                            bottom: 56,
+                                        }}
                                     >
-                                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                                            {index + 1}
-                                        </span>
-                                        <div className="min-w-0 flex-1">
-                                            <Link
-                                                href={row.dashboard_url}
-                                                className="block truncate text-sm font-medium hover:underline"
-                                            >
-                                                {row.site.name}
-                                            </Link>
-                                            <p className="text-xs text-muted-foreground tabular-nums">
-                                                {money(row.total_cost)}
-                                            </p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ol>
+                                        <CartesianGrid
+                                            strokeDasharray="3 3"
+                                            className="stroke-muted"
+                                        />
+                                        <XAxis
+                                            dataKey="site"
+                                            angle={-30}
+                                            textAnchor="end"
+                                            interval={0}
+                                            height={72}
+                                            className="text-xs"
+                                        />
+                                        <YAxis
+                                            tickFormatter={(value) =>
+                                                `$${Number(value / 1000).toFixed(0)}k`
+                                            }
+                                            className="text-xs"
+                                        />
+                                        <Tooltip
+                                            formatter={(value) =>
+                                                money(Number(value))
+                                            }
+                                        />
+                                        <Legend />
+                                        {categoryKeys.map((category, index) => (
+                                            <Bar
+                                                key={category.key}
+                                                dataKey={category.key}
+                                                name={category.label}
+                                                stackId="cost"
+                                                fill={chartColor(index)}
+                                            />
+                                        ))}
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <EmptyState
+                                    icon={BarChart3}
+                                    heading="No cost data for this period"
+                                    description="Costs appear once journals post against site cost centres inside the selected date range."
+                                />
+                            )}
                         </CardContent>
                     </Card>
-                )}
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">
-                            Site Comparison
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <SortableHead
-                                            label="Site"
-                                            sortKey="site"
-                                            activeSort={sort}
-                                            onSort={updateSort}
-                                        />
-                                        <SortableHead
-                                            label="Total Cost"
-                                            sortKey="total_cost"
-                                            activeSort={sort}
-                                            onSort={updateSort}
-                                            align="right"
-                                        />
-                                        <SortableHead
-                                            label="vs Budget"
-                                            sortKey="variance_pct"
-                                            activeSort={sort}
-                                            onSort={updateSort}
-                                            align="right"
-                                        />
-                                        <SortableHead
-                                            label="Top Category"
-                                            sortKey="top_category"
-                                            activeSort={sort}
-                                            onSort={updateSort}
-                                        />
-                                        <TableHead>Trend</TableHead>
-                                        <TableHead className="text-right">
-                                            Dashboard
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {sortedSites.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={6}
-                                                className="py-10 text-center text-muted-foreground"
-                                            >
-                                                No sites found for this period
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        sortedSites.map((row) => (
-                                            <TableRow key={row.site.id}>
-                                                <TableCell>
-                                                    <div className="font-medium">
-                                                        {row.site.name}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {row.site.region ??
-                                                            row.site.type}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right font-medium tabular-nums">
-                                                    {money(row.total_cost)}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex flex-col items-end gap-1">
-                                                        <span className="font-medium tabular-nums">
-                                                            {pct(
-                                                                row.budget
-                                                                    .variance_pct,
-                                                            )}
-                                                        </span>
-                                                        {statusBadge(
-                                                            row.budget.status,
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {row.top_category ? (
-                                                        <div>
-                                                            <div className="font-medium">
-                                                                {
-                                                                    row
-                                                                        .top_category
-                                                                        .label
-                                                                }
-                                                            </div>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                {money(
-                                                                    row
-                                                                        .top_category
-                                                                        .amount,
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">
-                                                            -
-                                                        </span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Sparkline
-                                                        values={row.trend.map(
-                                                            (point) =>
-                                                                Number(
-                                                                    point.amount,
-                                                                ),
-                                                        )}
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button
-                                                        asChild
-                                                        variant="ghost"
-                                                        size="sm"
-                                                    >
-                                                        <Link
-                                                            href={
-                                                                row.dashboard_url
-                                                            }
-                                                        >
-                                                            <ExternalLink className="h-4 w-4" />
-                                                            Open
-                                                        </Link>
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
+                    <div className="flex flex-col gap-5">
+                        <ListCaption
+                            title="Site comparison"
+                            caption={`${visibleSites.length} of ${sites.length} shown`}
+                        />
+                        {visibleSites.length === 0 ? (
+                            <EmptyState
+                                icon={Building2}
+                                heading={
+                                    sites.length === 0
+                                        ? 'No sites found for this period'
+                                        : 'No sites match your filters'
+                                }
+                                description={
+                                    sites.length === 0
+                                        ? 'Sites appear here once they are active and costs post against their cost centres.'
+                                        : 'Try clearing the search or the budget filter.'
+                                }
+                            />
+                        ) : (
+                            <EntityTable
+                                rows={visibleSites}
+                                rowKey={(row) => row.site.id}
+                                identityLabel="Site"
+                                minWidth={980}
+                                identity={(row) => ({
+                                    icon: Building2,
+                                    name: row.site.name,
+                                    subline: row.site.region ?? row.site.type,
+                                })}
+                                hrefFor={(row) => row.dashboard_url}
+                                columns={columns}
+                                actionsFor={actionsFor}
+                                onOpen={(row) =>
+                                    router.visit(row.dashboard_url)
+                                }
+                                onRowContextMenu={(e, row) =>
+                                    ctxMenu.open(e, row)
+                                }
+                            />
+                        )}
+                    </div>
+                </div>
             </PageLayout>
+
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={Building2}
+                    title={ctxMenu.ctx.record.site.name}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
         </AppLayout>
-    );
-}
-
-function SortableHead({
-    label,
-    sortKey,
-    activeSort,
-    onSort,
-    align = 'left',
-}: {
-    label: string;
-    sortKey: SortKey;
-    activeSort: { key: SortKey; direction: 'asc' | 'desc' };
-    onSort: (key: SortKey) => void;
-    align?: 'left' | 'right';
-}) {
-    const active = activeSort.key === sortKey;
-    const Icon = activeSort.direction === 'asc' ? ArrowUp : ArrowDown;
-
-    return (
-        <TableHead className={align === 'right' ? 'text-right' : undefined}>
-            <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className={align === 'right' ? 'ml-auto' : '-ml-3'}
-                onClick={() => onSort(sortKey)}
-            >
-                {label}
-                {active && <Icon className="h-3.5 w-3.5" />}
-            </Button>
-        </TableHead>
     );
 }
 
 function Sparkline({ values }: { values: number[] }) {
     if (values.length === 0) {
-        return <span className="text-muted-foreground">-</span>;
+        return <span className="text-muted-foreground">—</span>;
     }
 
     const max = Math.max(...values, 1);

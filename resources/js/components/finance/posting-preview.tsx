@@ -1,5 +1,4 @@
-import { Check, TriangleAlert } from 'lucide-react';
-
+import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 import { formatMoney } from './money';
 
@@ -66,21 +65,13 @@ export function PostingPreview({
         >
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
                 <span className="text-sm font-semibold">{title}</span>
-                <span
-                    className={cn(
-                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold',
-                        totals.balanced
-                            ? 'bg-status-success-bg text-status-success'
-                            : 'bg-status-warning-bg text-status-warning',
-                    )}
-                >
-                    {totals.balanced ? (
-                        <Check className="h-3 w-3" />
-                    ) : (
-                        <TriangleAlert className="h-3 w-3" />
-                    )}
-                    {totals.balanced ? 'Balanced' : 'Out of balance'}
-                </span>
+                {/* One badge for the whole app: the module used to carry
+                    three independent "Balanced/Unbalanced" pills. */}
+                <StatusBadge
+                    size="sm"
+                    status={totals.balanced ? 'balanced' : 'unbalanced'}
+                    label={totals.balanced ? 'Balanced' : 'Out of balance'}
+                />
             </div>
             <table className="w-full text-sm">
                 <thead>

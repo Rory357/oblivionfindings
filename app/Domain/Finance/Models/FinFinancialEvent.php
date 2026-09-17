@@ -51,7 +51,7 @@ class FinFinancialEvent extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Constants                                                          */
+    /*  Constants */
     /* ------------------------------------------------------------------ */
 
     /** Maximum queue retry attempts before marking as permanently failed. */
@@ -59,11 +59,13 @@ class FinFinancialEvent extends Model
 
     /** Payment types determine which credit account is used. */
     public const PAYMENT_AP = 'ap';                 // Accounts Payable — vendor invoice
+
     public const PAYMENT_CASH = 'cash';             // Direct bank/cash payment
+
     public const PAYMENT_REIMBURSEMENT = 'reimburse'; // Staff reimbursement payable
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function source(): MorphTo
@@ -102,7 +104,7 @@ class FinFinancialEvent extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForOrganization($query, ?int $orgId)
@@ -152,7 +154,7 @@ class FinFinancialEvent extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     public function isPosted(): bool

@@ -1,0 +1,14 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+stderr | resources/js/pages/it/knowledge/show.test.tsx > loads older file versions without losing the current document or its native context
+React does not recognize the `preserveState` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `preservestate` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `preserveScroll` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `preservescroll` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+
+······················
+
+ Test Files  3 passed (3)
+      Tests  22 passed (22)
+   Start at  17:52:14
+   Duration  5.86s (transform 925ms, setup 327ms, import 6.42s, tests 2.61s, environment 2.61s)
+

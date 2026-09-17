@@ -1,0 +1,151 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+······················································x·········
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/my-day/components/quick-add-task.test.tsx > Quick task recovery > prefills the exact calendar time and sends that instant when adding a task
+AssertionError: expected "vi.fn()" to be called once, but got 0 times
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body
+    data-scroll-locked="1"
+    style="pointer-events: none;"
+  >
+    <span
+      aria-hidden="true"
+      data-aria-hidden="true"
+      data-radix-focus-guard=""
+      style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+      tabindex="0"
+    />
+    <div
+      aria-hidden="true"
+      data-aria-hidden="true"
+    />
+    <div
+      aria-hidden="true"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+      data-aria-hidden="true"
+      data-slot="dialog-overlay"
+      data-state="open"
+      style="pointer-events: auto;"
+    />
+    <div
+      aria-describedby="radix-_r_2_"
+      aria-labelledby="radix-_r_1_"
+      class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg max-h-[90vh] overflow-y-auto"
+      data-slot="dialog-content"
+      data-state="open"
+      id="radix-_r_0_"
+      role="dialog"
+      style="max-width: none; pointer-events: auto;"
+      tabindex="-1"
+    >
+      <div
+        class="flex flex-col gap-2 text-center sm:text-left"
+        data-slot="dialog-header"
+      >
+        <h2
+          class="text-lg leading-none font-semibold"
+          data-slot="dialog-title"
+          id="radix-_r_1_"
+        >
+          Add a task
+        </h2>
+        <p
+          class="text-muted-foreground text-sm"
+          data-slot="dialog-description"
+          id="radix-_r_2_"
+        >
+          Something that needs doing during this shift. To record care already provided, use Daily note, Meal or Observation.
+        </p>
+      </div>
+      <p
+        class="rounded-lg bg-muted px-4 py-3 text-sm"
+      >
+        <strong>
+          Test House
+        </strong>
+         ·
+         
+        Test Worker
+        <br />
+        <span
+          class="text-muted-foreground"
+        >
+          Sat 12 Sept, 7:00 am
+           –
+           
+          Sat 12 Sept, 3:00 pm
+        </span>
+      </p>
+      <form
+        class="space-y-5"
+        id="quick-add-task-form"
+      >
+        <fieldset
+          class="space-y-5"
+        >
+          <div
+            class="space-y-2"
+          >
+            <label
+              class="text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50"
+              data-slot="label"
+              for="day-task-label"
+            >
+              What needs to happen?
+            </label>
+            <input
+              aria-invalid="false"
+              class="border-input file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"
+              data-slot="input"
+              id="day-task-label"
+              maxlength="180"
+              placeholder="For example, prepare the activity bag"
+              value="Selected time task"
+            />
+          </div>
+          <div
+            class="space-y-2"
+          >
+            <label
+              class="text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50"
+              data-slot="label"
+              for="day-task-person"
+            >
+              Who is it for?
+            </label>
+            <button
+              aria-autocomplete="none"
+              aria-controls="radix-_r_3_"
+              aria-expanded="false"
+              aria-invalid="true"
+              class="border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex h-9 items-center justify-between rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&>span]:line-clamp-1 w-full"
+              data-placeholder=""
+              data-slot="select-trigger"
+              data-state="closed"
+              dir=[3...
+ ❯ resources/js/pages/my-day/components/quick-add-task.test.tsx:75:54
+     73|         );
+     74|         fireEvent.click(screen.getByRole('button', { name: 'Add task' …
+     75|         await waitFor(() => expect(events.onCreated).toHaveBeenCalledO…
+       |                                                      ^
+     76|         expect(api.request).toHaveBeenCalledWith(
+     77|             '/my-day/shifts/7/tasks',
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 17 passed (18)
+      Tests  1 failed | 63 passed (64)
+   Start at  10:29:49
+   Duration  8.27s (transform 3.53s, setup 3.50s, import 39.47s, tests 9.02s, environment 45.90s)
+

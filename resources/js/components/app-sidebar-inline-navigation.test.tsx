@@ -1,3 +1,5 @@
+import type { SharedData } from '@/types';
+import { usePage } from '@inertiajs/react';
 import {
     fireEvent,
     render,
@@ -53,7 +55,7 @@ vi.mock('@inertiajs/react', async () => {
                 {children}
             </a>
         )),
-        usePage: () => page,
+        usePage: vi.fn(() => page),
     };
 });
 
@@ -66,6 +68,76 @@ vi.mock('@/hooks/use-initials', () => ({
 }));
 
 describe('inline application navigation', () => {
+    it('discovers register-only access in IT and selects filtered credential deep links without activating Sites', async () => {
+        const original = usePage<SharedData>();
+        try {
+            for (const [canVendors, canCredentials, currentUrl, canContracts] of [
+                [
+                    false,
+                    true,
+                    '/vendors?tab=credentials&credential_id=17&site_id=3',
+                    false,
+                ],
+                [true, false, '/vendors/17?return_to=%2Fit', false],
+                [true, true, '/vendors?tab=credentials&site_id=3', false],
+                [false, false, '/vendors/renewals', true],
+            ] as const) {
+                vi.mocked(usePage).mockReturnValue({
+                    ...original,
+                    url: currentUrl,
+                    props: {
+                        ...original.props,
+                        auth: {
+                            ...original.props.auth,
+                            can: {
+                                sites: { viewAny: true },
+                                vendors: { view: canVendors, contracts_view: canContracts },
+                                credentials: { view: canCredentials },
+                            },
+                        },
+                    },
+                } as never);
+                const view = render(<AppSidebar collapsed={false} />);
+                const trigger = screen.getByRole('button', {
+                    name: 'IT & Support menu',
+                });
+                await waitFor(() =>
+                    expect(trigger).toHaveAttribute('aria-expanded', 'true'),
+                );
+                const group = within(
+                    screen.getByRole('group', {
+                        name: 'IT & Support navigation',
+                    }),
+                );
+                const registerLink = group.getByRole('link', {
+                    name: 'Vendors & Credentials',
+                });
+                expect(registerLink).toHaveAttribute('aria-current', 'page');
+                expect(registerLink).toHaveAttribute(
+                    'href',
+                    canVendors
+                        ? '/vendors?tab=vendors'
+                        : canCredentials
+                          ? '/vendors?tab=credentials'
+                          : '/vendors',
+                );
+                expect(group.getAllByRole('link')).toHaveLength(1);
+                expect(
+                    group.queryByRole('link', {
+                        name: /Knowledge|Guides|Service desk/,
+                    }),
+                ).toBeNull();
+                expect(
+                    screen.getByRole('button', {
+                        name: 'Sites & Locations menu',
+                    }),
+                ).toHaveAttribute('aria-expanded', 'false');
+                view.unmount();
+            }
+        } finally {
+            vi.mocked(usePage).mockReturnValue(original);
+        }
+    });
     it('keeps the active Security & Devices tree inside the expanded primary sidebar', async () => {
         render(<AppSidebar collapsed={false} />);
 
@@ -98,6 +170,42 @@ describe('inline application navigation', () => {
                 name: 'Security & Devices navigation',
             }),
         ).not.toBeInTheDocument();
+    });
+
+    it('renders each module as one continuous list with no section captions', () => {
+        render(<AppSidebar collapsed={false} />);
+
+        const navigation = screen.getByRole('group', {
+            name: 'Security & Devices navigation',
+        });
+        const links = within(navigation).getAllByRole('link');
+        expect(links.length).toBeGreaterThan(1);
+        // Every child of the list is a link: no caption rows in between.
+        expect(Array.from(navigation.children)).toEqual(links);
+        expect(navigation.querySelector('.uppercase')).toBeNull();
+    });
+
+    it('restores the rail scroll offset when the shell remounts on navigation', () => {
+        const getSpy = vi
+            .spyOn(Element.prototype, 'scrollTop', 'get')
+            .mockReturnValue(120);
+        const setSpy = vi.spyOn(Element.prototype, 'scrollTop', 'set');
+        try {
+            const first = render(<AppSidebar collapsed={false} />);
+            const rail = document.querySelector(
+                '#app-sidebar-nav > div',
+            ) as HTMLElement;
+            fireEvent.scroll(rail);
+            first.unmount();
+            setSpy.mockClear();
+
+            render(<AppSidebar collapsed={false} />);
+
+            expect(setSpy).toHaveBeenCalledWith(120);
+        } finally {
+            getSpy.mockRestore();
+            setSpy.mockRestore();
+        }
     });
 
     it('uses the flyout only as a fallback for the collapsed icon rail', () => {

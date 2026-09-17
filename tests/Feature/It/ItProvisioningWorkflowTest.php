@@ -4,6 +4,8 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTask;
+use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
+use App\Domain\It\Services\ItProvisioningTemplatePublicationService;
 use App\Domain\It\Services\ItProvisioningTemplateService;
 use App\Domain\It\Services\ItProvisioningWorkflowService;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
@@ -17,6 +19,7 @@ use App\Models\ItProvisioningTemplateTask;
 use App\Models\ItProvisioningTemplateVersion;
 use App\Models\ItProvisioningWorkflow;
 use App\Models\ItTeam;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -25,6 +28,7 @@ use Database\Seeders\ItProvisioningTemplateSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 function jmlManager(): User
 {
@@ -93,7 +97,7 @@ function jmlAssignSite(User $user, Site $site): void
 /**
  * @param  array<int, array<string, mixed>>  $tasks
  */
-function jmlTemplate(string $lifecycle, array $tasks, array $overrides = []): ItProvisioningTemplate
+function jmlPublishedTemplate(string $lifecycle, array $tasks, array $overrides = []): ItProvisioningTemplate
 {
     $template = ItProvisioningTemplate::query()->create([
         'name' => ucfirst($lifecycle).' default',
@@ -127,10 +131,38 @@ function jmlTemplate(string $lifecycle, array $tasks, array $overrides = []): It
         ]);
     }
 
-    return $template->load('tasks');
+    return jmlPublish($template)->load('tasks');
+}
+
+/** Fixture publication is explicit; application author saves remain unpublished. */
+function jmlPublish(ItProvisioningTemplate $template, ?User $author = null): ItProvisioningTemplate
+{
+    $template = $template->fresh();
+    if ($author === null) {
+        $author = test()->manager;
+        if ($template->site_id !== null && ! app(ItProvisioningTemplatePublicationService::class)->canView($author, $template)) {
+            $author = jmlManager();
+            jmlAssignSite($author, Site::findOrFail($template->site_id));
+        }
+    }
+
+    return app(ItProvisioningTemplatePublicationService::class)->publish($template, $author, true, [
+        'expected_version' => $template->lock_version,
+        'expected_published_version_id' => $template->published_version_id,
+        'reason' => 'Synthetic review accepts this saved task graph.',
+    ]);
+}
+
+function jmlCommandIdentity(ItProvisioningRequest $request, ?User $actor = null): array
+{
+    $actor ??= test()->manager;
+
+    return ['actor_user_id' => $actor->id, 'request_uuid' => (string) Str::uuid(),
+        'expected_version' => $request->fresh()->lock_version];
 }
 
 beforeEach(function () {
+    $this->travelTo(Carbon::parse('2026-07-19 09:00:00'));
     $this->seed(RbacSeeder::class);
     $this->site = Site::factory()->create();
     $this->manager = jmlManager();
@@ -148,8 +180,8 @@ function jmlTemplateEditData(ItProvisioningTemplate $template): array
     ];
 }
 
-test('template edits preserve original workflow instructions and new launches use the saved version', function () {
-    $template = jmlTemplate('joiner', [['title' => 'Original account instructions', 'description' => 'Verify identity before granting access']]);
+test('template edits preserve original workflow instructions until the new saved version is explicitly published', function () {
+    $template = jmlPublishedTemplate('joiner', [['title' => 'Original account instructions', 'description' => 'Verify identity before granting access']]);
     $profile = jmlProfile();
     $first = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:before', $this->manager->id);
     $versionOne = $first->templateVersion;
@@ -159,6 +191,8 @@ test('template edits preserve original workflow instructions and new launches us
     $data['tasks'][0]['title'] = 'New account instructions';
     $data['tasks'][0]['description'] = 'Require the new identity verification';
     $this->actingAs($this->manager)->patchJson("/it/setup/provisioning-templates/{$template->id}", $data)->assertRedirect();
+    expect($template->fresh()->published_version_id)->toBe($versionOne->id);
+    jmlPublish($template);
     $second = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:after', $this->manager->id);
     expect($first->fresh()->template_version_id)->toBe($versionOne->id)
         ->and($versionOne->fresh()->contract['tasks'][0]['title'])->toBe('Original account instructions')
@@ -170,15 +204,15 @@ test('template edits preserve original workflow instructions and new launches us
         ->and(ItProvisioningTemplateVersion::query()->count())->toBe(2);
     $replay = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:before', $this->manager->id);
     expect($replay->id)->toBe($first->id)->and($replay->templateVersion->id)->toBe($versionOne->id);
-    $this->actingAs($this->manager)->get('/it?tab=provisioning')->assertOk()
+    $this->actingAs($this->manager)->get('/it/provisioning?view=workflows')->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->where('provisioningWorkflows.0.template_version', 2)
-            ->where('provisioningWorkflows.1.template', 'Joiner default')
-            ->where('provisioningWorkflows.1.template_version', 1));
+            ->where('records.data.0.template.version', 2)
+            ->where('records.data.1.template.name', 'Joiner default')
+            ->where('records.data.1.template.version', 1));
 });
 
 test('stale or missing template edit tokens cannot overwrite saved tasks', function () {
-    $template = jmlTemplate('joiner', [['title' => 'Original']]);
+    $template = jmlPublishedTemplate('joiner', [['title' => 'Original']]);
     $stale = jmlTemplateEditData($template);
     $updated = $stale;
     $updated['tasks'][0]['title'] = 'Saved by another editor';
@@ -196,27 +230,29 @@ test('stale or missing template edit tokens cannot overwrite saved tasks', funct
 test('a manager cannot take over another Site template by changing its Site in the request', function () {
     expect($this->manager->canDo('it.organisationWide'))->toBeFalse();
     $otherSite = Site::factory()->create();
-    $template = jmlTemplate('joiner', [['title' => 'Other Site instructions']], ['site_id' => $otherSite->id]);
+    $template = jmlPublishedTemplate('joiner', [['title' => 'Other Site instructions']], ['site_id' => $otherSite->id]);
     $data = jmlTemplateEditData($template);
     $data['site_id'] = $this->site->id;
     $this->actingAs($this->manager)->patchJson("/it/setup/provisioning-templates/{$template->id}", $data)->assertNotFound();
     expect($template->fresh()->site_id)->toBe($otherSite->id)
         ->and($template->fresh()->lock_version)->toBe(1)
-        ->and(ItProvisioningTemplateVersion::query()->count())->toBe(0);
+        ->and(ItProvisioningTemplateVersion::query()->count())->toBe(1);
 });
 
-test('launch rejects a mutable task changed outside its recorded template contract', function () {
-    $template = jmlTemplate('joiner', [['title' => 'Recorded instructions']]);
+test('published instructions survive mutable drift and publishing that drift requires a reviewed author save', function () {
+    $template = jmlPublishedTemplate('joiner', [['title' => 'Recorded instructions']]);
     $profile = jmlProfile();
     $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:recorded', $this->manager->id);
     $template->tasks()->update(['title' => 'Unreviewed mutation']);
-    expect(fn () => $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:unreviewed', $this->manager->id))
-        ->toThrow(DomainException::class, 'outside its saved version');
-    expect(ItProvisioningWorkflow::query()->count())->toBe(1)
-        ->and(ItProvisioningRequest::query()->count())->toBe(1);
+    $retained = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:unreviewed', $this->manager->id);
+    expect($retained->requests()->sole()->item)->toBe('Recorded instructions');
+    expect(fn () => jmlPublish($template))->toThrow(DomainException::class, 'outside its saved version');
+    expect(ItProvisioningWorkflow::query()->count())->toBe(2)
+        ->and(ItProvisioningRequest::query()->count())->toBe(2);
     $reviewed = jmlTemplateEditData($template);
     $reviewed['tasks'][0]['title'] = 'Reviewed replacement instructions';
     app(ItProvisioningTemplateService::class)->update($template, $this->manager, $reviewed);
+    jmlPublish($template);
     $recovered = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:repaired', $this->manager->id);
     expect($recovered->templateVersion->version)->toBe(2)
         ->and($recovered->requests()->sole()->item)->toBe('Reviewed replacement instructions')
@@ -224,7 +260,7 @@ test('launch rejects a mutable task changed outside its recorded template contra
 });
 
 test('saved template versions cannot be rewritten deleted or removed by rollback', function () {
-    $template = jmlTemplate('joiner', [['title' => 'Preserve these instructions']]);
+    $template = jmlPublishedTemplate('joiner', [['title' => 'Preserve these instructions']]);
     $profile = jmlProfile();
     $workflow = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:immutable', $this->manager->id);
     $version = $workflow->templateVersion;
@@ -236,15 +272,16 @@ test('saved template versions cannot be rewritten deleted or removed by rollback
 });
 
 test('old workflows without version evidence are labelled rather than assigned current instructions', function () {
-    $template = jmlTemplate('joiner', [['title' => 'Current instructions']]);
+    $template = jmlPublishedTemplate('joiner', [['title' => 'Current instructions']]);
     $profile = jmlProfile();
     $workflow = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:legacy-work', $this->manager->id);
     // Explicitly model a pre-migration workflow with no historical version.
     $workflow->update(['template_version_id' => null]);
-    $this->actingAs($this->manager)->get('/it?tab=provisioning')->assertOk()
+    $this->actingAs($this->manager)->get('/it/provisioning?view=workflows')->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->where('provisioningWorkflows.0.template_version', null)
-            ->where('provisioningWorkflows.0.template_provenance', 'legacy_unrecorded'));
+            ->where('records.data.0.template.version', null)
+            ->where('records.data.0.template.name', 'Original template'));
+    expect($workflow->fresh()->template_version_id)->toBeNull();
 });
 
 test('JML persistence carries templates workflows and governed provisioning task state', function () {
@@ -271,7 +308,7 @@ test('JML persistence carries templates workflows and governed provisioning task
     ]))->toBeTrue();
 });
 
-test('safe baseline templates make joiner mover and leaver workflows usable immediately', function () {
+test('baseline joiner mover and leaver templates remain available for explicit review and publication', function () {
     $this->seed(ItProvisioningTemplateSeeder::class);
 
     expect(ItProvisioningTemplate::query()->pluck('lifecycle_type')->all())
@@ -284,6 +321,11 @@ test('safe baseline templates make joiner mover and leaver workflows usable imme
             'access_control', 'telephony', 'vehicle_technology', 'healthcare_access',
         )
         ->and($joiner->tasks()->where('category', 'healthcare_access')->value('approval_required'))->toBeTruthy();
+    $profile = jmlProfile();
+    expect($joiner->published_version_id)->toBeNull()
+        ->and($this->service->resolveTemplate($profile, 'joiner'))->toBeNull();
+    jmlPublish($joiner);
+    expect($this->service->resolveTemplate($profile, 'joiner')->id)->toBe($joiner->id);
 });
 
 test('template resolution chooses the most specific role site and employment match', function () {
@@ -291,9 +333,9 @@ test('template resolution chooses the most specific role site and employment mat
     $otherSite = Site::factory()->create();
     $profile = jmlProfile($site);
 
-    jmlTemplate('joiner', [['title' => 'Generic account']]);
-    jmlTemplate('joiner', [['title' => 'Wrong site']], ['site_id' => $otherSite->id]);
-    $specific = jmlTemplate('joiner', [['title' => 'Exact support-worker account']], [
+    jmlPublishedTemplate('joiner', [['title' => 'Generic account']]);
+    jmlPublishedTemplate('joiner', [['title' => 'Wrong site']], ['site_id' => $otherSite->id]);
+    $specific = jmlPublishedTemplate('joiner', [['title' => 'Exact support-worker account']], [
         'position_role' => 'support_worker',
         'site_id' => $site->id,
         'employment_type' => 'full_time',
@@ -305,11 +347,10 @@ test('template resolution chooses the most specific role site and employment mat
 });
 
 test('a joiner launch expands ordered and parallel work with teams approvals evidence due targets and minimum data', function () {
-    Carbon::setTestNow('2026-07-19 09:00:00');
     $site = Site::factory()->create(['name' => 'Sunnyside']);
     $profile = jmlProfile($site);
     $team = ItTeam::factory()->create(['name' => 'Identity & Access']);
-    $template = jmlTemplate('joiner', [
+    $template = jmlPublishedTemplate('joiner', [
         [
             'task_key' => 'identity',
             'title' => 'Create identity and email',
@@ -378,7 +419,7 @@ test('a joiner launch expands ordered and parallel work with teams approvals evi
 
 test('HR event replay is idempotent and never duplicates a workflow or its requests', function () {
     $profile = jmlProfile();
-    jmlTemplate('joiner', [
+    jmlPublishedTemplate('joiner', [
         ['task_key' => 'account', 'title' => 'Create account'],
         ['task_key' => 'groups', 'title' => 'Assign groups', 'category' => 'group'],
     ]);
@@ -398,7 +439,7 @@ test('HR event replay is idempotent and never duplicates a workflow or its reque
 test('mover workflows include only deltas triggered by changed role site or employment fields', function () {
     $site = Site::factory()->create();
     $profile = jmlProfile($site, ['position_role' => 'team_lead']);
-    jmlTemplate('mover', [
+    jmlPublishedTemplate('mover', [
         [
             'task_key' => 'groups',
             'title' => 'Reconcile role groups',
@@ -443,7 +484,7 @@ test('mover workflows include only deltas triggered by changed role site or empl
 
 test('the canonical HR profile update launches one matching mover workflow', function () {
     $profile = jmlProfile();
-    jmlTemplate('mover', [[
+    jmlPublishedTemplate('mover', [[
         'task_key' => 'role-access',
         'title' => 'Change access for new role',
         'category' => 'access_control',
@@ -466,11 +507,12 @@ test('the canonical HR profile update launches one matching mover workflow', fun
 
 test('dependencies approvals and evidence gate fulfilment and source HR completion', function () {
     $profile = jmlProfile();
-    $template = jmlTemplate('joiner', [
+    $template = jmlPublishedTemplate('joiner', [
         ['task_key' => 'account', 'title' => 'Create account'],
         [
             'task_key' => 'healthcare',
             'title' => 'Grant approved healthcare application access',
+            'stage' => 2,
             'category' => 'healthcare_access',
             'request_type' => 'access',
             'dependency_task_keys' => ['account'],
@@ -500,29 +542,47 @@ test('dependencies approvals and evidence gate fulfilment and source HR completi
     $healthcare = $workflow->requests->firstWhere('task_key', 'healthcare');
     expect($workflow->provisioning_template_id)->toBe($template->id)
         ->and($healthcare->onboarding_task_id)->toBe($sourceTask->id);
+    $lifecycle = app(ItProvisioningRequestLifecycleService::class);
+    $lifecycle->assign($account, $this->manager, $this->manager);
+    $lifecycle->assign($healthcare, $this->manager, $this->manager);
 
     $this->actingAs($this->manager)
-        ->post("/it/provisioning/{$healthcare->id}/fulfil")
+        ->post("/it/provisioning/{$healthcare->id}/fulfil", jmlCommandIdentity($healthcare))
         ->assertSessionHas('error', 'Complete this request’s dependencies first.');
 
     $this->actingAs($this->manager)
-        ->post("/it/provisioning/{$account->id}/fulfil")
+        ->post("/it/provisioning/{$account->id}/fulfil", [
+            ...jmlCommandIdentity($account), 'external_ref' => 'SYN-ACCOUNT-1042',
+            'evidence_summary' => 'Synthetic account creation independently verified.',
+        ])
         ->assertSessionHas('success');
 
     $this->actingAs($this->manager)
-        ->post("/it/provisioning/{$healthcare->id}/fulfil")
+        ->post("/it/provisioning/{$healthcare->id}/fulfil", jmlCommandIdentity($healthcare))
         ->assertSessionHas('error', 'This request needs approval before fulfilment.');
 
-    $this->actingAs($this->manager)
-        ->post("/it/provisioning/{$healthcare->id}/approve", ['decision_note' => 'Approved for the role.'])
+    $approver = jmlManager();
+    $cover = jmlManager();
+    jmlAssignSite($approver, $this->site);
+    jmlAssignSite($cover, $this->site);
+    $lifecycle->requestApproval($healthcare, $this->manager, [
+        'primary_approver_user_id' => $approver->id, 'cover_approver_user_id' => $cover->id,
+        'approval_expires_at' => now()->addDays(2)->toIso8601String(),
+        'reason' => 'Synthetic independent healthcare access review.',
+    ]);
+    $this->actingAs($approver)
+        ->post("/it/provisioning/{$healthcare->id}/approve", [
+            ...jmlCommandIdentity($healthcare, $approver), 'decision_note' => 'Approved for the role.',
+        ])
         ->assertSessionHas('success');
 
     $this->actingAs($this->manager)
-        ->post("/it/provisioning/{$healthcare->id}/fulfil")
+        ->post("/it/provisioning/{$healthcare->id}/fulfil", jmlCommandIdentity($healthcare))
         ->assertSessionHas('error', 'Record fulfilment evidence before completing this request.');
 
     $this->actingAs($this->manager)
         ->post("/it/provisioning/{$healthcare->id}/fulfil", [
+            ...jmlCommandIdentity($healthcare), 'external_ref' => 'SYN-HEALTHCARE-1042',
             'evidence_summary' => 'IAM change CHG-1042 verified by second operator.',
         ])
         ->assertSessionHas('success');
@@ -535,18 +595,23 @@ test('dependencies approvals and evidence gate fulfilment and source HR completi
 
 test('a failed fulfilment is explicit and marks the workflow partially failed without losing other work', function () {
     $profile = jmlProfile();
-    jmlTemplate('joiner', [
+    jmlPublishedTemplate('joiner', [
         ['task_key' => 'email', 'title' => 'Create email'],
         ['task_key' => 'phone', 'title' => 'Configure telephony', 'category' => 'telephony'],
     ]);
-    $workflow = $this->service->launch(
-        $profile, 'joiner', 'hr_onboarding', 99, 'onboarding:99:generated', $this->manager->id,
-    );
+    $checklist = HrOnboardingChecklist::query()->create([
+        'employee_profile_id' => $profile->id, 'template_key' => 'support_worker:all',
+        'status' => 'in_progress', 'started_at' => now(), 'due_date' => now()->addDays(20),
+        'created_by' => $this->manager->id,
+    ]);
+    $workflow = $this->service->launchFromOnboarding($checklist, $this->manager->id);
     $email = $workflow->requests->firstWhere('task_key', 'email');
     $phone = $workflow->requests->firstWhere('task_key', 'phone');
 
     $this->actingAs($this->manager)
-        ->post("/it/provisioning/{$phone->id}/fail", ['failure_reason' => 'Provider API unavailable.'])
+        ->post("/it/provisioning/{$phone->id}/fail", [
+            ...jmlCommandIdentity($phone), 'failure_reason' => 'Provider API unavailable.',
+        ])
         ->assertSessionHas('success');
 
     expect($phone->fresh()->status)->toBe('failed')
@@ -555,15 +620,15 @@ test('a failed fulfilment is explicit and marks the workflow partially failed wi
         ->and($email->fresh()->status)->toBe('pending');
 
     $this->actingAs($this->manager)
-        ->get('/it?tab=provisioning&status=failed')
-        ->assertInertia(fn ($page) => $page->where('summary.provisioning.failed', 1));
+        ->get('/it/provisioning?status=failed')
+        ->assertInertia(fn ($page) => $page->where('summary.failed', 1));
 });
 
 test('leaver launch creates reversal work and canonical asset and device recovery without duplicating ownership', function () {
     $site = Site::factory()->create();
     jmlAssignSite($this->manager, $site);
-    $profile = jmlProfile($site);
-    jmlTemplate('leaver', [
+    $profile = jmlProfile($site, ['start_date' => now()->subMonth()->toDateString()]);
+    jmlPublishedTemplate('leaver', [
         [
             'task_key' => 'accounts',
             'title' => 'Revoke accounts and licences',
@@ -617,12 +682,34 @@ test('leaver launch creates reversal work and canonical asset and device recover
 
     $assetRecovery = $workflow->requests->first(fn ($request) => $request->canonical_target_type === 'asset_assignment');
     $deviceRecovery = $workflow->requests->first(fn ($request) => $request->canonical_target_type === 'device_assignment');
+    app(ItProvisioningRequestLifecycleService::class)->assign($assetRecovery, $this->manager, $this->manager);
+    app(ItProvisioningRequestLifecycleService::class)->assign($deviceRecovery, $this->manager, $this->manager);
+
+    // Provisioning responsibility does not grant source-domain recovery rights.
+    expect(fn () => app(ItProvisioningRequestLifecycleService::class)->fulfil($assetRecovery, $this->manager, [
+        'evidence_summary' => 'Laptop checked into stores.',
+    ]))->toThrow(DomainException::class, 'The linked canonical record is no longer available');
+    expect($assetAssignment->fresh()->released_at)->toBeNull();
+    $permissionKeys = ['assets.viewAny', 'assets.assignments.manage', 'securityDevices.devices.view',
+        'securityDevices.devices.assign', 'staff.viewAny', 'hazards.view'];
+    $permissionIds = collect($permissionKeys)->map(fn (string $key) => Permission::query()->firstOrCreate(
+        ['key' => $key], ['description' => 'Synthetic recovery fixture permission', 'group' => 'test', 'module' => 'Test'],
+    )->id);
+    $this->manager->permissionOverrides()->syncWithoutDetaching(
+        $permissionIds->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all(),
+    );
+    $this->manager->unsetRelation('permissionOverrides')->unsetRelation('roles');
+    expect((int) $deviceAssignment->fresh()->custody_site_id)->toBe((int) $site->id);
 
     $this->actingAs($this->manager)
-        ->post("/it/provisioning/{$assetRecovery->id}/fulfil", ['evidence_summary' => 'Laptop checked into stores.'])
+        ->post("/it/provisioning/{$assetRecovery->id}/fulfil", [
+            ...jmlCommandIdentity($assetRecovery), 'evidence_summary' => 'Laptop checked into stores.',
+        ])
         ->assertSessionHas('success');
     $this->actingAs($this->manager)
-        ->post("/it/provisioning/{$deviceRecovery->id}/fulfil", ['evidence_summary' => 'Handset returned to pool.'])
+        ->post("/it/provisioning/{$deviceRecovery->id}/fulfil", [
+            ...jmlCommandIdentity($deviceRecovery), 'evidence_summary' => 'Handset returned to pool.',
+        ])
         ->assertSessionHas('success');
 
     expect($assetAssignment->fresh()->released_at)->not->toBeNull()
@@ -668,7 +755,9 @@ test('template administration is application-wide and the IT workspace exposes J
         ->and($template->currentVersion->provenance)->toBe('author_saved')
         ->and($template->currentVersion->version)->toBe(1)
         ->and($template->tasks)->toHaveCount(1)
-        ->and($template->tasks->first()->responsible_team_id)->toBe($team->id);
+        ->and($template->tasks->first()->responsible_team_id)->toBe($team->id)
+        ->and($template->published_version_id)->toBeNull();
+    jmlPublish($template);
 
     $profile = jmlProfile();
     $workflow = $this->service->launch(
@@ -676,13 +765,13 @@ test('template administration is application-wide and the IT workspace exposes J
     );
 
     $this->actingAs($this->manager)
-        ->get('/it?tab=provisioning')
+        ->get('/it/provisioning?view=workflows')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('it/index')
-            ->has('provisioningWorkflows', 1)
-            ->where('provisioningWorkflows.0.lifecycle_type', 'joiner')
-            ->where('provisioningWorkflows.0.progress.total', 1));
+            ->component('it/provisioning/index')
+            ->has('records.data', 1)
+            ->where('records.data.0.lifecycle_type', 'joiner')
+            ->where('records.data.0.progress.total', 1));
 
     $this->actingAs($this->manager)
         ->get('/it/setup')
@@ -693,6 +782,7 @@ test('template administration is application-wide and the IT workspace exposes J
             ->where('provisioningTemplates.0.tasks.0.task_key', 'account'));
 
     $otherManager = jmlManager();
+    jmlAssignSite($otherManager, $this->site);
 
     $this->actingAs($otherManager)
         ->get('/it/setup')
@@ -704,14 +794,15 @@ test('template administration is application-wide and the IT workspace exposes J
 
     $this->actingAs($otherManager)
         ->post("/it/provisioning/{$request->id}/assign", [
+            ...jmlCommandIdentity($request, $otherManager),
             'assigned_to_user_id' => $otherManager->id,
         ])
         ->assertSessionHas('success');
 
     $this->actingAs($otherManager)
-        ->get('/it?tab=provisioning')
+        ->get('/it/provisioning?view=workflows')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->has('provisioningWorkflows', 1)
-            ->where('provisioningWorkflows.0.id', $workflow->id));
+            ->has('records.data', 1)
+            ->where('records.data.0.id', $workflow->id));
 });

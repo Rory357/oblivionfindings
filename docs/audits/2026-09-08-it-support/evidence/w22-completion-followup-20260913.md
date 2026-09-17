@@ -1,0 +1,19 @@
+# Knowledge Base completion follow-up — 13 September 2026
+
+Scope: Knowledge Base only. The user approved the separate advanced diagram mockup and then image insertion in that design task. Integration is now authorized; the mockup itself is not yet in the application.
+
+Applied after independent Ticket cleanup verification and all 23 original file hashes matched. The 26-file coherent change adds tags and tag filters, searches structured sections and tags within visible publications, typed document requirements before review/publication, visible inactive-link warnings with correction actions, explicit solved feedback separate from helpful votes, tags in immutable revisions and restore, and owner review reminders in the existing Tasks feed. Reading or changing a proposed review date does not clear the publication's deadline.
+
+Verification: 22 frontend tests in 3 files passed (5.86s); all 17 PHP files passed syntax checks; 16 pure document-definition checks passed; scoped ESLint passed. Full TypeScript found only three existing My Day test errors and two independent Governance Actions Show errors. Initial frontend failure was an incorrect test label; corrected to the actual Review due field. Full Knowledge backend checks are queued with W15. No backend or current-build browser pass is claimed yet.
+
+New additive migration `2026_09_13_000004_add_it_knowledge_tags.php` is not applied to the working database. Tags UI is schema-gated. Legacy deflection counters are preserved but no longer incremented or presented as avoided tickets. Explicit solved interactions retain the publication revision and reject stale versions or switched accounts.
+
+Current source frozen for the normal shared build and browser window. No Knowledge runtime remains from the earlier upload proof. Details and exact file hashes: `w22-completion-source-checkpoint-20260913.json`; frontend log: `w22-completion-ui-20260913.log`.
+
+At 18:34 NZST the Knowledge-only guarded run (session 20989, token it_ed81259ed6c943eb) finished: 37 passed, 1 assertion failed, no errors. All 14 postflight invariants passed; an independent read confirmed zero tables/connections in that exact disposable schema. All 2,166 source hashes matched at the terminal comparison. The only failure was Laravel's legacy Word fake reporting 1 KiB while storing zero bytes; the new integrity check correctly rejected it. The fixture now contains its reported byte count and scoped Pint passes; its rerun remains pending. No HR/provisioning tests or implementation are part of this Knowledge run.
+
+The resolution-to-document closure is now applied: permission-checked source references copy no raw ticket text, link to the first immutable publication, retain canonical Problem links, and restrict historical documents/files to both current parent access and original audience. Its 18 focused frontend checks, scoped ESLint and 10 PHP syntax checks passed. TypeScript now reports only the three existing My Day test errors. File integrity and historical recovery checks passed except for the synthetic legacy Word size issue above.
+
+The richer drawing contract is privately staged and passes 36 PHP parity checks including the nine approved templates, grouped shapes, multiple pages, ink and image references. PNG/JPEG decode verification and private scanned upload integration are in progress. No application diagram source has been changed during the independent W15 test freeze.
+
+Remaining: rerun the corrected Word fixture, apply/test the approved diagram and raster integration, activate the exact additive local tags migration, and verify the final served Knowledge build in the browser. Existing full-page editing, private Word/PDF upload/open/version history and basic diagram persistence have earlier real-browser evidence; that evidence does not cover the pending integration.

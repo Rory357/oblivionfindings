@@ -116,7 +116,7 @@ test('credential store accepts new fields, encrypts password, and writes a creat
             'is_shareable' => false,
             'password_strength' => 4,
         ])
-        ->assertRedirect();
+        ->assertCreated();
 
     $credential = SiteCredential::query()->where('site_id', $this->site->id)->firstOrFail();
 
@@ -148,8 +148,8 @@ test('credential store rejects unsafe url schemes', function () {
             'credential_type' => 'password',
             'value' => 'Sup3rS3cretPw!',
         ])
-        ->assertRedirect("/sites/{$this->site->id}")
-        ->assertSessionHasErrors(['url']);
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['url']);
 
     expect(SiteCredential::query()->where('label', 'Bad Link')->exists())->toBeFalse();
 });
@@ -166,13 +166,14 @@ test('credential update rejects unsafe url schemes', function () {
     $this->actingAs($this->admin)
         ->from("/sites/{$this->site->id}")
         ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'lock_version' => $credential->fresh()->lock_version,
             'label' => 'new name',
             'credential_type' => 'password',
             'url' => 'data:text/html,<script>alert(1)</script>',
             'value' => '',
         ])
-        ->assertRedirect("/sites/{$this->site->id}")
-        ->assertSessionHasErrors(['url']);
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['url']);
 
     expect($credential->fresh()->url)->toBe('https://safe.example.test');
 });
@@ -189,6 +190,7 @@ test('credential update can change metadata without rotating password', function
 
     $this->actingAs($this->admin)
         ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'lock_version' => $credential->fresh()->lock_version,
             'label' => 'new name',
             'credential_type' => 'password',
             'username' => 'user@example.test',
@@ -196,7 +198,7 @@ test('credential update can change metadata without rotating password', function
             'value' => '',
             'is_shareable' => true,
         ])
-        ->assertRedirect();
+        ->assertOk();
 
     $credential->refresh();
     expect($credential->label)->toBe('new name');
@@ -318,7 +320,7 @@ test('site show for an admin exposes both deferred full registers without secret
         ->assertJsonMissingPath('props.vendorsCredentialsData.credentials.0.totp_secret_encrypted');
 });
 
-test('credential destroy returns back(303) and audits delete (audit row survives via nullOnDelete)', function () {
+test('credential retirement retains the canonical record and its audit history', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
         'label' => 'to delete',
@@ -328,20 +330,20 @@ test('credential destroy returns back(303) and audits delete (audit row survives
 
     $deleteAuditsBefore = SiteCredentialAuditLog::query()
         ->where('site_id', $this->site->id)
-        ->where('action', 'delete')
+        ->where('action', 'retire')
         ->count();
 
     $this->actingAs($this->admin)
         ->from("/sites/{$this->site->id}")
-        ->delete("/sites/{$this->site->id}/credentials/{$credential->id}")
-        ->assertRedirect("/sites/{$this->site->id}");
+        ->deleteJson("/sites/{$this->site->id}/credentials/{$credential->id}", ['lock_version' => 1, 'password' => 'password', 'evidence' => 'Synthetic service retirement approved'])
+        ->assertOk();
 
-    expect(SiteCredential::query()->find($credential->id))->toBeNull();
+    expect(SiteCredential::query()->findOrFail($credential->id)->retired_at)->not->toBeNull();
 
-    // FK is nullOnDelete; the audit row survives with credential_id = null.
+    // Retirement preserves the original ID and every version.
     $deleteAuditsAfter = SiteCredentialAuditLog::query()
         ->where('site_id', $this->site->id)
-        ->where('action', 'delete')
+        ->where('action', 'retire')
         ->count();
     expect($deleteAuditsAfter)->toBe($deleteAuditsBefore + 1);
 });

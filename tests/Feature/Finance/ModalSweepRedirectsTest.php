@@ -52,6 +52,11 @@ it('redirects every retired create/edit url to its flow index', function (string
     'fixed asset create' => ['/finance/fixed-assets/create', '/finance/fixed-assets'],
     'fixed asset edit' => ['/finance/fixed-assets/123/edit', '/finance/fixed-assets'],
     'donor fund create' => ['/finance/donor-funds/create', '/finance/donor-funds'],
+    // Added with the 2026-09-16 finance design migration (WP3): the chart of
+    // accounts and journals dropped their routed create/edit pages too.
+    'account create' => ['/finance/accounts/create', '/finance/accounts'],
+    'account edit' => ['/finance/accounts/123/edit', '/finance/accounts'],
+    'journal create' => ['/finance/journals/create', '/finance/journals'],
 ]);
 
 it('still serves each flow index (now hosting the modal) to a permitted user', function (string $url, string $component) {

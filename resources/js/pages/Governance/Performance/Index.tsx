@@ -1,271 +1,476 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
-import { cn } from '@/lib/utils';
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
 import {
-    create as createPerformance,
-    show as showPerformance,
-} from '@/routes/governance/performance';
+    EmptyValue,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageLayout,
+} from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
+import {
+    governanceStatus,
+    performanceRatingLabel,
+    performanceReviewTypeLabel,
+    reviewCycleLabel,
+} from '@/lib/governance-labels';
 import { PageProps } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { Calendar, Star, Target, TrendingUp } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { ExternalLink, Lock, Plus, Target, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+    CONFIDENTIAL_NOTICE,
+    PerformanceReviewWizardDialog,
+    type ReviewCycleOption,
+    type RevieweeOption,
+} from './_dialogs';
 
 interface Review {
     id: number;
     review_cycle: string;
+    cycle_label?: string;
     review_type: string;
     period_start: string;
     period_end: string;
     status: string;
+    /** Server-masked for the person being reviewed until the review is done. */
     overall_rating: string | null;
-    reviewee: { name: string };
-    goals_count: number;
+    assessment_hidden?: boolean;
+    reviewee: { id: number; name: string } | null;
+    goals_count?: number;
 }
 
 interface Props extends PageProps {
     reviews: {
         data: Review[];
+        links?: Array<{ url: string | null; label: string; active: boolean }>;
+        last_page?: number;
+        total?: number;
     };
-    review_cycles: Array<{ value: string; label: string }>;
+    review_cycles: ReviewCycleOption[];
+    current_cycle?: string;
+    current_financial_year?: string;
+    summary?: {
+        total: number;
+        active: number;
+        completed: number;
+        board_review: number;
+    };
+    filters?: {
+        status: string | null;
+        review_type: string | null;
+        search: string | null;
+    };
+    can_create?: boolean;
+    reviewees?: RevieweeOption[];
 }
 
+const ALL = '__all';
+
+const STATUS_OPTIONS = [
+    { value: ALL, label: 'Any status' },
+    { value: 'active', label: 'Not done yet' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'self_review', label: 'Waiting for self-assessment' },
+    { value: 'board_review', label: 'Waiting for the board' },
+    { value: 'completed', label: 'Done' },
+];
+
+const RATING_VARIANT: Record<
+    string,
+    'success' | 'info' | 'warning' | 'critical'
+> = {
+    exceeds: 'success',
+    meets: 'info',
+    needs_improvement: 'warning',
+    unsatisfactory: 'critical',
+};
+
+const shortDate = (value: string) => formatDateOnly(value?.slice(0, 10));
+
 export default function PerformanceIndex({
-    auth,
     reviews,
     review_cycles,
+    current_cycle,
+    current_financial_year,
+    summary,
+    filters = { status: null, review_type: null, search: null },
+    can_create = false,
+    reviewees = [],
 }: Props) {
-    const getStatusColor = (status: string) => governanceStatusColor(status);
+    const [search, setSearch] = useState(filters.search ?? '');
+    const [createOpen, setCreateOpen] = useDialogDeepLink('create', can_create);
+    const ctxMenu = useEntityContextMenu<Review>();
 
-    const getRatingColor = (rating: string | null) => {
-        return (
-            {
-                exceeds: 'bg-status-success-bg text-status-success',
-                meets: 'bg-status-info-bg text-status-info',
-                needs_improvement: 'bg-status-warning-bg text-status-warning',
-                unsatisfactory: 'bg-status-critical-bg text-status-critical',
-            }[rating || ''] || 'bg-muted text-foreground'
-        );
+    const counts = summary ?? {
+        total: reviews.data.length,
+        active: reviews.data.filter((r) => r.status !== 'completed').length,
+        completed: reviews.data.filter((r) => r.status === 'completed').length,
+        board_review: reviews.data.filter((r) => r.status === 'board_review')
+            .length,
     };
+
+    useEffect(() => {
+        setSearch(filters.search ?? '');
+    }, [filters.search]);
+
+    const go = (next: Partial<NonNullable<Props['filters']>>) => {
+        const merged = { ...filters, ...next };
+        const query = Object.fromEntries(
+            Object.entries(merged).filter(([, value]) => value),
+        );
+        router.get('/governance/performance', query, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            if ((filters.search ?? '') !== search) {
+                go({ search: search.trim() || null });
+            }
+        }, 350);
+        return () => clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
+
+    const hasFilters = Boolean(
+        filters.status || filters.review_type || filters.search,
+    );
+    const open = (review: Review) =>
+        router.visit(`/governance/performance/${review.id}`);
+    const actionsFor = (review: Review): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Open review',
+                icon: ExternalLink,
+                onClick: () => open(review),
+            },
+        ]);
+    const titleFor = (review: Review) =>
+        review.reviewee?.name ?? 'Performance review';
+    const cycleText = (review: Review) =>
+        review.cycle_label ?? reviewCycleLabel(review.review_cycle);
+
+    const header = (
+        <PageHeader
+            icon={Target}
+            title="CEO performance"
+            subline="The board's regular review of the CEO and executives against agreed goals"
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search by name or cycle…"
+                    />
+                    {can_create ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                        >
+                            New review
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Not done yet"
+                        href="/governance/performance?status=active"
+                    >
+                        <PageHeaderMeterBig>{counts.active}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Reviews still in progress
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Waiting for the board"
+                        href="/governance/performance?status=board_review"
+                        tone={counts.board_review > 0 ? 'warning' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>
+                            {counts.board_review}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Ready for the board&apos;s assessment
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Done"
+                        href="/governance/performance?status=completed"
+                        tone={counts.completed > 0 ? 'success' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>
+                            {counts.completed}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Completed reviews
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="All reviews"
+                        href="/governance/performance"
+                    >
+                        <PageHeaderMeterBig>{counts.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {current_cycle
+                                ? `Current cycle: ${reviewCycleLabel(current_cycle)}`
+                                : current_financial_year
+                                  ? `Financial year ${current_financial_year}`
+                                  : 'Every review you can see'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={filters.status ?? ALL}
+                        allValue={ALL}
+                        options={STATUS_OPTIONS}
+                        onChange={(value) =>
+                            go({ status: value === ALL ? null : value })
+                        }
+                    />
+                    <PageHeaderFilterSelect
+                        label="Kind"
+                        value={filters.review_type ?? ALL}
+                        allValue={ALL}
+                        options={[
+                            { value: ALL, label: 'Any kind' },
+                            ...['annual', 'quarterly', 'ad_hoc'].map(
+                                (value) => ({
+                                    value,
+                                    label: performanceReviewTypeLabel(value),
+                                }),
+                            ),
+                        ]}
+                        onChange={(value) =>
+                            go({ review_type: value === ALL ? null : value })
+                        }
+                    />
+                </>
+            }
+            rail={<GovernanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Performance', href: '/governance/performance' },
+                { title: 'CEO performance', href: '/governance/performance' },
             ]}
         >
-            <Head title="Performance Reviews" />
+            <Head title="CEO performance" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        icon={Target}
-                        title="Performance Reviews"
-                        description="Manage CEO and executive review cycles, goals, and ratings."
-                        stats={[
-                            {
-                                label: 'Active reviews',
-                                value: reviews.data.filter(
-                                    (r) => r.status !== 'completed',
-                                ).length,
-                            },
-                            {
-                                label: 'Completed',
-                                value: reviews.data.filter(
-                                    (r) => r.status === 'completed',
-                                ).length,
-                            },
-                            {
-                                label: 'Pending board review',
-                                value: reviews.data.filter(
-                                    (r) => r.status === 'board_review',
-                                ).length,
-                            },
-                            {
-                                label: 'Current cycle',
-                                value: review_cycles[0]?.label ?? '—',
-                            },
-                        ]}
-                        actions={
-                            auth.can?.governance?.performance?.create ? (
-                                <Button asChild>
-                                    <Link href={createPerformance.url()}>
-                                        New Review
-                                    </Link>
-                                </Button>
-                            ) : undefined
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Performance reviews"
+                        caption={`${reviews.data.length} of ${reviews.total ?? reviews.data.length} shown`}
+                        right={
+                            <span className="text-caption flex items-center gap-1.5">
+                                <Lock className="h-3.5 w-3.5 shrink-0" />
+                                {CONFIDENTIAL_NOTICE}
+                            </span>
                         }
                     />
-                }
-            >
-                {/* Summary Cards */}
-                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Active Reviews
-                                    </p>
-                                    <p className="text-3xl font-bold">
-                                        {
-                                            reviews.data.filter(
-                                                (r) => r.status !== 'completed',
-                                            ).length
-                                        }
-                                    </p>
-                                </div>
-                                <Target className="h-8 w-8 text-status-info" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Completed
-                                    </p>
-                                    <p className="text-3xl font-bold">
-                                        {
-                                            reviews.data.filter(
-                                                (r) => r.status === 'completed',
-                                            ).length
-                                        }
-                                    </p>
-                                </div>
-                                <Star className="h-8 w-8 text-status-success" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Pending Board Review
-                                    </p>
-                                    <p className="text-3xl font-bold">
-                                        {
-                                            reviews.data.filter(
-                                                (r) =>
-                                                    r.status === 'board_review',
-                                            ).length
-                                        }
-                                    </p>
-                                </div>
-                                <TrendingUp className="h-8 w-8 text-status-warning" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Current Cycle
-                                    </p>
-                                    <p className="text-lg font-bold">
-                                        {review_cycles[0]?.label}
-                                    </p>
-                                </div>
-                                <Calendar className="h-8 w-8 text-primary" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
 
-                {/* Reviews List */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Performance Reviews</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-3">
-                            {reviews.data.map((review) => (
-                                <div
-                                    key={review.id}
-                                    className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted"
-                                >
-                                    <div className="flex-1">
-                                        <div className="mb-2 flex items-center gap-3">
-                                            <h3 className="font-semibold text-foreground">
-                                                <Link
-                                                    href={showPerformance.url({
-                                                        review: review.id,
-                                                    })}
-                                                    className="hover:text-status-info"
-                                                >
-                                                    {review.reviewee.name} -{' '}
-                                                    {review.review_cycle}
-                                                </Link>
-                                            </h3>
-                                            <Badge
-                                                className={cn(
-                                                    getStatusColor(
-                                                        review.status,
-                                                    ),
-                                                )}
-                                            >
-                                                {review.status.replace(
-                                                    '_',
-                                                    ' ',
-                                                )}
-                                            </Badge>
-                                            <Badge variant="outline">
-                                                {review.review_type}
-                                            </Badge>
-                                            {review.overall_rating && (
-                                                <Badge
-                                                    className={cn(
-                                                        getRatingColor(
-                                                            review.overall_rating,
-                                                        ),
-                                                    )}
-                                                >
-                                                    {review.overall_rating.replace(
-                                                        '_',
-                                                        ' ',
-                                                    )}
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                            <span>
-                                                Period:{' '}
-                                                {new Date(
-                                                    review.period_start,
-                                                ).toLocaleDateString()}{' '}
-                                                -{' '}
-                                                {new Date(
-                                                    review.period_end,
-                                                ).toLocaleDateString()}
-                                            </span>
-                                            <span>•</span>
-                                            <span>
-                                                {review.goals_count} goals
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <Button variant="ghost" size="sm" asChild>
-                                        <Link
-                                            href={showPerformance.url({
-                                                review: review.id,
-                                            })}
-                                        >
-                                            View →
-                                        </Link>
+                    {reviews.data.length === 0 ? (
+                        <EmptyState
+                            icon={Target}
+                            title={
+                                hasFilters
+                                    ? 'No reviews match your filters'
+                                    : 'No performance reviews yet'
+                            }
+                            description={
+                                hasFilters
+                                    ? 'Try clearing a filter or search term.'
+                                    : can_create
+                                      ? 'Reviews you can see appear here once the board sets one up.'
+                                      : "CEO performance reviews are confidential. They're shared with the board chair, the committee that runs the review and the person being reviewed."
+                            }
+                            action={
+                                hasFilters ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearch('');
+                                            go({
+                                                status: null,
+                                                review_type: null,
+                                                search: null,
+                                            });
+                                        }}
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                        Clear filters
                                     </Button>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
+                                ) : can_create ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
+                                        <Plus className="h-3.5 w-3.5" />
+                                        New review
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={reviews.data}
+                            rowKey={(review) => review.id}
+                            identityLabel="Person"
+                            identity={(review) => ({
+                                icon: Target,
+                                name: titleFor(review),
+                                subline: cycleText(review),
+                            })}
+                            hrefFor={(review) =>
+                                `/governance/performance/${review.id}`
+                            }
+                            onOpen={open}
+                            onRowContextMenu={ctxMenu.open}
+                            actionsFor={actionsFor}
+                            columns={[
+                                {
+                                    key: 'status',
+                                    label: 'Status',
+                                    width: '1.1fr',
+                                    cell: (review) => {
+                                        const chip = governanceStatus(
+                                            'performance_review_status',
+                                            review.status,
+                                        );
+                                        return (
+                                            <EntityStatusChip
+                                                variant={chip.variant}
+                                            >
+                                                {chip.label}
+                                            </EntityStatusChip>
+                                        );
+                                    },
+                                },
+                                {
+                                    key: 'type',
+                                    label: 'Kind',
+                                    width: '0.7fr',
+                                    cell: (review) => (
+                                        <EntityChip>
+                                            {performanceReviewTypeLabel(
+                                                review.review_type,
+                                            )}
+                                        </EntityChip>
+                                    ),
+                                },
+                                {
+                                    key: 'rating',
+                                    label: "Board's rating",
+                                    width: '1.1fr',
+                                    cell: (review) =>
+                                        review.overall_rating ? (
+                                            <EntityStatusChip
+                                                variant={
+                                                    RATING_VARIANT[
+                                                        review.overall_rating
+                                                    ] ?? 'neutral'
+                                                }
+                                            >
+                                                {performanceRatingLabel(
+                                                    review.overall_rating,
+                                                )}
+                                            </EntityStatusChip>
+                                        ) : review.assessment_hidden ? (
+                                            <span className="text-caption">
+                                                Shared when the review is done
+                                            </span>
+                                        ) : review.status === 'completed' ? (
+                                            <EmptyValue />
+                                        ) : (
+                                            <span className="text-caption">
+                                                Not rated yet
+                                            </span>
+                                        ),
+                                },
+                                {
+                                    key: 'period',
+                                    label: 'Period',
+                                    width: '1.2fr',
+                                    cell: (review) =>
+                                        `${shortDate(review.period_start)} – ${shortDate(review.period_end)}`,
+                                },
+                                {
+                                    key: 'goals',
+                                    label: 'Goals',
+                                    width: '0.5fr',
+                                    align: 'right',
+                                    cell: (review) => (
+                                        <span className="tabular-nums">
+                                            {review.goals_count ?? 0}
+                                        </span>
+                                    ),
+                                },
+                            ]}
+                        />
+                    )}
+
+                    {reviews.links ? (
+                        <LaravelPagination
+                            links={reviews.links}
+                            lastPage={reviews.last_page}
+                            preserveScroll
+                        />
+                    ) : null}
+                </div>
             </PageLayout>
+
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={Target}
+                    title={titleFor(ctxMenu.ctx.record)}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
+
+            {can_create ? (
+                <PerformanceReviewWizardDialog
+                    isOpen={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    reviewees={reviewees}
+                    reviewCycles={review_cycles}
+                />
+            ) : null}
         </AppLayout>
     );
 }

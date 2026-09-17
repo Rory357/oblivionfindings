@@ -3,17 +3,23 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItCatalogFieldOptionService;
 use App\Domain\It\Services\ItCatalogSubmissionService;
+use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItProvisioningAccessService;
+use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
+use App\Jobs\DispatchItTicketNotifications;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
 use App\Models\AuditLog;
 use App\Models\ItCatalogItem;
 use App\Models\ItCatalogSubmission;
 use App\Models\ItCatalogVersion;
+use App\Models\ItEmailDelivery;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItService;
 use App\Models\ItSetupCommandReceipt;
 use App\Models\ItTicket;
+use App\Models\ItTicketCommandReceipt;
+use App\Models\ItTicketComment;
 use App\Models\ItTicketEvent;
 use App\Models\Role;
 use App\Models\Site;
@@ -21,8 +27,11 @@ use App\Models\User;
 use App\Notifications\It\TicketCreatedNotification;
 use Database\Seeders\ItServiceCatalogSeeder;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 function catalogUser(string $role): User
 {
@@ -90,11 +99,378 @@ beforeEach(function () {
     ]);
 });
 
+test('catalogue intake atomically preserves publication audit and durable delivery with one recovery drain', function () {
+    Bus::fake([DispatchItTicketNotifications::class]);
+    $service = ItService::factory()->create(['is_active' => true]);
+    $item = ItCatalogItem::factory()->create(['outcome_type' => 'service_request', 'category' => 'hardware',
+        'requires_approval' => true, 'it_service_id' => $service->id, 'form_schema' => ['fields' => []]]);
+    $input = ['actor_user_id' => $this->worker->id, 'schema_version' => 1,
+        'idempotency_key' => (string) Str::uuid(), 'values' => []];
+    $url = "/it/catalog/{$item->id}/submissions";
+    $this->actingAs($this->worker)->postJson($url, $input)->assertCreated();
+    $ticket = ItTicket::query()->sole();
+    $submission = ItCatalogSubmission::query()->sole();
+    $delivery = ItEmailDelivery::query()->sole();
+    expect($ticket->work_type)->toBe('service_request')->and($ticket->requires_approval)->toBeTrue()
+        ->and((int) $ticket->it_service_id)->toBe((int) $service->id)
+        ->and($ticket->next_response_party)->toBe('it')
+        ->and($ticket->events()->where('type', 'created')->count())->toBe(1)
+        ->and((int) $ticket->events()->where('type', 'created')->sole()->payload['catalog_version_id'])->toBe((int) $submission->catalog_version_id)
+        ->and(AuditLog::where('action', 'it.ticket.created')->count())->toBe(1)
+        ->and($delivery->dispatch_requested_at)->not->toBeNull()
+        ->and($delivery->dispatch_finished_at)->toBeNull()
+        ->and(Mail::mailer('array')->getSymfonyTransport()->messages())->toHaveCount(0);
+    $this->postJson($url, $input)->assertOk()->assertJsonPath('data.id', $ticket->id);
+    expect(ItEmailDelivery::query()->count())->toBe(1);
+    $outbox = app(ItEmailDeliveryService::class);
+    expect($outbox->dispatchPending())->toBe(1)->and($outbox->dispatchPending())->toBe(0)
+        ->and($delivery->fresh()->attempt_count)->toBe(1)
+        ->and(Mail::mailer('array')->getSymfonyTransport()->messages())->toHaveCount(1);
+});
+
+test('catalogue submission storage failure rolls back canonical ticket audit and notification intent', function () {
+    Bus::fake([DispatchItTicketNotifications::class]);
+    $item = ItCatalogItem::factory()->create(['form_schema' => ['fields' => []]]);
+    $input = ['schema_version' => 1, 'idempotency_key' => (string) Str::uuid(), 'values' => []];
+    $dispatcher = ItCatalogSubmission::getEventDispatcher();
+    ItCatalogSubmission::setEventDispatcher(clone $dispatcher);
+    $reject = true;
+    ItCatalogSubmission::creating(function () use (&$reject) {
+        if ($reject) {
+            throw new RuntimeException('Synthetic final submission write failure');
+        }
+    });
+    try {
+        expect(fn () => app(ItCatalogSubmissionService::class)->submit($item, $this->worker, $input))
+            ->toThrow(RuntimeException::class, 'Synthetic final submission write failure');
+        expect(ItTicket::query()->count())->toBe(0)->and(ItCatalogSubmission::query()->count())->toBe(0)
+            ->and(ItEmailDelivery::query()->count())->toBe(0)
+            ->and(AuditLog::where('action', 'it.ticket.created')->count())->toBe(0);
+        // Keep all model boot hooks registered during the first attempt for
+        // the retry. Only the deliberate failure is disabled.
+        $reject = false;
+        $saved = app(ItCatalogSubmissionService::class)->submit($item, $this->worker, $input);
+        expect($saved['created'])->toBeTrue()->and(ItTicket::query()->count())->toBe(1)
+            ->and(ItEmailDelivery::query()->count())->toBe(1);
+    } finally {
+        ItCatalogSubmission::setEventDispatcher($dispatcher);
+    }
+});
+
+test('catalogue technician answers remain usable internal notes and never enter beneficiary projections or notifications', function () {
+    Bus::fake([DispatchItTicketNotifications::class]);
+    $item = ItCatalogItem::factory()->create(['form_schema' => catalogSchema()]);
+    $private = 'SYNTHETIC-TECHNICIAN-ONLY-CATALOGUE-ANSWER';
+    $input = ['actor_user_id' => $this->agent->id, 'schema_version' => 1,
+        'idempotency_key' => (string) Str::uuid(), 'requested_for_user_id' => $this->worker->id,
+        'values' => ['details' => 'Public requested access', 'system_name' => 'VPN', 'fulfilment_note' => $private]];
+    $url = "/it/catalog/{$item->id}/submissions";
+    $this->actingAs($this->agent)->postJson($url, $input)->assertCreated()->assertDontSee($private, false);
+    $ticket = ItTicket::query()->sole();
+    $note = $ticket->comments()->sole();
+    expect($ticket->description)->toContain('Public requested access')->not->toContain($private)
+        ->and($note->body)->toContain($private)->and($note->is_internal)->toBeTrue()
+        ->and($ticket->next_response_party)->toBe('it')
+        ->and($ticket->first_responded_at)->toBeNull()
+        ->and(ItCatalogSubmission::query()->sole()->submitted_values['fulfilment_note'])->toBe($private)
+        ->and(AuditLog::where('action', 'it.ticket.comment.added')->count())->toBe(1);
+    $this->postJson($url, $input)->assertOk()->assertJsonPath('data.id', $ticket->id);
+    expect($ticket->comments()->count())->toBe(1)->and(ItEmailDelivery::query()->count())->toBe(1);
+    $this->get("/it/tickets/{$ticket->id}")->assertOk()->assertSee($private, false);
+    $this->actingAs($this->worker)->get("/it/tickets/{$ticket->id}")->assertOk()->assertDontSee($private, false);
+    $this->get('/it')->assertOk()->assertDontSee($private, false);
+    app(ItEmailDeliveryService::class)->dispatchPending();
+    expect(json_encode($this->agent->notifications()->get()->toArray(), JSON_THROW_ON_ERROR))->not->toContain($private);
+    foreach (Mail::mailer('array')->getSymfonyTransport()->messages() as $message) {
+        expect($message->getOriginalMessage()->toString())->not->toContain($private);
+    }
+});
+
+test('failure to persist a catalogue internal note rolls back the submission ticket and notification intent', function () {
+    Bus::fake([DispatchItTicketNotifications::class]);
+    $item = ItCatalogItem::factory()->create(['form_schema' => catalogSchema()]);
+    $input = ['schema_version' => 1, 'idempotency_key' => (string) Str::uuid(),
+        'requested_for_user_id' => $this->worker->id,
+        'values' => ['details' => 'Public requested access', 'system_name' => 'VPN', 'fulfilment_note' => 'Private instructions']];
+    $dispatcher = AuditLog::getEventDispatcher();
+    AuditLog::setEventDispatcher(clone $dispatcher);
+    $reject = true;
+    AuditLog::creating(function (AuditLog $audit) use (&$reject) {
+        if ($reject && $audit->action === 'it.ticket.comment.added') {
+            throw new RuntimeException('Synthetic catalogue note audit failure');
+        }
+    });
+    try {
+        expect(fn () => app(ItCatalogSubmissionService::class)->submit($item, $this->agent, $input))
+            ->toThrow(RuntimeException::class, 'Synthetic catalogue note audit failure');
+        expect(ItTicket::query()->count())->toBe(0)->and(ItCatalogSubmission::query()->count())->toBe(0)
+            ->and(ItEmailDelivery::query()->count())->toBe(0)
+            ->and(ItTicketComment::query()->count())->toBe(0);
+        $reject = false;
+        expect(app(ItCatalogSubmissionService::class)->submit($item, $this->agent, $input)['created'])->toBeTrue()
+            ->and(ItTicket::query()->count())->toBe(1)->and(ItTicketComment::query()->count())->toBe(1);
+    } finally {
+        AuditLog::setEventDispatcher($dispatcher);
+    }
+});
+
+test('the provisioning beneficiary can track public answers without gaining IT notes or unrelated HR work', function () {
+    $item = ItCatalogItem::factory()->create(['outcome_type' => 'provisioning', 'provisioning_type' => 'equipment', 'form_schema' => catalogSchema()]);
+    $input = ['schema_version' => 1, 'idempotency_key' => (string) Str::uuid(),
+        'requested_for_user_id' => $this->worker->id,
+        'values' => ['details' => 'A public equipment request', 'system_name' => 'VPN', 'fulfilment_note' => 'SYNTHETIC-PRIVATE-PROVISIONING-INSTRUCTION']];
+    $result = app(ItCatalogSubmissionService::class)->submit($item, $this->agent, $input)['result'];
+    expect($result->notes)->toContain('SYNTHETIC-PRIVATE-PROVISIONING-INSTRUCTION');
+    $this->actingAs($this->worker)->get('/it/provisioning/'.$result->id)->assertOk()
+        ->assertInertia(fn ($page) => $page->where('request.id', $result->id)
+            ->where('request.answers.0.value', 'A public equipment request')->has('request.answers', 2)->missing('request.notes'))
+        ->assertDontSee('SYNTHETIC-PRIVATE-PROVISIONING-INSTRUCTION', false);
+    $this->get('/it?tab=my-tickets')->assertOk()->assertInertia(fn ($page) => $page->where('myProvisioning.total', 1));
+    $unrelated = catalogUser('support_worker');
+    $this->actingAs($unrelated)->get('/it/provisioning/'.$result->id)->assertNotFound();
+    $privateItem = ItCatalogItem::factory()->create(['internal_only' => true, 'outcome_type' => 'provisioning',
+        'provisioning_type' => 'equipment', 'form_schema' => ['fields' => []]]);
+    $private = app(ItCatalogSubmissionService::class)->submit($privateItem, $this->agent, [
+        'schema_version' => 1, 'idempotency_key' => (string) Str::uuid(), 'requested_for_user_id' => $this->worker->id, 'values' => [],
+    ])['result'];
+    $this->actingAs($this->worker)->get('/it/provisioning/'.$private->id)->assertNotFound();
+    $this->workerProfile->update(['is_active' => false]);
+    $this->get('/it/provisioning/'.$result->id)->assertNotFound();
+});
+
+test('catalogue requested-for preserves the submitter and denies spoofed or out-of-scope beneficiaries', function (string $outcome) {
+    Bus::fake([DispatchItTicketNotifications::class]);
+    $item = ItCatalogItem::factory()->create(['outcome_type' => $outcome,
+        'provisioning_type' => $outcome === 'provisioning' ? 'equipment' : null, 'form_schema' => ['fields' => []]]);
+    $input = ['actor_user_id' => $this->worker->id, 'schema_version' => 1,
+        'idempotency_key' => (string) Str::uuid(), 'values' => [], 'requested_for_user_id' => $this->agent->id];
+    $url = "/it/catalog/{$item->id}/submissions";
+    $this->actingAs($this->worker)->postJson($url, $input)->assertForbidden();
+    $input['actor_user_id'] = $this->agent->id;
+    $input['requested_for_user_id'] = $this->worker->id;
+    $this->actingAs($this->agent)->postJson($url, $input)->assertCreated();
+    $submission = ItCatalogSubmission::query()->sole();
+    expect((int) $submission->requester_user_id)->toBe((int) $this->agent->id);
+    if ($outcome === 'service_request') {
+        expect((int) $submission->result->requester_user_id)->toBe((int) $this->agent->id)
+            ->and((int) $submission->result->requested_for_user_id)->toBe((int) $this->worker->id);
+    } else {
+        expect((int) $submission->result->employee_profile_id)->toBe((int) $this->workerProfile->id)
+            ->and((int) $submission->result->created_by)->toBe((int) $this->agent->id);
+    }
+    $this->postJson($url, [...$input, 'requested_for_user_id' => $this->agent->id])
+        ->assertUnprocessable()->assertJsonValidationErrors('idempotency_key');
+    $this->workerProfile->update(['primary_site_id' => Site::factory()->create()->id]);
+    $response = $this->postJson($url, [...$input, 'idempotency_key' => (string) Str::uuid()]);
+    expect($response->status())->toBeIn([403, 422]);
+    expect(ItCatalogSubmission::query()->count())->toBe(1);
+})->with(['service_request', 'provisioning']);
+
+test('new catalogue HTTP commands require a recoverable UUID before any work', function () {
+    $item = ItCatalogItem::factory()->create(['form_schema' => ['fields' => []]]);
+    $this->actingAs($this->worker)->postJson("/it/catalog/{$item->id}/submissions", [
+        'actor_user_id' => $this->worker->id, 'schema_version' => 1, 'values' => [], 'idempotency_key' => 'legacy-free-text',
+    ])->assertUnprocessable()->assertJsonValidationErrors('idempotency_key');
+    $this->postJson("/it/catalog/{$item->id}/submissions", [
+        'actor_user_id' => $this->worker->id, 'schema_version' => 1, 'values' => [],
+        'idempotency_key' => (string) Str::uuid(), 'requested_for_user_id' => null,
+    ])->assertUnprocessable()->assertJsonValidationErrors('requested_for_user_id');
+    expect(ItCatalogSubmission::query()->count())->toBe(0)->and(ItTicket::query()->count())->toBe(0);
+});
+
+test('requested-for discovery binds actor publication and Site and denies inaccessible selected people', function () {
+    $item = ItCatalogItem::factory()->create(['form_schema' => ['fields' => []]]);
+    $url = "/it/catalog/{$item->id}/requested-for/options";
+    $input = ['actor_user_id' => $this->agent->id, 'query_uuid' => (string) Str::uuid(),
+        'schema_version' => 1, 'site_id' => $this->site->id, 'query' => '', 'selected_id' => $this->worker->id];
+    $this->actingAs($this->worker)->postJson($url, [...$input, 'actor_user_id' => $this->worker->id])->assertForbidden();
+    $this->actingAs($this->agent)->postJson($url, $input)->assertOk()
+        ->assertHeader('Cache-Control', 'no-store, private')
+        ->assertJsonPath('purpose', 'requested-for')->assertJsonPath('site_id', $this->site->id)
+        ->assertJsonPath('selected.name', $this->worker->name);
+    $this->postJson($url, [...$input, 'actor_user_id' => $this->worker->id])->assertForbidden();
+    $this->postJson($url, [...$input, 'schema_version' => 2])->assertConflict();
+    $outside = Site::factory()->create();
+    $this->workerProfile->update(['primary_site_id' => $outside->id]);
+    $this->postJson($url, $input)->assertOk()->assertJsonPath('selected', null)
+        ->assertJsonMissing(['name' => $this->worker->name]);
+    $this->postJson($url, [...$input, 'site_id' => $outside->id])->assertNotFound();
+    $this->actingAs($this->worker)->getJson('/it/catalog')->assertJsonPath('data.0.can_request_for_others', false);
+    expect(ItCatalogSubmission::query()->count())->toBe(0);
+});
+
+test('catalogue submissions bind the original browser account before creating or replaying work', function (string $outcome) {
+    Notification::fake();
+    $item = ItCatalogItem::factory()->create([
+        'outcome_type' => $outcome,
+        'provisioning_type' => $outcome === 'provisioning' ? 'equipment' : null,
+        'form_schema' => catalogSchema(),
+    ]);
+    $input = [
+        'actor_user_id' => $this->worker->id,
+        'schema_version' => 1,
+        'idempotency_key' => (string) Str::uuid(),
+        'values' => ['details' => 'Private original requester details', 'system_name' => 'VPN'],
+    ];
+    $url = "/it/catalog/{$item->id}/submissions";
+
+    // Both accounts may request this item. The old buffer still belongs only
+    // to the account that opened it, including when the new login manages IT.
+    $this->actingAs($this->agent)->postJson($url, $input)->assertForbidden();
+    $withoutActor = $input;
+    unset($withoutActor['actor_user_id']);
+    $this->actingAs($this->worker)->postJson($url, $withoutActor)
+        ->assertUnprocessable()->assertJsonValidationErrors('actor_user_id');
+    $this->postJson($url, [...$input, 'actor_user_id' => [$this->worker->id]])->assertForbidden();
+    expect(ItCatalogSubmission::query()->count())->toBe(0)
+        ->and(ItTicket::query()->count())->toBe(0)
+        ->and(ItProvisioningRequest::query()->count())->toBe(0);
+    Notification::assertNothingSent();
+
+    $this->post($url, $input)->assertRedirect()->assertSessionDoesntHaveErrors();
+    $submission = ItCatalogSubmission::query()->sole();
+    expect($submission->requester_user_id)->toBe($this->worker->id);
+    $this->actingAs($this->agent)->postJson($url, $input)->assertForbidden();
+    $this->actingAs($this->worker)->post($url, $input)
+        ->assertRedirect()->assertSessionHas('it_catalog_submission.created', false);
+    expect(ItCatalogSubmission::query()->count())->toBe(1)
+        ->and(ItTicket::query()->count())->toBe($outcome === 'service_request' ? 1 : 0)
+        ->and(ItProvisioningRequest::query()->count())->toBe($outcome === 'provisioning' ? 1 : 0);
+})->with(['service_request', 'provisioning']);
+
+test('catalogue JSON commands recover the original published result without resubmitting private values', function (string $outcome) {
+    Notification::fake();
+    $item = ItCatalogItem::factory()->create([
+        'outcome_type' => $outcome,
+        'provisioning_type' => $outcome === 'provisioning' ? 'equipment' : null,
+        'form_schema' => catalogSchema(),
+    ]);
+    $input = [
+        'actor_user_id' => $this->worker->id,
+        'schema_version' => 1,
+        'idempotency_key' => (string) Str::uuid(),
+        'values' => ['details' => 'Private detail is not returned in the command receipt', 'system_name' => 'VPN'],
+    ];
+    $url = "/it/catalog/{$item->id}/submissions";
+    $created = $this->actingAs($this->worker)->postJson($url, $input)->assertCreated()
+        ->assertJsonPath('status', 'committed')->assertJsonPath('data.viewer_user_id', $this->worker->id)
+        ->assertJsonPath('data.catalog_item_id', $item->id)->assertJsonPath('data.schema_version', 1)
+        ->assertJsonPath('data.request_uuid', $input['idempotency_key'])->assertJsonPath('data.replayed', false)
+        ->assertJsonPath('data.result_type', $outcome === 'service_request' ? 'ticket' : 'provisioning')
+        ->assertJsonMissingPath('data.values')->assertJsonMissingPath('data.submitted_values');
+    expect($created->headers->get('Cache-Control'))->toContain('no-store');
+    $resultId = $created->json('data.id');
+    $expectedUrl = ($outcome === 'service_request' ? '/it/tickets/' : '/it/provisioning/').$resultId;
+    $created->assertJsonPath('data.url', $expectedUrl);
+    $item->update(['is_published' => false]);
+    $identity = ['actor_user_id' => $this->worker->id, 'idempotency_key' => $input['idempotency_key']];
+    Notification::fake();
+
+    $recovered = $this->postJson($url.'/recover', $identity)->assertOk()
+        ->assertJsonPath('status', 'committed')->assertJsonPath('data.id', $resultId)
+        ->assertJsonPath('data.submission_id', $created->json('data.submission_id'))
+        ->assertJsonPath('data.url', $expectedUrl)->assertJsonPath('data.replayed', true);
+    expect($recovered->headers->get('Cache-Control'))->toContain('no-store');
+    $this->postJson($url, $input)->assertOk()->assertJsonPath('data.replayed', true);
+    $this->actingAs($this->agent)->postJson($url.'/recover', $identity)->assertForbidden();
+    $different = ItCatalogItem::factory()->create();
+    $this->actingAs($this->worker)->postJson("/it/catalog/{$different->id}/submissions/recover", $identity)->assertNotFound();
+    expect(ItCatalogSubmission::query()->count())->toBe(1)
+        ->and(ItTicket::query()->count())->toBe($outcome === 'service_request' ? 1 : 0)
+        ->and(ItProvisioningRequest::query()->count())->toBe($outcome === 'provisioning' ? 1 : 0);
+    Notification::assertNothingSent();
+})->with(['service_request', 'provisioning']);
+
+test('unknown catalogue recovery is scoped and never creates work or invites a withdrawn request', function () {
+    Notification::fake();
+    $item = ItCatalogItem::factory()->create();
+    $url = "/it/catalog/{$item->id}/submissions/recover";
+    $identity = ['actor_user_id' => $this->worker->id, 'idempotency_key' => (string) Str::uuid()];
+    $this->actingAs($this->worker)->postJson($url, $identity)->assertOk()
+        ->assertJsonPath('status', 'not_found')->assertJsonPath('data.catalog_item_id', $item->id)
+        ->assertJsonPath('data.viewer_user_id', $this->worker->id)
+        ->assertJsonPath('data.request_uuid', $identity['idempotency_key'])
+        ->assertJsonPath('data.retry_same_command', true)->assertJsonMissingPath('data.id');
+    $this->postJson($url, ['idempotency_key' => $identity['idempotency_key']])
+        ->assertUnprocessable()->assertJsonValidationErrors('actor_user_id');
+    $this->postJson($url, [...$identity, 'idempotency_key' => 'invalid'])
+        ->assertUnprocessable()->assertJsonValidationErrors('idempotency_key');
+    $item->update(['is_published' => false]);
+    $this->postJson($url, $identity)->assertNotFound();
+    expect(ItCatalogSubmission::query()->count())->toBe(0)
+        ->and(ItTicket::query()->count())->toBe(0)
+        ->and(ItProvisioningRequest::query()->count())->toBe(0);
+    Notification::assertNothingSent();
+});
+
+test('catalogue cancellation prevents late submission and never undoes committed work', function (string $outcome) {
+    Notification::fake();
+    $item = ItCatalogItem::factory()->create(['outcome_type' => $outcome,
+        'provisioning_type' => $outcome === 'provisioning' ? 'equipment' : null, 'form_schema' => catalogSchema()]);
+    $url = "/it/catalog/{$item->id}/submissions";
+    $identity = ['actor_user_id' => $this->worker->id, 'idempotency_key' => (string) Str::uuid()];
+    $input = [...$identity, 'schema_version' => 1, 'values' => ['details' => 'Original request', 'system_name' => 'VPN']];
+    $this->actingAs($this->agent)->postJson($url.'/cancel', $identity)->assertForbidden();
+    $this->actingAs($this->worker)->postJson($url.'/cancel', $identity)->assertOk()
+        ->assertJsonPath('status', 'cancelled')->assertJsonPath('data.cancelled', true)
+        ->assertJsonPath('data.viewer_user_id', $this->worker->id)->assertJsonPath('data.catalog_item_id', $item->id)
+        ->assertJsonPath('data.request_uuid', $identity['idempotency_key'])->assertJsonMissingPath('data.id');
+    $this->postJson($url.'/cancel', $identity)->assertOk()->assertJsonPath('status', 'cancelled');
+    $this->postJson($url, $input)->assertOk()->assertJsonPath('status', 'cancelled');
+    $this->postJson($url.'/recover', $identity)->assertOk()->assertJsonPath('status', 'cancelled');
+    expect(ItCatalogSubmission::count())->toBe(0)->and(ItTicket::count())->toBe(0)
+        ->and(ItProvisioningRequest::count())->toBe(0)
+        ->and(ItTicketCommandReceipt::where('operation', ItTicketCommandReceipt::CATALOGUE_OPERATION)->count())->toBe(1)
+        ->and(AuditLog::where('action', 'it.catalogue.submission.cancelled')->count())->toBe(1);
+    Notification::assertNothingSent();
+
+    $input['idempotency_key'] = (string) Str::uuid();
+    $saved = $this->postJson($url, $input)->assertCreated()->json('data');
+    $item->update(['is_published' => false]);
+    $identity['idempotency_key'] = $input['idempotency_key'];
+    $this->postJson($url.'/cancel', $identity)->assertOk()->assertJsonPath('status', 'committed')
+        ->assertJsonPath('data.id', $saved['id'])->assertJsonPath('data.replayed', true);
+    $this->postJson($url.'/cancel', [...$identity, 'idempotency_key' => (string) Str::uuid()])
+        ->assertOk()->assertJsonPath('status', 'cancelled');
+    expect(ItCatalogSubmission::count())->toBe(1)
+        ->and(ItTicket::count())->toBe($outcome === 'service_request' ? 1 : 0)
+        ->and(ItProvisioningRequest::count())->toBe($outcome === 'provisioning' ? 1 : 0);
+    // Withdrawal permits cancellation only, never fresh intake or discovery.
+    expect(fn () => $item->fresh()->publishedContract())
+        ->toThrow(HttpException::class);
+    $this->postJson($url, [...$input, 'idempotency_key' => (string) Str::uuid()])->assertNotFound();
+    $privateItem = ItCatalogItem::factory()->create(['internal_only' => true]);
+    $privateItem->update(['is_published' => false, 'internal_only' => false]);
+    $this->postJson("/it/catalog/{$privateItem->id}/submissions/cancel", [
+        ...$identity, 'idempotency_key' => (string) Str::uuid(),
+    ])->assertNotFound();
+})->with(['service_request', 'provisioning']);
+
+test('catalogue cancellation audit failure rolls back its receipt and inaccessible drafts cannot be cancelled', function () {
+    $item = ItCatalogItem::factory()->create();
+    $key = (string) Str::uuid();
+    $dispatcher = AuditLog::getEventDispatcher();
+    AuditLog::setEventDispatcher(clone $dispatcher);
+    AuditLog::creating(fn () => throw new RuntimeException('Synthetic cancellation audit failure'));
+    try {
+        expect(fn () => app(ItCatalogSubmissionService::class)->cancel($item->id, $this->worker, $key, $this->worker->id))
+            ->toThrow(RuntimeException::class);
+        expect(ItTicketCommandReceipt::where('request_uuid', $key)->count())->toBe(0);
+    } finally {
+        AuditLog::setEventDispatcher($dispatcher);
+    }
+    $draft = ItCatalogItem::factory()->unpublished()->create();
+    $this->actingAs($this->worker)->postJson("/it/catalog/{$draft->id}/submissions/cancel", [
+        'actor_user_id' => $this->worker->id, 'idempotency_key' => $key,
+    ])->assertNotFound();
+    expect(ItTicketCommandReceipt::where('request_uuid', $key)->count())->toBe(0);
+});
+
 test('requesters track their canonical catalogue work without technician or HR details', function () {
     $item = ItCatalogItem::factory()->create([
         'outcome_type' => 'provisioning', 'provisioning_type' => 'equipment', 'form_schema' => catalogSchema(),
     ]);
-    $this->actingAs($this->worker)->post("/it/catalog/{$item->id}/submissions", [
+    $this->actingAs($this->worker)->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id,
         'schema_version' => 1, 'idempotency_key' => (string) Str::uuid(),
         'values' => ['details' => 'A headset please', 'system_name' => 'VPN'],
     ])->assertRedirect();
@@ -152,14 +528,16 @@ test('tracking hides an internal request after its author loses IT management', 
 });
 
 test('requester tracking paginates and applies literal search and status to the complete owned set', function () {
-    $item = ItCatalogItem::factory()->create(['outcome_type' => 'provisioning', 'provisioning_type' => 'equipment', 'form_schema' => ['fields' => []]]);
+    $attributes = ['outcome_type' => 'provisioning', 'provisioning_type' => 'equipment', 'form_schema' => ['fields' => []]];
+    $item = ItCatalogItem::factory()->create([...$attributes, 'name' => 'Tracking request']);
+    $percentItem = ItCatalogItem::factory()->create([...$attributes, 'name' => 'Tracking 100% request']);
     $firstId = null;
     foreach (range(1, 21) as $number) {
-        $work = app(ItCatalogSubmissionService::class)->submit($item, $this->worker, [
+        $work = app(ItCatalogSubmissionService::class)->submit($number === 21 ? $percentItem : $item, $this->worker, [
             'schema_version' => 1, 'idempotency_key' => (string) Str::uuid(), 'values' => [],
         ])['result'];
         $firstId ??= $work->id;
-        $work->update(['item' => $number === 21 ? 'Tracking 100% request' : 'Tracking request '.$number,
+        $work->update(['item' => 'Private internal task '.$number,
             'status' => $number <= 5 ? 'done' : 'pending']);
     }
     $this->actingAs($this->worker)->get('/it?tab=my-tickets')->assertOk()->assertInertia(fn ($page) => $page
@@ -171,6 +549,8 @@ test('requester tracking paginates and applies literal search and status to the 
         ->where('myProvisioning.total', 21)->where('myProvisioning.matched', 16)->has('myProvisioning.data', 16));
     $this->get('/it?tab=my-tickets&my_q=%25')->assertOk()->assertInertia(fn ($page) => $page
         ->where('myProvisioning.matched', 1)->where('myProvisioning.data.0.title', 'Tracking 100% request'));
+    $this->get('/it?tab=my-tickets&my_q=Private%20internal')->assertOk()->assertInertia(fn ($page) => $page
+        ->where('myProvisioning.matched', 0)->has('myProvisioning.data', 0));
     $this->get('/it?tab=my-tickets&my_q=IT-P'.str_pad((string) $firstId, 6, '0', STR_PAD_LEFT))->assertOk()->assertInertia(fn ($page) => $page
         ->where('myProvisioning.matched', 1)->where('myProvisioning.data.0.id', $firstId));
 });
@@ -225,25 +605,25 @@ test('catalogue submission enforces the published schema version required fields
     ]);
 
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", [
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id,
             'schema_version' => 2,
-            'idempotency_key' => 'stale-form',
+            'idempotency_key' => (string) Str::uuid(),
             'values' => ['details' => 'Please help', 'system_name' => 'VPN'],
         ])
         ->assertSessionHasErrors('schema_version');
 
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", [
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id,
             'schema_version' => 3,
-            'idempotency_key' => 'missing-required',
+            'idempotency_key' => (string) Str::uuid(),
             'values' => ['details' => 'Please help'],
         ])
         ->assertSessionHasErrors('values.system_name');
 
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", [
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id,
             'schema_version' => 3,
-            'idempotency_key' => 'internal-injection',
+            'idempotency_key' => (string) Str::uuid(),
             'values' => [
                 'details' => 'Please help',
                 'system_name' => 'VPN',
@@ -253,9 +633,9 @@ test('catalogue submission enforces the published schema version required fields
         ->assertSessionHasErrors('values.fulfilment_note');
 
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", [
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id,
             'schema_version' => 3,
-            'idempotency_key' => 'invalid-number-range',
+            'idempotency_key' => (string) Str::uuid(),
             'values' => [
                 'details' => 'Please help',
                 'system_name' => 'VPN',
@@ -281,16 +661,16 @@ test('service request catalogue intake is idempotent and creates one canonical g
     ]);
     $payload = [
         'schema_version' => 4,
-        'idempotency_key' => 'vpn-request-001',
+        'idempotency_key' => (string) Str::uuid(),
         'values' => ['details' => 'Need access for the on-call shift', 'system_name' => 'VPN'],
     ];
 
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", $payload)
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$payload])
         ->assertRedirect()
         ->assertSessionHas('it_catalog_submission');
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", $payload)
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$payload])
         ->assertRedirect();
 
     expect(ItCatalogSubmission::query()->count())->toBe(1)
@@ -328,9 +708,9 @@ test('security catalogue intake creates a security request in the shared ticket 
     ]);
 
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", [
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id,
             'schema_version' => 1,
-            'idempotency_key' => 'security-request-001',
+            'idempotency_key' => (string) Str::uuid(),
             'values' => ['details' => 'Unexpected sign-in prompt', 'system_name' => 'Microsoft 365'],
         ])
         ->assertRedirect();
@@ -348,9 +728,9 @@ test('provisioning catalogue intake creates the canonical provisioning record an
     ]);
 
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", [
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id,
             'schema_version' => 1,
-            'idempotency_key' => 'laptop-request-001',
+            'idempotency_key' => (string) Str::uuid(),
             'values' => ['details' => 'Current laptop battery is swollen', 'system_name' => 'Microsoft 365'],
         ])
         ->assertRedirect()
@@ -377,12 +757,12 @@ test('catalogue provisioning preserves its approval gate through revision replay
     ]);
     $payload = [
         'schema_version' => 1,
-        'idempotency_key' => 'approval-required-provisioning',
+        'idempotency_key' => (string) Str::uuid(),
         'values' => ['details' => 'Request approved application access', 'system_name' => 'Microsoft 365'],
     ];
 
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", $payload)
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$payload])
         ->assertRedirect()
         ->assertSessionHas('it_catalog_submission');
 
@@ -393,13 +773,16 @@ test('catalogue provisioning preserves its approval gate through revision replay
 
     $item->update(['requires_approval' => false]);
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", $payload)
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$payload])
         ->assertRedirect();
     expect(ItProvisioningRequest::query()->count())->toBe(1)
         ->and($request->fresh()->approval_required)->toBeTrue();
 
+    $request->update(['assigned_to_user_id' => $this->agent->id]);
+    $identity = fn (User $actor): array => ['actor_user_id' => $actor->id, 'request_uuid' => (string) Str::uuid(),
+        'expected_version' => $request->fresh()->lock_version];
     $this->actingAs($this->agent)
-        ->post("/it/provisioning/{$request->id}/fulfil")
+        ->post("/it/provisioning/{$request->id}/fulfil", $identity($this->agent))
         ->assertSessionHas('error', 'This request needs approval before fulfilment.');
     expect($request->fresh()->status)->toBe('pending')
         ->and($request->events()->where('type', 'fulfilled')->count())->toBe(0);
@@ -409,14 +792,25 @@ test('catalogue provisioning preserves its approval gate through revision replay
         ->assertForbidden();
     expect($request->fresh()->approval_status)->toBe('pending');
 
-    $this->actingAs($this->agent)
-        ->post("/it/provisioning/{$request->id}/approve", ['decision_note' => 'Approved for this role.'])
+    $approver = catalogUser('hr');
+    $cover = catalogUser('hr');
+    ensureCanonicalHrStaffProfile($approver, $this->site);
+    ensureCanonicalHrStaffProfile($cover, $this->site);
+    app(ItProvisioningRequestLifecycleService::class)->requestApproval($request, $this->agent, [
+        'primary_approver_user_id' => $approver->id, 'cover_approver_user_id' => $cover->id,
+        'approval_expires_at' => now()->addDays(2)->toIso8601String(), 'reason' => 'Independent review of original catalogue approval.',
+    ]);
+    $this->actingAs($approver)
+        ->post("/it/provisioning/{$request->id}/approve", [...$identity($approver), 'decision_note' => 'Approved for this role.'])
         ->assertSessionHas('success');
-    $this->post("/it/provisioning/{$request->id}/fulfil")
+    $this->actingAs($this->agent)->post("/it/provisioning/{$request->id}/fulfil", [
+        ...$identity($this->agent), 'external_ref' => 'SYN-CATALOGUE-ACCESS',
+        'evidence_summary' => 'Synthetic catalogue access manually completed and verified.',
+    ])
         ->assertSessionHas('success');
 
     expect($request->fresh()->status)->toBe('done')
-        ->and($request->fresh()->approved_by_user_id)->toBe($this->agent->id)
+        ->and($request->fresh()->approved_by_user_id)->toBe($approver->id)
         ->and($request->events()->where('type', 'approved')->count())->toBe(1)
         ->and($request->events()->where('type', 'fulfilled')->count())->toBe(1)
         ->and(ItCatalogSubmission::query()->count())->toBe(1)
@@ -428,15 +822,15 @@ test('a requester cannot submit an unpublished or internal-only catalogue item',
     $internal = ItCatalogItem::factory()->create(['internal_only' => true]);
     $payload = [
         'schema_version' => 1,
-        'idempotency_key' => 'blocked',
+        'idempotency_key' => (string) Str::uuid(),
         'values' => [],
     ];
 
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$draft->id}/submissions", $payload)
+        ->post("/it/catalog/{$draft->id}/submissions", ['actor_user_id' => $this->worker->id, ...$payload])
         ->assertNotFound();
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$internal->id}/submissions", $payload)
+        ->post("/it/catalog/{$internal->id}/submissions", ['actor_user_id' => $this->worker->id, ...$payload])
         ->assertNotFound();
 });
 
@@ -550,8 +944,8 @@ test('draft edits preserve publication and requests recover the original contrac
     $this->getJson('/it/catalog?q=Confidential')->assertJsonCount(0, 'data');
     $this->get('/it')->assertInertia(fn ($page) => $page->where('catalogItems.0.name', 'Published equipment request'));
 
-    $input = ['schema_version' => 1, 'idempotency_key' => 'original-contract', 'values' => []];
-    $this->post("/it/catalog/{$item->id}/submissions", $input)->assertSessionDoesntHaveErrors();
+    $input = ['schema_version' => 1, 'idempotency_key' => (string) Str::uuid(), 'values' => []];
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input])->assertSessionDoesntHaveErrors();
     $submission = ItCatalogSubmission::query()->sole();
     expect($submission->contract_snapshot['name'])->toBe('Published equipment request')
         ->and($submission->contract_snapshot['requires_approval'])->toBeFalse()
@@ -562,17 +956,17 @@ test('draft edits preserve publication and requests recover the original contrac
     expect($item->fresh()->publishedVersion->version)->toBe(2)
         ->and($item->fresh()->publishedVersion->contract['requires_approval'])->toBeTrue();
     $this->actingAs($this->worker)->getJson('/it/catalog')->assertJsonCount(0, 'data');
-    $this->post("/it/catalog/{$item->id}/submissions", $input)->assertSessionDoesntHaveErrors();
-    $this->post("/it/catalog/{$item->id}/submissions", [...$input, 'idempotency_key' => 'new-private-request', 'schema_version' => 2])->assertNotFound();
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input])->assertSessionDoesntHaveErrors();
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input, 'idempotency_key' => (string) Str::uuid(), 'schema_version' => 2])->assertNotFound();
 
     $this->actingAs($this->agent)->post("/it/setup/catalogue-items/{$item->id}/unpublish", [
         'expected_version' => 3, 'reason' => 'Withdrawn for review.',
     ])->assertSessionDoesntHaveErrors();
-    $this->actingAs($this->worker)->post("/it/catalog/{$item->id}/submissions", $input)
+    $this->actingAs($this->worker)->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input])
         ->assertSessionDoesntHaveErrors()->assertSessionHas('it_catalog_submission.created', false);
-    $this->post("/it/catalog/{$item->id}/submissions", [...$input, 'values' => ['changed' => 'input']])
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input, 'values' => ['changed' => 'input']])
         ->assertSessionHasErrors('idempotency_key');
-    $this->post("/it/catalog/{$item->id}/submissions", [...$input, 'idempotency_key' => 'new-withdrawn-request'])
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input, 'idempotency_key' => (string) Str::uuid()])
         ->assertNotFound();
     expect(ItCatalogSubmission::query()->count())->toBe(1)
         ->and(ItTicket::query()->count())->toBe(1)
@@ -584,12 +978,12 @@ test('draft edits preserve publication and requests recover the original contrac
 test('catalogue replay denies a result whose current permission boundary changed', function () {
     Notification::fake();
     $item = ItCatalogItem::factory()->create(['form_schema' => ['fields' => []]]);
-    $input = ['schema_version' => 1, 'idempotency_key' => 'current-result-access', 'values' => []];
-    $this->actingAs($this->worker)->post("/it/catalog/{$item->id}/submissions", $input)->assertRedirect();
+    $input = ['schema_version' => 1, 'idempotency_key' => (string) Str::uuid(), 'values' => []];
+    $this->actingAs($this->worker)->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input])->assertRedirect();
     $ticket = ItTicket::query()->sole();
     $other = catalogUser('support_worker');
     $ticket->forceFill(['requester_user_id' => $other->id, 'requested_for_user_id' => $other->id, 'is_sensitive' => true])->save();
-    $this->post("/it/catalog/{$item->id}/submissions", $input)->assertNotFound();
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input])->assertNotFound();
     expect(ItTicket::query()->count())->toBe(1);
 });
 
@@ -675,6 +1069,12 @@ test('catalogue entity fields expose only canonical choices and reject forged di
         ],
     ]);
 
+    $access = app(ItProvisioningAccessService::class);
+    expect($access->selectableProfiles($this->worker)->exists())->toBeFalse()
+        ->and($access->canSelectProfile($this->worker, $this->workerProfile))->toBeFalse()
+        ->and($access->canRequestForProfile($this->worker, $this->workerProfile))->toBeTrue()
+        ->and($access->canRequestForProfile($this->worker, $otherProfile))->toBeFalse();
+
     $this->actingAs($this->worker)
         ->get('/it')
         ->assertInertia(fn ($page) => $page
@@ -686,9 +1086,9 @@ test('catalogue entity fields expose only canonical choices and reject forged di
             ->where('catalogFieldOptions.asset', fn ($options) => ! collect($options)->pluck('id')->contains($otherAsset->id)));
 
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", [
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id,
             'schema_version' => 1,
-            'idempotency_key' => 'forged-entity-options',
+            'idempotency_key' => (string) Str::uuid(),
             'values' => [
                 'employee' => $otherProfile->id,
                 'user' => $other->id,
@@ -702,9 +1102,9 @@ test('catalogue entity fields expose only canonical choices and reject forged di
         ]);
 
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$item->id}/submissions", [
+        ->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id,
             'schema_version' => 1,
-            'idempotency_key' => 'canonical-entity-options',
+            'idempotency_key' => (string) Str::uuid(),
             'values' => [
                 'employee' => $this->workerProfile->id,
                 'user' => $this->worker->id,
@@ -793,7 +1193,7 @@ test('catalogue entity submissions resolve current permitted records beyond the 
     } while ($after !== null && count($seen) <= 250);
     expect($seen)->toHaveCount(201)->and(array_unique($seen))->toHaveCount(201)
         ->and($seen)->toContain($asset->id)->and($after)->toBeNull();
-    $this->actingAs($this->agent)->post("/it/catalog/{$item->id}/submissions", $payload)
+    $this->actingAs($this->agent)->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->agent->id, ...$payload])
         ->assertRedirect()->assertSessionDoesntHaveErrors();
     expect(ItTicket::query()->sole()->description)->toContain($person->name, $asset->name)
         ->and(ItCatalogSubmission::query()->count())->toBe(1);
@@ -802,7 +1202,7 @@ test('catalogue entity submissions resolve current permitted records beyond the 
     $profile->update(['is_active' => false]);
     $asset->update(['status' => 'retired']);
     $payload['idempotency_key'] = (string) Str::uuid();
-    $this->post("/it/catalog/{$item->id}/submissions", $payload)
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->agent->id, ...$payload])
         ->assertSessionHasErrors(['values.employee', 'values.user', 'values.asset']);
     expect(ItTicket::query()->count())->toBe(1)
         ->and(ItCatalogSubmission::query()->count())->toBe(1);
@@ -829,7 +1229,9 @@ test('catalogue field search requires the current actor and visible published fi
         ->assertOk()->assertJsonPath('selected', null);
     $this->workerProfile->update(['is_active' => false]);
     $this->postJson("{$base}/person/options", [...$input, 'selected_id' => $this->workerProfile->id])
-        ->assertOk()->assertJsonCount(0, 'options')->assertJsonPath('selected', null);
+        ->assertNotFound();
+    $this->workerProfile->update(['is_active' => true]);
+    $this->postJson("{$base}/person/options", $input)->assertOk()->assertJsonCount(1, 'options');
     $item->update(['is_published' => false]);
     $this->postJson("{$base}/person/options", $input)->assertNotFound();
 });
@@ -856,24 +1258,24 @@ test('catalogue Site discovery and direct submission use the published audience 
         'site_id' => $otherSite->id, 'values' => ['details' => 'Site scoped work', 'system_name' => 'VPN']];
     $this->actingAs($this->worker)->getJson('/it/catalog')->assertOk()->assertJsonCount(0, 'data');
     $this->get('/it?tab=catalog')->assertInertia(fn ($page) => $page->has('catalogItems', 0));
-    $this->post("/it/catalog/{$item->id}/submissions", $input)->assertNotFound();
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input])->assertNotFound();
     expect(ItCatalogSubmission::query()->count())->toBe(0);
 
     $this->workerProfile->update(['secondary_site_ids' => [$otherSite->id]]);
     $this->getJson('/it/catalog')->assertOk()->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.site_options.0.id', $otherSite->id);
-    $this->post("/it/catalog/{$item->id}/submissions", [...$input, 'site_id' => $this->site->id])
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input, 'site_id' => $this->site->id])
         ->assertSessionHasErrors('catalog_item');
-    $this->post("/it/catalog/{$item->id}/submissions", $input)->assertRedirect();
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input])->assertRedirect();
     expect(ItTicket::query()->sole()->site_id)->toBe($otherSite->id)
         ->and(ItCatalogSubmission::query()->sole()->contract_snapshot['site_scope'])->toBe([$otherSite->id]);
-    $this->post("/it/catalog/{$item->id}/submissions", [...$input, 'site_id' => $this->site->id])
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input, 'site_id' => $this->site->id])
         ->assertSessionHasErrors('idempotency_key');
     expect(ItTicket::query()->count())->toBe(1);
 
     $otherSite->update(['is_active' => false]);
     $this->getJson('/it/catalog')->assertOk()->assertJsonCount(0, 'data');
-    $this->post("/it/catalog/{$item->id}/submissions", [...$input, 'idempotency_key' => (string) Str::uuid()])->assertNotFound();
+    $this->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->worker->id, ...$input, 'idempotency_key' => (string) Str::uuid()])->assertNotFound();
 });
 
 test('catalogue Site authoring rejects empty or unavailable scopes and preserves published versions until reviewed', function () {
@@ -908,7 +1310,7 @@ test('site-limited provisioning cannot be requested for an employee at another a
         'site_scope' => [$this->site->id], 'outcome_type' => 'provisioning', 'provisioning_type' => 'equipment',
         'form_schema' => ['fields' => [['key' => 'employee_profile_id', 'label' => 'Requested for', 'type' => 'employee', 'required' => true]]],
     ]);
-    $this->actingAs($this->agent)->post("/it/catalog/{$item->id}/submissions", [
+    $this->actingAs($this->agent)->post("/it/catalog/{$item->id}/submissions", ['actor_user_id' => $this->agent->id,
         'schema_version' => 1, 'idempotency_key' => (string) Str::uuid(), 'values' => ['employee_profile_id' => $otherProfile->id],
     ])->assertSessionHasErrors('values.employee_profile_id');
     expect(ItProvisioningRequest::query()->count())->toBe(0)->and(ItCatalogSubmission::query()->count())->toBe(0);
@@ -987,7 +1389,7 @@ test('publication rechecks Site availability instead of releasing a stale audien
     $item = ItCatalogItem::query()->sole();
     $this->site->update(['is_active' => false]);
     $this->post("/it/setup/catalogue-items/{$item->id}/publish", ['expected_version' => $item->lock_version])
-        ->assertSessionHasErrors('site_scope');
+        ->assertNotFound();
     expect($item->fresh()->is_published)->toBeFalse()
         ->and(ItCatalogVersion::query()->count())->toBe(0)
         ->and(AuditLog::query()->where('action', 'it.catalogue.item.published')->count())->toBe(0);

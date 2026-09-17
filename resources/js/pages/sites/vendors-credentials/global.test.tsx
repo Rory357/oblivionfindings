@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const inertiaLocation = vi.hoisted(() => ({ url: '/vendors' }));
+
 // Mock the app shell so the page renders without the full sidebar/layout tree.
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: React.ReactNode }) => (
@@ -17,6 +19,7 @@ vi.mock('@inertiajs/react', async () => {
             <a {...rest}>{children}</a>
         ),
         usePage: () => ({
+            url: inertiaLocation.url,
             props: { auth: { user: { name: 'Rangi Morgan' } } },
         }),
         router: {
@@ -25,6 +28,8 @@ vi.mock('@inertiajs/react', async () => {
             delete: vi.fn(),
             visit: vi.fn(),
             reload: vi.fn(),
+            replace: vi.fn(),
+            on: vi.fn(() => vi.fn()),
         },
         useForm: (initial: Record<string, unknown>) => {
             const [data, setData] = ReactActual.useState(initial);
@@ -45,6 +50,8 @@ vi.mock('@inertiajs/react', async () => {
     };
 });
 
+import { router } from '@inertiajs/react';
+import { AuditLogDialog } from './_audit-dialog';
 import GlobalVendorsCredentials from './global';
 
 const sites = [
@@ -126,7 +133,102 @@ const baseProps = {
 };
 
 describe('GlobalVendorsCredentials', () => {
-    afterEach(() => vi.unstubAllGlobals());
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.clearAllMocks();
+        inertiaLocation.url = '/vendors';
+    });
+    it('keeps sidebar URLs and restored tab state aligned while retaining site and runbook context', () => {
+        inertiaLocation.url =
+            '/vendors?tab=vendors&site_id=1&return_to=%2Fit%2Fknowledge%2F9&credential_id=20';
+        render(<GlobalVendorsCredentials {...baseProps} />);
+        fireEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
+        const credentialsVisit = vi
+            .mocked(router.replace)
+            .mock.calls.at(-1)![0];
+        const credentialsUrl = new URL(
+            credentialsVisit.url!,
+            'http://local.invalid',
+        );
+        expect(credentialsUrl.searchParams.get('tab')).toBe('credentials');
+        expect(credentialsUrl.searchParams.get('site_id')).toBe('1');
+        expect(credentialsUrl.searchParams.get('return_to')).toBe(
+            '/it/knowledge/9',
+        );
+        expect(credentialsUrl.searchParams.get('credential_id')).toBe('20');
+        expect(typeof credentialsVisit.props).toBe('function');
+        if (typeof credentialsVisit.props !== 'function')
+            throw new Error('Page state update is missing.');
+        expect(
+            credentialsVisit.props({ filters: { site_id: 1 } }, {}).filters,
+        ).toEqual({ site_id: 1, tab: 'credentials' });
+        fireEvent.click(screen.getByRole('tab', { name: /^Vendors/ }));
+        const vendorsVisit = vi.mocked(router.replace).mock.calls.at(-1)![0];
+        expect(
+            new URL(vendorsVisit.url!, 'http://local.invalid').searchParams.has(
+                'credential_id',
+            ),
+        ).toBe(false);
+        expect(typeof vendorsVisit.props).toBe('function');
+        if (typeof vendorsVisit.props !== 'function')
+            throw new Error('Page state update is missing.');
+        expect(
+            vendorsVisit.props(
+                { filters: {}, selectedCredential: credentials[0] },
+                {},
+            ).selectedCredential,
+        ).toBeNull();
+    });
+    it('shows a reported clipboard failure separately from its authorized intent and storage maintenance', async () => {
+        const shared = {
+            at: new Date().toISOString(),
+            actor: { name: 'Synthetic auditor', initials: 'SA' },
+            target: 'Synthetic access',
+            target_type: 'password',
+            site_name: 'Synthetic house',
+            ip: '127.0.0.1',
+        };
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    logs: [
+                        {
+                            ...shared,
+                            id: 1,
+                            action: 'copy_intent',
+                            result: 'intent',
+                        },
+                        {
+                            ...shared,
+                            id: 2,
+                            action: 'copy_reported_failed',
+                            result: 'failed',
+                        },
+                        {
+                            ...shared,
+                            id: 3,
+                            action: 'storage_key_maintenance',
+                            result: 'ok',
+                        },
+                    ],
+                }),
+            }),
+        );
+        render(<AuditLogDialog isOpen onClose={vi.fn()} />);
+        expect(await screen.findByText('Reported failure')).toBeVisible();
+        expect(screen.getByText('Intent recorded')).toBeVisible();
+        expect(
+            screen.getAllByText('Encryption key maintained').length,
+        ).toBeGreaterThan(0);
+        expect(screen.getByText('External changes')).toBeVisible();
+        expect(
+            screen.queryByText('Clipboard success reported', {
+                selector: 'td *',
+            }),
+        ).not.toBeInTheDocument();
+    });
     it('renders the hero, health strip and vendor table without crashing', () => {
         render(<GlobalVendorsCredentials {...baseProps} />);
 
@@ -167,17 +269,15 @@ describe('GlobalVendorsCredentials', () => {
         ).toBeInTheDocument();
         expect(screen.getByText('Password')).toBeInTheDocument();
         expect(screen.getByText('PIN / Code')).toBeInTheDocument();
-        expect(screen.getByText('Select a site…')).toBeInTheDocument();
+        expect(screen.getByText('Choose site')).toBeInTheDocument();
     });
 
-    it('opens the read-only vendor detail dialog from a row', async () => {
+    it('opens the canonical vendor detail page from a row', async () => {
         render(<GlobalVendorsCredentials {...baseProps} />);
 
         fireEvent.click(screen.getByText('Capital Plumbing & Gas'));
 
-        // Read-first detail dialog shows contact affordances + Edit action.
-        expect(await screen.findByText('Call now')).toBeInTheDocument();
-        expect(screen.getByText('Preferred method')).toBeInTheDocument();
+        expect(router.visit).toHaveBeenCalledWith('/vendors/10');
     });
 
     it('offers history to an auditor without reveal rights and conceals it immediately after grant revocation', async () => {
@@ -197,11 +297,13 @@ describe('GlobalVendorsCredentials', () => {
             <GlobalVendorsCredentials {...baseProps} can={auditorCan} />,
         );
         fireEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
-        fireEvent.click(screen.getByText('Front Door Smart Lock'));
+        fireEvent.contextMenu(screen.getByText('Front Door Smart Lock'));
         expect(
-            screen.getByRole('button', { name: 'Re-authenticate & reveal' }),
-        ).toBeDisabled();
-        fireEvent.click(screen.getByRole('button', { name: 'Reveal history' }));
+            screen.queryByRole('button', { name: 'Reveal for 30 seconds' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: 'Reveal history' }),
+        );
         expect(await screen.findByText('Reveal & audit log')).toBeVisible();
         expect(fetchAudit).toHaveBeenCalledWith(
             expect.stringContaining('/vendors/audit'),
@@ -230,9 +332,9 @@ describe('GlobalVendorsCredentials', () => {
             />,
         );
         fireEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
-        fireEvent.click(screen.getByText('Front Door Smart Lock'));
+        fireEvent.contextMenu(screen.getByText('Front Door Smart Lock'));
         expect(
-            screen.queryByRole('button', { name: 'Reveal history' }),
+            screen.queryByRole('menuitem', { name: 'Reveal history' }),
         ).not.toBeInTheDocument();
     });
 });

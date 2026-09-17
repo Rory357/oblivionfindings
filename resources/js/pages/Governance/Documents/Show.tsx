@@ -1,47 +1,72 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Head, router } from '@inertiajs/react';
+import { Download, FileText, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { formatFileSize } from '@/components/ui/file-dropzone';
 import AppLayout from '@/layouts/app-layout';
-import { statusColors } from '@/lib/status-colors';
+import { formatDateLong, formatDateTimeLong } from '@/lib/datetime';
 import { PageProps } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Download, FileText, FolderOpen } from 'lucide-react';
+
+import { documentTypeIcon } from './_dialogs';
 
 interface Document {
     id: number;
     title: string;
     category: string;
+    category_label: string;
     description: string | null;
     file_name: string;
+    format_label: string;
     file_size: number;
-    mime_type: string | null;
     version: number;
     is_current: boolean;
     uploaded_by: { id: number; name: string } | null;
-    created_at: string;
-    updated_at: string;
+    created_at: string | null;
+    updated_at: string | null;
 }
 
 interface Props extends PageProps {
     document: Document;
 }
 
-const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-};
+function DetailItem({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div>
+            <p className="text-caption">{label}</p>
+            <div className="mt-0.5 text-sm">{children}</div>
+        </div>
+    );
+}
 
 export default function DocumentShow({ auth, document }: Props) {
-    const canManage = auth.can?.governance?.documents?.manage ?? false;
+    const canManage = Boolean(auth.can?.governance?.documents?.manage);
+    const [confirmRemove, setConfirmRemove] = useState(false);
+    const TypeIcon = documentTypeIcon(document.category);
+    const downloadHref = `/governance/documents/${document.id}/download`;
+    const size = formatFileSize(document.file_size);
 
     return (
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Documents', href: '/governance/documents' },
                 {
@@ -54,193 +79,124 @@ export default function DocumentShow({ auth, document }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
-                        icon={FolderOpen}
-                        category="governance"
+                    <PageHeader
+                        variant="profile"
+                        backHref="/governance/documents"
+                        icon={TypeIcon}
                         title={document.title}
-                        description={
-                            document.description ?? 'Governance document'
+                        wrapTitle
+                        titleChip={
+                            <PageHeaderStatusChip
+                                variant={document.is_current ? 'success' : 'neutral'}
+                            >
+                                {document.is_current ? 'Current' : 'Archived'}
+                            </PageHeaderStatusChip>
                         }
-                        badges={[
-                            { label: document.category },
-                            ...(document.is_current
-                                ? [{ label: 'Current' }]
-                                : [{ label: 'Archived' }]),
-                        ]}
-                        stats={[
-                            { label: 'Version', value: `v${document.version}` },
-                            {
-                                label: 'Size',
-                                value: formatBytes(document.file_size),
-                            },
-                        ]}
+                        subline={[document.category_label, document.format_label, size]
+                            .filter(Boolean)
+                            .join(' · ')}
                         actions={
-                            <div className="flex gap-2">
-                                <Button asChild variant="outline">
-                                    <Link href="/governance/documents">
-                                        <ArrowLeft className="mr-2 h-4 w-4" />{' '}
-                                        Back
-                                    </Link>
-                                </Button>
-                                <Button asChild>
-                                    <a
-                                        href={`/governance/documents/${document.id}/download`}
-                                        download
+                            <>
+                                {canManage ? (
+                                    <PageHeaderGlassButton
+                                        icon={Trash2}
+                                        onClick={() => setConfirmRemove(true)}
                                     >
-                                        <Download className="mr-2 h-4 w-4" />{' '}
-                                        Download
-                                    </a>
-                                </Button>
-                            </div>
+                                        Remove
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                <PageHeaderPrimaryButton
+                                    icon={Download}
+                                    onClick={() => {
+                                        window.location.href = downloadHref;
+                                    }}
+                                >
+                                    Download
+                                </PageHeaderPrimaryButton>
+                            </>
+                        }
+                        meters={
+                            <PageHeaderMeterBlock
+                                label="Document type"
+                                ariaLabel={`Show all ${document.category_label.toLowerCase()} documents`}
+                                href={`/governance/documents?document_type=${document.category}`}
+                            >
+                                <PageHeaderMeterBig>
+                                    <span className="text-base">
+                                        {document.category_label}
+                                    </span>
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    see others of this type
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
                         }
                     />
                 }
             >
-                <div className="grid gap-4 lg:grid-cols-3">
-                    <div className="space-y-4 lg:col-span-2">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <FileText className="h-4 w-4" /> Document
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3 text-sm">
-                                <div>
-                                    <p className="text-xs text-muted-foreground">
-                                        Filename
+                <div className="grid gap-5 lg:grid-cols-3">
+                    <Card className="lg:col-span-2">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-primary" />
+                                Document
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-4">
+                            <DetailItem label="File name">
+                                {document.file_name}
+                            </DetailItem>
+                            <DetailItem label="Description">
+                                {document.description ? (
+                                    <p className="whitespace-pre-wrap">
+                                        {document.description}
                                     </p>
-                                    <p className="font-mono">
-                                        {document.file_name}
-                                    </p>
-                                </div>
-                                {document.description && (
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">
-                                            Description
-                                        </p>
-                                        <p className="whitespace-pre-wrap">
-                                            {document.description}
-                                        </p>
-                                    </div>
+                                ) : (
+                                    <span className="text-muted-foreground">
+                                        No description
+                                    </span>
                                 )}
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">
-                                            Mime type
-                                        </p>
-                                        <p>{document.mime_type ?? '—'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">
-                                            Status
-                                        </p>
-                                        <Badge
-                                            className={
-                                                document.is_current
-                                                    ? (statusColors.approved ??
-                                                      '')
-                                                    : (statusColors.archived ??
-                                                      '')
-                                            }
-                                        >
-                                            {document.is_current
-                                                ? 'Current'
-                                                : 'Archived'}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                            </DetailItem>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <DetailItem label="Format">
+                                    {document.format_label}
+                                </DetailItem>
+                                <DetailItem label="Size">{size || '—'}</DetailItem>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                    <div className="space-y-3">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">
-                                    Metadata
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3 text-sm">
-                                <div>
-                                    <p className="text-xs text-muted-foreground">
-                                        Uploaded by
-                                    </p>
-                                    <p className="font-medium">
-                                        {document.uploaded_by?.name ??
-                                            'Unknown'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground">
-                                        Created
-                                    </p>
-                                    <p>{document.created_at}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground">
-                                        Last updated
-                                    </p>
-                                    <p>{document.updated_at}</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {canManage && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Actions
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <Button
-                                        variant="outline"
-                                        className="w-full"
-                                        onClick={() => {
-                                            if (
-                                                confirm('Remove this document?')
-                                            ) {
-                                                const form =
-                                                    window.document.createElement(
-                                                        'form',
-                                                    );
-                                                form.method = 'POST';
-                                                form.action = `/governance/documents/${document.id}`;
-                                                const csrf =
-                                                    window.document.querySelector<HTMLMetaElement>(
-                                                        'meta[name="csrf-token"]',
-                                                    )?.content ?? '';
-                                                const token =
-                                                    window.document.createElement(
-                                                        'input',
-                                                    );
-                                                token.type = 'hidden';
-                                                token.name = '_token';
-                                                token.value = csrf;
-                                                const method =
-                                                    window.document.createElement(
-                                                        'input',
-                                                    );
-                                                method.type = 'hidden';
-                                                method.name = '_method';
-                                                method.value = 'DELETE';
-                                                form.appendChild(token);
-                                                form.appendChild(method);
-                                                window.document.body.appendChild(
-                                                    form,
-                                                );
-                                                form.submit();
-                                            }
-                                        }}
-                                    >
-                                        Remove document
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-4">
+                            <DetailItem label="Uploaded by">
+                                <span className="font-medium">
+                                    {document.uploaded_by?.name ?? 'Not recorded'}
+                                </span>
+                            </DetailItem>
+                            <DetailItem label="Added">
+                                {formatDateTimeLong(document.created_at)}
+                            </DetailItem>
+                            <DetailItem label="Last updated">
+                                {formatDateLong(document.updated_at)}
+                            </DetailItem>
+                        </CardContent>
+                    </Card>
                 </div>
             </PageLayout>
+
+            <ConfirmDialog
+                open={confirmRemove}
+                onClose={() => setConfirmRemove(false)}
+                onConfirm={() =>
+                    router.delete(`/governance/documents/${document.id}`)
+                }
+                title="Remove this document?"
+                description={`“${document.title}” will be removed from Documents. Board members will no longer be able to open it.`}
+                confirmText="Remove document"
+            />
         </AppLayout>
     );
 }

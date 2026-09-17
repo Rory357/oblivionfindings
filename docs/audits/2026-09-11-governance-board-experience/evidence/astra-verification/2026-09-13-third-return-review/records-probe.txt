@@ -1,0 +1,13 @@
+{
+    "checked_at": "2026-09-13T04:55:41+00:00",
+    "database": "oblivion_gov_review3_runtime_20260913_22816",
+    "cases": {
+        "records_ignores_explicit_document_capability_denial": {
+            "home_permission": true,
+            "documents_permission": false,
+            "records_status": 200,
+            "title_disclosed": true,
+            "direct_status": 403
+        }
+    }
+}

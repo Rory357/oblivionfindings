@@ -22,17 +22,34 @@ interface Props extends PageProps {
     events?: CalendarEvent[];
 }
 
-export default function ComplianceCalendar({ events = [] }: Props) {
+/**
+ * Compliance calendar — the canonical Site Calendar (DESIGN.md "Calendars —
+ * always the Site Calendar style") fed through the Governance data adapter.
+ * SiteCalendar owns the Event Horizon header, its five-view rail and source
+ * filters; this page only supplies the adapter and the Home-rooted trail.
+ */
+export default function ComplianceCalendar({ auth }: Props) {
+    const canManage = Boolean(auth?.can?.governance?.compliance?.manage);
+
     const adapter = useMemo(
-        () =>
-            createGovernanceCalendarAdapter({
+        () => ({
+            ...createGovernanceCalendarAdapter({
                 title: 'Compliance calendar',
                 subline:
-                    'Statutory obligations, reviews, and renewals across frameworks',
+                    'When legal, standards and funding requirements are due',
                 initialSources: ['obligations'],
                 sourceFilters: GOVERNANCE_CALENDAR_SOURCES,
             }),
-        [],
+            searchPlaceholder: 'Search requirements…',
+            // The requirement wizard lives on the register; this deep link opens it.
+            primaryAction: canManage
+                ? {
+                      href: '/governance/compliance?create=1',
+                      label: 'Add requirement',
+                  }
+                : undefined,
+        }),
+        [canManage],
     );
 
     return (
@@ -44,7 +61,7 @@ export default function ComplianceCalendar({ events = [] }: Props) {
                 { title: 'Calendar', href: '/governance/compliance/calendar' },
             ]}
         >
-            <Head title="Compliance Calendar" />
+            <Head title="Compliance calendar" />
             <SiteCalendar
                 context="page"
                 scope="global"

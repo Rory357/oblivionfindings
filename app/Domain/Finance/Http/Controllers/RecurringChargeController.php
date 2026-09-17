@@ -83,6 +83,9 @@ class RecurringChargeController extends Controller
                 'active' => (clone $baseQuery)
                     ->where('is_active', true)
                     ->count(),
+                'inactive' => (clone $baseQuery)
+                    ->where('is_active', false)
+                    ->count(),
                 'monthly_total' => (float) (clone $baseQuery)
                     ->where('is_active', true)
                     ->sum('amount'),

@@ -1,0 +1,23 @@
+Browser tab: 2, Title: "Review September Board - Laravel", URL: "http://127.0.0.1:8783/governance/meetings/1?tab=resolutions".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 110-114
+~1 AXWebArea Review September Board - Laravel, URL: 127.0.0.1:8783/governance/meetings/1?tab=resolutions
+~		3 link Description: Skip to main content, Value: 127.0.0.1:8783/governance/meetings/1?tab=resolutions#main-content
+~				79 link Description: View workflow, Value: 127.0.0.1:8783/governance/meetings/1?tab=resolutions#tab-workflow
+~				80 link Description: View quorum, Value: 127.0.0.1:8783/governance/meetings/1?tab=resolutions#tab-attendance
+~				81 link Description: View agenda, Value: 127.0.0.1:8783/governance/meetings/1?tab=resolutions#tab-agenda
+~				82 link Description: View resolutions, Value: 127.0.0.1:8783/governance/meetings/1?tab=resolutions#tab-resolutions
+~				105 tab (selectable, settable, boolean) Agenda (0), ID: radix-_r_l_-trigger-agenda, Value: 0
+Agenda (0)
+~				108 tab (selected, settable, boolean) Resolutions (1), ID: radix-_r_l_-trigger-resolutions, Value: 1
+Resolutions (1)
++			116 container Description: Resolutions (1), ID: radix-_r_l_-content-resolutions
++				117 text Resolutions
++				118 button New Resolution
++					119 image
++					120 text New Resolution
++				121 text Review equipment renewal
++				122 text RES-5FZ0CX
++				123 text draft
++				124 link Description: View →, Value: 127.0.0.1:8783/governance/resolutions/1
+The focused UI element is 82 link Description: View resolutions, URL: 127.0.0.1:8783/governance/meetings/1?tab=resolutions#tab-resolutions

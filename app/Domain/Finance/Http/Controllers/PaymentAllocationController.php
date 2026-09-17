@@ -36,6 +36,19 @@ class PaymentAllocationController extends Controller
             'correction_policy' => 'journal_backed_correction_only',
         ];
 
+        // Per-type headline figures for the header meters (server totals, not
+        // page-local sums).
+        $typeTotals = [];
+        foreach (['receivable', 'payable'] as $type) {
+            $typeQuery = (clone $query)->where('type', $type);
+            $typeTotals[$type] = [
+                'count' => in_array($type, $permittedTypes, true) ? (clone $typeQuery)->count() : 0,
+                'total_amount' => in_array($type, $permittedTypes, true)
+                    ? (float) (clone $typeQuery)->sum('amount')
+                    : 0.0,
+            ];
+        }
+
         $query->with('allocatable')->orderByDesc('payment_date');
 
         if ($request->filled('type')) {
@@ -45,7 +58,7 @@ class PaymentAllocationController extends Controller
             ));
         }
 
-        $allocations = $query->paginate(20)->through(fn (FinPaymentAllocation $alloc) => [
+        $allocations = $query->paginate(20)->withQueryString()->through(fn (FinPaymentAllocation $alloc) => [
             'id' => $alloc->id,
             'type' => $alloc->type,
             'payment_date' => $alloc->payment_date->toDateString(),
@@ -64,6 +77,7 @@ class PaymentAllocationController extends Controller
             'filters' => [
                 'type' => $request->input('type', ''),
             ],
+            'typeTotals' => $typeTotals,
             'legacyReview' => $legacyReview,
         ]);
     }

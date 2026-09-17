@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\BindsItBrowserActor;
 use App\Models\ItMajorIncident;
 use App\Models\ItTicket;
 use Illuminate\Foundation\Http\FormRequest;
@@ -9,14 +10,18 @@ use Illuminate\Validation\Rule;
 
 class StoreItMajorIncidentRequest extends FormRequest
 {
+    use BindsItBrowserActor;
+
     public function authorize(): bool
     {
-        return (bool) $this->user()?->canDo('it.manage');
+        return $this->hasCurrentBrowserActor() && (bool) $this->user()?->canDo('it.manage');
     }
 
     public function rules(): array
     {
         return [
+            ...$this->browserActorRules(),
+            'wizard' => ['sometimes', 'boolean'],
             'title' => ['required', 'string', 'max:255'], 'description' => ['nullable', 'string', 'max:10000'],
             'category' => ['required', Rule::in(ItTicket::CATEGORIES)], 'priority' => ['required', Rule::in(ItTicket::PRIORITIES)],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'], 'is_organisation_wide' => ['nullable', 'boolean'],

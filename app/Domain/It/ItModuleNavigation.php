@@ -3,6 +3,7 @@
 namespace App\Domain\It;
 
 use App\Models\User;
+use App\Services\Sites\SiteCredentialAccess;
 
 final class ItModuleNavigation
 {
@@ -19,8 +20,9 @@ final class ItModuleNavigation
         $canOpenIntegrations = $canOpenSecurityDevices
             && $user->canDo('securityDevices.integrations.view');
         $canEditSla = $canManage && $user->hasRole('admin');
+        $registers = self::registerCapabilities($user);
 
-        if (! $canView && ! $canRequest && ! $canKnowledge) {
+        if (! $canView && ! $canRequest && ! $canKnowledge && ! in_array(true, $registers, true)) {
             return [];
         }
 
@@ -39,7 +41,7 @@ final class ItModuleNavigation
                     $canRequest
                         ? self::item('Service catalogue', '/it?tab=catalog', 'book-open')
                         : null,
-                    self::item('Provisioning', '/it?tab=provisioning', 'package-check'),
+                    self::item('Provisioning', '/it/provisioning', 'package-check'),
                     self::item('Work planning', '/it/work', 'calendar-clock'),
                     self::item('Knowledge & Documentation', '/it/knowledge', 'library'),
                     self::item('Reports', '/it/reports', 'chart-no-axes-column'),
@@ -72,7 +74,27 @@ final class ItModuleNavigation
             ];
         }
 
-        return $groups;
+        $groups[] = [
+            'label' => 'Vendors & access',
+            'items' => array_values(array_filter([
+                $registers['vendors'] || $registers['credentials'] || $registers['contracts']
+                    ? self::item('Vendors & Credentials', $registers['vendors'] ? '/vendors?tab=vendors' : ($registers['credentials'] ? '/vendors?tab=credentials' : '/vendors'), 'package')
+                    : null,
+            ])),
+        ];
+
+        return array_values(array_filter($groups, fn (array $group) => $group['items'] !== []));
+    }
+
+    /** Metadata discovery only; reveal, copy and commercial rights remain record-specific. */
+    public static function registerCapabilities(User $user): array
+    {
+        return [
+            'vendors' => $user->isApproved() && $user->canDo('vendors.view'),
+            'contracts' => app(\App\Services\Sites\VendorCommercialAccess::class)->capable($user),
+            'credentials' => $user->isApproved() && ($user->canDo('credentials.view')
+                || app(SiteCredentialAccess::class)->query($user, 'view')->exists()),
+        ];
     }
 
     /** @return array{label: string, href: string, icon: string} */

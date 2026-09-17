@@ -9,6 +9,7 @@ import {
 } from '@/components/it/ticket-comment-delivery';
 import { TicketReplyComposer } from '@/components/it/ticket-reply-composer';
 import { ticketWatcherActivity } from '@/components/it/ticket-watcher-activity';
+import type { TicketWork } from '@/components/it/ticket-work-types';
 import { Button } from '@/components/ui/button';
 import { formatFileSize, StagedFileCard } from '@/components/ui/file-dropzone';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -52,6 +53,8 @@ export interface ThreadAttachment {
     name: string;
     size: number;
     url: string;
+    catalogue_field_label?: string;
+    is_internal?: boolean;
 }
 
 export interface ThreadComment {
@@ -151,10 +154,19 @@ function AttachmentChips({ attachments }: { attachments: ThreadAttachment[] }) {
                     href={a.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-card px-2 py-1 text-[11.5px] font-semibold text-primary hover:border-primary/50"
+                    className="frontline-focus inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-card px-2 py-1 text-[11.5px] font-semibold text-primary hover:border-primary/50"
                 >
                     <Paperclip className="h-3 w-3 flex-none" />
                     <span className="min-w-0 truncate">{a.name}</span>
+                    {a.is_internal && (
+                        <StatusBadge variant="warning">Internal</StatusBadge>
+                    )}
+                    {a.catalogue_field_label && (
+                        <span className="sr-only">
+                            {' '}
+                            · {a.catalogue_field_label}
+                        </span>
+                    )}
                     <span className="flex-none text-muted-foreground">
                         {formatFileSize(a.size)}
                     </span>
@@ -345,6 +357,7 @@ function eventIcon(type: string) {
 }
 
 export function TicketThread({
+    ticketWork,
     ticketId,
     requesterName,
     description,
@@ -367,6 +380,7 @@ export function TicketThread({
     conversationReady = false,
     draftsEnabled = false,
 }: {
+    ticketWork?: TicketWork | null;
     ticketId: number;
     actorId?: number;
     expectedVersion?: number;
@@ -572,6 +586,8 @@ export function TicketThread({
                                 {visibleComments.map((c) => (
                                     <div
                                         key={c.id}
+                                        id={`ticket-comment-${c.id}`}
+                                        tabIndex={-1}
                                         className={
                                             c.is_internal
                                                 ? 'rounded-xl border border-border/60 bg-accent/50 px-3.5 py-2.5'
@@ -869,6 +885,8 @@ export function TicketThread({
                 expectedVersion !== undefined && (
                     <div hidden={lane !== 'conversation'}>
                         <TicketReplyComposer
+                            modal
+                            ticketWork={canInternal ? ticketWork : null}
                             actorId={actorId}
                             ticketId={ticketId}
                             expectedVersion={expectedVersion}

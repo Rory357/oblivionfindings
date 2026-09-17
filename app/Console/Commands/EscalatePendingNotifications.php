@@ -2,8 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\ClientIncident;
-use App\Models\IncidentFollowup;
 use App\Models\NotificationEscalationRule;
 use App\Models\Timesheet;
 use App\Models\User;
@@ -32,6 +30,7 @@ use Illuminate\Support\Carbon;
 class EscalatePendingNotifications extends Command
 {
     protected $signature = 'notifications:escalate';
+
     protected $description = 'Re-notify pending workflow notifications based on admin-configured escalation rules.';
 
     /**
@@ -53,6 +52,7 @@ class EscalatePendingNotifications extends Command
         $rules = NotificationEscalationRule::query()->where('enabled', true)->get();
         if ($rules->isEmpty()) {
             $this->info('No escalation rules enabled.');
+
             return self::SUCCESS;
         }
 
@@ -64,6 +64,7 @@ class EscalatePendingNotifications extends Command
             // Skip operational event keys — these are now escalated by Control Room
             if ($this->isOperationalEventKey($rule->event_key)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -71,6 +72,7 @@ class EscalatePendingNotifications extends Command
         }
 
         $this->info("Escalation run complete. Sent {$sent} reminders. Skipped {$skipped} operational rules (handled by Control Room).");
+
         return self::SUCCESS;
     }
 
@@ -112,7 +114,9 @@ class EscalatePendingNotifications extends Command
         });
 
         $pending = $q->limit(200)->get();
-        if ($pending->isEmpty()) return 0;
+        if ($pending->isEmpty()) {
+            return 0;
+        }
 
         $sent = 0;
         foreach ($pending as $n) {
@@ -121,23 +125,24 @@ class EscalatePendingNotifications extends Command
                     'last_escalated_at' => $now,
                     'escalation_count' => (int) $n->escalation_count,
                 ])->save();
+
                 continue;
             }
 
             $payload = is_array($n->data) ? $n->data : (array) $n->data;
             $payload['is_reminder'] = true;
             $payload['reminder_number'] = ((int) $n->escalation_count) + 1;
-            $payload['title'] = 'Reminder: ' . (string) ($payload['title'] ?? 'Notification');
+            $payload['title'] = 'Reminder: '.(string) ($payload['title'] ?? 'Notification');
 
             $payload['context'] = array_merge((array) ($payload['context'] ?? []), [
-                'Reminder' => '#' . $payload['reminder_number'],
+                'Reminder' => '#'.$payload['reminder_number'],
             ]);
 
             $reminderNumber = ((int) $payload['reminder_number']);
 
             $recipients = $this->resolveEscalationRecipients($n, $rule, $reminderNumber);
 
-            if (!$rule->force_delivery) {
+            if (! $rule->force_delivery) {
                 $svc = app(NotificationService::class);
                 $recipients = $svc->applyPreferences($recipients, (string) $rule->event_key);
             }
@@ -165,11 +170,14 @@ class EscalatePendingNotifications extends Command
         $eventKey = (string) ($data['event_key'] ?? '');
         $entityId = $data['entity_id'] ?? null;
 
-        if (!$entityId) return false;
+        if (! $entityId) {
+            return false;
+        }
 
         // Timesheets: stop if approved/rejected
         if (str_starts_with($eventKey, 'timesheets.')) {
             $t = Timesheet::query()->find($entityId);
+
             return $t && in_array($t->status, ['approved', 'rejected'], true);
         }
 
@@ -180,7 +188,7 @@ class EscalatePendingNotifications extends Command
     {
         $ids = collect();
 
-        if (!empty($n->notifiable_id) && $n->notifiable_type === User::class) {
+        if (! empty($n->notifiable_id) && $n->notifiable_type === User::class) {
             $ids->push((int) $n->notifiable_id);
         }
 
@@ -191,11 +199,13 @@ class EscalatePendingNotifications extends Command
         }
 
         $tiers = (array) ($rule->tiers ?? []);
-        if (!empty($tiers)) {
+        if (! empty($tiers)) {
             usort($tiers, fn ($a, $b) => ((int) ($a['from_reminder'] ?? 0)) <=> ((int) ($b['from_reminder'] ?? 0)));
             foreach ($tiers as $t) {
                 $from = (int) ($t['from_reminder'] ?? 0);
-                if ($from <= 0) continue;
+                if ($from <= 0) {
+                    continue;
+                }
                 if ($reminderNumber >= $from) {
                     foreach ((array) ($t['role_groups'] ?? []) as $g) {
                         $ids = $ids->merge($svc->resolveRoleGroupUserIds((string) $g));
@@ -205,7 +215,9 @@ class EscalatePendingNotifications extends Command
         }
 
         $ids = $ids->unique()->values();
-        if ($ids->isEmpty()) return collect();
+        if ($ids->isEmpty()) {
+            return collect();
+        }
 
         return User::query()->whereIn('id', $ids)->get();
     }

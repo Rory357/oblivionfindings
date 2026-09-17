@@ -1,0 +1,17 @@
+{
+  "limitation": "Own build43671 failed during overlapping route generation; independent producer exited before an exit code could be captured. This records asset verification, not a passed build command.",
+  "captured_at": "2026-09-12T20:48:38.5251829+12:00",
+  "it_page": "assets/index-BIyvu8Rq.js",
+  "source_23_design_10_unchanged": true,
+  "app": "assets/app-BaqjEZHw.js",
+  "producer_exit_observed": false,
+  "vite_config_sha256": "f026a83cb632177ab885af1919635ac6e5ae53fae54ad42b83fe19ba0cbf053a",
+  "manifest_sha256": "565a595d3a460d4b8e1932d2bb403e720c259f912d969fabc6010450ed7da7f4",
+  "all_manifest_assets_exist": true,
+  "manifest_written_at": "2026-09-12T20:46:57.0716754+12:00",
+  "producer_pid": 26296,
+  "producer_exit_code": null,
+  "producer_start_utc": "2026-09-12T08:42:53.3019539Z",
+  "asset_count": 1552,
+  "producer_no_longer_running": true
+}

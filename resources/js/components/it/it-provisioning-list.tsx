@@ -16,6 +16,7 @@ import { Link } from '@inertiajs/react';
 import { Server } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { RequestRow } from './it-wizards';
+import { ProvisioningRequestFiles } from './provisioning-request-files';
 
 const label = (value: string) =>
     value.replace(/_/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase());
@@ -197,9 +198,17 @@ export function ItProvisioningList({
                         { key: 'due', label: 'Due', width: '1fr', cell: due },
                         {
                             key: 'linked',
-                            label: 'Ticket',
+                            label: 'Linked records',
                             width: '.8fr',
-                            cell: linked,
+                            cell: (row) => (
+                                <div className="flex flex-col items-start gap-1">
+                                    {linked(row)}
+                                    <ProvisioningRequestFiles
+                                        item={row.item}
+                                        files={row.attachments}
+                                    />
+                                </div>
+                            ),
                         },
                     ]}
                     actionsFor={actionsFor}
@@ -267,6 +276,10 @@ export function ItProvisioningList({
                                         </span>
                                     )}
                                     {linked(row)}
+                                    <ProvisioningRequestFiles
+                                        item={row.item}
+                                        files={row.attachments}
+                                    />
                                 </>
                             }
                             footer={{

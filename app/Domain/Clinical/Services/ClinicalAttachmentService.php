@@ -15,6 +15,7 @@ use Illuminate\Http\UploadedFile;
 class ClinicalAttachmentService
 {
     public const DISK = 'public';
+
     public const DIRECTORY = 'clinical_attachments';
 
     /**

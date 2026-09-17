@@ -18,6 +18,7 @@ use DomainException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 final class ItProvisioningWorkflowService
@@ -26,6 +27,10 @@ final class ItProvisioningWorkflowService
     {
         if (! in_array($lifecycleType, ItProvisioningTemplate::LIFECYCLE_TYPES, true)) {
             throw new DomainException('Unsupported provisioning lifecycle type.');
+        }
+
+        if (Schema::hasColumn('it_provisioning_templates', 'published_version_id')) {
+            return app(ItProvisioningTemplatePublicationService::class)->resolve($profile, $lifecycleType, $lock);
         }
 
         return ItProvisioningTemplate::query()
@@ -66,6 +71,8 @@ final class ItProvisioningWorkflowService
         array $changes = [],
         ?HrOnboardingChecklist $onboardingChecklist = null,
         ?HrOffboardingChecklist $offboardingChecklist = null,
+        ?int $templateVersionId = null,
+        bool $retainedCatalogueVersion = false,
     ): ItProvisioningWorkflow {
         $sourceEventKey = trim($sourceEventKey);
         if ($sourceEventKey === '' || strlen($sourceEventKey) > 191) {
@@ -76,6 +83,8 @@ final class ItProvisioningWorkflowService
             ->where('source_event_key', $sourceEventKey)
             ->first();
         if ($existing) {
+            $this->assertSource($existing, $profile, $lifecycleType, $sourceType, $sourceId);
+
             return $this->loaded($existing);
         }
 
@@ -90,25 +99,46 @@ final class ItProvisioningWorkflowService
             $changes,
             $onboardingChecklist,
             $offboardingChecklist,
+            $templateVersionId,
+            $retainedCatalogueVersion,
         ): ItProvisioningWorkflow {
+            $profile = HrEmployeeProfile::query()->whereKey($profile->id)->lockForUpdate()->firstOrFail();
             $locked = ItProvisioningWorkflow::query()
                 ->where('source_event_key', $sourceEventKey)
                 ->lockForUpdate()
                 ->first();
             if ($locked) {
+                $this->assertSource($locked, $profile, $lifecycleType, $sourceType, $sourceId);
+
                 return $this->loaded($locked);
+            }
+
+            if ($lifecycleType === 'mover' && in_array($sourceType, ['manual', 'catalogue'], true)) {
+                $changes = $this->moverChanges($profile, User::query()->findOrFail($actorId));
             }
 
             // Resolve and copy under the same parent locks used by template
             // editing; an edit cannot replace tasks halfway through launch.
-            $template = $this->resolveTemplate($profile, $lifecycleType, lock: true);
+            $publication = app(ItProvisioningTemplatePublicationService::class);
+            $lifecycleReady = app(ItProvisioningReadinessService::class)->storageReady();
+            $template = $templateVersionId !== null
+                ? $publication->resolve($profile, $lifecycleType, true, $templateVersionId, $retainedCatalogueVersion)
+                : $this->resolveTemplate($profile, $lifecycleType, lock: true);
             if (! $template) {
-                throw new DomainException("No active {$lifecycleType} provisioning template matches this employee.");
+                throw new DomainException("No published {$lifecycleType} provisioning template matches this employee. Review the saved template and its approved Site.");
             }
-            $version = app(ItProvisioningTemplateVersionService::class)->current($template);
+            $version = $lifecycleReady ? $template->publishedVersion : app(ItProvisioningTemplateVersionService::class)->current($template);
+            if (! $version) {
+                throw new DomainException('The published template version is unavailable.');
+            }
             $profile->loadMissing(['primarySite:id,name', 'user:id,name,email', 'manager:id,name']);
-            $effective = $this->effectiveAt($profile, $lifecycleType, $effectiveAt, $offboardingChecklist);
+            $effective = match (true) {
+                $onboardingChecklist !== null && $profile->start_date === null => null,
+                $offboardingChecklist !== null && $offboardingChecklist->due_date === null => null,
+                default => $this->effectiveAt($profile, $lifecycleType, $effectiveAt, $offboardingChecklist),
+            };
             $safeChanges = array_intersect_key($changes, array_flip(ItProvisioningTemplateTask::TRIGGER_FIELDS));
+            $fallback = $lifecycleReady ? app(ItProvisioningResponsibilityService::class)->fallback($profile->primary_site_id) : [];
 
             $workflow = ItProvisioningWorkflow::query()->create([
                 'employee_profile_id' => $profile->id,
@@ -125,11 +155,19 @@ final class ItProvisioningWorkflowService
                 'employment_type_snapshot' => $profile->employment_type,
                 'changes' => $safeChanges,
                 'created_by_user_id' => $actorId,
+                ...($lifecycleReady ? ['lock_version' => 1, 'original_effective_at' => $effective,
+                    'owner_user_id' => $fallback['owner']?->id, 'cover_user_id' => $fallback['cover']?->id] : []),
             ]);
 
-            $tasks = $template->tasks
+            $tasks = ($lifecycleReady ? $publication->tasks($version) : $template->tasks)
                 ->filter(fn (ItProvisioningTemplateTask $task) => $this->appliesToChanges($task, $lifecycleType, $safeChanges))
                 ->values();
+            $taskKeys = $tasks->pluck('task_key')->all();
+            foreach ($tasks as $task) {
+                if (array_diff($task->dependency_task_keys ?? [], $taskKeys) !== []) {
+                    throw new DomainException('The mover filters exclude a required prerequisite. Review the template dependency and trigger rules before launching work.');
+                }
+            }
             $created = collect();
             foreach ($tasks as $task) {
                 $created->put($task->task_key, $this->createRequest(
@@ -175,6 +213,7 @@ final class ItProvisioningWorkflowService
                 'template_id' => $template->id,
                 'template_version_id' => $version->id,
                 'request_count' => $workflow->requests()->count(),
+                'responsibility_gap' => $fallback['gap'] ?? null,
             ]);
 
             return $this->loaded($workflow);
@@ -265,6 +304,37 @@ final class ItProvisioningWorkflowService
         );
     }
 
+    private function moverChanges(HrEmployeeProfile $profile, User $actor): array
+    {
+        $access = app(ItProvisioningAccessService::class);
+        $baselineQuery = ItProvisioningWorkflow::query()->where('employee_profile_id', $profile->id);
+        if ($actor->canDo('it.manage')) {
+            $access->applyWorkflowScope($baselineQuery, $actor);
+        } elseif ((int) $profile->user_id === (int) $actor->id && $access->canRequestForProfile($actor, $profile)) {
+            // A self-service catalogue request can compare its own Site-bound
+            // context without exposing the technician workspace or task notes.
+            $baselineQuery->whereIn('site_id_snapshot', app(ItWorkAccessService::class)->approvedSiteIds($actor));
+        } else {
+            $baselineQuery->whereRaw('1 = 0');
+        }
+        $baseline = $baselineQuery->whereIn('lifecycle_type', ['joiner', 'mover'])
+            ->whereNull('cancelled_at')->latest('id')->first();
+        if (! $baseline) {
+            throw new DomainException('No accessible original provisioning context exists for this employee. Start mover work through the canonical HR profile change.');
+        }
+        $changes = [];
+        foreach (['position_role' => 'role_snapshot', 'primary_site_id' => 'site_id_snapshot', 'employment_type' => 'employment_type_snapshot'] as $field => $snapshot) {
+            if ((string) $baseline->{$snapshot} !== (string) $profile->{$field}) {
+                $changes[$field] = ['from' => $baseline->{$snapshot}, 'to' => $profile->{$field}];
+            }
+        }
+        if ($changes === []) {
+            throw new DomainException('The recorded role, Site and employment context already match HR. Use a service request for additional access or corrective work.');
+        }
+
+        return $changes;
+    }
+
     private function specificity(ItProvisioningTemplate $template, HrEmployeeProfile $profile): int
     {
         return ($template->position_role === $profile->position_role ? 4 : 0)
@@ -293,7 +363,7 @@ final class ItProvisioningWorkflowService
         ItProvisioningTemplateTask $task,
         HrEmployeeProfile $profile,
         int $actorId,
-        CarbonInterface $effectiveAt,
+        ?CarbonInterface $effectiveAt,
         ?HrOnboardingChecklist $onboardingChecklist,
         ?HrOffboardingChecklist $offboardingChecklist,
         array $changes,
@@ -318,9 +388,10 @@ final class ItProvisioningWorkflowService
             'fulfiller_context' => $this->fulfillerContext($profile, $task->fulfiller_fields ?? [], $changes),
             'status' => 'pending',
             'priority' => 'normal',
-            'due_date' => $effectiveAt->copy()->addDays($task->due_offset_days)->toDateString(),
+            'due_date' => $effectiveAt?->copy()->addDays($task->due_offset_days)->toDateString(),
             'notes' => $task->description,
             'created_by' => $actorId,
+            ...(array_key_exists('lock_version', $workflow->getAttributes()) ? ['due_offset_days' => $task->due_offset_days] : []),
         ]);
     }
 
@@ -328,7 +399,7 @@ final class ItProvisioningWorkflowService
         ItProvisioningWorkflow $workflow,
         HrEmployeeProfile $profile,
         int $actorId,
-        CarbonInterface $effectiveAt,
+        ?CarbonInterface $effectiveAt,
         ?HrOffboardingChecklist $checklist,
     ): void {
         if (! $profile->user_id) {
@@ -381,7 +452,8 @@ final class ItProvisioningWorkflowService
                     'canonical_target_id' => $assignment->id,
                     'status' => 'pending',
                     'priority' => 'high',
-                    'due_date' => $effectiveAt->toDateString(),
+                    'due_date' => $effectiveAt?->toDateString(),
+                    ...(array_key_exists('lock_version', $workflow->getAttributes()) ? ['due_offset_days' => 0] : []),
                     'created_by' => $actorId,
                 ]);
             });
@@ -423,7 +495,8 @@ final class ItProvisioningWorkflowService
                     'canonical_target_id' => $assignment->id,
                     'status' => 'pending',
                     'priority' => 'high',
-                    'due_date' => $effectiveAt->toDateString(),
+                    'due_date' => $effectiveAt?->toDateString(),
+                    ...(array_key_exists('lock_version', $workflow->getAttributes()) ? ['due_offset_days' => 0] : []),
                     'created_by' => $actorId,
                 ]);
             });
@@ -494,5 +567,13 @@ final class ItProvisioningWorkflowService
             'employeeProfile.user:id,name,email',
             'requests.responsibleTeam:id,name',
         ]);
+    }
+
+    private function assertSource(ItProvisioningWorkflow $workflow, HrEmployeeProfile $profile, string $lifecycle, string $sourceType, int $sourceId): void
+    {
+        if ((int) $workflow->employee_profile_id !== (int) $profile->id || $workflow->lifecycle_type !== $lifecycle
+            || $workflow->source_type !== $sourceType || (int) $workflow->source_id !== $sourceId) {
+            throw new DomainException('This source event already belongs to a different employee or lifecycle.');
+        }
     }
 }

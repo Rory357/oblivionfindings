@@ -3,6 +3,12 @@
 namespace App\Domain\Governance\Support;
 
 use App\Domain\Governance\Models\BoardPack;
+use App\Domain\Governance\Models\CeoBoardReport;
+use App\Domain\Governance\Models\GovernanceDocument;
+use App\Domain\Governance\Models\Resolution;
+use App\Domain\Governance\Services\GovernanceRecordAccessService;
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 
 class BoardPackPresenter
 {
@@ -25,6 +31,92 @@ class BoardPackPresenter
                 'download_rate' => $recipientCount > 0 ? round(($downloadCount / $recipientCount) * 100, 1) : 0,
             ],
         ];
+    }
+
+    /**
+     * The pack as a reader sees it: each section in order, with a link to the
+     * live record wherever this viewer is allowed to open it (the CEO report,
+     * each resolution, each supporting document). Records the viewer can't
+     * open are listed by title only — never linked.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function readingSections(BoardPack $pack, User $viewer): array
+    {
+        $manifest = $pack->document_manifest ?? [];
+        $content = $manifest['content_sections'] ?? $manifest['content'] ?? [];
+        if (! is_array($content)) {
+            return [];
+        }
+
+        $access = app(GovernanceRecordAccessService::class);
+        $sections = [];
+
+        foreach ($content as $key => $section) {
+            $key = is_string($key) ? $key : (is_array($section) ? (string) ($section['id'] ?? 'section') : 'section');
+            $row = [
+                'key' => $key,
+                'title' => $this->sectionTitle($key, $section),
+                'summary' => $this->sectionSummary($key, $section),
+                'href' => null,
+                'items' => [],
+            ];
+
+            if ($key === 'ceo_report' && $pack->governance_meeting_id) {
+                $report = CeoBoardReport::query()->where('governance_meeting_id', $pack->governance_meeting_id)->first();
+                if ($report && Gate::forUser($viewer)->allows('view', $report)) {
+                    $row['href'] = "/governance/ceo-reports/{$report->id}";
+                }
+            }
+
+            if ($key === 'resolutions') {
+                $items = $this->items($section);
+                $ids = collect($items)->pluck('id')->filter(fn ($id) => is_numeric($id))->map(fn ($id) => (int) $id)->all();
+                $records = Resolution::query()->with('meeting')->whereIn('id', $ids)->get()->keyBy('id');
+
+                $row['items'] = collect($items)->map(function ($item) use ($records, $access, $viewer) {
+                    $id = is_numeric($item['id'] ?? null) ? (int) $item['id'] : null;
+                    $record = $id !== null ? $records->get($id) : null;
+                    $canOpen = $record && $access->canViewResolution($viewer, $record);
+
+                    return [
+                        'title' => (string) ($item['title'] ?? 'Resolution'),
+                        'reference' => $item['reference'] ?? null,
+                        'href' => $canOpen ? "/governance/resolutions/{$record->id}" : null,
+                    ];
+                })->values()->all();
+            }
+
+            if ($key === 'supporting_documents') {
+                $items = $this->items($section);
+                $ids = collect($items)->pluck('id')->filter(fn ($id) => is_numeric($id))->map(fn ($id) => (int) $id)->all();
+                $records = GovernanceDocument::query()->whereIn('id', $ids)->get()->keyBy('id');
+
+                $row['items'] = collect($items)->map(function ($item) use ($records, $access, $viewer) {
+                    $id = is_numeric($item['id'] ?? null) ? (int) $item['id'] : null;
+                    $record = $id !== null ? $records->get($id) : null;
+                    $canOpen = $record && $access->canViewDocument($viewer, $record);
+
+                    return [
+                        'title' => (string) ($item['title'] ?? 'Document'),
+                        'reference' => null,
+                        'href' => $canOpen ? "/governance/documents/{$record->id}" : null,
+                    ];
+                })->values()->all();
+            }
+
+            if ($key === 'committee_reports') {
+                $row['items'] = collect($this->items($section))->map(fn ($item) => [
+                    'title' => (string) ($item['name'] ?? $item['title'] ?? 'Committee'),
+                    'reference' => null,
+                    'href' => null,
+                ])->values()->all();
+            }
+
+            $sections[] = $row;
+        }
+
+        return $sections;
     }
 
     public function normalizeManifest(array $manifest): array
@@ -62,7 +154,7 @@ class BoardPackPresenter
                 ->filter(fn ($section) => is_array($section))
                 ->map(fn (array $section) => [
                     'id' => $section['id'] ?? 'section',
-                    'title' => $section['title'] ?? $this->sectionTitle($section['id'] ?? 'section'),
+                    'title' => $this->plainManifestTitle($section),
                     'type' => $section['type'] ?? 'auto',
                     'included' => (bool) ($section['included'] ?? true),
                 ])
@@ -105,35 +197,98 @@ class BoardPackPresenter
         };
     }
 
+    /**
+     * Stored manifests carry the titles written when the pack was built
+     * ("Cover & Meeting Overview", "Paper: …"); show the plain names instead.
+     */
+    protected function plainManifestTitle(array $section): string
+    {
+        $id = (string) ($section['id'] ?? 'section');
+        $stored = isset($section['title']) ? (string) $section['title'] : null;
+
+        if (str_starts_with($id, 'res_') || str_starts_with($id, 'doc_')) {
+            return $stored !== null ? (string) preg_replace('/^Paper:\s*/u', '', $stored) : 'Document';
+        }
+
+        return $this->sectionTitle($id, $stored !== null ? ['title' => $stored] : null);
+    }
+
     protected function sectionTitle(string $key, mixed $content = null): string
     {
         return match ($key) {
-            'cover' => 'Cover & Meeting Overview',
+            'cover' => 'Meeting details',
             'agenda' => 'Agenda',
-            'dashboard' => 'Executive Dashboard Snapshot',
-            'risk_report' => 'Risk Report',
-            'finance_report' => 'Financial Summary',
-            'ceo_report' => 'CEO Board Report',
-            'committee_reports' => 'Committee Updates',
-            'supporting_documents' => 'Supporting Documents',
-            'resolutions' => 'Decision Papers',
-            default => is_array($content) && isset($content['title']) ? $content['title'] : str($key)->replace('_', ' ')->title()->toString(),
+            'dashboard' => 'Organisation dashboard',
+            'risk_report' => 'Risk report',
+            'finance_report' => 'Finance summary',
+            'ceo_report' => 'CEO report',
+            'committee_reports' => 'Committee updates',
+            'supporting_documents' => 'Supporting documents',
+            'resolutions' => 'Resolutions',
+            default => is_array($content) && isset($content['title'])
+                ? GovernanceLabels::sentence((string) $content['title'])
+                : GovernanceLabels::humanise($key),
         };
     }
 
     protected function sectionSummary(string $key, mixed $content): string
     {
         return match ($key) {
-            'cover' => trim(($content['type'] ?? 'Board meeting') . ' ' . ($content['date'] ?? '')),
-            'agenda' => count($content ?? []) . ' agenda item(s)',
-            'dashboard' => count($content ?? []) . ' dashboard widget(s)',
-            'risk_report' => (string) (data_get($content, 'executive_summary.total_active', count(data_get($content, 'top_10_risks', []))) . ' active risks'),
-            'finance_report' => trim('Variance ' . ($content['variance'] ?? 'Unavailable')),
-            'ceo_report' => (string) ($content['status'] ?? 'Included'),
-            'committee_reports' => count($content['items'] ?? $content ?? []) . ' committee update(s)',
-            'supporting_documents' => count($content['items'] ?? $content ?? []) . ' supporting document(s)',
-            'resolutions' => count($content['items'] ?? $content ?? []) . ' pending resolution(s)',
-            default => is_array($content) ? count($content) . ' item(s)' : 'Included',
+            'cover' => trim(implode(' · ', array_filter([
+                is_array($content) ? ($content['type'] ?? null) : null,
+                is_array($content) ? ($content['date'] ?? null) : null,
+            ]))) ?: 'Meeting details',
+            'agenda' => $this->counted(is_array($content) ? count($content) : 0, 'agenda item', 'No agenda items'),
+            'dashboard' => $this->counted(is_array($content) ? count($content) : 0, 'figure from the organisation dashboard', 'No dashboard figures', 'figures from the organisation dashboard'),
+            'risk_report' => $this->counted(
+                (int) data_get($content, 'executive_summary.total_active', count(data_get($content, 'top_10_risks', []))),
+                'open risk',
+                'No open risks',
+            ),
+            'finance_report' => $this->financeSummary(is_array($content) ? $content : []),
+            'ceo_report' => is_array($content) && isset($content['status'])
+                ? GovernanceLabels::label('ceo_report_status', (string) $content['status'])
+                : 'Included',
+            'committee_reports' => $this->counted(count($this->items($content)), 'committee update', 'No committee updates'),
+            'supporting_documents' => $this->counted(count($this->items($content)), 'supporting document', 'No supporting documents'),
+            'resolutions' => $this->counted(count($this->items($content)), 'resolution', 'No resolutions'),
+            default => is_array($content) ? $this->counted(count($content), 'item', 'Nothing included') : 'Included',
         };
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    protected function items(mixed $content): array
+    {
+        if (! is_array($content)) {
+            return [];
+        }
+
+        $items = $content['items'] ?? $content;
+
+        return is_array($items) ? array_values(array_filter($items, 'is_array')) : [];
+    }
+
+    protected function financeSummary(array $content): string
+    {
+        $utilisation = $content['utilization'] ?? null;
+        if (is_string($utilisation) && $utilisation !== '' && $utilisation !== 'Unavailable') {
+            return "{$utilisation} of the budget spent";
+        }
+
+        $difference = $content['variance'] ?? null;
+        if (is_string($difference) && $difference !== '' && $difference !== 'Unavailable') {
+            return "Difference from budget: {$difference}";
+        }
+
+        return 'Budget figures not available';
+    }
+
+    protected function counted(int $count, string $one, string $none, ?string $many = null): string
+    {
+        if ($count === 0) {
+            return $none;
+        }
+
+        return GovernanceWording::count($count, $one, $many);
     }
 }

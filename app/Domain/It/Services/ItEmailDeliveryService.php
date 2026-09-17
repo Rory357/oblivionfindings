@@ -755,6 +755,11 @@ class ItEmailDeliveryService
                 && $this->workAccess->canView($recipient, $delivery->ticket);
         }
 
+        if ($delivery->notification_type === 'it_provisioning_update') {
+            return $delivery->provisioningRequest !== null
+                && app(ItProvisioningNotifier::class)->canReceive($delivery->provisioningRequest, $recipient, $delivery->notification_context ?? []);
+        }
+
         return $delivery->provisioningRequest !== null
             && $this->actorCanRetryLoadedDelivery($delivery, $recipient);
     }
@@ -825,6 +830,14 @@ class ItEmailDeliveryService
 
         if ($delivery->notification_type === 'it_email_configuration_test') {
             return new EmailConfigurationTestNotification((int) ($context['configuration_version'] ?? -1), $context['capture_mode'] ?? null);
+        }
+
+        if ($delivery->notification_type === 'it_provisioning_update') {
+            if (! $delivery->provisioningRequest) {
+                throw new DomainException('The provisioning request is no longer available.');
+            }
+
+            return app(ItProvisioningNotifier::class)->forRetry($delivery);
         }
 
         if ($delivery->notification_type === 'it_provisioning_cancelled') {

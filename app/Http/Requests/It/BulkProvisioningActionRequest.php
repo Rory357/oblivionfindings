@@ -26,6 +26,11 @@ class BulkProvisioningActionRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'actor_user_id' => ['required', 'integer', 'min:1'],
+            'expected_versions' => ['required', 'array', 'max:50'],
+            'expected_versions.*' => ['required', 'integer', 'min:1'],
+            'request_uuids' => ['required', 'array', 'max:50'],
+            'request_uuids.*' => ['required', 'uuid', 'distinct'],
             'ids' => ['required', 'array', 'min:1', 'max:50'],
             'ids.*' => ['integer', 'min:1', 'distinct'],
             'action' => ['required', Rule::in(['assign', 'fulfil'])],

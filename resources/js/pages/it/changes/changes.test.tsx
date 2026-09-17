@@ -24,13 +24,21 @@ vi.mock('@inertiajs/react', () => ({
         </a>
     ),
     router: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
-    usePage: () => ({ props: { itNavigation: [] }, url: '/it/changes' }),
+    usePage: () => ({
+        props: { itNavigation: [], auth: { user: { id: 7 } } },
+        url: '/it/changes',
+    }),
     useForm: (initial: Record<string, unknown>) => ({
         data: initial,
         setData: vi.fn(),
         post: vi.fn(),
         patch: vi.fn(),
         reset: vi.fn(),
+        resetAndClearErrors: vi.fn(),
+        setDefaults: vi.fn(),
+        clearErrors: vi.fn(),
+        transform: vi.fn(),
+        isDirty: false,
         processing: false,
         errors: {},
     }),
@@ -44,6 +52,7 @@ const ticket = {
     status: 'in_progress',
     workflow_state: 'scheduled',
     href: '/it/tickets/52',
+    lock_version: 1,
 };
 
 describe('IT change management workspaces', () => {
@@ -73,10 +82,9 @@ describe('IT change management workspaces', () => {
         );
 
         expect(screen.getByRole('heading', { name: 'Changes' })).toBeVisible();
-        expect(screen.getByRole('link', { name: /IT-000052/ })).toHaveAttribute(
-            'href',
-            '/it/changes/9',
-        );
+        expect(
+            screen.getByRole('link', { name: 'Replace gateway policy' }),
+        ).toHaveAttribute('href', '/it/changes/9');
         expect(screen.getByText('Upcoming window')).toBeVisible();
         expect(
             screen.getByRole('button', { name: /New change/i }),
@@ -153,7 +161,7 @@ describe('IT change management workspaces', () => {
 
         expect(
             screen.getByRole('link', {
-                name: /Open canonical ticket workspace/i,
+                name: 'Open ticket',
             }),
         ).toHaveAttribute('href', '/it/tickets/52');
         expect(screen.getByText('Maintenance window')).toBeVisible();

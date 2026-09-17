@@ -2,7 +2,6 @@
 
 namespace App\Domain\Finance\Http\Requests;
 
-use App\Domain\Finance\Models\FinVendor;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateVendorRequest extends FormRequest

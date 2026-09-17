@@ -142,6 +142,94 @@ final class ItTicketRoutingService
     }
 
     /**
+     * Explainable dry run: the exact decision route() would make for this
+     * ticket right now, computed without locking, saving, events or audit.
+     *
+     * @return array{strategy: string, queue_id: int|null, queue_name: string|null, team_id: int|null, owner_user_id: int|null, assigned_to_user_id: int|null, gaps: list<string>}
+     */
+    public function preview(ItTicket $ticket): array
+    {
+        $ticket->loadMissing('service');
+        [$queue, $strategy] = $this->matchingQueue($ticket);
+        $fields = (array) ($ticket->routing_override['fields'] ?? []);
+        $suspended = [];
+        if (array_key_exists('queue_id', $fields)) {
+            $chosen = ItQueue::query()->with('team.members')->find($fields['queue_id']);
+            if ($chosen && $this->queueCanReceive($chosen, $ticket)) {
+                $queue = $chosen;
+                $strategy = 'override';
+            } else {
+                $suspended[] = 'queue_id';
+            }
+        }
+
+        $owner = $this->ownerDecision($queue, $ticket);
+        $ownerUserId = $owner['owner_user_id'];
+        if (array_key_exists('owner_user_id', $fields)) {
+            if ($this->eligibility->agent($fields['owner_user_id'], $ticket)) {
+                $ownerUserId = $fields['owner_user_id'];
+                $owner['accountable_user_id'] = $fields['owner_user_id'];
+            } else {
+                $suspended[] = 'owner_user_id';
+            }
+        }
+
+        $defaultAssignee = $queue?->filter_rules['default_assignee_user_id'] ?? null;
+        $oldAutomaticAssignee = $ticket->routing_decision['automatic_assignee_user_id'] ?? null;
+        $candidate = $ticket->assigned_to_user_id;
+        if ($candidate !== null && (int) $candidate === (int) $oldAutomaticAssignee) {
+            $candidate = null;
+        }
+        $candidate = $candidate !== null && $this->eligibility->agent((int) $candidate, $ticket)
+            ? (int) $candidate : null;
+        if ($candidate === null && is_numeric($defaultAssignee)) {
+            $candidate = $this->teamIncludes($queue, (int) $defaultAssignee)
+                ? $this->eligibility->agent((int) $defaultAssignee, $ticket)?->id : null;
+            if ($candidate === null) {
+                $candidate = $this->eligibleCover($queue, $ticket)?->id;
+            }
+        }
+        if (array_key_exists('assigned_to_user_id', $fields)) {
+            if ($fields['assigned_to_user_id'] === null
+                || $this->eligibility->agent((int) $fields['assigned_to_user_id'], $ticket)) {
+                $candidate = $fields['assigned_to_user_id'];
+            } else {
+                $suspended[] = 'assigned_to_user_id';
+            }
+        }
+
+        $gaps = [];
+        if ($queue === null) {
+            $gaps[] = 'no_eligible_queue';
+        }
+        if ($queue?->team_id === null) {
+            $gaps[] = 'no_accountable_team';
+        }
+        if ($ownerUserId === null) {
+            $gaps[] = 'no_available_owner';
+        }
+        if ($owner['accountable_user_id'] === null) {
+            $gaps[] = 'no_accountable_owner';
+        }
+        if ($this->eligibleCover($queue, $ticket) === null) {
+            $gaps[] = 'no_available_cover';
+        }
+        if ($suspended !== []) {
+            $gaps[] = 'manual_override_suspended';
+        }
+
+        return [
+            'strategy' => $strategy,
+            'queue_id' => $queue?->id,
+            'queue_name' => $queue?->name,
+            'team_id' => $queue?->team_id,
+            'owner_user_id' => $ownerUserId !== null ? (int) $ownerUserId : null,
+            'assigned_to_user_id' => $candidate !== null ? (int) $candidate : null,
+            'gaps' => $gaps,
+        ];
+    }
+
+    /**
      * Validate a manual intent for the locked triage command. This only builds
      * provenance; the canonical triage transaction persists it and routes.
      *

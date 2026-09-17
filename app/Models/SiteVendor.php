@@ -15,6 +15,12 @@ class SiteVendor extends Model
 
     protected $fillable = [
         'site_id',
+        'visibility',
+        'owner_user_id',
+        'finance_vendor_id',
+        'supplied_services',
+        'related_records',
+        'lock_version',
         'tenant_id',
         'service_type',
         'company_name',
@@ -45,6 +51,8 @@ class SiteVendor extends Model
     ];
 
     protected $casts = [
+        'related_records' => 'array',
+        'lock_version' => 'integer',
         'is_preferred' => 'boolean',
         'is_active' => 'boolean',
         'hs_induction_completed' => 'boolean',
@@ -70,6 +78,21 @@ class SiteVendor extends Model
     public function credentials(): HasMany
     {
         return $this->hasMany(SiteCredential::class, 'vendor_id');
+    }
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    public function financeVendor(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domain\Finance\Models\FinVendor::class, 'finance_vendor_id');
+    }
+
+    public function agreements(): HasMany
+    {
+        return $this->hasMany(VendorAgreement::class, 'vendor_id');
     }
 
     public function scopeActive($query)

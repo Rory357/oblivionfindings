@@ -6,7 +6,6 @@ use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Models\MileageClaim;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -16,12 +15,12 @@ class ExpenseJournalService
      * GL account code mapping for expense categories.
      */
     private const CATEGORY_ACCOUNT_MAP = [
-        'travel'        => '6100',
-        'meals'         => '7010',
+        'travel' => '6100',
+        'meals' => '7010',
         'accommodation' => '6000',
-        'supplies'      => '6300',
-        'mileage'       => '6100',
-        'other'         => '6300',
+        'supplies' => '6300',
+        'mileage' => '6100',
+        'other' => '6300',
     ];
 
     private const ACCOUNTS_PAYABLE_CODE = '2000';
@@ -70,32 +69,32 @@ class ExpenseJournalService
         foreach ($groupedAmounts as $accountCode => $amount) {
             $account = $this->findAccountByCode($orgId, $accountCode);
             $lines[] = [
-                'account_id'  => $account->id,
+                'account_id' => $account->id,
                 'description' => "Expense Claim {$claim->claim_number} — {$account->name}",
-                'debit'       => $amount,
-                'credit'      => 0,
+                'debit' => $amount,
+                'credit' => 0,
             ];
         }
 
         $apAccount = $this->findAccountByCode($orgId, self::ACCOUNTS_PAYABLE_CODE);
         $lines[] = [
-            'account_id'  => $apAccount->id,
+            'account_id' => $apAccount->id,
             'description' => "Expense Claim {$claim->claim_number} — Accounts Payable",
-            'debit'       => 0,
-            'credit'      => $claim->total_amount,
+            'debit' => 0,
+            'credit' => $claim->total_amount,
         ];
 
         $journal = $this->journalPostingService->createAndPost($orgId, [
             'journal_date' => $claim->approved_at?->toDateString() ?? now()->toDateString(),
-            'type'         => 'standard',
-            'source_type'  => 'expense_claim',
-            'source_id'    => $claim->id,
-            'description'  => "Expense Claim {$claim->claim_number}",
-            'lines'        => $lines,
+            'type' => 'standard',
+            'source_type' => 'expense_claim',
+            'source_id' => $claim->id,
+            'description' => "Expense Claim {$claim->claim_number}",
+            'lines' => $lines,
         ]);
 
         $claim->update([
-            'journal_id'   => $journal->id,
+            'journal_id' => $journal->id,
             'gl_posted_at' => now(),
         ]);
 
@@ -117,26 +116,26 @@ class ExpenseJournalService
 
         $lines = [
             [
-                'account_id'  => $expenseAccount->id,
+                'account_id' => $expenseAccount->id,
                 'description' => "Mileage Claim — {$mileageClaim->purpose}",
-                'debit'       => $mileageClaim->amount,
-                'credit'      => 0,
+                'debit' => $mileageClaim->amount,
+                'credit' => 0,
             ],
             [
-                'account_id'  => $apAccount->id,
-                'description' => "Mileage Claim — Accounts Payable",
-                'debit'       => 0,
-                'credit'      => $mileageClaim->amount,
+                'account_id' => $apAccount->id,
+                'description' => 'Mileage Claim — Accounts Payable',
+                'debit' => 0,
+                'credit' => $mileageClaim->amount,
             ],
         ];
 
         return $this->journalPostingService->createAndPost($orgId, [
             'journal_date' => $mileageClaim->approved_at?->toDateString() ?? $mileageClaim->claim_date->toDateString(),
-            'type'         => 'standard',
-            'source_type'  => 'mileage_claim',
-            'source_id'    => $mileageClaim->id,
-            'description'  => "Mileage Claim — {$mileageClaim->purpose}",
-            'lines'        => $lines,
+            'type' => 'standard',
+            'source_type' => 'mileage_claim',
+            'source_id' => $mileageClaim->id,
+            'description' => "Mileage Claim — {$mileageClaim->purpose}",
+            'lines' => $lines,
         ]);
     }
 
@@ -165,7 +164,7 @@ class ExpenseJournalService
         );
 
         $claim->update([
-            'journal_id'   => null,
+            'journal_id' => null,
             'gl_posted_at' => null,
         ]);
 

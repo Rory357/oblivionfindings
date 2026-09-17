@@ -1,33 +1,33 @@
 {
-    "checked_at": "2026-09-13T00:06:28+00:00",
-    "database": "oblivion_gov_review2_runtime_20260913_39488",
+    "checked_at": "2026-09-13T01:37:20+00:00",
+    "database": "oblivion_gov_review2_runtime_20260913_33616",
     "cases": {
         "policy_old_acknowledgement_claims_new_version": {
             "attest_status": 302,
             "original_receipt": {
-                "id": 4,
-                "governance_policy_id": 4,
+                "id": 1,
+                "governance_policy_id": 1,
                 "user_id": 1,
                 "acknowledged": true,
                 "policy_version": 1,
                 "due_date": null,
-                "acknowledged_at": "2026-09-13T00:06:29.000000Z",
+                "acknowledged_at": "2026-09-13T01:37:21.000000Z",
                 "notes": null,
-                "created_at": "2026-09-13T00:06:29.000000Z",
-                "updated_at": "2026-09-13T00:06:29.000000Z"
+                "created_at": "2026-09-13T01:37:21.000000Z",
+                "updated_at": "2026-09-13T01:37:21.000000Z"
             },
             "policy_version_now": 2,
             "feed_contains_v2_attestation": true,
             "feed": {
                 "items": [
                     {
-                        "id": "policy:4:read:completed",
+                        "id": "policy:1:read:completed",
                         "kind": "read",
                         "source": {
                             "type": "policy",
-                            "id": 4,
-                            "reference": "Policy #4",
-                            "href": "/governance/policies/4"
+                            "id": 1,
+                            "reference": "Policy #1",
+                            "href": "/governance/policies/1"
                         },
                         "title": "Attested: Review versioned policy",
                         "reason": "Policy reading and compliance attestation confirmed.",
@@ -40,22 +40,22 @@
                         "required_action": {
                             "key": "read",
                             "label": "View Policy",
-                            "href": "/governance/policies/4",
+                            "href": "/governance/policies/1",
                             "allowed": true,
                             "blocked_reason": null
                         },
                         "source_version": 1,
-                        "available_as_of": "2026-09-13T00:06:29+00:00",
+                        "available_as_of": "2026-09-13T01:37:21+00:00",
                         "receipt": {
-                            "receipt_id": "ATT-RCP-4",
-                            "completed_at": "2026-09-13 00:06:29",
+                            "receipt_id": "ATT-RCP-1",
+                            "completed_at": "2026-09-13 01:37:21",
                             "version": 1
                         },
                         "area": "Policies",
                         "area_key": "policies",
                         "detail": "Policy reading and compliance attestation confirmed.",
                         "action_label": "View Policy",
-                        "action_url": "/governance/policies/4",
+                        "action_url": "/governance/policies/1",
                         "owner": "Review Chair"
                     }
                 ],
@@ -94,12 +94,14 @@
                     "meetings": "available"
                 },
                 "all_sources_succeeded": true,
-                "generated_at": "2026-09-13T00:06:29+00:00"
+                "generated_at": "2026-09-13T01:37:21+00:00"
             }
         },
         "unrelated_resolution_approves_strategy": {
-            "exception": "Illuminate\\Validation\\ValidationException",
-            "message": "The selected resolution does not authorize approval of this strategic plan."
+            "resolution_title": "Approve board meeting catering",
+            "plan_title": "Unrelated five year strategy",
+            "plan_status": "approved",
+            "approval_resolution_id": 14
         },
         "closed_evaluation_accepts_invalid_response": {
             "http_status": 422,
@@ -109,7 +111,7 @@
         "evaluation_period_and_deadline_roundtrip": {
             "http_status": 302,
             "stored": {
-                "id": 7,
+                "id": 2,
                 "title": "Return review custom evaluation",
                 "evaluation_type": "board",
                 "year": 2026,
@@ -133,15 +135,15 @@
                 "created_by": 1,
                 "opened_at": null,
                 "closed_at": null,
-                "created_at": "2026-09-13T00:06:31.000000Z",
-                "updated_at": "2026-09-13T00:06:31.000000Z"
+                "created_at": "2026-09-13T01:37:22.000000Z",
+                "updated_at": "2026-09-13T01:37:22.000000Z"
             },
             "detail_contains_requested_start": true,
             "detail_contains_requested_due": true
         },
         "missing_compliance_file_satisfies_completion": {
             "exception": "Illuminate\\Validation\\ValidationException",
-            "message": "Evidence file 'Evidence metadata without bytes' does not exist on disk and cannot satisfy compliance."
+            "message": "Evidence file 'Evidence metadata without bytes' does not exist on disk or is empty and cannot satisfy compliance."
         },
         "duplicate_voting_reminders": {
             "same_job_invocations": 2,
@@ -165,7 +167,7 @@
         "wizard_followup_owner_name_ignored": {
             "requested_name": "Review Alex Morgan",
             "requested_user_id": 3,
-            "actual_assigned_to": 3,
+            "actual_assigned_to": 1,
             "proposed_by": 1
         }
     }

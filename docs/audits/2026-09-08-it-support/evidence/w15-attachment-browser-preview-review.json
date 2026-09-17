@@ -1,0 +1,18 @@
+{
+  "fingerprint": "318cab1ac8222b2619851a80db16c9b40c13b11a6850f8e48394f883d5847088",
+  "host": "127.0.0.1",
+  "port": 8766,
+  "app_environment": "local",
+  "csrf_testing_bypass": false,
+  "mail": "array",
+  "queue": "sync",
+  "catalogue_fixtures": true,
+  "migration_changes": [
+    "2026_09_12_000061_create_shift_task_drafts.php",
+    "2026_09_12_000062_add_shift_task_follow_through.php",
+    "2026_09_12_000070_add_catalogue_field_to_it_attachments.php"
+  ],
+  "schema_unchanged": true,
+  "asset_manifest_sha256": "507ea8955a48a1e578997f97b1683d2f5a89afb999861ff17eb940b54d6a4323",
+  "mutations_performed": false
+}

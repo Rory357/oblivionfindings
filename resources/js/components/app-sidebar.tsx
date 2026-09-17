@@ -14,6 +14,19 @@ import {
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useStableValue } from '@/hooks/use-stable-value';
 import { cn, resolveUrl } from '@/lib/utils';
+import {
+    FINANCE_SECTIONS,
+    financeHubContainsUrl,
+    isFinanceHubHref,
+    visibleSectionTabs as visibleFinanceSectionTabs,
+} from '@/lib/finance-sections';
+import {
+    GOVERNANCE_SECTION_GROUP_LABELS,
+    GOVERNANCE_SECTIONS,
+    governanceHubContainsUrl,
+    visibleSectionTabs,
+} from '@/lib/governance-sections';
+import { vendorRegisterTab } from '@/lib/vendor-navigation';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
@@ -84,7 +97,14 @@ import {
     X,
     type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import { buildSecurityDevicesNavigationGroups } from './security-devices/security-devices-navigation';
 
 /* Event Horizon ink rail (APP_SHELL_STYLE_GUIDE.md §3). Sits below the
@@ -125,6 +145,36 @@ function CountPill({
             {count > 9 ? '9+' : count}
         </span>
     );
+}
+
+// The shell is not a persistent Inertia layout, so the rail remounts on
+// every visit and its scroll offset would snap to the top on each click.
+// Remember the offset across mounts (and reloads) so the link the user
+// just clicked stays where it was.
+const SIDEBAR_SCROLL_STORAGE_KEY = 'oblivionfindings:sidebar-scroll';
+let sidebarScrollTop = 0;
+
+function readStoredScrollTop(): number {
+    if (sidebarScrollTop > 0) return sidebarScrollTop;
+    try {
+        const raw = window.sessionStorage.getItem(SIDEBAR_SCROLL_STORAGE_KEY);
+        const parsed = raw === null ? 0 : Number(raw);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    } catch {
+        return 0;
+    }
+}
+
+function persistScrollTop(value: number) {
+    sidebarScrollTop = value;
+    try {
+        window.sessionStorage.setItem(
+            SIDEBAR_SCROLL_STORAGE_KEY,
+            String(Math.max(0, Math.round(value))),
+        );
+    } catch {
+        // sessionStorage unavailable (private mode): in-memory copy suffices.
+    }
 }
 
 // Per-user persistence for which module groups are unfolded (same local
@@ -214,6 +264,19 @@ export interface SubPanelGroup {
     items: NavItem[];
 }
 
+/** Flatten module groups into one ordered link list. Keys stay scoped to
+ *  the source group so a link that appears under two captions stays unique. */
+export function flattenSidebarGroups(
+    groups: SubPanelGroup[],
+): Array<{ key: string; item: NavItem }> {
+    return groups.flatMap((group) =>
+        (group.items ?? []).map((item) => ({
+            key: `${group.label}:${resolveUrl(item.href)}`,
+            item,
+        })),
+    );
+}
+
 export function filterVisibleSidebarGroups(
     groups: Array<SubPanelGroup | null | undefined>,
 ): SubPanelGroup[] {
@@ -247,6 +310,26 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
 
     const normalizedCurrentPath = normalizePath(currentPath);
     const normalizedItemPath = normalizePath(itemPath);
+
+    if (normalizedItemPath === '/vendors') {
+        const selected = vendorRegisterTab(current);
+        return selected ? 3000 + item.length : -1;
+    }
+
+    // A Governance hub entry stays lit on every register in its rail.
+    if (governanceHubContainsUrl(normalizedItemPath, normalizedCurrentPath)) {
+        return 2000 + item.length;
+    }
+
+    // A Finance hub entry is lit by its own hub ONLY. Overview lives at
+    // /finance, a prefix of every other finance URL, so falling through to the
+    // generic prefix rule below would light it on top of the real hub on every
+    // finance page.
+    if (isFinanceHubHref(normalizedItemPath)) {
+        return financeHubContainsUrl(normalizedItemPath, normalizedCurrentPath)
+            ? 2000 + item.length
+            : -1;
+    }
 
     if (itemQuery.length > 0) {
         return normalizedCurrentPath === normalizedItemPath &&
@@ -293,6 +376,7 @@ export function isIconActive(
     if (item.href) {
         return matchScore(currentUrl, item.href) > 0;
     }
+    if (item.id === 'sites' && vendorRegisterTab(currentUrl)) return false;
     if (item.id === 'operations' && isWorkforceUrl(currentUrl)) {
         return false;
     }
@@ -307,7 +391,7 @@ export function isIconActive(
     return false;
 }
 
-function isSubItemActive(currentUrl: string, href: NavItem['href']): boolean {
+export function isSubItemActive(currentUrl: string, href: NavItem['href']): boolean {
     if (resolveUrl(href) === '/it') {
         const path = normalizePath(resolveUrl(currentUrl));
         return path === '/it' || path.startsWith('/it/tickets/');
@@ -465,12 +549,6 @@ function buildIconNavItems({
                       icon: LayoutGrid,
                       label: 'Overview',
                       href: '/dashboard',
-                  } as IconNavItem,
-                  {
-                      id: 'today',
-                      icon: ClipboardList,
-                      label: 'Today',
-                      href: '/today',
                   } as IconNavItem,
               ]
             : []),
@@ -655,7 +733,10 @@ function buildIconNavItems({
         can?.it?.view ||
         can?.it?.request ||
         can?.it?.knowledge_author ||
-        can?.it?.knowledge_review
+        can?.it?.knowledge_review ||
+        can?.vendors?.view ||
+        can?.vendors?.contracts_view ||
+        can?.credentials?.view
     ) {
         items.push({
             id: 'it-provisioning',
@@ -724,12 +805,12 @@ function buildIconNavItems({
     }
 
     // Finance
+    // Any visible hub view opens the module — a treasurer with only
+    // finance.reports.view can reach /finance/reports, so they get the entry.
     if (
-        can?.finance?.dashboard ||
-        can?.finance?.ledger?.view ||
-        can?.finance?.ap?.view ||
-        can?.finance?.ar?.view ||
-        can?.finance?.ar?.manage
+        FINANCE_SECTIONS.some(
+            (section) => visibleFinanceSectionTabs(section, can).length > 0,
+        )
     ) {
         items.push({
             id: 'finance',
@@ -796,7 +877,10 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         !can?.it?.view &&
         !can?.it?.request &&
         !can?.it?.knowledge_author &&
-        !can?.it?.knowledge_review
+        !can?.it?.knowledge_review &&
+        !can?.vendors?.view &&
+        !can?.vendors?.contracts_view &&
+        !can?.credentials?.view
     )
         return [];
     return [
@@ -806,18 +890,30 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                 ...(can?.it?.view || can?.it?.request
                     ? [{ title: 'Service desk', href: '/it', icon: Server }]
                     : []),
-                {
-                    title:
-                        can?.it?.view ||
-                        can?.it?.knowledge_author ||
-                        can?.it?.knowledge_review
-                            ? 'Knowledge & Documentation'
-                            : 'Guides',
-                    href: '/it/knowledge',
-                    icon: BookOpen,
-                },
+                ...(can?.it?.view ||
+                can?.it?.request ||
+                can?.it?.knowledge_author ||
+                can?.it?.knowledge_review
+                    ? [
+                          {
+                              title:
+                                  can?.it?.view ||
+                                  can?.it?.knowledge_author ||
+                                  can?.it?.knowledge_review
+                                      ? 'Knowledge & Documentation'
+                                      : 'Guides',
+                              href: '/it/knowledge',
+                              icon: BookOpen,
+                          },
+                      ]
+                    : []),
                 ...(can?.it?.view
                     ? [
+                          {
+                              title: 'Provisioning',
+                              href: '/it/provisioning',
+                              icon: Server,
+                          },
                           {
                               title: 'Work planning',
                               href: '/it/work',
@@ -847,6 +943,19 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                     : []),
                 ...(can?.it?.manage
                     ? [{ title: 'Setup', href: '/it/setup', icon: Settings }]
+                    : []),
+                ...(can?.vendors?.view || can?.credentials?.view || can?.vendors?.contracts_view
+                    ? [
+                          {
+                              title: 'Vendors & Credentials',
+                              href: can?.vendors?.view
+                                  ? '/vendors?tab=vendors'
+                                  : can?.credentials?.view
+                                      ? '/vendors?tab=credentials'
+                                      : '/vendors',
+                              icon: Package,
+                          },
+                      ]
                     : []),
             ],
         },
@@ -895,10 +1004,14 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/sites/reports',
             icon: BarChart3,
         });
-    if (can?.vendors?.view || can?.credentials?.view)
+    if (can?.vendors?.view || can?.credentials?.view || can?.vendors?.contracts_view)
         items.push({
             title: 'Vendors & Credentials',
-            href: '/vendors',
+            href: can?.vendors?.view
+                ? '/vendors?tab=vendors'
+                : can?.credentials?.view
+                    ? '/vendors?tab=credentials'
+                    : '/vendors',
             icon: Package,
         });
     items.push({
@@ -1730,20 +1843,68 @@ function buildFleetAssetsSubPanelGroups({
     return groups;
 }
 
+/**
+ * Governance pages a viewer can act in — manage, decide, request, or (for
+ * the person being reviewed) take part in — keyed by hub tab key
+ * (lib/governance-sections.ts). Viewing alone never earns a sidebar entry:
+ * ordinary members keep their focused navigation. Navigation only — every
+ * page is still authorised on the server.
+ */
+export function governanceActionableTabKeys(can?: any): Set<string> {
+    const gov = can?.governance ?? {};
+    const keys = new Set<string>();
+    const add = (key: string, allowed: unknown) => {
+        if (allowed) keys.add(key);
+    };
+
+    add('meetings', gov.meetings?.manage);
+    add('packs', gov.packs?.manage);
+    add('ceo-reports', gov['ceo-reports']?.manage);
+    add('resolutions', gov.resolutions?.manage);
+    add('actions', gov.actions?.manage);
+    add('risks', gov.risks?.manage);
+    add('compliance', gov.compliance?.manage);
+    add('clinical', gov.clinical?.manage);
+    add('te-tiriti', gov['te-tiriti']?.manage);
+    add(
+        'budgets',
+        gov.budgets?.create || gov.budgets?.submit || gov.budgets?.approve,
+    );
+    add('spend-approvals', gov.spend?.request || gov.spend?.approve);
+    add('strategy', gov.strategy?.manage);
+    add(
+        'performance',
+        gov.performance?.manage || gov.performance?.reviewee,
+    );
+    add('roadmap', can?.roadmap?.manage);
+    add('policies', gov.policies?.manage);
+    add('documents', gov.documents?.manage);
+    add('members', gov.meetings?.manage);
+    add('evaluations', gov.evaluations?.manage);
+    add('settings', gov.settings?.manage);
+
+    return keys;
+}
+
 function buildGovernanceSubPanelGroups({
     can,
 }: {
     can?: any;
 }): SubPanelGroup[] {
-    // Permission-gated builders for each group. Every entry preserves its
-    // existing route — this only changes how items are grouped in the sidebar.
+    // Everyone with Governance access gets Home, My work, Calendar and
+    // Records. A hub (lib/governance-sections.ts) is added only when the
+    // viewer can act in one of its pages — a treasurer gets Board finance,
+    // the CEO gets Meetings (CEO reports) and, once they have a review,
+    // Strategy & performance. Each hub entry opens the first page the viewer
+    // can act in; its sibling pages are the hub's header rail.
     const groups: SubPanelGroup[] = [];
+    const actionable = governanceActionableTabKeys(can);
 
-    // 1. Overview & My work
+    // 1. Primary Member destinations
     const overview: NavItem[] = [];
     if (can?.governance?.view) {
         overview.push({
-            title: 'Overview',
+            title: 'Home',
             href: '/governance/dashboard',
             icon: Landmark,
         });
@@ -1754,336 +1915,97 @@ function buildGovernanceSubPanelGroups({
         });
         overview.push({
             title: 'Calendar',
-            href: '/governance/meetings/calendar',
+            href: '/governance/calendar',
             icon: CalendarDays,
         });
-    }
-    if (overview.length > 0) {
-        groups.push({ label: 'Overview & My work', items: overview });
-    }
-
-    // 2. Meetings & decisions — meetings, packs, CEO reports, resolutions, actions, evaluations
-    const meetingsDecisions: NavItem[] = [];
-    if (can?.governance?.meetings?.view || can?.governance?.view) {
-        meetingsDecisions.push({
-            title: 'Meetings',
-            href: '/governance/meetings',
-            icon: CalendarDays,
-        });
-    }
-    if (can?.governance?.packs?.view) {
-        meetingsDecisions.push({
-            title: 'Board Packs',
-            href: '/governance/packs',
+        overview.push({
+            title: 'Records',
+            href: '/governance/records',
             icon: FileText,
         });
     }
-    if (can?.governance?.['ceo-reports']?.view) {
-        meetingsDecisions.push({
-            title: 'CEO Reports',
-            href: '/governance/ceo-reports',
-            icon: FileText,
-        });
-    }
-    if (can?.governance?.resolutions?.view) {
-        meetingsDecisions.push({
-            title: 'Resolutions',
-            href: '/governance/resolutions',
-            icon: ClipboardCheck,
-        });
-    }
-    if (can?.governance?.actions?.view) {
-        meetingsDecisions.push({
-            title: 'Action Items',
-            href: '/governance/actions',
-            icon: ClipboardList,
-        });
-    }
-    if (can?.governance?.evaluations?.view) {
-        meetingsDecisions.push({
-            title: 'Board Evaluations',
-            href: '/governance/evaluations',
-            icon: ClipboardCheck,
-        });
-    }
-    if (meetingsDecisions.length > 0) {
-        groups.push({ label: 'Meetings & decisions', items: meetingsDecisions });
+
+    // One entry per hub the viewer acts in; the hub's pages are the
+    // connected-tab rail in its page header, so the sidebar stays short.
+    const hubGroups: SubPanelGroup[] = [];
+    let recordsHubShown = false;
+    for (const group of ['board', 'oversight', 'admin'] as const) {
+        const items: NavItem[] = [];
+        for (const section of GOVERNANCE_SECTIONS) {
+            if (section.group !== group) continue;
+            const visible = visibleSectionTabs(section, can);
+            // The page being reviewed is reachable for its reviewee even
+            // though reviews are otherwise limited to the board's reviewers.
+            const reachable = [
+                ...visible,
+                ...section.tabs.filter(
+                    (tab) =>
+                        !visible.includes(tab) &&
+                        tab.key === 'performance' &&
+                        actionable.has('performance'),
+                ),
+            ];
+            const entry = reachable.find((tab) => actionable.has(tab.key));
+            if (!entry) continue;
+            if (section.key === 'records') recordsHubShown = true;
+            items.push({
+                title: section.label,
+                href: entry.href,
+                icon: section.icon,
+            });
+        }
+        if (items.length > 0) {
+            hubGroups.push({
+                label: GOVERNANCE_SECTION_GROUP_LABELS[group],
+                items,
+            });
+        }
     }
 
-    // 3. Oversight — risks, compliance, financial, strategy, policies, evidence
-    const oversight: NavItem[] = [];
-    if (can?.governance?.risks?.view) {
-        oversight.push({
-            title: 'Risk Register',
-            href: '/governance/risks',
-            icon: Target,
+    // Records search lives inside the "Policies & records" hub when that
+    // hub is shown; everyone else keeps it in the main list.
+    const primary = recordsHubShown
+        ? overview.filter((item) => item.href !== '/governance/records')
+        : overview;
+    if (primary.length > 0) {
+        groups.push({ label: 'Governance', items: primary });
+    } else if (hubGroups.length === 0 && can?.roadmap?.view) {
+        // Roadmap-only viewers still need a way in (it has no other entry).
+        groups.push({
+            label: 'Governance',
+            items: [
+                { title: 'Roadmap', href: '/roadmap/dashboard', icon: Map },
+            ],
         });
-    }
-    if (can?.governance?.compliance?.view) {
-        oversight.push({
-            title: 'Compliance',
-            href: '/governance/compliance',
-            icon: Shield,
-        });
-    }
-    if (can?.compliance?.view) {
-        oversight.push({
-            title: 'Operational Compliance',
-            href: '/compliance',
-            icon: ShieldCheck,
-        });
-    }
-    if (can?.governance?.clinical?.view) {
-        oversight.push({
-            title: 'Clinical Governance',
-            href: '/governance/clinical',
-            icon: Shield,
-        });
-    }
-    if (can?.governance?.['te-tiriti']?.view) {
-        oversight.push({
-            title: 'Te Tiriti',
-            href: '/governance/te-tiriti',
-            icon: Landmark,
-        });
-    }
-    if (can?.governance?.budgets?.view) {
-        oversight.push({
-            title: 'Budgets',
-            href: '/governance/budgets',
-            icon: DollarSign,
-        });
-    }
-    if (can?.governance?.spend?.view) {
-        oversight.push({
-            title: 'Spend Approvals',
-            href: '/governance/spend-approvals',
-            icon: DollarSign,
-        });
-    }
-    if (can?.governance?.strategy?.view) {
-        oversight.push({
-            title: 'Strategic Plan',
-            href: '/governance/strategy',
-            icon: Target,
-        });
-    }
-    if (can?.governance?.performance?.view) {
-        oversight.push({
-            title: 'Performance',
-            href: '/governance/performance',
-            icon: ClipboardCheck,
-        });
-    }
-    if (can?.roadmap?.view) {
-        oversight.push({
-            title: 'Roadmap',
-            href: '/roadmap/dashboard',
-            icon: Map,
-        });
-    }
-    if (can?.governance?.policies?.view) {
-        oversight.push({
-            title: 'Policies',
-            href: '/governance/policies',
-            icon: BookOpen,
-        });
-    }
-    if (can?.governance?.documents?.view) {
-        oversight.push({
-            title: 'Documents',
-            href: '/governance/documents',
-            icon: FileText,
-        });
-    }
-    if (can?.governance?.interests?.view) {
-        oversight.push({
-            title: 'Interests Register',
-            href: '/governance/interests',
-            icon: ClipboardList,
-        });
-    }
-    if (oversight.length > 0) {
-        groups.push({ label: 'Oversight', items: oversight });
     }
 
-    // 4. Board administration — board members, audit log, governance settings
-    const admin: NavItem[] = [];
-    if (can?.governance?.meetings?.manage) {
-        admin.push({
-            title: 'Board Members',
-            href: '/governance/admin/board-members',
-            icon: Users,
-        });
-    }
-    if (can?.governance?.audit?.view) {
-        admin.push({
-            title: 'Audit Log',
-            href: '/governance/audit-log',
-            icon: ClipboardCheck,
-        });
-    }
-    if (can?.governance?.settings?.view) {
-        admin.push({
-            title: 'Governance Settings',
-            href: '/governance/settings',
-            icon: Shield,
-        });
-    }
-    if (admin.length > 0) {
-        groups.push({ label: 'Board administration', items: admin });
-    }
-
-    return groups;
+    return [...groups, ...hubGroups];
 }
 
+/**
+ * Finance sub-panel: ONE entry per hub from `lib/finance-sections.ts`
+ * (anti-pattern "One sidebar link per register", corrected 2026-09-16). A hub
+ * is shown when the viewer can open at least one of its views, and its entry
+ * points at the first such view so the link never lands on a 403. The hub's
+ * other views are the connected rail in the page header, and `matchScore`
+ * keeps the entry lit across all of them via `financeHubContainsUrl`.
+ */
 function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
-    const overview: NavItem[] = [];
-    // Overview hub — Summary · Executive · By site · Cash position are tabs at /finance.
-    overview.push({
-        title: 'Overview',
-        href: '/finance',
-        icon: LayoutDashboard,
-    });
+    const items: NavItem[] = [];
 
-    if (can?.finance?.dashboard) {
-        // Obligation calendar — invoice/bill due dates, payment runs, GST deadlines.
-        overview.push({
-            title: 'Calendar',
-            href: '/finance/calendar',
-            icon: CalendarDays,
-        });
+    for (const section of FINANCE_SECTIONS) {
+        const visible = visibleFinanceSectionTabs(section, can);
+        if (visible.length === 0) continue;
+        // The hub landing URL when its own first view is reachable, otherwise
+        // straight to the first view this viewer can open.
+        const href =
+            visible[0].href === section.tabs[0].href
+                ? section.href
+                : visible[0].href;
+        items.push({ title: section.label, href, icon: section.icon });
     }
 
-    if (
-        can?.finance?.ledger?.view ||
-        can?.finance?.ledger?.manage ||
-        can?.finance?.admin ||
-        can?.finance?.assets?.view
-    ) {
-        // General Ledger hub — chart of accounts, journals, cost centres, fiscal
-        // periods, currencies, FX revaluations and fixed assets are now tabs here.
-        overview.push({
-            title: 'General Ledger',
-            href: '/finance/ledger',
-            icon: BookOpen,
-        });
-    }
-
-    const ap: NavItem[] = [];
-    if (can?.finance?.ap?.view) {
-        // Purchases & Payables hub — bills, purchase orders, vendors, credit notes
-        // and payment runs are now tabs here.
-        ap.push({
-            title: 'Payables',
-            href: '/finance/payables',
-            icon: Receipt,
-        });
-    }
-
-    const ar: NavItem[] = [];
-    if (can?.finance?.ar?.view) {
-        ar.push({
-            title: 'Billing',
-            href: '/finance/billing',
-            icon: DollarSign,
-        });
-        // Sales & Receivables hub — invoices, quotes, recurring charges, billing,
-        // aged AR, statements, price books and allocations are now tabs here.
-        ar.push({
-            title: 'Receivables',
-            href: '/finance/receivables',
-            icon: DollarSign,
-        });
-        ar.push({
-            title: 'Invoices',
-            href: '/finance/invoices',
-            icon: FileText,
-        });
-        ar.push({
-            title: 'Price Books',
-            href: '/finance/price-books',
-            icon: BookOpen,
-        });
-        ar.push({
-            title: 'Quotes',
-            href: '/finance/quotes',
-            icon: FileText,
-        });
-        ar.push({
-            title: 'Recurring Charges',
-            href: '/finance/recurring-charges',
-            icon: Receipt,
-        });
-    }
-
-    const banking: NavItem[] = [];
-    if (
-        can?.finance?.bank?.view ||
-        can?.finance?.bank?.manage ||
-        can?.finance?.pettyCash?.view
-    ) {
-        // Banking & Cash hub — accounts, transactions, reconciliation, matching,
-        // feeds, EFTPOS, petty cash and match rules are now tabs here.
-        banking.push({
-            title: 'Banking',
-            href: '/finance/banking',
-            icon: Landmark,
-        });
-    }
-
-    const other: NavItem[] = [];
-    // Tax & Compliance hub — GST returns, IRD filings and audit exports are
-    // tabs here. The unsupported consolidation surface remains quarantined.
-    if (
-        can?.finance?.tax?.view ||
-        can?.finance?.tax?.manage ||
-        can?.finance?.reports?.view
-    ) {
-        other.push({
-            title: 'Tax & Compliance',
-            href: '/finance/tax',
-            icon: Receipt,
-        });
-    }
-    // Petty Cash is now a tab in the Banking & Cash hub (see `banking` above).
-    if (can?.finance?.reports?.view)
-        other.push({
-            title: 'Donor Funds',
-            href: '/finance/donor-funds',
-            icon: Heart,
-        });
-
-    const reports: NavItem[] = [];
-    if (can?.finance?.reports?.view) {
-        // Reports & Planning hub — P&L, balance sheet, trial balance, cash flow,
-        // aged AR/AP, funding summary, budget vs actuals and cash-flow forecast
-        // are now tabs here.
-        reports.push({
-            title: 'Reports',
-            href: '/finance/reports',
-            icon: BarChart3,
-        });
-    }
-
-    if (can?.finance?.admin) {
-        // Settings hub — accounting integrations (Xero/MYOB) and funding streams
-        // are now tabs here. (Fiscal periods, cost centres, currencies live in the
-        // Ledger hub; match rules in the Banking hub — not duplicated here.)
-        other.push({
-            title: 'Settings',
-            href: '/finance/settings',
-            icon: Settings,
-        });
-    }
-
-    const groups: SubPanelGroup[] = [{ label: 'Finance', items: overview }];
-    if (ap.length) groups.push({ label: 'Accounts Payable', items: ap });
-    if (ar.length) groups.push({ label: 'Accounts Receivable', items: ar });
-    if (banking.length) groups.push({ label: 'Banking', items: banking });
-    if (other.length) groups.push({ label: 'Other', items: other });
-    if (reports.length) groups.push({ label: 'Reports', items: reports });
-    return groups;
+    return items.length > 0 ? [{ label: 'Finance', items }] : [];
 }
 
 function buildSystemSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
@@ -2179,14 +2101,22 @@ function buildReportingSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const governance: NavItem[] = [];
     if (can?.governance?.view)
         governance.push({
-            title: 'Board Reports',
+            title: 'Board monthly report',
             href: '/governance/reports/board-monthly',
             icon: FileText,
         });
-    if (can?.governance?.compliance?.view || can?.governance?.view)
+    // These reports check their register's permission on the server, so the
+    // links only show to people who can open them.
+    if (can?.governance?.compliance?.view)
         governance.push({
-            title: 'Compliance',
+            title: 'Compliance status report',
             href: '/governance/reports/compliance-status',
+            icon: ShieldCheck,
+        });
+    if (can?.governance?.risks?.view)
+        governance.push({
+            title: 'Top risks report',
+            href: '/governance/reports/risk-narrative',
             icon: ShieldCheck,
         });
     if (governance.length)
@@ -2639,59 +2569,46 @@ function SubPanel({
                 </Button>
             </div>
 
-            {/* Panel groups */}
+            {/* Panel links. Section captions were dropped (2026-09-16):
+                they competed with the links and made the panel harder to
+                scan, so each module is one continuous list in group order. */}
             <div className="py-2">
-                {visibleGroups.map((group) => (
-                    <div key={group.label} className="mb-1">
-                        <div className="px-4 py-1.5 text-[11px] font-medium tracking-wider text-sidebar-foreground/40 uppercase">
-                            {group.label}
-                        </div>
-                        {(group.items ?? []).map((item) => {
-                            const active = isSubItemActive(
-                                currentUrl,
-                                item.href,
-                            );
-                            return (
-                                <Link
-                                    key={resolveUrl(item.href)}
-                                    href={item.href}
-                                    aria-current={active ? 'page' : undefined}
-                                    prefetch
-                                    preserveScroll
+                {flattenSidebarGroups(visibleGroups).map(({ key, item }) => {
+                    const active = isSubItemActive(currentUrl, item.href);
+                    return (
+                        <Link
+                            key={key}
+                            href={item.href}
+                            aria-current={active ? 'page' : undefined}
+                            prefetch
+                            preserveScroll
+                            className={cn(
+                                'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                active
+                                    ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                                    : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+                            )}
+                        >
+                            {item.icon && <SidebarItemIcon icon={item.icon} />}
+                            <span className="truncate">{item.title}</span>
+                            {item.badge != null && item.badge > 0 && (
+                                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
+                                    {item.badge > 9 ? '9+' : item.badge}
+                                </span>
+                            )}
+                            {active && (
+                                <ChevronRight
                                     className={cn(
-                                        'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
-                                        active
-                                            ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                                            : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+                                        'h-3 w-3 text-sidebar-foreground/40',
+                                        item.badge != null && item.badge > 0
+                                            ? 'ml-0'
+                                            : 'ml-auto',
                                     )}
-                                >
-                                    {item.icon && (
-                                        <SidebarItemIcon icon={item.icon} />
-                                    )}
-                                    <span className="truncate">
-                                        {item.title}
-                                    </span>
-                                    {item.badge != null && item.badge > 0 && (
-                                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
-                                            {item.badge > 9 ? '9+' : item.badge}
-                                        </span>
-                                    )}
-                                    {active && (
-                                        <ChevronRight
-                                            className={cn(
-                                                'h-3 w-3 text-sidebar-foreground/40',
-                                                item.badge != null &&
-                                                    item.badge > 0
-                                                    ? 'ml-0'
-                                                    : 'ml-auto',
-                                            )}
-                                        />
-                                    )}
-                                </Link>
-                            );
-                        })}
-                    </div>
-                ))}
+                                />
+                            )}
+                        </Link>
+                    );
+                })}
             </div>
         </div>
     );
@@ -2708,60 +2625,42 @@ function InlineSubPanelGroups({
 }) {
     const visibleGroups = filterVisibleSidebarGroups(groups);
 
+    // Section captions were dropped (2026-09-16): they competed with the
+    // links and made the rail harder to scan. Each module renders one
+    // continuous list; the group order is preserved.
     return (
         <div
             role="group"
             aria-label={`${title} navigation`}
-            className="mt-0.5 mb-1 space-y-1.5 py-0.5"
+            className="mt-0.5 mb-1 space-y-px py-0.5"
         >
-            {visibleGroups.map((group) => {
-                // A lone group that just repeats the module name adds noise —
-                // its items read fine directly under the group header row.
-                const showLabel =
-                    visibleGroups.length > 1 || group.label !== title;
+            {flattenSidebarGroups(visibleGroups).map(
+                ({ key, item: subItem }) => {
+                    const active = isSubItemActive(currentUrl, subItem.href);
 
-                return (
-                    <div key={group.label}>
-                        {showLabel && (
-                            <div className="py-1 pr-2 pl-[38px] text-[10px] font-semibold tracking-wider text-sidebar-foreground/80 uppercase">
-                                {group.label}
-                            </div>
-                        )}
-                        <div className="space-y-px">
-                            {(group.items ?? []).map((subItem) => {
-                                const active = isSubItemActive(
-                                    currentUrl,
-                                    subItem.href,
-                                );
-
-                                return (
-                                    <Link
-                                        key={resolveUrl(subItem.href)}
-                                        href={subItem.href}
-                                        aria-current={
-                                            active ? 'page' : undefined
-                                        }
-                                        prefetch
-                                        preserveScroll
-                                        data-sidebar-item
-                                        className={cn(
-                                            'flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-[38px] text-[13px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-                                            active
-                                                ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                                                : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
-                                        )}
-                                    >
-                                        <span className="min-w-0 flex-1 truncate">
-                                            {subItem.title}
-                                        </span>
-                                        <CountPill count={subItem.badge ?? 0} />
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    </div>
-                );
-            })}
+                    return (
+                        <Link
+                            key={key}
+                            href={subItem.href}
+                            aria-current={active ? 'page' : undefined}
+                            prefetch
+                            preserveScroll
+                            data-sidebar-item
+                            className={cn(
+                                'flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-[38px] text-[13px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                                active
+                                    ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                                    : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
+                            )}
+                        >
+                            <span className="min-w-0 flex-1 truncate">
+                                {subItem.title}
+                            </span>
+                            <CountPill count={subItem.badge ?? 0} />
+                        </Link>
+                    );
+                },
+            )}
         </div>
     );
 }
@@ -2796,6 +2695,15 @@ export function AppSidebar({
     // persisted per user).
     const [expandedGroupIds, setExpandedGroupIds] =
         useState<string[]>(readStoredGroupIds);
+    const railScrollRef = useRef<HTMLDivElement>(null);
+
+    // Restore the rail's scroll offset before paint so the remount is invisible.
+    useLayoutEffect(() => {
+        const el = railScrollRef.current;
+        if (!el) return;
+        const stored = readStoredScrollTop();
+        if (stored > 0) el.scrollTop = stored;
+    }, []);
 
     const iconNavItems = useMemo(
         () =>
@@ -2899,6 +2807,10 @@ export function AppSidebar({
                     )}
                 >
                     <div
+                        ref={railScrollRef}
+                        onScroll={(event) =>
+                            persistScrollTop(event.currentTarget.scrollTop)
+                        }
                         className={cn(
                             'scrollbar-none flex w-full flex-1 flex-col gap-0.5 overflow-y-auto px-2',
                             isCollapsed ? 'items-center' : 'items-stretch',

@@ -1,0 +1,5 @@
+
+[32m [Wayfinder] Generated actions in C:\Users\steph\Herd\oblivionfindings\resources\js\actions[39m
+
+[32m [Wayfinder] Generated routes in C:\Users\steph\Herd\oblivionfindings\resources\js\routes[39m
+

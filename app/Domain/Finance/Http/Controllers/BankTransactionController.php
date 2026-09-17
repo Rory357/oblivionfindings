@@ -66,9 +66,30 @@ class BankTransactionController extends Controller
             ->latest('id')
             ->first();
 
+        // Totals for the header meters. `filtered_*` follow the current filters
+        // so the meters describe the query, never just the page you are on
+        // (DESIGN.md "page-local counts labelled as totals").
+        $filtered = fn () => FinBankTransaction::forOrganization($orgId)
+            ->when($request->bank_account_id, fn ($q, $bankAccountId) => $q->where('bank_account_id', $bankAccountId))
+            ->when($request->status, fn ($q, $status) => $q->where('status', $status))
+            ->when($request->start_date, fn ($q, $start) => $q->where('transaction_date', '>=', $start))
+            ->when($request->end_date, fn ($q, $end) => $q->where('transaction_date', '<=', $end));
+
         return Inertia::render('finance/bank-transactions/Index', [
             'transactions' => $transactions,
             'bankAccounts' => $bankAccounts,
+            'summary' => [
+                'filtered_count' => $transactions->total(),
+                'filtered_value' => (float) $filtered()->sum('amount'),
+                'unreconciled_count' => (int) FinBankTransaction::forOrganization($orgId)
+                    ->where('status', 'unreconciled')
+                    ->count(),
+                'unreconciled_value' => (float) FinBankTransaction::forOrganization($orgId)
+                    ->where('status', 'unreconciled')
+                    ->sum('amount'),
+                'bank_accounts' => $bankAccounts->count(),
+            ],
+            'canManage' => $request->user()->can('create', FinBankTransaction::class),
             'filters' => [
                 'bank_account_id' => $request->bank_account_id ?? '',
                 'status' => $request->status ?? '',

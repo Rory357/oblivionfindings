@@ -1,5 +1,13 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -8,83 +16,104 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { EmptyState } from '@/components/ui/empty-state';
+import { formatFileSize } from '@/components/ui/file-dropzone';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
-import { cn } from '@/lib/utils';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import {
-    complete as completeObligation,
-    index as complianceIndex,
-} from '@/routes/governance/compliance';
-import { upload as uploadEvidence } from '@/routes/governance/compliance/evidence';
+    complianceEvidenceTypeLabel,
+    frequencyLabel,
+    governanceStatus,
+    refSuffix,
+} from '@/lib/governance-labels';
 import { PageProps } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import axios from 'axios';
+import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle,
     Clock,
+    Download,
+    ExternalLink,
     FileCheck,
+    Pencil,
     Upload,
     User,
 } from 'lucide-react';
+import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import { GovernanceTermHint } from '@/components/governance/GovernanceTermHint';
 import { useState } from 'react';
+
+import {
+    CompleteObligationDialog,
+    frameworkIcon,
+    ObligationWizardDialog,
+    UploadEvidenceDialog,
+    type ObligationFormOptions,
+} from './_dialogs';
+import {
+    dueLabel,
+    obligationStatusLabel,
+    obligationStatusVariant,
+    plural,
+} from './_shared';
 
 interface Evidence {
     id: number;
     evidence_type: string;
     title: string;
-    file_path: string;
+    description: string | null;
+    file_name: string | null;
+    file_size: number | null;
     valid_until: string | null;
-    uploaded_by: { name: string };
-    uploaded_at: string;
+    expired: boolean;
+    uploaded_by: { name: string } | null;
+    uploaded_at: string | null;
+    open_url: string | null;
+    download_url: string | null;
 }
 
 interface Reminder {
     id: number;
     days_before_due: number;
-    scheduled_at: string;
+    scheduled_at: string | null;
     status: string;
     sent_at: string | null;
+    is_escalation: boolean;
 }
 
 interface Obligation {
     id: number;
     framework: string;
+    framework_label: string;
     obligation_code: string | null;
     obligation_title: string;
     description: string;
     requirements?: string | null;
     frequency: string;
+    priority?: string | null;
     due_date: string;
     next_due_date: string | null;
+    days_until_due: number | null;
     status: string;
+    owner_id?: number | null;
     owner: { id: number; name: string } | null;
     completed_at: string | null;
     completed_by: { name: string } | null;
     completion_notes?: string | null;
     version_number?: number;
     parent_obligation_id?: number | null;
-    parent_obligation?: { id: number; obligation_title: string; due_date: string } | null;
-    recurrences?: Array<{ id: number; obligation_title: string; due_date: string; status: string }>;
+    parent_obligation?: {
+        id: number;
+        obligation_title: string;
+        due_date: string;
+    } | null;
+    recurrences?: Array<{
+        id: number;
+        obligation_title: string;
+        due_date: string;
+        status: string;
+    }>;
     evidence_required: boolean;
     evidence_provided: boolean;
     sign_off_required: boolean;
@@ -97,655 +126,431 @@ interface Obligation {
 
 interface Props extends PageProps {
     obligation: Obligation;
+    abilities?: {
+        update?: boolean;
+        complete?: boolean;
+        uploadEvidence?: boolean;
+    };
+    formOptions?: ObligationFormOptions | null;
 }
 
-export default function ComplianceShow({ auth, obligation }: Props) {
+function dateOnly(value: string | null | undefined): string {
+    return formatDateOnly(value ? value.slice(0, 10) : null);
+}
+
+const REMINDER_STATUS: Record<string, { label: string; variant: 'success' | 'neutral' | 'critical' }> = {
+    pending: { label: 'Scheduled', variant: 'neutral' },
+    sent: { label: 'Sent', variant: 'success' },
+    failed: { label: "Couldn't send", variant: 'critical' },
+};
+
+function scrollTo(id: string) {
+    document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+export default function ComplianceShow({
+    obligation,
+    abilities = {},
+    formOptions = null,
+}: Props) {
     const evidenceItems = obligation.evidence ?? [];
     const reminderItems = obligation.reminders ?? [];
-    const [showUploadDialog, setShowUploadDialog] = useState(false);
-    const [uploadForm, setUploadForm] = useState({
-        evidence_type: 'document',
-        title: '',
-        description: '',
-        valid_until: '',
-        file: null as File | null,
-    });
-    const [submitting, setSubmitting] = useState(false);
+    const [uploadOpen, setUploadOpen] = useState(false);
+    const [completeOpen, setCompleteOpen] = useState(false);
+    const canEdit = Boolean(abilities.update) && formOptions != null;
+    const canComplete =
+        Boolean(abilities.complete) &&
+        obligation.status !== 'complete' &&
+        obligation.status !== 'cancelled';
+    const canUpload = Boolean(abilities.uploadEvidence);
+    // Retired /compliance/{id}/edit deep links arrive as ?edit=1.
+    const [editOpen, setEditOpen] = useDialogDeepLink('edit', canEdit);
 
-    // Enhanced Completion Dialog State
-    const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-    const [completionNotes, setCompletionNotes] = useState('');
-    const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<number[]>([]);
-    const [completeSubmitting, setCompleteSubmitting] = useState(false);
-    const [completeError, setCompleteError] = useState<string | null>(null);
+    const frameworkLabel = obligation.framework_label;
+    const currentEvidence = evidenceItems.filter((ev) => !ev.expired);
+    const sentReminders = reminderItems.filter((r) => r.status === 'sent').length;
+    const isComplete = obligation.status === 'complete';
+    const statusTone =
+        obligation.status === 'overdue'
+            ? 'critical'
+            : obligation.status === 'due_soon'
+              ? 'warning'
+              : isComplete
+                ? 'success'
+                : 'brand';
 
-    const isEvidenceExpired = (ev: Evidence) => {
-        if (!ev.valid_until) return false;
-        const validUntil = new Date(ev.valid_until);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return validUntil < today;
-    };
-
-    const validEvidenceItems = evidenceItems.filter((ev) => !isEvidenceExpired(ev));
-    const hasValidEvidence = validEvidenceItems.length > 0;
-    const canComplete = !obligation.evidence_required || hasValidEvidence;
-
-    const openCompleteDialog = () => {
-        setSelectedEvidenceIds(validEvidenceItems.map((e) => e.id));
-        setCompletionNotes(obligation.completion_notes || '');
-        setCompleteError(null);
-        setShowCompleteDialog(true);
-    };
-
-    const handleComplete = async () => {
-        setCompleteSubmitting(true);
-        setCompleteError(null);
-        try {
-            await axios.post(
-                completeObligation.url({ obligation: obligation.id }),
-                {
-                    evidence_ids: selectedEvidenceIds.length > 0 ? selectedEvidenceIds : undefined,
-                    completion_notes: completionNotes || undefined,
-                    expected_version: obligation.version_number ?? 1,
-                },
-            );
-            setShowCompleteDialog(false);
-            router.reload();
-        } catch (error: any) {
-            const msg =
-                error.response?.data?.message ||
-                'Failed to mark obligation complete.';
-            setCompleteError(msg);
-        } finally {
-            setCompleteSubmitting(false);
-        }
-    };
-
-    const getFrameworkLabel = (framework: string) => {
-        const labels: Record<string, string> = {
-            charities: 'Charities Services',
-            nga_paerewa: 'Ngā Paerewa NZS 8134:2021',
-            hdsa_safety: 'H&D Services (Safety) Act',
-            privacy_act: 'Privacy Act 2020',
-            hip_code: 'Health Information Privacy Code',
-            hswa: 'Health and Safety at Work Act',
-            employment: 'Employment Relations',
-            funding_moh: 'MoH/Health NZ Funding',
-            funding_msd: 'MSD Funding',
-            funding_acc: 'ACC Funding',
-        };
-        return labels[framework] || framework;
-    };
-
-    const getStatusColor = (status: string) => {
-        return governanceStatusColor(status);
-        // legacy switch removed — see lib/governance-status.ts
-    };
-
-    const daysRemaining = () => {
-        const due = new Date(obligation.due_date);
-        const now = new Date();
-        const diff = Math.ceil(
-            (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-        );
-        return diff;
-    };
-
-    const handleUpload = async () => {
-        if (!uploadForm.file) return;
-        setSubmitting(true);
-
-        const formData = new FormData();
-        formData.append('evidence_type', uploadForm.evidence_type);
-        formData.append('title', uploadForm.title);
-        formData.append('description', uploadForm.description || '');
-        formData.append('file', uploadForm.file);
-        if (uploadForm.valid_until) {
-            formData.append('valid_until', uploadForm.valid_until);
-        }
-
-        try {
-            await axios.post(
-                uploadEvidence.url({ obligation: obligation.id }),
-                formData,
-                {
-                    headers: { 'Content-Type': 'multipart/form-data' },
-                },
-            );
-            router.reload();
-            setShowUploadDialog(false);
-        } catch (error) {
-            console.error('Upload failed:', error);
-        } finally {
-            setSubmitting(false);
-        }
-    };
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/governance/compliance"
+            icon={frameworkIcon(obligation.framework)}
+            title={obligation.obligation_title}
+            titleDusk="compliance-heading"
+            wrapTitle
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={obligationStatusVariant(obligation.status)}
+                >
+                    {obligationStatusLabel(obligation.status)}
+                </PageHeaderStatusChip>
+            }
+            subline={[
+                frameworkLabel,
+                `Due ${dateOnly(obligation.due_date)}`,
+                obligation.owner?.name
+                    ? `Owner ${obligation.owner.name}`
+                    : 'No owner',
+                refSuffix(obligation.obligation_code),
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                <>
+                    {canUpload ? (
+                        <PageHeaderGlassButton
+                            icon={Upload}
+                            onClick={() => setUploadOpen(true)}
+                        >
+                            Upload evidence
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {canEdit ? (
+                        <PageHeaderGlassButton
+                            icon={Pencil}
+                            onClick={() => setEditOpen(true)}
+                        >
+                            Edit
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {canComplete ? (
+                        <PageHeaderPrimaryButton
+                            icon={CheckCircle}
+                            onClick={() => setCompleteOpen(true)}
+                            data-dusk="open-complete-dialog-button"
+                        >
+                            Mark as done
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Due date"
+                        ariaLabel="View due date and status"
+                        onClick={() => scrollTo('obligation-status')}
+                        tone={statusTone}
+                    >
+                        <PageHeaderMeterBig>
+                            <span className="text-base">
+                                {dateOnly(obligation.due_date)}
+                            </span>
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {isComplete
+                                ? `Done ${dateOnly(obligation.completed_at)}`
+                                : dueLabel(obligation.days_until_due)}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Evidence"
+                        ariaLabel="View evidence"
+                        onClick={() => scrollTo('obligation-evidence')}
+                        tone={
+                            obligation.evidence_required &&
+                            currentEvidence.length === 0 &&
+                            !isComplete
+                                ? 'warning'
+                                : 'brand'
+                        }
+                    >
+                        <PageHeaderMeterBig>
+                            {evidenceItems.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {currentEvidence.length} current ·{' '}
+                            {obligation.evidence_required
+                                ? 'needed to mark done'
+                                : 'not needed to mark done'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Reminders"
+                        ariaLabel="View reminders"
+                        onClick={() => scrollTo('obligation-reminders')}
+                    >
+                        <PageHeaderMeterBig>
+                            {reminderItems.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {sentReminders} sent ·{' '}
+                            {reminderItems.length - sentReminders} still to send
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Status"
+                        ariaLabel={`View requirements that are ${obligationStatusLabel(obligation.status).toLowerCase()}`}
+                        href={`/governance/compliance?status=${obligation.status}`}
+                        tone={statusTone}
+                    >
+                        <PageHeaderMeterBig>
+                            <span className="text-base">
+                                {obligationStatusLabel(obligation.status)}
+                            </span>
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Due {frequencyLabel(obligation.frequency).toLowerCase()}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+        />
+    );
 
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Compliance', href: '/governance/compliance' },
                 {
-                    title: 'Obligation',
+                    title: obligation.obligation_title,
                     href: `/governance/compliance/${obligation.id}`,
                 },
             ]}
         >
             <Head title={obligation.obligation_title} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="governance"
-                        backHref={complianceIndex.url()}
-                        icon={FileCheck}
-                        title={
-                            <span
-                                className="flex flex-wrap items-center gap-3"
-                                dusk="compliance-heading"
-                            >
-                                {obligation.obligation_title}
-                                <Badge variant="outline">
-                                    {getFrameworkLabel(obligation.framework)}
-                                </Badge>
-                                {obligation.obligation_code && (
-                                    <Badge variant="outline">
-                                        {obligation.obligation_code}
-                                    </Badge>
-                                )}
-                                <Badge
-                                    className={getStatusColor(
-                                        obligation.status,
-                                    )}
-                                >
-                                    {obligation.status}
-                                </Badge>
-                            </span>
-                        }
-                        stats={[
-                            {
-                                label: 'Framework',
-                                value: getFrameworkLabel(obligation.framework),
-                            },
-                            { label: 'Due', value: obligation.due_date },
-                            { label: 'Status', value: obligation.status },
-                            { label: 'Evidence', value: evidenceItems.length },
-                        ]}
-                        actions={
-                            <div className="flex gap-2">
-                                <Dialog
-                                    open={showUploadDialog}
-                                    onOpenChange={setShowUploadDialog}
-                                >
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline">
-                                            <Upload className="mr-2 h-4 w-4" />
-                                            Upload Evidence
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>
-                                                Upload Evidence
-                                            </DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-4 py-4">
-                                            <div>
-                                                <Label>Evidence Type</Label>
-                                                <Select
-                                                    value={
-                                                        uploadForm.evidence_type
-                                                    }
-                                                    onValueChange={(v) =>
-                                                        setUploadForm({
-                                                            ...uploadForm,
-                                                            evidence_type: v,
-                                                        })
-                                                    }
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="document">
-                                                            Document
-                                                        </SelectItem>
-                                                        <SelectItem value="audit_report">
-                                                            Audit Report
-                                                        </SelectItem>
-                                                        <SelectItem value="certification">
-                                                            Certification
-                                                        </SelectItem>
-                                                        <SelectItem value="system_export">
-                                                            System Export
-                                                        </SelectItem>
-                                                        <SelectItem value="attestation">
-                                                            Attestation
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div>
-                                                <Label>Title</Label>
-                                                <Input
-                                                    value={uploadForm.title}
-                                                    onChange={(e) =>
-                                                        setUploadForm({
-                                                            ...uploadForm,
-                                                            title: e.target
-                                                                .value,
-                                                        })
-                                                    }
-                                                    placeholder="Evidence title..."
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label>File</Label>
-                                                <Input
-                                                    type="file"
-                                                    onChange={(e) =>
-                                                        setUploadForm({
-                                                            ...uploadForm,
-                                                            file:
-                                                                e.target
-                                                                    .files?.[0] ||
-                                                                null,
-                                                        })
-                                                    }
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label>
-                                                    Valid Until (optional)
-                                                </Label>
-                                                <Input
-                                                    type="date"
-                                                    value={
-                                                        uploadForm.valid_until
-                                                    }
-                                                    onChange={(e) =>
-                                                        setUploadForm({
-                                                            ...uploadForm,
-                                                            valid_until:
-                                                                e.target.value,
-                                                        })
-                                                    }
-                                                />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button
-                                                onClick={handleUpload}
-                                                disabled={
-                                                    submitting ||
-                                                    !uploadForm.file ||
-                                                    !uploadForm.title
-                                                }
-                                            >
-                                                {submitting
-                                                    ? 'Uploading...'
-                                                    : 'Upload'}
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                                {obligation.status !== 'complete' && (
-                                    <Button
-                                        onClick={openCompleteDialog}
-                                        data-dusk="open-complete-dialog-button"
-                                    >
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        Mark Complete
-                                    </Button>
-                                )}
-                                <Dialog
-                                    open={showCompleteDialog}
-                                    onOpenChange={setShowCompleteDialog}
-                                >
-                                    <DialogContent className="max-w-xl">
-                                        <DialogHeader>
-                                            <DialogTitle>
-                                                Complete Compliance Obligation
-                                            </DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-4 py-3">
-                                            {completeError && (
-                                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
-                                                    {completeError}
-                                                </div>
-                                            )}
-
-                                            <div className="rounded-lg border bg-muted/40 p-3 space-y-1 text-sm">
-                                                <p className="font-semibold text-foreground">
-                                                    {obligation.obligation_title}
-                                                </p>
-                                                <p className="text-muted-foreground">
-                                                    {getFrameworkLabel(obligation.framework)} &bull; Due: {obligation.due_date}
-                                                </p>
-                                                {obligation.requirements && (
-                                                    <p className="text-xs text-muted-foreground pt-1 border-t border-border mt-1">
-                                                        <span className="font-medium">Requirements:</span>{' '}
-                                                        {obligation.requirements}
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            {obligation.evidence_required && !hasValidEvidence && (
-                                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 space-y-3">
-                                                    <div className="flex items-start gap-2">
-                                                        <AlertTriangle className="h-5 w-5 text-status-critical shrink-0 mt-0.5" />
-                                                        <div>
-                                                            <p className="font-medium text-status-critical">
-                                                                Valid Evidence Required
-                                                            </p>
-                                                            <p className="text-xs text-muted-foreground mt-0.5">
-                                                                Evidence is mandatory to satisfy this compliance obligation, but no active, unexpired evidence is currently attached.
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="w-full"
-                                                        onClick={() => {
-                                                            setShowCompleteDialog(false);
-                                                            setShowUploadDialog(true);
-                                                        }}
-                                                    >
-                                                        <Upload className="mr-2 h-4 w-4" />
-                                                        Upload Evidence First
-                                                    </Button>
-                                                </div>
-                                            )}
-
-                                            <div>
-                                                <Label className="text-xs font-semibold uppercase text-muted-foreground">
-                                                    Attached Evidence ({evidenceItems.length})
-                                                </Label>
-                                                {evidenceItems.length > 0 ? (
-                                                    <div className="mt-2 space-y-2 max-h-48 overflow-y-auto pr-1">
-                                                        {evidenceItems.map((ev) => {
-                                                            const expired = isEvidenceExpired(ev);
-                                                            const isChecked = selectedEvidenceIds.includes(ev.id);
-                                                            return (
-                                                                <label
-                                                                    key={ev.id}
-                                                                    className={cn(
-                                                                        'flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors',
-                                                                        expired
-                                                                            ? 'opacity-60 bg-muted/30 cursor-not-allowed'
-                                                                            : 'hover:bg-muted/40',
-                                                                        isChecked &&
-                                                                            !expired &&
-                                                                            'border-primary/50 bg-primary/5',
-                                                                    )}
-                                                                >
-                                                                    <Checkbox
-                                                                        checked={isChecked}
-                                                                        disabled={expired}
-                                                                        onCheckedChange={(checked) => {
-                                                                            if (checked) {
-                                                                                setSelectedEvidenceIds([
-                                                                                    ...selectedEvidenceIds,
-                                                                                    ev.id,
-                                                                                ]);
-                                                                            } else {
-                                                                                setSelectedEvidenceIds(
-                                                                                    selectedEvidenceIds.filter(
-                                                                                        (id) =>
-                                                                                            id !==
-                                                                                            ev.id,
-                                                                                    ),
-                                                                                );
-                                                                            }
-                                                                        }}
-                                                                        className="mt-0.5"
-                                                                    />
-                                                                    <div className="flex-1 text-xs">
-                                                                        <div className="flex items-center justify-between gap-2">
-                                                                            <span className="font-medium text-foreground">
-                                                                                {ev.title}
-                                                                            </span>
-                                                                            {expired ? (
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="border-status-critical/30 text-status-critical text-[10px]"
-                                                                                >
-                                                                                    Expired ({ev.valid_until})
-                                                                                </Badge>
-                                                                            ) : ev.valid_until ? (
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="border-status-success/30 text-status-success text-[10px]"
-                                                                                >
-                                                                                    Valid until {ev.valid_until}
-                                                                                </Badge>
-                                                                            ) : (
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="text-[10px]"
-                                                                                >
-                                                                                    Active
-                                                                                </Badge>
-                                                                            )}
-                                                                        </div>
-                                                                        <p className="text-muted-foreground capitalize mt-0.5">
-                                                                            {ev.evidence_type.replace('_', ' ')} &bull; Uploaded by {ev.uploaded_by?.name || 'Unknown'}
-                                                                        </p>
-                                                                    </div>
-                                                                </label>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-xs text-muted-foreground mt-2 italic">
-                                                        No evidence files uploaded yet.
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            <div>
-                                                <Label
-                                                    htmlFor="completion-notes"
-                                                    className="text-xs font-semibold uppercase text-muted-foreground"
-                                                >
-                                                    Completion Notes
-                                                </Label>
-                                                <Textarea
-                                                    id="completion-notes"
-                                                    value={completionNotes}
-                                                    onChange={(e) =>
-                                                        setCompletionNotes(
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="Add details on how this obligation was fulfilled, relevant findings, or actions taken..."
-                                                    className="mt-1"
-                                                    rows={3}
-                                                />
-                                            </div>
-                                        </div>
-                                        <DialogFooter className="gap-2 sm:gap-0">
-                                            <Button
-                                                variant="outline"
-                                                onClick={() =>
-                                                    setShowCompleteDialog(false)
-                                                }
-                                            >
-                                                Cancel
-                                            </Button>
-                                            <Button
-                                                onClick={handleComplete}
-                                                disabled={
-                                                    completeSubmitting ||
-                                                    !canComplete
-                                                }
-                                                data-dusk="submit-complete-obligation-button"
-                                            >
-                                                {completeSubmitting
-                                                    ? 'Completing...'
-                                                    : 'Complete Obligation'}
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                        }
-                    />
-                }
-            >
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    {/* Main Content */}
-                    <div className="space-y-6 lg:col-span-2">
-                        {/* Description */}
+            <PageLayout hero={header}>
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                    <div className="flex flex-col gap-5 lg:col-span-2">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Description</CardTitle>
+                                <CardTitle className="flex items-center gap-1.5">
+                                    About this requirement
+                                    <GovernanceTermHint term="requirement" />
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="flex flex-col gap-4">
                                 <p className="whitespace-pre-wrap text-foreground">
                                     {obligation.description}
                                 </p>
-                                {obligation.notes && (
-                                    <div className="mt-4 rounded-lg bg-muted p-4">
+                                {obligation.requirements ? (
+                                    <div className="rounded-lg bg-muted p-4">
+                                        <p className="text-sm font-medium text-foreground">
+                                            What must be done
+                                        </p>
+                                        <p className="text-subtle whitespace-pre-wrap">
+                                            {obligation.requirements}
+                                        </p>
+                                    </div>
+                                ) : null}
+                                {obligation.notes ? (
+                                    <div className="rounded-lg bg-muted p-4">
                                         <p className="text-sm font-medium text-foreground">
                                             Notes
                                         </p>
-                                        <p className="text-sm text-muted-foreground">
+                                        <p className="text-subtle whitespace-pre-wrap">
                                             {obligation.notes}
                                         </p>
                                     </div>
-                                )}
+                                ) : null}
                             </CardContent>
                         </Card>
 
-                        {/* Evidence */}
-                        <Card>
+                        <Card id="obligation-evidence">
                             <CardHeader>
-                                <CardTitle>Evidence</CardTitle>
+                                <CardTitle className="flex items-center gap-1.5">
+                                    Evidence
+                                    <GovernanceTermHint term="evidence" />
+                                </CardTitle>
                                 <CardDescription>
                                     {obligation.evidence_required
-                                        ? 'Evidence is required for this obligation'
-                                        : 'Evidence is optional'}
+                                        ? 'Evidence that hasn’t expired is needed before this can be marked done.'
+                                        : 'Evidence is optional for this requirement.'}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 {evidenceItems.length > 0 ? (
-                                    <div className="space-y-3">
+                                    <div className="flex flex-col gap-3">
                                         {evidenceItems.map((ev) => (
                                             <div
                                                 key={ev.id}
-                                                className="flex items-center justify-between rounded-lg border p-4"
+                                                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-4"
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <FileCheck className="h-6 w-6 text-status-success" />
-                                                    <div>
-                                                        <p className="font-medium">
+                                                <div className="flex min-w-0 items-center gap-3">
+                                                    {ev.expired ? (
+                                                        <AlertTriangle
+                                                            className="h-6 w-6 shrink-0 text-status-warning"
+                                                            aria-label="Expired"
+                                                        />
+                                                    ) : (
+                                                        <FileCheck
+                                                            className="h-6 w-6 shrink-0 text-status-success"
+                                                            aria-label="Current"
+                                                        />
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <p className="truncate font-medium">
                                                             {ev.title}
                                                         </p>
-                                                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="text-xs capitalize"
+                                                        <div className="text-subtle flex flex-wrap items-center gap-x-3 gap-y-1">
+                                                            <StatusBadge
+                                                                variant="neutral"
+                                                                size="sm"
                                                             >
-                                                                {
-                                                                    ev.evidence_type
-                                                                }
-                                                            </Badge>
+                                                                {complianceEvidenceTypeLabel(
+                                                                    ev.evidence_type,
+                                                                )}
+                                                            </StatusBadge>
+                                                            {ev.file_name ? (
+                                                                <span className="truncate">
+                                                                    {ev.file_name}
+                                                                    {ev.file_size
+                                                                        ? ` · ${formatFileSize(ev.file_size)}`
+                                                                        : ''}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-status-warning">
+                                                                    File missing
+                                                                </span>
+                                                            )}
                                                             <span>
-                                                                by{' '}
-                                                                {
-                                                                    ev
-                                                                        .uploaded_by
-                                                                        ?.name
-                                                                }
-                                                            </span>
-                                                            <span>
-                                                                {ev.uploaded_at}
+                                                                Uploaded by{' '}
+                                                                {ev.uploaded_by?.name ??
+                                                                    'someone no longer listed'}
+                                                                {ev.uploaded_at
+                                                                    ? ` · ${formatDateTime(ev.uploaded_at)}`
+                                                                    : ''}
                                                             </span>
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {ev.valid_until && (
-                                                    <Badge variant="outline">
-                                                        Valid until{' '}
-                                                        {ev.valid_until}
-                                                    </Badge>
-                                                )}
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {ev.valid_until ? (
+                                                        <StatusBadge
+                                                            variant={
+                                                                ev.expired
+                                                                    ? 'warning'
+                                                                    : 'success'
+                                                            }
+                                                        >
+                                                            {ev.expired
+                                                                ? 'Expired'
+                                                                : 'Valid until'}{' '}
+                                                            {dateOnly(ev.valid_until)}
+                                                        </StatusBadge>
+                                                    ) : null}
+                                                    {ev.open_url ? (
+                                                        <Button
+                                                            asChild
+                                                            variant="outline"
+                                                            size="sm"
+                                                        >
+                                                            <a
+                                                                href={ev.open_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                aria-label={`Open ${ev.title} in a new tab`}
+                                                            >
+                                                                <ExternalLink className="h-4 w-4" />
+                                                                Open
+                                                            </a>
+                                                        </Button>
+                                                    ) : null}
+                                                    {ev.download_url ? (
+                                                        <Button
+                                                            asChild
+                                                            variant="outline"
+                                                            size="sm"
+                                                        >
+                                                            <a
+                                                                href={ev.download_url}
+                                                                aria-label={`Download ${ev.title}`}
+                                                            >
+                                                                <Download className="h-4 w-4" />
+                                                                Download
+                                                            </a>
+                                                        </Button>
+                                                    ) : null}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="py-8 text-center text-muted-foreground">
-                                        <Upload className="mx-auto mb-2 h-12 w-12 opacity-50" />
-                                        <p>No evidence uploaded yet</p>
-                                    </div>
+                                    <EmptyState
+                                        variant="compact"
+                                        icon={Upload}
+                                        title="No evidence uploaded yet"
+                                        description={
+                                            canUpload
+                                                ? 'Upload a document, audit report or certificate showing this requirement is met.'
+                                                : 'Evidence the owner uploads appears here.'
+                                        }
+                                    />
                                 )}
                             </CardContent>
                         </Card>
 
-                        {/* Reminders */}
-                        {reminderItems.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Scheduled Reminders</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-2">
-                                        {reminderItems.map((reminder) => (
-                                            <div
-                                                key={reminder.id}
-                                                className="flex items-center justify-between rounded-lg border p-3"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                                    <span className="text-sm">
-                                                        {
-                                                            reminder.days_before_due
-                                                        }{' '}
-                                                        days before due
-                                                    </span>
-                                                </div>
-                                                <Badge
-                                                    className={cn(
-                                                        reminder.status ===
-                                                            'sent' &&
-                                                            'bg-status-success-bg text-status-success',
-                                                        reminder.status ===
-                                                            'pending' &&
-                                                            'bg-muted text-foreground',
-                                                    )}
+                        <Card id="obligation-reminders">
+                            <CardHeader>
+                                <CardTitle>Reminders</CardTitle>
+                                <CardDescription>
+                                    Emails to the owner before the due date.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {reminderItems.length > 0 ? (
+                                    <div className="flex flex-col gap-2">
+                                        {reminderItems.map((reminder) => {
+                                            const chip =
+                                                REMINDER_STATUS[reminder.status] ?? {
+                                                    label: governanceStatus(
+                                                        'compliance_status',
+                                                        reminder.status,
+                                                    ).label,
+                                                    variant: 'neutral' as const,
+                                                };
+                                            return (
+                                                <div
+                                                    key={reminder.id}
+                                                    className="flex items-center justify-between rounded-lg border border-border p-3"
                                                 >
-                                                    {reminder.status}
-                                                </Badge>
-                                            </div>
-                                        ))}
+                                                    <div className="flex items-center gap-2">
+                                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                                        <span className="text-sm">
+                                                            {reminder.is_escalation
+                                                                ? 'Follow-up because it is overdue'
+                                                                : reminder.days_before_due === 0
+                                                                  ? 'On the due date'
+                                                                  : `${plural(reminder.days_before_due, 'day')} before it is due`}
+                                                        </span>
+                                                    </div>
+                                                    <StatusBadge variant={chip.variant}>
+                                                        {chip.label}
+                                                    </StatusBadge>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
-                                </CardContent>
-                            </Card>
-                        )}
+                                ) : (
+                                    <EmptyState
+                                        variant="compact"
+                                        icon={Clock}
+                                        title="No reminders scheduled"
+                                    />
+                                )}
+                            </CardContent>
+                        </Card>
                     </div>
 
-                    {/* Sidebar */}
-                    <div className="space-y-6">
-                        {/* Status Card */}
-                        <Card
-                            className={cn(
-                                obligation.status === 'overdue' &&
-                                    'border-status-critical/30 bg-status-critical-bg',
-                                obligation.status === 'due_soon' &&
-                                    'border-status-warning/30 bg-status-warning-bg',
-                                obligation.status === 'complete' &&
-                                    'border-status-success/30 bg-status-success-bg',
-                            )}
-                        >
+                    <div className="flex flex-col gap-5">
+                        <Card id="obligation-status">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    {obligation.status === 'complete' ? (
+                                    {isComplete ? (
                                         <CheckCircle className="h-5 w-5 text-status-success" />
                                     ) : obligation.status === 'overdue' ? (
                                         <AlertTriangle className="h-5 w-5 text-status-critical" />
@@ -755,167 +560,191 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                                     Status
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent>
-                                {obligation.status === 'complete' ? (
-                                    <div className="space-y-2">
-                                        <div>
-                                            <p className="font-medium text-status-success">
-                                                Completed
-                                            </p>
-                                            <p className="text-sm text-status-success">
-                                                {obligation.completed_at} by{' '}
-                                                {obligation.completed_by?.name || 'Authorized Staff'}
-                                            </p>
-                                        </div>
-                                        {obligation.completion_notes && (
-                                            <div className="rounded bg-background/80 p-2 text-xs">
+                            <CardContent className="flex flex-col gap-2">
+                                <StatusBadge
+                                    variant={obligationStatusVariant(
+                                        obligation.status,
+                                    )}
+                                    className="w-fit"
+                                >
+                                    {isComplete
+                                        ? 'Done'
+                                        : obligation.status === 'cancelled'
+                                          ? 'Cancelled'
+                                          : dueLabel(obligation.days_until_due)}
+                                </StatusBadge>
+                                {isComplete ? (
+                                    <>
+                                        <p className="text-subtle">
+                                            Marked done on{' '}
+                                            {dateOnly(obligation.completed_at)} by{' '}
+                                            {obligation.completed_by?.name ||
+                                                'someone no longer listed'}
+                                        </p>
+                                        {obligation.completion_notes ? (
+                                            <div className="rounded-md bg-muted p-2 text-xs">
                                                 <p className="font-semibold text-muted-foreground">
-                                                    Completion Notes:
+                                                    How it was met
                                                 </p>
-                                                <p className="text-foreground whitespace-pre-wrap">
+                                                <p className="whitespace-pre-wrap text-foreground">
                                                     {obligation.completion_notes}
                                                 </p>
                                             </div>
-                                        )}
-                                    </div>
+                                        ) : null}
+                                    </>
                                 ) : (
-                                    <div>
-                                        <p className="text-2xl font-bold">
-                                            {daysRemaining() < 0 ? (
-                                                <span className="text-status-critical">
-                                                    {Math.abs(daysRemaining())}{' '}
-                                                    days overdue
-                                                </span>
-                                            ) : (
-                                                <span
-                                                    className={
-                                                        daysRemaining() <= 7
-                                                            ? 'text-status-warning'
-                                                            : 'text-foreground'
-                                                    }
-                                                >
-                                                    {daysRemaining()} days
-                                                    remaining
-                                                </span>
-                                            )}
-                                        </p>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            Due: {obligation.due_date}
-                                        </p>
-                                    </div>
+                                    <p className="text-subtle">
+                                        Due {dateOnly(obligation.due_date)}
+                                    </p>
                                 )}
                             </CardContent>
                         </Card>
 
-                        {/* Details */}
                         <Card>
                             <CardHeader>
                                 <CardTitle>Details</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent className="flex flex-col gap-4">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Owner
-                                    </p>
+                                    <p className="text-subtle">Comes from</p>
+                                    <p className="font-medium">{frameworkLabel}</p>
+                                </div>
+                                <div>
+                                    <p className="text-subtle">Owner</p>
                                     <p className="flex items-center gap-2 font-medium">
                                         <User className="h-4 w-4" />
-                                        {obligation.owner?.name ||
-                                            'Not assigned'}
+                                        {obligation.owner?.name || 'No owner'}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Frequency
-                                    </p>
-                                    <p className="font-medium capitalize">
-                                        {obligation.frequency}
+                                    <p className="text-subtle">How often</p>
+                                    <p className="font-medium">
+                                        {frequencyLabel(obligation.frequency)}
                                     </p>
                                 </div>
-                                {obligation.parent_obligation && (
+                                {obligation.priority ? (
                                     <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Prior Cycle
-                                        </p>
-                                        <a
+                                        <p className="text-subtle">Priority</p>
+                                        <StatusBadge
+                                            variant={
+                                                governanceStatus(
+                                                    'priority',
+                                                    obligation.priority,
+                                                ).variant
+                                            }
+                                        >
+                                            {
+                                                governanceStatus(
+                                                    'priority',
+                                                    obligation.priority,
+                                                ).label
+                                            }
+                                        </StatusBadge>
+                                    </div>
+                                ) : null}
+                                {obligation.parent_obligation ? (
+                                    <div>
+                                        <p className="text-subtle">Previous time</p>
+                                        <Link
                                             href={`/governance/compliance/${obligation.parent_obligation.id}`}
                                             className="text-sm font-medium text-primary hover:underline"
                                         >
-                                            {obligation.parent_obligation.obligation_title} ({obligation.parent_obligation.due_date})
-                                        </a>
+                                            Due{' '}
+                                            {dateOnly(
+                                                obligation.parent_obligation.due_date,
+                                            )}
+                                        </Link>
                                     </div>
-                                )}
-                                {obligation.recurrences && obligation.recurrences.length > 0 && (
+                                ) : null}
+                                {obligation.recurrences &&
+                                obligation.recurrences.length > 0 ? (
                                     <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Next Cycle
-                                        </p>
-                                        <div className="space-y-1 mt-0.5">
+                                        <p className="text-subtle">Next time</p>
+                                        <div className="mt-0.5 flex flex-col gap-1">
                                             {obligation.recurrences.map((rec) => (
-                                                <a
+                                                <Link
                                                     key={rec.id}
                                                     href={`/governance/compliance/${rec.id}`}
-                                                    className="block text-sm font-medium text-primary hover:underline"
+                                                    className="text-sm font-medium text-primary hover:underline"
                                                 >
-                                                    Due {rec.due_date} ({rec.status})
-                                                </a>
+                                                    Due {dateOnly(rec.due_date)} (
+                                                    {obligationStatusLabel(rec.status)})
+                                                </Link>
                                             ))}
                                         </div>
                                     </div>
-                                )}
-                                {obligation.next_due_date && (
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Next Due Date
-                                        </p>
-                                        <p className="font-medium">
-                                            {obligation.next_due_date}
-                                        </p>
-                                    </div>
-                                )}
+                                ) : null}
                                 <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Evidence
+                                    <p className="text-subtle">
+                                        Evidence needed to mark done
                                     </p>
-                                    <p className="font-medium">
-                                        {obligation.evidence_provided ? (
-                                            <span className="flex items-center gap-1 text-status-success">
-                                                <CheckCircle className="h-4 w-4" />
-                                                Provided
-                                            </span>
-                                        ) : obligation.evidence_required ? (
-                                            <span className="text-status-critical">
-                                                Required - Not provided
-                                            </span>
-                                        ) : (
-                                            <span className="text-muted-foreground">
-                                                Not required
-                                            </span>
-                                        )}
-                                    </p>
-                                </div>
-                                {obligation.sign_off_required && (
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Sign-off
+                                    {obligation.evidence_provided ? (
+                                        <StatusBadge variant="success">
+                                            <CheckCircle className="h-3.5 w-3.5" />
+                                            Provided
+                                        </StatusBadge>
+                                    ) : obligation.evidence_required ? (
+                                        <StatusBadge variant="warning">
+                                            Needed — not provided yet
+                                        </StatusBadge>
+                                    ) : (
+                                        <p className="font-medium text-muted-foreground">
+                                            Not needed
                                         </p>
+                                    )}
+                                </div>
+                                {obligation.sign_off_required ? (
+                                    <div>
+                                        <p className="text-subtle">Signed off</p>
                                         {obligation.signed_off_at ? (
-                                            <p className="text-sm text-status-success">
-                                                Signed by{' '}
-                                                {obligation.signed_off_by?.name}{' '}
-                                                on {obligation.signed_off_at}
-                                            </p>
+                                            <StatusBadge variant="success">
+                                                By {obligation.signed_off_by?.name}{' '}
+                                                on {dateOnly(obligation.signed_off_at)}
+                                            </StatusBadge>
                                         ) : (
-                                            <p className="text-sm text-status-warning">
-                                                Pending sign-off
-                                            </p>
+                                            <StatusBadge variant="warning">
+                                                Waiting to be signed off
+                                            </StatusBadge>
                                         )}
                                     </div>
-                                )}
+                                ) : null}
                             </CardContent>
                         </Card>
                     </div>
                 </div>
             </PageLayout>
+
+            {canUpload ? (
+                <UploadEvidenceDialog
+                    open={uploadOpen}
+                    onClose={() => setUploadOpen(false)}
+                    obligationId={obligation.id}
+                />
+            ) : null}
+            {canComplete ? (
+                <CompleteObligationDialog
+                    open={completeOpen}
+                    onClose={() => setCompleteOpen(false)}
+                    onUploadFirst={
+                        canUpload
+                            ? () => {
+                                  setCompleteOpen(false);
+                                  setUploadOpen(true);
+                              }
+                            : undefined
+                    }
+                    obligation={obligation}
+                    frameworkLabel={frameworkLabel}
+                />
+            ) : null}
+            {canEdit && formOptions ? (
+                <ObligationWizardDialog
+                    open={editOpen}
+                    onClose={() => setEditOpen(false)}
+                    options={formOptions}
+                    obligation={obligation}
+                />
+            ) : null}
         </AppLayout>
     );
 }

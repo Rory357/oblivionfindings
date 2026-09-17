@@ -186,11 +186,23 @@ return new class extends Migration
             Permission::query()->whereKey($permissionIds)->delete();
         }
 
+        // Rolling this back on a fully-migrated database means later migrations
+        // have already reshaped some of what it created:
+        // 2026_08_23_000130_create_external_settlement_lifecycle replaces the
+        // lifetime-unique settlement_bill index with a non-unique one, so an
+        // unconditional dropUnique() here fails with "Can't DROP … check that
+        // column/key exists" and leaves the rollback half-applied. Drop each
+        // index only if it is still present; dropping the columns below removes
+        // whatever single-column index replaced it.
         Schema::table('fin_payment_run_items', function (Blueprint $table) {
             $table->dropForeign(['settlement_bill_id']);
             $table->dropForeign(['site_id']);
-            $table->dropUnique('fin_payment_run_items_settlement_bill_unique');
-            $table->dropIndex('fin_payment_run_items_run_site_index');
+            if (Schema::hasIndex('fin_payment_run_items', 'fin_payment_run_items_settlement_bill_unique')) {
+                $table->dropUnique('fin_payment_run_items_settlement_bill_unique');
+            }
+            if (Schema::hasIndex('fin_payment_run_items', 'fin_payment_run_items_run_site_index')) {
+                $table->dropIndex('fin_payment_run_items_run_site_index');
+            }
             $table->dropColumn(['settlement_bill_id', 'site_id']);
         });
 

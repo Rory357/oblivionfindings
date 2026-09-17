@@ -14,12 +14,27 @@ import {
     type ProvisioningTemplate,
 } from '@/components/it/it-provisioning-templates';
 import {
+    ItRecurrencePlans,
+    type RecurrencePlanRow,
+} from '@/components/it/it-recurrence-plans';
+import {
+    ItReplyTemplates,
+    type ReplyTemplateRow,
+} from '@/components/it/it-reply-templates';
+import { ItRoutingDryRun } from '@/components/it/it-routing-dry-run';
+import {
     ItServiceOperations,
     type AutomationDefinition,
     type AutomationRunRow,
     type EmailDeliveryRow,
     type OperationsAudit,
 } from '@/components/it/it-service-operations';
+import {
+    ItTicketMacros,
+    summariseMacroAction,
+    type MacroRow,
+} from '@/components/it/it-ticket-macros';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -34,11 +49,14 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
+    CalendarClock,
     ClipboardCheck,
+    MessageSquareText,
     Network,
     Pencil,
     Route,
     UsersRound,
+    Wand2,
 } from 'lucide-react';
 import {
     useEffect,
@@ -61,6 +79,24 @@ import {
 } from './use-setup-create-command';
 import { useSetupMemory, type SetupFields } from './use-setup-memory';
 
+/** Automation sub-registers (tier-2 tabs); `singular` names the header action. */
+const AUTOMATION_KINDS = [
+    {
+        key: 'templates',
+        label: 'Reply templates',
+        singular: 'template',
+        icon: MessageSquareText,
+    },
+    { key: 'macros', label: 'Macros', singular: 'macro', icon: Wand2 },
+    {
+        key: 'plans',
+        label: 'Recurring plans',
+        singular: 'plan',
+        icon: CalendarClock,
+    },
+] as const;
+type AutomationKind = (typeof AUTOMATION_KINDS)[number]['key'];
+
 interface Props {
     teams: Team[];
     queues: Queue[];
@@ -74,6 +110,10 @@ interface Props {
     canManageApiIdentities?: boolean;
     oneTimeApiCredential?: OneTimeApiCredential | null;
     provisioningTemplates: ProvisioningTemplate[];
+    replyTemplates?: ReplyTemplateRow[];
+    replyPlaceholders?: Record<string, string>;
+    recurrencePlans?: RecurrencePlanRow[];
+    macros?: MacroRow[];
     operationsAudit?: OperationsAudit;
     emailDeliveries?: EmailDeliveryRow[];
     emailDeliveryFilter?: {
@@ -169,6 +209,10 @@ export default function ItSetupIndex({
     canManageApiIdentities = true,
     oneTimeApiCredential = null,
     provisioningTemplates,
+    replyTemplates = [],
+    replyPlaceholders = {},
+    recurrencePlans = [],
+    macros = [],
     operationsAudit,
     emailDeliveries = [],
     emailDeliveryFilter = null,
@@ -197,6 +241,13 @@ export default function ItSetupIndex({
     const queryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const state = params.get('state') ?? 'all';
     const layout = params.get('list_view') === 'table' ? 'table' : 'cards';
+    const requestedAutomation = params.get('automation');
+    const automationKind: AutomationKind = AUTOMATION_KINDS.some(
+        (item) => item.key === requestedAutomation,
+    )
+        ? (requestedAutomation as AutomationKind)
+        : 'templates';
+    const [automationCreating, setAutomationCreating] = useState(false);
     const [recordEditor, setRecordEditor] = useState<
         | { kind: 'team'; record?: Team }
         | { kind: 'service'; record?: Service }
@@ -211,16 +262,24 @@ export default function ItSetupIndex({
         nextState = 'all',
         nextLayout: 'cards' | 'table' = layout,
         clearQuery = false,
+        nextAutomation: AutomationKind = automationKind,
     ) => {
         if (queryTimer.current) clearTimeout(queryTimer.current);
-        const nextQuery = next === tab && !clearQuery ? query : '';
+        const nextQuery =
+            next === tab && !clearQuery && nextAutomation === automationKind
+                ? query
+                : '';
         setQuery(nextQuery);
+        setAutomationCreating(false);
         router.get(
             '/it/setup',
             {
                 tab: next,
                 ...(nextState !== 'all' ? { state: nextState } : {}),
                 list_view: nextLayout,
+                ...(next === 'automation'
+                    ? { automation: nextAutomation }
+                    : {}),
                 ...(next === 'operations' &&
                 tab === 'operations' &&
                 emailDeliveryFilter
@@ -244,6 +303,9 @@ export default function ItSetupIndex({
                     tab,
                     ...(state !== 'all' ? { state } : {}),
                     list_view: layout,
+                    ...(tab === 'automation'
+                        ? { automation: automationKind }
+                        : {}),
                     ...(tab === 'operations' && params.get('automation_from')
                         ? { automation_from: params.get('automation_from') }
                         : {}),
@@ -844,6 +906,13 @@ export default function ItSetupIndex({
                         queues={queues}
                         services={services}
                         generatedAt={generatedAt}
+                        createLabel={
+                            tab === 'automation'
+                                ? AUTOMATION_KINDS.find(
+                                      (item) => item.key === automationKind,
+                                  )!.singular
+                                : undefined
+                        }
                         onCreate={
                             tab === 'teams'
                                 ? () => openTeam()
@@ -851,7 +920,9 @@ export default function ItSetupIndex({
                                   ? () => openQueue()
                                   : tab === 'services'
                                     ? () => openService()
-                                    : undefined
+                                    : tab === 'automation'
+                                      ? () => setAutomationCreating(true)
+                                      : undefined
                         }
                     />
                     {tab === 'teams' && (
@@ -864,13 +935,18 @@ export default function ItSetupIndex({
                         />
                     )}
                     {tab === 'queues' && (
-                        <SetupRegister
-                            title="Queues"
-                            rows={filterRows(queues)}
-                            total={queues.length}
-                            layout={layout}
-                            onEdit={openQueue}
-                        />
+                        <>
+                            <div className="mb-3 flex justify-end">
+                                <ItRoutingDryRun />
+                            </div>
+                            <SetupRegister
+                                title="Queues"
+                                rows={filterRows(queues)}
+                                total={queues.length}
+                                layout={layout}
+                                onEdit={openQueue}
+                            />
+                        </>
                     )}
                     {tab === 'services' && (
                         <SetupRegister
@@ -898,6 +974,135 @@ export default function ItSetupIndex({
                             services={services}
                             sites={sites}
                         />
+                    ) : null}
+                    {tab === 'automation' ? (
+                        <div className="space-y-5">
+                            <TierTwoTabs
+                                tabs={AUTOMATION_KINDS.map((item) => ({
+                                    key: item.key,
+                                    label: item.label,
+                                    icon: item.icon,
+                                    count:
+                                        item.key === 'templates'
+                                            ? replyTemplates.length
+                                            : item.key === 'macros'
+                                              ? macros.length
+                                              : recurrencePlans.length,
+                                }))}
+                                activeTab={automationKind}
+                                onTab={(key) =>
+                                    navigate(
+                                        'automation',
+                                        'all',
+                                        layout,
+                                        false,
+                                        key as AutomationKind,
+                                    )
+                                }
+                                renderLink={(
+                                    item,
+                                    className,
+                                    inner,
+                                    accessibility,
+                                ) => (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        className={className}
+                                        {...accessibility}
+                                        onClick={() =>
+                                            navigate(
+                                                'automation',
+                                                'all',
+                                                layout,
+                                                false,
+                                                item.key as AutomationKind,
+                                            )
+                                        }
+                                    >
+                                        {inner}
+                                    </Button>
+                                )}
+                                testIdPrefix="it-automation"
+                                ariaLabel="Automation registers"
+                                panelId="it-automation-panel"
+                            />
+                            <div id="it-automation-panel" role="tabpanel">
+                                {automationKind === 'templates' && (
+                                    <ItReplyTemplates
+                                        templates={replyTemplates.filter(
+                                            (template) =>
+                                                match(
+                                                    [
+                                                        template.name,
+                                                        template.body,
+                                                        template.owner?.name ??
+                                                            '',
+                                                    ].join(' '),
+                                                ),
+                                        )}
+                                        total={replyTemplates.length}
+                                        placeholders={replyPlaceholders}
+                                        layout={layout}
+                                        creating={automationCreating}
+                                        onCreatingChange={setAutomationCreating}
+                                    />
+                                )}
+                                {automationKind === 'macros' && (
+                                    <ItTicketMacros
+                                        macros={macros.filter((macro) =>
+                                            match(
+                                                [
+                                                    macro.name,
+                                                    macro.description ?? '',
+                                                    ...macro.actions.map(
+                                                        (action) =>
+                                                            summariseMacroAction(
+                                                                action,
+                                                                {
+                                                                    agents,
+                                                                    queues,
+                                                                    templates:
+                                                                        replyTemplates,
+                                                                },
+                                                            ),
+                                                    ),
+                                                ].join(' '),
+                                            ),
+                                        )}
+                                        total={macros.length}
+                                        agents={agents}
+                                        queues={queues}
+                                        templates={replyTemplates.filter(
+                                            (template) => template.is_active,
+                                        )}
+                                        layout={layout}
+                                        creating={automationCreating}
+                                        onCreatingChange={setAutomationCreating}
+                                    />
+                                )}
+                                {automationKind === 'plans' && (
+                                    <ItRecurrencePlans
+                                        plans={recurrencePlans.filter((plan) =>
+                                            match(
+                                                [
+                                                    plan.name,
+                                                    plan.ticket_template.title,
+                                                    plan.owner?.name ?? '',
+                                                ].join(' '),
+                                            ),
+                                        )}
+                                        total={recurrencePlans.length}
+                                        sites={sites}
+                                        services={services}
+                                        agents={agents}
+                                        layout={layout}
+                                        creating={automationCreating}
+                                        onCreatingChange={setAutomationCreating}
+                                    />
+                                )}
+                            </div>
+                        </div>
                     ) : null}
                     {tab === 'provisioning' ? (
                         <ItProvisioningTemplates

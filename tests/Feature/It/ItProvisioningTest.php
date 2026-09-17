@@ -14,6 +14,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 function itProfile(Site $site, ?User $user = null, bool $current = false): HrEmployeeProfile
@@ -54,6 +55,12 @@ function itProvisioningAgent(Site $site): User
     itProfile($site, $user, true);
 
     return $user;
+}
+
+function itProvisioningIdentity(?ItProvisioningRequest $request = null): array
+{
+    return ['actor_user_id' => test()->hr->id, 'request_uuid' => (string) Str::uuid(),
+        'expected_version' => $request?->fresh()->lock_version ?? 1];
 }
 
 beforeEach(function () {
@@ -221,16 +228,19 @@ test('fulfilling a request records the outcome and completes the linked onboardi
         'created_by' => $this->hr->id,
     ]);
 
+    $request->update(['assigned_to_user_id' => $this->hr->id, 'notes' => 'Original account instructions']);
     $this->actingAs($this->hr)
         ->post("/it/provisioning/{$request->id}/fulfil", [
+            ...itProvisioningIdentity($request),
             'external_ref' => 'M365-0042',
-            'notes' => 'Provisioned via admin centre.',
+            'evidence_summary' => 'Provisioned via admin centre and verified independently.',
         ])
         ->assertRedirect();
 
     $request->refresh();
     expect($request->status)->toBe('done');
     expect($request->external_ref)->toBe('M365-0042');
+    expect($request->notes)->toBe('Original account instructions');
     expect((int) $request->fulfilled_by)->toBe($this->hr->id);
     expect($request->fulfilled_at)->not->toBeNull();
 
@@ -239,7 +249,7 @@ test('fulfilling a request records the outcome and completes the linked onboardi
 
     // A second fulfil is rejected without clobbering the record.
     $this->actingAs($this->hr)
-        ->post("/it/provisioning/{$request->id}/fulfil", ['external_ref' => 'OTHER'])
+        ->post("/it/provisioning/{$request->id}/fulfil", [...itProvisioningIdentity($request), 'external_ref' => 'OTHER'])
         ->assertRedirect()
         ->assertSessionHas('error');
     expect($request->fresh()->external_ref)->toBe('M365-0042');
@@ -263,10 +273,10 @@ test('provisioning lists and direct actions conceal inaccessible Sites', functio
     ]);
 
     $this->actingAs($this->hr)
-        ->get('/it?tab=provisioning')
+        ->get('/it/provisioning')
         ->assertInertia(fn ($page) => $page
-            ->where('requests.data.0.id', $local->id)
-            ->has('requests.data', 1));
+            ->where('records.data.0.id', $local->id)
+            ->has('records.data', 1));
 
     $this->actingAs($this->hr)
         ->post("/it/provisioning/{$remote->id}/fulfil", ['notes' => 'Forged request'])
@@ -340,7 +350,7 @@ test('provisioning assign, fulfil and cancel each write an activity event', func
 
     // Assigning moves pending → in_progress and records an `assigned` event.
     $this->actingAs($this->hr)
-        ->post("/it/provisioning/{$request->id}/assign", ['assigned_to_user_id' => $agent->id])
+        ->post("/it/provisioning/{$request->id}/assign", [...itProvisioningIdentity($request), 'assigned_to_user_id' => $agent->id])
         ->assertRedirect();
     expect($request->refresh()->status)->toBe('in_progress');
     expect($request->events()->where('type', 'assigned')->count())->toBe(1);
@@ -352,7 +362,8 @@ test('provisioning assign, fulfil and cancel each write an activity event', func
 
     // Fulfilling records a `fulfilled` event (no onboarding task to complete here).
     $this->actingAs($this->hr)
-        ->post("/it/provisioning/{$request->id}/fulfil", ['notes' => 'Provisioned'])
+        ->post("/it/provisioning/{$request->id}/fulfil", [...itProvisioningIdentity($request),
+            'evidence_summary' => 'Synthetic account provisioned and verified.', 'external_ref' => 'SYN-EMAIL'])
         ->assertRedirect();
     expect($request->events()->where('type', 'fulfilled')->count())->toBe(1);
 
@@ -364,7 +375,7 @@ test('provisioning assign, fulfil and cancel each write an activity event', func
         'status' => 'pending',
     ]);
     $this->actingAs($this->hr)
-        ->post("/it/provisioning/{$toCancel->id}/cancel", ['reason' => 'Duplicate'])
+        ->post("/it/provisioning/{$toCancel->id}/cancel", [...itProvisioningIdentity($toCancel), 'reason' => 'Duplicate'])
         ->assertRedirect();
     $cancelled = $toCancel->events()->where('type', 'cancelled')->first();
     expect($cancelled)->not->toBeNull();
@@ -376,7 +387,7 @@ test('provisioning assign, fulfil and cancel each write an activity event', func
         ->exists())->toBeTrue();
 
     $this->actingAs($this->hr)
-        ->post("/it/provisioning/{$toCancel->id}/cancel", ['reason' => 'Repeated click'])
+        ->post("/it/provisioning/{$toCancel->id}/cancel", [...itProvisioningIdentity($toCancel), 'reason' => 'Repeated click'])
         ->assertSessionHas('error', 'This request is already cancelled.');
     expect($toCancel->events()->where('type', 'cancelled')->count())->toBe(1);
 });
@@ -388,6 +399,7 @@ test('an agent raises a manual provisioning request; requesters cannot', functio
     // Assigned manual request → in_progress, with a `created` event.
     $this->actingAs($this->hr)
         ->post('/it/provisioning', [
+            ...itProvisioningIdentity(),
             'employee_profile_id' => $profile->id,
             'type' => 'equipment',
             'item' => 'Replacement laptop',
@@ -413,6 +425,7 @@ test('an agent raises a manual provisioning request; requesters cannot', functio
     // Unassigned manual request stays pending.
     $this->actingAs($this->hr)
         ->post('/it/provisioning', [
+            ...itProvisioningIdentity(),
             'employee_profile_id' => $profile->id,
             'type' => 'account',
             'item' => 'Email setup',
@@ -425,12 +438,13 @@ test('an agent raises a manual provisioning request; requesters cannot', functio
     $remoteProfile = itProfile($remoteSite);
     $this->actingAs($this->hr)
         ->post('/it/provisioning', [
+            ...itProvisioningIdentity(),
             'employee_profile_id' => $remoteProfile->id,
             'type' => 'access',
             'item' => 'Hidden Site access',
             'priority' => 'normal',
         ])
-        ->assertForbidden();
+        ->assertNotFound();
     expect(ItProvisioningRequest::query()->where('item', 'Hidden Site access')->exists())->toBeFalse();
 
     // Self-service requesters (no it.manage) cannot raise provisioning requests.
@@ -441,6 +455,7 @@ test('an agent raises a manual provisioning request; requesters cannot', functio
     itProfile($this->site, $worker, true);
     $this->actingAs($worker)
         ->post('/it/provisioning', [
+            ...itProvisioningIdentity(),
             'employee_profile_id' => $profile->id,
             'type' => 'account',
             'item' => 'Nope',

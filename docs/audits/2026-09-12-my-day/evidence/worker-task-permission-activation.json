@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-13",
+  "authorization": "User explicitly approved enabling Add task for all existing support workers.",
+  "activation_exit_code": 0,
+  "before": {
+    "role_exists": true,
+    "task_creation_enabled": false,
+    "other_role_permissions_hash": "f33f232040eeb761199e52b1bb24b3b2896529c4cd01d636da15e4e4fd2eb7bd",
+    "individual_overrides_hash": "1dc633223c13603dfdda5f7b13ec92faa282d26385b0b9b08ff27fdd32e978b6",
+    "required_migrations_present": true
+  },
+  "after": {
+    "role_exists": true,
+    "task_creation_enabled": true,
+    "other_role_permissions_hash": "f33f232040eeb761199e52b1bb24b3b2896529c4cd01d636da15e4e4fd2eb7bd",
+    "individual_overrides_hash": "1dc633223c13603dfdda5f7b13ec92faa282d26385b0b9b08ff27fdd32e978b6",
+    "required_migrations_present": true
+  },
+  "other_role_permissions_unchanged": true,
+  "individual_overrides_unchanged": true,
+  "post_restart_browser": {
+    "url": "https://oblivionfindings.test/login",
+    "asset": "https://oblivionfindings.test/build/assets/app-BBId7isD.js",
+    "captured_warnings_or_errors": [],
+    "note": "Existing browser session expired; app renders its normal login screen."
+  }
+}

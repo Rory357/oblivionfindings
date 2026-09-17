@@ -13,6 +13,7 @@ import { router } from '@inertiajs/react';
 import { Ticket } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { TicketConversationSummary } from './ticket-conversation-summary';
+import { PRIORITY_LABELS } from './ticket-work-types';
 
 export interface MyTicketRow {
     conversation?: import('./ticket-conversation-summary').TicketConversation;
@@ -151,7 +152,8 @@ export function MyTicketsList({
                                         'neutral'
                                     }
                                 >
-                                    {label(row.priority)}
+                                    {PRIORITY_LABELS[row.priority] ??
+                                        label(row.priority)}
                                 </EntityStatusChip>
                             ),
                         },
@@ -206,7 +208,8 @@ export function MyTicketsList({
                                             'neutral'
                                         }
                                     >
-                                        {label(row.priority)}
+                                        {PRIORITY_LABELS[row.priority] ??
+                                            label(row.priority)}
                                     </EntityStatusChip>
                                 </>
                             }

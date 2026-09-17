@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Services;
 
+use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinCurrency;
@@ -119,7 +120,6 @@ class FxRevaluationService
             }
         }
 
-
         return [
             'items' => $items,
             'total_gain_loss' => $totalGainLoss,
@@ -138,7 +138,7 @@ class FxRevaluationService
             'revaluation_date' => $date,
             'total_gain_loss' => $result['total_gain_loss'],
             'status' => 'draft',
-            'notes' => 'Unrealised FX gain/loss revaluation with ' . count($result['items']) . ' item(s).',
+            'notes' => 'Unrealised FX gain/loss revaluation with '.count($result['items']).' item(s).',
             'created_by' => Auth::id(),
         ]);
     }
@@ -165,18 +165,18 @@ class FxRevaluationService
 
             // Determine debit/credit accounts
             // Unrealised FX Gain/Loss uses account 8300 (we'll look it up, or use a sensible default)
-            $fxGainLossAccount = \App\Domain\Finance\Models\FinAccount::forOrganization($reval->organization_id)
+            $fxGainLossAccount = FinAccount::forOrganization($reval->organization_id)
                 ->where('code', '8300')
                 ->first();
 
-            $retainedEarningsAccount = \App\Domain\Finance\Models\FinAccount::forOrganization($reval->organization_id)
+            $retainedEarningsAccount = FinAccount::forOrganization($reval->organization_id)
                 ->where('code', '3000')
                 ->first();
 
             if (! $fxGainLossAccount || ! $retainedEarningsAccount) {
                 throw new \InvalidArgumentException(
                     'Required GL accounts (8300 - FX Gain/Loss, 3000 - Retained Earnings) not found. '
-                    . 'Please ensure these accounts exist in the Chart of Accounts.'
+                    .'Please ensure these accounts exist in the Chart of Accounts.'
                 );
             }
 
@@ -215,8 +215,8 @@ class FxRevaluationService
             $journal = $this->journalPostingService->createAndPost($reval->organization_id, [
                 'journal_date' => $reval->revaluation_date->toDateString(),
                 'type' => 'adjustment',
-                'reference' => 'FX-REVAL-' . $reval->id,
-                'description' => 'FX Revaluation — unrealised gain/loss as at ' . $reval->revaluation_date->toDateString(),
+                'reference' => 'FX-REVAL-'.$reval->id,
+                'description' => 'FX Revaluation — unrealised gain/loss as at '.$reval->revaluation_date->toDateString(),
                 'lines' => $lines,
             ]);
 

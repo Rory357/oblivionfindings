@@ -45,7 +45,7 @@ export type QuotePriceBook = {
     items: QuotePriceBookItem[];
 };
 
-/** An existing DRAFT quote to prefill the wizard with (edit mode — header only). */
+/** An existing DRAFT quote to prefill the wizard with (edit mode). */
 export type EditableQuoteLine = {
     description: string;
     quantity: string | number;
@@ -80,12 +80,11 @@ const money = (n: number | string) =>
 
 /**
  * Quote wizard — the multi-line AR quote as an Add-Client-grade stepper modal.
- * CREATE runs Details → Line items → Review and posts to `finance.quotes.store`
- * (client_id, title, valid_until, notes, line_items[]); the controller rolls up
- * NZ GST 15% on the header. EDIT is DRAFT-ONLY and HEADER-ONLY (Details →
- * Review) because `finance.quotes.update` only validates client/title/valid_until/
- * notes — it never persists line changes — so the wizard doesn't pretend to edit
- * lines. No GL journal results, so there is no posting preview.
+ * Both modes run Details → Line items → Review. CREATE posts to
+ * `finance.quotes.store`; EDIT is DRAFT-ONLY and PUTs to `finance.quotes.update`,
+ * which replaces the quote's line items and re-rolls the NZ GST 15% header
+ * totals, so a draft's lines are editable through the UI. No GL journal results,
+ * so there is no posting preview.
  */
 export function QuoteDialog({
     open,
@@ -98,46 +97,31 @@ export function QuoteDialog({
     onClose: () => void;
     clients: QuoteClientOption[];
     priceBooks: QuotePriceBook[];
-    /** When provided, the wizard opens in EDIT mode (draft-only, header fields only). */
+    /** When provided, the wizard opens in EDIT mode (draft quotes only). */
     quote?: EditableQuote | null;
 }) {
     const isEdit = !!quote;
 
-    const STEPS: readonly WizardStep[] = isEdit
-        ? [
-              {
-                  key: 'details',
-                  label: 'Details',
-                  blurb: 'Client & title',
-                  icon: FileText,
-              },
-              {
-                  key: 'review',
-                  label: 'Review',
-                  blurb: 'Confirm & save',
-                  icon: ListChecks,
-              },
-          ]
-        : [
-              {
-                  key: 'details',
-                  label: 'Details',
-                  blurb: 'Client & title',
-                  icon: FileText,
-              },
-              {
-                  key: 'lines',
-                  label: 'Line items',
-                  blurb: 'What you are quoting',
-                  icon: Receipt,
-              },
-              {
-                  key: 'review',
-                  label: 'Review',
-                  blurb: 'Confirm & create',
-                  icon: ListChecks,
-              },
-          ];
+    const STEPS: readonly WizardStep[] = [
+        {
+            key: 'details',
+            label: 'Details',
+            blurb: 'Client & title',
+            icon: FileText,
+        },
+        {
+            key: 'lines',
+            label: 'Line items',
+            blurb: 'What you are quoting',
+            icon: Receipt,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: isEdit ? 'Confirm & save' : 'Confirm & create',
+            icon: ListChecks,
+        },
+    ];
 
     const wizard = useWizard(STEPS.length);
     const { index, goTo, next, back, isFirst, isLast, reset } = wizard;
@@ -249,8 +233,7 @@ export function QuoteDialog({
                 Number(l.quantity) > 0,
         ) && totals.subtotal > 0;
     const canContinueDetails = detailsValid;
-    // Edit is header-only, so the wizard is complete once details are valid.
-    const submitReady = isEdit ? detailsValid : detailsValid && linesValid;
+    const submitReady = detailsValid && linesValid;
 
     const close = () => {
         reset();
@@ -265,26 +248,20 @@ export function QuoteDialog({
             onSuccess: () => close(),
             onError: () => goTo(0),
         };
+        form.transform((d) => ({
+            client_id: d.client_id,
+            title: d.title,
+            valid_until: d.valid_until || null,
+            notes: d.notes || null,
+            line_items: d.lines.map((l) => ({
+                description: l.description,
+                quantity: l.quantity,
+                unit_price: l.unit_price,
+            })),
+        }));
         if (isEdit && quote) {
-            form.transform((d) => ({
-                client_id: d.client_id,
-                title: d.title,
-                valid_until: d.valid_until || null,
-                notes: d.notes || null,
-            }));
             form.put(`/finance/quotes/${quote.id}`, opts);
         } else {
-            form.transform((d) => ({
-                client_id: d.client_id,
-                title: d.title,
-                valid_until: d.valid_until || null,
-                notes: d.notes || null,
-                line_items: d.lines.map((l) => ({
-                    description: l.description,
-                    quantity: l.quantity,
-                    unit_price: l.unit_price,
-                })),
-            }));
             form.post('/finance/quotes', opts);
         }
     };
@@ -315,19 +292,17 @@ export function QuoteDialog({
                           (detailsValid ? 50 : 0) + (linesValid ? 40 : 0),
                       )
             }
-            pctLabel={isEdit ? 'Quote' : 'Total'}
+            pctLabel="Total"
             footerStart={
-                !isEdit ? (
-                    <span className="text-[13px] text-muted-foreground">
-                        Total{' '}
-                        <span className="font-semibold text-foreground">
-                            {money(totals.total)}
-                        </span>
-                        <span className="ml-1">
-                            (incl. {money(totals.gst)} GST)
-                        </span>
+                <span className="text-[13px] text-muted-foreground">
+                    Total{' '}
+                    <span className="font-semibold text-foreground">
+                        {money(totals.total)}
                     </span>
-                ) : undefined
+                    <span className="ml-1">
+                        (incl. {money(totals.gst)} GST)
+                    </span>
+                </span>
             }
             footerEnd={
                 <>
@@ -347,7 +322,7 @@ export function QuoteDialog({
                             onClick={next}
                             disabled={
                                 (index === 0 && !canContinueDetails) ||
-                                (!isEdit && index === 1 && !linesValid)
+                                (index === 1 && !linesValid)
                             }
                         >
                             Continue
@@ -419,17 +394,10 @@ export function QuoteDialog({
                             />
                         </Field>
                     </div>
-                    {isEdit && (
-                        <p className="mt-4 text-[13px] text-muted-foreground">
-                            Line items are locked once a quote exists — edit the
-                            header details here, or create a new quote to change
-                            what's being quoted.
-                        </p>
-                    )}
                 </div>
             )}
 
-            {!isEdit && index === 1 && (
+            {index === 1 && (
                 <div>
                     <StepHead
                         icon={Receipt}
@@ -602,30 +570,19 @@ export function QuoteDialog({
                                 value={data.valid_until}
                             />
                         )}
-                        {!isEdit && (
-                            <ReviewRow
-                                label="Lines"
-                                value={String(data.lines.length)}
-                            />
-                        )}
-                        {!isEdit && (
-                            <ReviewRow
-                                label="Subtotal"
-                                value={money(totals.subtotal)}
-                            />
-                        )}
-                        {!isEdit && (
-                            <ReviewRow
-                                label="GST (15%)"
-                                value={money(totals.gst)}
-                            />
-                        )}
-                        {!isEdit && (
-                            <ReviewRow
-                                label="Total (NZD)"
-                                value={money(totals.total)}
-                            />
-                        )}
+                        <ReviewRow
+                            label="Lines"
+                            value={String(data.lines.length)}
+                        />
+                        <ReviewRow
+                            label="Subtotal"
+                            value={money(totals.subtotal)}
+                        />
+                        <ReviewRow label="GST (15%)" value={money(totals.gst)} />
+                        <ReviewRow
+                            label="Total (NZD)"
+                            value={money(totals.total)}
+                        />
                     </ReviewCard>
                     {processing && (
                         <p className="mt-3 text-[13px] text-muted-foreground">

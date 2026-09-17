@@ -2,7 +2,6 @@
 
 namespace App\Domain\Finance\Services;
 
-use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinAccountMapping;
 use App\Domain\Finance\Models\FinConsolidationEntity;
 use App\Domain\Finance\Models\FinConsolidationGroup;

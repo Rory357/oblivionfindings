@@ -1,0 +1,7 @@
+{
+    "token": "b31bef25eaa6bec2",
+    "phase": "vendor_fixtures",
+    "exception_class": "App\\Domain\\It\\Exceptions\\ItKnowledgeRelationshipUnavailable",
+    "migration": [],
+    "raw_sql_or_values_emitted": false
+}

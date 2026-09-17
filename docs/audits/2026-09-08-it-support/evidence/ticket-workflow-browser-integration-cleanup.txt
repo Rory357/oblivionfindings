@@ -1,0 +1,7 @@
+{"database_removed":"oblivion_ticket_work_browser_ab019eac87936d52","token":"ab019eac87936d52","other_databases_affected":false}
+{
+  "token": "ab019eac87936d52",
+  "database_removed": true,
+  "owned_directory_removed": true,
+  "current_herd_environment_changed": false
+}

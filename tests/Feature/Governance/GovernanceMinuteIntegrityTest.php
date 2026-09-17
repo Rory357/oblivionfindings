@@ -239,7 +239,7 @@ class GovernanceMinuteIntegrityTest extends TestCase
         ], $chair);
 
         $this->expectException(DomainException::class);
-        $this->expectExceptionMessage('Cannot approve empty minutes');
+        $this->expectExceptionMessage("You can't approve empty minutes");
 
         $service->approveMinutes($meeting, $chair);
     }

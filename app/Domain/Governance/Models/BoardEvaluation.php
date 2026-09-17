@@ -12,8 +12,11 @@ class BoardEvaluation extends Model
 {
     use AuditableChanges;
 
+    /** Statuses in which results can be read (see BoardEvaluationPolicy::results). */
+    public const RESULTS_OPEN_STATUSES = ['closed', 'reported'];
+
     protected $fillable = [
-        'title', 'evaluation_type', 'year', 'period_start', 'period_end',
+        'title', 'evaluation_type', 'board_committee_id', 'year', 'period_start', 'period_end',
         'due_date', 'version_number', 'audience', 'status', 'summary',
         'questions', 'aggregate_results', 'recommendations',
         'action_plan', 'created_by', 'opened_at', 'closed_at',
@@ -38,6 +41,12 @@ class BoardEvaluation extends Model
     public function responses(): HasMany
     {
         return $this->hasMany(BoardEvaluationResponse::class);
+    }
+
+    /** The committee a committee evaluation is about. */
+    public function committee(): BelongsTo
+    {
+        return $this->belongsTo(BoardCommittee::class, 'board_committee_id');
     }
 
     public function open(): void

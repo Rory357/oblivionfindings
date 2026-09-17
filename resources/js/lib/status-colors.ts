@@ -104,6 +104,27 @@ export const statusColors: Record<string, string> = {
     final: SUCCESS,
     fully_spent: WARNING,
     returned: NEUTRAL,
+    // Added 2026-09-16 with the finance design migration — keys the module's
+    // pages used to colour with local maps (calendar obligations, payment runs,
+    // journal/ledger balance, donor-fund restriction).
+    due: INFO,
+    scheduled: INFO,
+    processed: SUCCESS,
+    awaiting_bank: INFO,
+    settled: SUCCESS,
+    balanced: SUCCESS,
+    unbalanced: CRITICAL,
+    restricted: NEUTRAL,
+    unrestricted: SUCCESS,
+    // WP4 (payables): vendor active/inactive and the exported payment-run leg
+    // of the bank settlement workflow.
+    inactive: NEUTRAL,
+    exported: INFO,
+    // WP6 (banking): bank-feed sync outcomes and the payment-matching lifecycle.
+    success: SUCCESS,
+    suggested: WARNING,
+    confirmed: SUCCESS,
+    auto_confirmed: INFO,
 };
 
 export function getStatusColor(status: string): string {

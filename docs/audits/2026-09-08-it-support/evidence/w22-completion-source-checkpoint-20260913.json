@@ -1,0 +1,120 @@
+{
+  "recorded_at": "2026-09-13T05:55:32.5225766Z",
+  "scope": "Knowledge Base only",
+  "ui_tests": 22,
+  "ui_files": 3,
+  "ui_seconds": 5.86,
+  "php_syntax_files": 17,
+  "definition_checks": 16,
+  "eslint": "passed",
+  "types": "5 unrelated My Day/Governance errors; no IT errors",
+  "backend": "pending grouped isolated test",
+  "local_tags_migration": "not applied",
+  "source_frozen": true,
+  "files": [
+    {
+      "path": "app/Models/ItKbArticle.php",
+      "sha256": "312407FFBBAB9901A0ACEB542238DAFE8BE51434445C1BFDA02C4B9E4798810E"
+    },
+    {
+      "path": "app/Domain/It/Services/ItKbRevisionService.php",
+      "sha256": "BB2D0E7D718D00F70760488C3CFA01059C025662FBD4FAB059FDD2E778E9B92D"
+    },
+    {
+      "path": "app/Domain/It/Services/ItKbLifecycleService.php",
+      "sha256": "C51BBD75D4DCD5A5FF48FD54935674C425E388596D9CFF5D4675FFBE43B409BE"
+    },
+    {
+      "path": "app/Domain/It/Services/ItKnowledgeWorkspace.php",
+      "sha256": "2CE4ECB25DA6C2717339802C3AF39E7B75ABC3DDCDA59619A3B363B843252AE6"
+    },
+    {
+      "path": "app/Domain/It/Services/ItKnowledgeNavigation.php",
+      "sha256": "0007109739222CE6249D4DB0C1E6BC89F8D5854D0DCAD3F22C0A7EBFB3606DED"
+    },
+    {
+      "path": "app/Domain/It/Services/ItKnowledgeRelationships.php",
+      "sha256": "6F5B7F348833F45DC2D26388EEEF352FFC3A40192A1FAE132B1E502C5FB70E40"
+    },
+    {
+      "path": "app/Http/Requests/It/StoreKbArticleRequest.php",
+      "sha256": "10808ABE123D4DB59ED519EF2F2FC282F14A26B940A7FE79F8AB6FFBE953FA37"
+    },
+    {
+      "path": "app/Http/Requests/It/UpdateKbArticleRequest.php",
+      "sha256": "A5B839127412578480223021209C94B574C14DBC7247E019BF925000458E84A2"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItKnowledgeWorkspaceController.php",
+      "sha256": "92E03509A7C490D003D2891323FC15696D12A0A710ECC47FEC79DFCE75CC9E62"
+    },
+    {
+      "path": "resources/js/components/it/knowledge-document.ts",
+      "sha256": "36CE2A0BAC8E951E1F3EDF31D857EE1E1A7B7077CD8007C30E4148F93256D778"
+    },
+    {
+      "path": "resources/js/components/it/knowledge-navigation.ts",
+      "sha256": "F2F448BA16AEB3B67A8860B1DA41CBCCB5BE05C8F3AA300CD135BCEE6F1E804F"
+    },
+    {
+      "path": "resources/js/components/it/knowledge-revision-dialog.tsx",
+      "sha256": "C950C6D1E552B210A8B6DD436C12E269C81711175372469AC416EFA2DF58C220"
+    },
+    {
+      "path": "resources/js/pages/it/knowledge/show.tsx",
+      "sha256": "41FB6570B15E9243F6CEA875057A910A610E5E1EBD3BECEAA1E79F1A8C20B175"
+    },
+    {
+      "path": "resources/js/pages/it/knowledge/show.test.tsx",
+      "sha256": "9E5A4C6D3A6231559A02B5D48D3A7F3CF4C19B9D84347C9065A4A4B5AB32A9F6"
+    },
+    {
+      "path": "resources/js/components/it/it-wizards.tsx",
+      "sha256": "90D2F629167850E453C66B54DA4FAC9D8E0655B3DA4DF2B2AB1FB77A7ACD5664"
+    },
+    {
+      "path": "resources/js/pages/it/index.tsx",
+      "sha256": "DDB64017E763C5582FEBE626F8E4E1AEF62FE75AD27C8F44CDA93F8B791BAF3B"
+    },
+    {
+      "path": "resources/js/components/it/knowledge-library.tsx",
+      "sha256": "CDD7A9BE84C1CD4F95931B77DA0D95EF273D4C3FE5EDE81C2473D9385DC82EDA"
+    },
+    {
+      "path": "resources/js/components/it/knowledge-related-records.tsx",
+      "sha256": "BF3BE0F0E2D8DB19D863CCD90A6B5F219CC6BC7488A1BEA30D6723071B0A51C2"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItKbController.php",
+      "sha256": "D9CDD8E9F2ECCC838A55B0AA11C47749F3CB8C86F70004F9C2069CBC56576B68"
+    },
+    {
+      "path": "app/Http/Requests/It/KbHelpfulRequest.php",
+      "sha256": "D96712C6F6FDACB8ED6405AED216993C7367C720CD27BBD438AA86787A7ADE30"
+    },
+    {
+      "path": "tests/Feature/It/ItKbTest.php",
+      "sha256": "9BC36A4873A88F1E8D8ACF391175B58DEEBA6B24562C0C89C280199F9CC41B24"
+    },
+    {
+      "path": "tests/Feature/It/ItKnowledgeRevisionWorkspaceTest.php",
+      "sha256": "B5DDF3E872910A4EC82292D49BB09C2C792E5ADF774E76E5F1698A7A9321ED18"
+    },
+    {
+      "path": "app/Services/Tasks/TaskAggregator.php",
+      "sha256": "4FFD49A5D891762C60E76DADA8C1F5709C1C165C37368ADB4127039EB71085F7"
+    },
+    {
+      "path": "app/Domain/It/Services/ItKnowledgeDocumentDefinition.php",
+      "sha256": "91E62B11E1FED490C9906F52673CBBCC5B9892C72ACDCDF314720B94D91B901C"
+    },
+    {
+      "path": "app/Services/Tasks/Providers/ItKnowledgeReviewTaskProvider.php",
+      "sha256": "0973F528E55838F37CBA86D05A4283CA290883DFF69D1E2511CC0DCB586AFF63"
+    },
+    {
+      "path": "database/migrations/2026_09_13_000004_add_it_knowledge_tags.php",
+      "sha256": "033963D020119210D5A2D2205D6D4703B9A6553C908718A05024209A28CC926F"
+    }
+  ]
+}

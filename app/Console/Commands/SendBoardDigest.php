@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 class SendBoardDigest extends Command
 {
     protected $signature = 'governance:send-digest';
+
     protected $description = 'Send weekly board digest emails';
 
     public function handle(): int

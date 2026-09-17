@@ -118,8 +118,8 @@ test('governance CEO reports index loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/governance/ceo-reports')
-            ->waitForText('CEO Board Reports', 10)
-            ->assertSee('CEO Board Reports');
+            ->waitForText('CEO reports', 10)
+            ->assertSee('CEO reports');
     });
 });
 
@@ -128,8 +128,8 @@ test('governance CEO reports create page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/governance/ceo-reports/create')
-            ->waitForText('CEO Board Report', 10)
-            ->assertSee('CEO Board Report');
+            ->waitForText('New CEO report', 10)
+            ->assertSee('New CEO report');
     });
 });
 
@@ -158,8 +158,8 @@ test('governance clinical page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/governance/clinical')
-            ->waitForText('Clinical', 10)
-            ->assertSee('Clinical');
+            ->waitForText('Care quality', 10)
+            ->assertSee('Care quality');
     });
 });
 

@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export function useSettingsLeaveConfirmation(
     dirty: boolean,
     title = 'Discard unsaved settings?',
+    description = 'Your unsaved entries will be discarded. A save already sent may still finish; review the saved settings before retrying it. Cancel to keep editing.',
+    onDiscard?: () => void,
 ) {
     const [pending, setPending] = useState<{ run: () => void } | null>(null);
     const approved = useRef(false);
@@ -49,13 +51,14 @@ export function useSettingsLeaveConfirmation(
                     if (!dirty || !pending) return;
                     approved.current = true;
                     try {
+                        onDiscard?.();
                         pending.run();
                     } finally {
                         approved.current = false;
                     }
                 }}
                 title={title}
-                description="Your unsaved entries will be discarded. A save already sent may still finish; review the saved settings before retrying it. Cancel to keep editing."
+                description={description}
                 confirmText="Discard and continue"
             />
         ),

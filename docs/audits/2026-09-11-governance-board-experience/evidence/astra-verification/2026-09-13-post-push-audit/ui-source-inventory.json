@@ -1,0 +1,695 @@
+[
+  {
+    "path": "resources/js/pages/Governance/TeTiriti/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Strategy/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Strategy/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Strategy/Edit.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Strategy/Create.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Strategy/Changes.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/SpendApprovals/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/SpendApprovals/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/SpendApprovals/Edit.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/SpendApprovals/Create.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Settings/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Risks/Trends.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Risks/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Risks/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Risks/Heatmap.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Risks/Edit.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Risks/Create.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Risks/Committee.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Resolutions/_dialogs.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": true,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Resolutions/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Resolutions/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Resolutions/Create.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Reports/RiskNarrative.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Reports/ComplianceStatus.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Reports/Committee.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Reports/BoardMonthly.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Records/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Policies/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Policies/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Policies/Edit.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Policies/Create.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Policies/Attestations.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Performance/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Performance/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Performance/Edit.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Performance/Create.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Packs/_dialogs.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Packs/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Packs/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/MyWork/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Meetings/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Meetings/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Meetings/Edit.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Meetings/Create.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Meetings/Calendar.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Clinical/Trends.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Clinical/Dashboard.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Interests/MyInterests.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Interests/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/CeoReports/_dialogs.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/CeoReports/_attachments.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/CeoReports/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/CeoReports/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/CeoReports/Create.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Evaluations/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Evaluations/Results.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Evaluations/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Evaluations/Create.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Calendar/Index.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Budgets/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Budgets/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Budgets/Edit.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Budgets/Create.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Documents/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Documents/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Dashboard.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/AuditLog/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Admin/BoardMembers.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Components/WidgetCard.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Actions/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Actions/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": true,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Compliance/Show.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": true
+  },
+  {
+    "path": "resources/js/pages/Governance/Compliance/Index.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Compliance/Edit.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Compliance/Create.tsx",
+    "page_header": true,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": true,
+    "form": true,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Compliance/Calendar.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  },
+  {
+    "path": "resources/js/pages/Governance/Cockpit/CockpitLayout.tsx",
+    "page_header": false,
+    "page_hero": false,
+    "wizard_shell": false,
+    "full_page_create_edit": false,
+    "form": false,
+    "dialog": false
+  }
+]

@@ -41,7 +41,7 @@ class DraftTimesheetService
     public function fromShift(Shift $shift, int $actorId): array
     {
         if (! $shift->user_id || ! $shift->client_id) {
-            return ['success' => false, 'reason' => 'Shift is missing assigned staff or client.', 'timesheet' => null];
+            return ['success' => false, 'reason' => 'Shift is missing assigned staff or a client.', 'timesheet' => null];
         }
 
         $shift->loadMissing([

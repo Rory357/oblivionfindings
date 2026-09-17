@@ -6,7 +6,6 @@ use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinIrdFiling;
 use App\Domain\Finance\Models\FinJournal;
-use App\Domain\Finance\Models\FinJournalLine;
 use App\Domain\Finance\Services\Calendar\FinanceCalendarAggregator;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Models\BillingEntry;

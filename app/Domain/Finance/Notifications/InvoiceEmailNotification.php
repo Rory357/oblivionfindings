@@ -24,7 +24,7 @@ class InvoiceEmailNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $subject = $this->invoice->email_subject
-            ?? "Invoice {$this->invoice->invoice_number} from " . config('app.name');
+            ?? "Invoice {$this->invoice->invoice_number} from ".config('app.name');
 
         $body = $this->invoice->email_body
             ?? "Please find attached invoice {$this->invoice->invoice_number} for the amount of \${$this->formatAmount($this->invoice->total_amount)} {$this->invoice->currency_code}.";

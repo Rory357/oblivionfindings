@@ -1,0 +1,3324 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/it-module-navigation.test.tsx (7 tests | 1 failed) 1135ms
+     × turns the service catalogue into a searchable human workspace 50ms
+ ❯ resources/js/pages/it/knowledge-access.test.tsx (13 tests | 8 failed) 1929ms
+     × keeps the Service Desk rail focused on tickets and request entry points 239ms
+     × preserves provisioning filters and pagination when changing its dedicated page layout 121ms
+     × opens only an authorized article from a dedicated Knowledge deep link 153ms
+     × conceals an open reader when refreshed authorized articles remove it and does not reopen from stale selection 90ms
+     × renders a refreshed authorized publication instead of its previously selected body 111ms
+     × shows mutation controls only for articles whose current capability permits management 74ms
+     × lets a knowledge-only author read current draft content and use author actions without reviewer or ticket controls 113ms
+     × lets a knowledge-only reviewer read and publish without draft editing or author actions 60ms
+ ❯ resources/js/pages/it/major-incidents/major-incidents.test.tsx (3 tests | 1 failed) 402ms
+     × renders a command register with severity cadence and declaration action 282ms
+ ❯ resources/js/pages/it/changes/changes.test.tsx (2 tests | 1 failed) 370ms
+     × renders a scannable change register with governed deep links 281ms
+ ❯ resources/js/pages/it/problems/problems.test.tsx (2 tests | 1 failed) 299ms
+     × renders the production-backed register with a problem deep link 246ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > keeps the Service Desk rail focused on tickets and request entry points
+TestingLibraryElementError: Unable to find an accessible element with the role "heading" and name "Service Desk"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header />
+
+  --------------------------------------------------
+  button:
+
+  Name "Priority":
+  <button
+    aria-controls="radix-_r_i_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Find a view":
+  <button
+    aria-label="Find a view"
+    class="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
+    title="Find a view"
+    type="button"
+  />
+
+  --------------------------------------------------
+  tablist:
+
+  Name "IT views":
+  <div
+    aria-label="IT views"
+    class="flex w-full flex-wrap items-end gap-1"
+    role="tablist"
+  />
+
+  --------------------------------------------------
+  tab:
+
+  Name "Overview":
+  <button
+    aria-selected="true"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary"
+    role="tab"
+    tabindex="0"
+    type="button"
+  />
+
+  Name "Tickets0":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    tabindex="-1"
+    type="button"
+  />
+
+  Name "Service catalogue0":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    tabindex="-1"
+    type="button"
+  />
+
+  Name "My requests0":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    tabindex="-1"
+    type="button"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header>
+            <div
+              class="inline-flex items-center box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+            >
+              <button
+                aria-controls="radix-_r_i_"
+                aria-expanded="false"
+                aria-haspopup="dialog"
+                class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+                data-slot="popover-trigger"
+                data-state="closed"
+                type="button"
+              >
+                <span
+                  class="max-w-[130px] truncate"
+                >
+                  Priority
+                </span>
+                <svg
+                  class="lucide lucide-chevron-down size-3 opacity-70"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="m6 9 6 6 6-6"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div
+              aria-label="IT views"
+              class="flex w-full flex-wrap items-end gap-1"
+              role="tablist"
+            >
+              <button
+                aria-selected="true"
+                class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary"
+                role="tab"
+                tabindex="0"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-layout-dashboard size-[15px]"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="9"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="3"
+                  />
+                  <rect
+                    height="5"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="3"
+                  />
+                  <rect
+                    height="9"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="12"
+                  />
+                  <rect
+                    height="5"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="16"
+                  />
+                </svg>
+                <span>
+                  Overview
+                </span>
+              </button>
+              <button
+                aria-selected="false"
+                class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                role="tab"
+                tabindex="-1"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-ticket size-[15px]"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+                  />
+                  <path
+                    d="M13 5v2"
+                  />
+                  <path
+                    d="M13 17v2"
+                  />
+                  <path
+                    d="M13 11v2"
+                  />
+                </svg>
+                <span>
+                  Tickets
+                </span>
+                <span
+                  class="inline-flex min-w-[22px] items-center justify-center rounded-[6px] px-1.5 py-0.5 text-[11px] font-bold tabular-nums bg-primary-foreground/15 text-primary-foreground"
+                >
+                  0
+                </span>
+              </button>
+              <button
+                aria-selected="false"
+                class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                role="tab"
+                tabindex="-1"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-book-marked size-[15px]"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M10 2v8l3-3 3 3V2"
+                  />
+                  <path
+                    d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"
+                  />
+                </svg>
+                <span>
+                  Service catalogue
+                </span>
+                <span
+                  class="inline-flex min-w-[22px] items-center justify-center rounded-[6px] px-1.5 py-0.5 text-[11px] font-bold tabular-nums bg-primary-foreground/15 text-primary-foreground"
+                >
+                  0
+                </span>
+              </button>
+              <button
+                aria-selected="false"
+                class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                role="tab"
+                tabindex="-1"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-inbox size-[15px]"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <polyline
+                    points="22 12 16 12 14 15 10 15 8 12 2 12"
+                  />
+                  <path
+                    d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"
+                  />
+                </svg>
+                <span>
+                  My requests
+                </span>
+                <span
+                  class="inline-flex min-w-[22px] items-center justify-center rounded-[6px] px-1.5 py-0.5 text-[11px] font-bold tabular-nums bg-primary-foreground/15 text-primary-foreground"
+                >
+                  0
+                </span>
+              </button>
+              <button
+                aria-label="Find a view"
+                class="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
+                title="Find a view"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-search size-[15px]"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="11"
+                    cy="11"
+                    r="8"
+                  />
+                  <path
+                    d="m21 21-4.3-4.3"
+                  />
+                </svg>
+                <span
+                  class="hidden sm:inline"
+                >
+                  Find
+                </span>
+              </button>
+            </div>
+          </header>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:157:20
+    155|         );
+    156|         expect(
+    157|             screen.getByRole('heading', { name: 'Service Desk' }),
+       |                    ^
+    158|         ).toBeVisible();
+    159|         for (const name of [
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > preserves provisioning filters and pagination when changing its dedicated page layout
+TestingLibraryElementError: Unable to find an accessible element with the role "heading" and name "Provisioning"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search provisioning steps…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Status":
+  <button
+    aria-controls="radix-_r_18_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Type":
+  <button
+    aria-controls="radix-_r_19_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Assignee":
+  <button
+    aria-controls="radix-_r_1a_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  --------------------------------------------------
+  region:
+
+  Name "Joiner, mover & leaver workflows":
+  <section
+    aria-labelledby="jml-workflows-heading"
+    class="rounded-2xl border border-border bg-card p-4 sm:p-5"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Joiner, mover & leaver workflows":
+  <h2
+    class="text-sm font-bold text-foreground"
+    id="jml-workflows-heading"
+  />
+
+  Name "Provisioning steps":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="mt-3 text-[11px] text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="max-w-sm text-[12.5px] leading-relaxed text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  note:
+
+  Name "":
+  <span
+    class="flex min-h-11 items-center gap-2 px-2 text-sm text-muted-foreground"
+    role="note"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "Export the provisioning queue as CSV":
+  <a
+    aria-label="Export the provisioning queue as CSV"
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-secondary border border-border bg-card text-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+    data-slot="button"
+    href="/it/provisioning/export"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header>
+            <div
+              class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+            >
+              <svg
+                class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="8"
+                />
+                <path
+                  d="m21 21-4.3-4.3"
+                />
+              </svg>
+              <input
+                class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                placeholder="Search provisioning steps…"
+                type="search"
+                value=""
+              />
+              <kbd
+                aria-hidden="true"
+                class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+              >
+                /
+              </kbd>
+            </div>
+            <div
+              aria-label="List layout"
+              class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+              role="radiogroup"
+            >
+              <button
+                aria-checked="true"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-layout-grid size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="14"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="14"
+                  />
+                </svg>
+                Cards
+              </button>
+              <button
+                aria-checked="false"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-list size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M3 12h.01"
+                  />
+                  <path
+                    d="M3 18h.01"
+                  />
+                  <path
+                    d="M3 6h.01"
+                  />
+                  <path
+                    d="M8 12h13"
+                  />
+               ...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:186:20
+    184|         );
+    185|         expect(
+    186|             screen.getByRole('heading', { name: 'Provisioning' }),
+       |                    ^
+    187|         ).toBeVisible();
+    188|         expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > opens only an authorized article from a dedicated Knowledge deep link
+TestingLibraryElementError: Unable to find an accessible element with the role "heading" and name "Guides"
+
+Here are the accessible roles:
+
+  dialog:
+
+  Name "Approved guide":
+  <div
+    aria-describedby="radix-_r_1m_"
+    aria-labelledby="radix-_r_1l_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg max-w-2xl"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_1k_"
+    role="dialog"
+    style="pointer-events: auto;"
+    tabindex="-1"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Approved guide":
+  <h2
+    class="text-lg leading-none font-semibold"
+    data-slot="dialog-title"
+    id="radix-_r_1l_"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="text-muted-foreground text-sm"
+    data-slot="dialog-description"
+    id="radix-_r_1m_"
+  />
+
+  Name "":
+  <p />
+
+  --------------------------------------------------
+  button:
+
+  Name "Yes":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-secondary border border-border bg-card text-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5 min-h-11"
+    data-slot="button"
+  />
+
+  Name "No":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-secondary border border-border bg-card text-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5 min-h-11"
+    data-slot="button"
+  />
+
+  Name "Close":
+  <button
+    class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+    type="button"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  >
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header>
+            <div
+              class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+            >
+              <svg
+                class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="8"
+                />
+                <path
+                  d="m21 21-4.3-4.3"
+                />
+              </svg>
+              <input
+                class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                placeholder="Search the knowledge base…"
+                type="search"
+                value=""
+              />
+              <kbd
+                aria-hidden="true"
+                class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+              >
+                /
+              </kbd>
+            </div>
+            <div
+              aria-label="List layout"
+              class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+              role="radiogroup"
+            >
+              <button
+                aria-checked="false"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-layout-grid size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="14"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="14"
+                  />
+                </svg>
+                Cards
+              </button>
+              <button
+                aria-checked="true"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-list size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"[...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:205:23
+    203|         mocks.url = '/it/knowledge?article=41';
+    204|         const { rerender } = render(<KnowledgeIndex {...props()} />);
+    205|         expect(screen.getByRole('heading', { name: 'Guides' })).toBeVi…
+       |                       ^
+    206|         expect(
+    207|             within(screen.getByRole('dialog')).getByText(article.body),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > conceals an open reader when refreshed authorized articles remove it and does not reopen from stale selection
+TestingLibraryElementError: Unable to find an accessible element with the role "dialog"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search the knowledge base…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Category":
+  <button
+    aria-controls="radix-_r_6p_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Actions for Approved guide":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Approved guide"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_6q_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Published guides":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "DocumentDocument typePublicationServiceReview dueActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.1fr 1fr 32px;"
+  />
+
+  Name "Approved guideNetworkGuidePublishedNot linkedNot scheduled":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.1fr 1fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Document":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Document type":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Publication":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Service":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review due":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Approved guideNetwork":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Guide":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Published":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not linked":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not scheduled":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "Approved guide":
+  <a
+    href="/it/knowledge?article=41"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header>
+            <div
+              class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+            >
+              <svg
+                class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="8"
+                />
+                <path
+                  d="m21 21-4.3-4.3"
+                />
+              </svg>
+              <input
+                class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                placeholder="Search the knowledge base…"
+                type="search"
+                value=""
+              />
+              <kbd
+                aria-hidden="true"
+                class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+              >
+                /
+              </kbd>
+            </div>
+            <div
+              aria-label="List layout"
+              class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+              role="radiogroup"
+            >
+              <button
+                aria-checked="false"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-layout-grid size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="14"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="14"
+                  />
+                </svg>
+                Cards
+              </button>
+              <button
+                aria-checked="true"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-list size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M3 12h.01"
+                  />
+                  <path
+                    d="M3 18h.01"
+                  />
+                  <path
+                    d="M3 6h.01"
+                  />
+                  <path
+                    d="M8 12h13"
+    ...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:453:27
+    451|         fireEvent.click(screen.getByRole('button', { name: /Approved g…
+    452|         expect(
+    453|             within(screen.getByRole('dialog')).getByText(article.body),
+       |                           ^
+    454|         ).toBeVisible();
+    455|         expect(mocks.post).toHaveBeenCalledWith(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > renders a refreshed authorized publication instead of its previously selected body
+TestingLibraryElementError: Unable to find an accessible element with the role "dialog"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search the knowledge base…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Category":
+  <button
+    aria-controls="radix-_r_7e_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Actions for Updated approved guide":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Updated approved guide"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_7f_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Published guides":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "DocumentDocument typePublicationServiceReview dueActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.1fr 1fr 32px;"
+  />
+
+  Name "Updated approved guideNetworkGuidePublishedNot linkedNot scheduled":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.1fr 1fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Document":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Document type":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Publication":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Service":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review due":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Updated approved guideNetwork":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Guide":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Published":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not linked":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not scheduled":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "Updated approved guide":
+  <a
+    href="/it/knowledge?article=41"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header>
+            <div
+              class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+            >
+              <svg
+                class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="8"
+                />
+                <path
+                  d="m21 21-4.3-4.3"
+                />
+              </svg>
+              <input
+                class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                placeholder="Search the knowledge base…"
+                type="search"
+                value=""
+              />
+              <kbd
+                aria-hidden="true"
+                class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+              >
+                /
+              </kbd>
+            </div>
+            <div
+              aria-label="List layout"
+              class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+              role="radiogroup"
+            >
+              <button
+                aria-checked="false"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-layout-grid size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="14"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="14"
+                  />
+                </svg>
+                Cards
+              </button>
+              <button
+                aria-checked="true"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-list size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M3 12h.01"
+                  />
+                  <path
+                    d="M3 18h.01"
+                  />
+                  <path
+                    d="M3 6h.01"
+                  />
+                  <path
+                    d="M8 12h13"
+    ...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:488:38
+    486|         );
+    487|
+    488|         const reader = within(screen.getByRole('dialog'));
+       |                                      ^
+    489|         expect(reader.getByText('Updated approved guide')).toBeVisible…
+    490|         expect(reader.getByText('Revised canonical guide body.')).toBe…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > shows mutation controls only for articles whose current capability permits management
+Error: expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <button
+  aria-expanded="false"
+  aria-haspopup="menu"
+  aria-label="Actions for Shared readable guide"
+  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+  data-slot="dropdown-menu-trigger"
+  data-state="closed"
+  id="radix-_r_8b_"
+  type="button"
+>
+  <svg
+    class="lucide lucide-ellipsis-vertical size-4"
+    fill="none"
+    height="24"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="2"
+    viewBox="0 0 24 24"
+    width="24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <circle
+      cx="12"
+      cy="12"
+      r="1"
+    />
+    <circle
+      cx="12"
+      cy="5"
+      r="1"
+    />
+    <circle
+      cx="12"
+      cy="19"
+      r="1"
+    />
+  </svg>
+</button> instead
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:526:15
+    524|                 name: 'Actions for Shared readable guide',
+    525|             }),
+    526|         ).not.toBeInTheDocument();
+       |               ^
+    527|         expect(screen.getByText('Shared readable guide')).toBeVisible(…
+    528|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > lets a knowledge-only author read current draft content and use author actions without reviewer or ticket controls
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "New KB article"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search the knowledge base…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Document type":
+  <button
+    aria-controls="radix-_r_8v_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Browse records":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+    type="button"
+  />
+
+  Name "Review":
+  <button
+    aria-controls="radix-_r_90_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Owner":
+  <button
+    aria-controls="radix-_r_91_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Sort":
+  <button
+    aria-controls="radix-_r_92_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Category":
+  <button
+    aria-controls="radix-_r_93_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Publication status":
+  <button
+    aria-controls="radix-_r_94_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Actions for Author draft":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Author draft"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_95_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Documentation library":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "DocumentDocument typePublicationReview ownerServiceReview dueActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.2fr 1.1fr 1fr 32px;"
+  />
+
+  Name "Author draftNetworkGuideDraft—Not linkedNot scheduled":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.2fr 1.1fr 1fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Document":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Document type":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Publication":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review owner":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Service":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review due":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Author draftNetwork":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Guide":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Draft":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "—":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not linked":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not scheduled":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "Author draft":
+  <a
+    href="/it/knowledge?article=61"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header>
+            <div
+              class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+            >
+              <svg
+                class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="8"
+                />
+                <path
+                  d="m21 21-4.3-4.3"
+                />
+              </svg>
+              <input
+                class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                placeholder="Search the knowledge base…"
+                type="search"
+                value=""
+              />
+              <kbd
+                aria-hidden="true"
+                class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+              >
+                /
+              </kbd>
+            </div>
+            <div
+              aria-label="List layout"
+              class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+              role="radiogroup"
+            >
+              <button
+                aria-checked="false"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-layout-grid size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="3"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="14"
+                    y="14"
+                  />
+                  <rect
+                    height="7"
+                    rx="1"
+                    width="7"
+                    x="3"
+                    y="14"
+                  />
+                </svg>
+                Cards
+              </button>
+              <button
+                aria-checked="true"
+                class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+                role="radio"
+                type="button"
+              >
+                <svg
+                  class="lucide lucide-list size-2.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M3 12h.01"
+                  />
+                  <path
+                    d="M3 18h.01"
+                  />
+                  <path
+                    d="M3 6h.01"
+                  />
+                  <path
+                    d="M8 12h13"
+    ...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:572:20
+    570|         );
+    571|         expect(
+    572|             screen.getByRole('button', { name: 'New KB article' }),
+       |                    ^
+    573|         ).toBeVisible();
+    574|         expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > lets a knowledge-only reviewer read and publish without draft editing or author actions
+TypeError: Cannot read properties of undefined (reading 'filter')
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:652:21
+    650|         const actions = mocks.menu.mock.lastCall?.[0] as LeaveCtxItem[…
+    651|         expect(
+    652|             actions.filter((a) => a.kind === 'item').map((a) => a.labe…
+       |                     ^
+    653|         ).toEqual(['Approve & publish']);
+    654|         fireEvent.click(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+ FAIL  resources/js/components/it/__tests__/it-module-navigation.test.tsx > IT & Support grouped navigation > turns the service catalogue into a searchable human workspace
+Error: expect(element).toHaveAccessibleDescription()
+
+Expected element to have accessible description:
+  Complete the published request form. Required fields are marked.
+Received:
+  Complete, review and submit the published request.
+ ❯ resources/js/components/it/__tests__/it-module-navigation.test.tsx:544:44
+    542|             screen.getByRole('heading', { name: 'Request VPN access' }…
+    543|         ).toBeVisible();
+    544|         expect(screen.getByRole('dialog')).toHaveAccessibleDescription(
+       |                                            ^
+    545|             'Complete the published request form. Required fields are …
+    546|         );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+
+ FAIL  resources/js/pages/it/changes/changes.test.tsx > IT change management workspaces > renders a scannable change register with governed deep links
+TestingLibraryElementError: Unable to find an accessible element with the role "link" and name `/IT-000052/`
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  Name "":
+  <main
+    class="min-w-0 space-y-5"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Changes":
+  <h1
+    class="text-[22px] leading-tight font-bold tracking-tight truncate"
+  />
+
+  Name "Change register":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  Name "":
+  <p
+    class="text-caption"
+  />
+
+  Name "":
+  <p
+    class="text-caption"
+  />
+
+  Name "":
+  <p
+    class="text-caption"
+  />
+
+  Name "":
+  <p
+    class="text-caption"
+  />
+
+  Name "":
+  <p
+    class="text-caption"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search changes…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New change":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "Type":
+  <button
+    aria-controls="radix-_r_0_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Risk":
+  <button
+    aria-controls="radix-_r_1_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "State":
+  <button
+    aria-controls="radix-_r_2_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Actions for Replace gateway policy":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Replace gateway policy"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_3_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  region:
+
+  Name "Change register":
+  <section
+    aria-label="Change register"
+    class="space-y-4"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "RecordWorkflowPriorityDetailsNeeds attentionActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 88px 1.8fr 1fr 32px;"
+  />
+
+  Name "Replace gateway policyIT-000052 · Site traffic will fail over.ScheduledHighType:Normal Risk:High Window:Upcoming window Starts:20 Jul 2026, 10:00 am Ends:20 Jul 2026, 11:00 am—":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 88px 1.8fr 1fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Record":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Workflow":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Priority":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Details":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Needs attention":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Replace gateway policyIT-000052 · Site traffic will fail over.":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Scheduled":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "High":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Type:Normal Risk:High Window:Upcoming window Starts:20 Jul 2026, 10:00 am Ends:20 Jul 2026, 11:00 am":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "—":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "Replace gateway policy":
+  <a
+    class="truncate text-[13px] font-semibold text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+    href="/it/changes/9"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <main
+          class="min-w-0 space-y-5"
+        >
+          <header
+            class="eh-header text-primary-foreground"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-shield-check size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+                        />
+                        <path
+                          d="m9 12 2 2 4-4"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="text-[22px] leading-tight font-bold tracking-tight truncate"
+                        >
+                          Changes
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Risk, approvals, maintenance windows and verified outcomes
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search changes…"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                    <button
+                      class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+                      type="button"
+                    >
+                      <svg
+                        class="lucide lucide-plus size-4"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+               ...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/changes/changes.test.tsx:85:23
+     83|
+     84|         expect(screen.getByRole('heading', { name: 'Changes' })).toBeV…
+     85|         expect(screen.getByRole('link', { name: /IT-000052/ })).toHave…
+       |                       ^
+     86|             'href',
+     87|             '/it/changes/9',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯
+
+ FAIL  resources/js/pages/it/major-incidents/major-incidents.test.tsx > IT major incident command workspaces > renders a command register with severity cadence and declaration action
+TestingLibraryElementError: Unable to find an accessible element with the role "link" and name `/IT-000060/`
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  Name "":
+  <main
+    class="min-w-0 space-y-5"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Major incidents":
+  <h1
+    class="text-[22px] leading-tight font-bold tracking-tight truncate"
+  />
+
+  Name "Command register":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  Name "":
+  <p
+    class="text-caption"
+  />
+
+  Name "":
+  <p
+    class="text-caption"
+  />
+
+  Name "":
+  <p
+    class="text-caption"
+  />
+
+  Name "":
+  <p
+    class="text-caption"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search major incidents…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Declare major incident":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "Severity":
+  <button
+    aria-controls="radix-_r_0_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "State":
+  <button
+    aria-controls="radix-_r_1_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Actions for All-site identity outage":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for All-site identity outage"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_2_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  region:
+
+  Name "Command register":
+  <section
+    aria-label="Command register"
+    class="space-y-4"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "RecordWorkflowPriorityDetailsNeeds attentionActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 88px 1.8fr 1fr 32px;"
+  />
+
+  Name "All-site identity outageIT-000060 · Authentication is unavailable across all sites.RespondingUrgentSeverity:SEV1 Commander:Incident Commander Communications lead:Communications Lead Next update:20 Jul 2026, 10:30 amUpdate overdue":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 88px 1.8fr 1fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Record":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Workflow":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Priority":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Details":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Needs attention":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "All-site identity outageIT-000060 · Authentication is unavailable across all sites.":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Responding":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Urgent":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Severity:SEV1 Commander:Incident Commander Communications lead:Communications Lead Next update:20 Jul 2026, 10:30 am":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Update overdue":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "All-site identity outage":
+  <a
+    class="truncate text-[13px] font-semibold text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+    href="/it/major-incidents/12"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <main
+          class="min-w-0 space-y-5"
+        >
+          <header
+            class="eh-header text-primary-foreground"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-siren size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M7 18v-6a5 5 0 1 1 10 0v6"
+                        />
+                        <path
+                          d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"
+                        />
+                        <path
+                          d="M21 12h1"
+                        />
+                        <path
+                          d="M18.5 4.5 18 5"
+                        />
+                        <path
+                          d="M2 12h1"
+                        />
+                        <path
+                          d="M12 2v1"
+                        />
+                        <path
+                          d="m4.929 4.929.707.707"
+                        />
+                        <path
+                          d="M12 12v6"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="text-[22px] leading-tight font-bold tracking-tight truncate"
+                        >
+                          Major incidents
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Technical response, accountable command and audience updates
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search major incidents…"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                    <button
+                      class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-pri...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/major-incidents/major-incidents.test.tsx:92:23
+     90|             screen.getByRole('heading', { name: 'Major incidents' }),
+     91|         ).toBeVisible();
+     92|         expect(screen.getByRole('link', { name: /IT-000060/ })).toHave…
+       |                       ^
+     93|             'href',
+     94|             '/it/major-incidents/12',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯
+
+ FAIL  resources/js/pages/it/problems/problems.test.tsx > IT problem management workspaces > renders the production-backed register with a problem deep link
+TestingLibraryElementError: Unable to find an accessible element with the role "link" and name `/IT-000042/`
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  Name "":
+  <main
+    class="min-w-0 space-y-5"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Problems & known errors":
+  <h1
+    class="text-[22px] leading-tight font-bold tracking-tight truncate"
+  />
+
+  Name "Problem register":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  Name "":
+  <p
+    class="text-caption"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search problems & known errors…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New problem":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "State":
+  <button
+    aria-controls="radix-_r_0_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Actions for Repeated VPN failures":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Repeated VPN failures"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_1_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  region:
+
+  Name "Problem register":
+  <section
+    aria-label="Problem register"
+    class="space-y-4"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "RecordWorkflowPriorityDetailsNeeds attentionActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 88px 1.8fr 1fr 32px;"
+  />
+
+  Name "Repeated VPN failuresIT-000042 · Remote access is intermittent.Known errorHighKnown error:Not recordedKnown error":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 88px 1.8fr 1fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Record":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Workflow":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Priority":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Details":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Needs attention":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Repeated VPN failuresIT-000042 · Remote access is intermittent.":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Known error":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "High":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Known error:Not recorded":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Known error":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "Repeated VPN failures":
+  <a
+    class="truncate text-[13px] font-semibold text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+    href="/it/problems/7"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <main
+          class="min-w-0 space-y-5"
+        >
+          <header
+            class="eh-header text-primary-foreground"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-book-open-check size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M12 21V7"
+                        />
+                        <path
+                          d="m16 12 2 2 4-4"
+                        />
+                        <path
+                          d="M22 6V4a1 1 0 0 0-1-1h-5a4 4 0 0 0-4 4 4 4 0 0 0-4-4H3a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h6a3 3 0 0 1 3 3 3 3 0 0 1 3-3h6a1 1 0 0 0 1-1v-1.3"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="text-[22px] leading-tight font-bold tracking-tight truncate"
+                        >
+                          Problems & known errors
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Recurring incidents, investigation, workarounds and permanent fixes
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search problems & known errors…"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                    <button
+                      class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+                      type="button"
+                    >
+                      <svg
+                        class="lucide lucide-plus size-4"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin=[3...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/problems/problems.test.tsx:81:23
+     79|             screen.getByRole('heading', { name: 'Problems & known erro…
+     80|         ).toBeVisible();
+     81|         expect(screen.getByRole('link', { name: /IT-000042/ })).toHave…
+       |                       ^
+     82|             'href',
+     83|             '/it/problems/7',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯
+
+
+ Test Files  5 failed | 6 passed (11)
+      Tests  12 failed | 56 passed (68)
+   Start at  10:43:22
+   Duration  55.86s (transform 1.68s, setup 4.35s, import 58.52s, tests 8.62s, environment 35.17s)
+

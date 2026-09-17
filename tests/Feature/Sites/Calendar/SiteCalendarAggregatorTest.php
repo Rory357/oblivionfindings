@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteCalendarEvent;
 use App\Models\SiteCredential;
@@ -7,6 +9,7 @@ use App\Models\SiteMealPlanEntry;
 use App\Models\SiteVendor;
 use App\Models\User;
 use App\Services\Sites\Calendar\SiteCalendarAggregator;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
@@ -125,6 +128,34 @@ test('aggregator can filter to a single source layer', function () {
     expect($mealsOnly->pluck('source')->unique()->all())->toBe(['meal']);
 });
 
+/**
+ * Credential and vendor reminders are read through the vault/directory access
+ * boundaries (SiteCredentialAccess / SiteVendorAccessService), so the calendar
+ * never substitutes for vault access: an unauthenticated or unauthorised
+ * caller receives no credential/vendor items. Act as an approved reader who
+ * explicitly holds the directory permissions across all Sites.
+ */
+function actAsSiteCalendarVaultReader(): User
+{
+    test()->seed(RbacSeeder::class);
+
+    $role = Role::query()->create([
+        'name' => 'calendar-vault-reader-'.str()->uuid(),
+        'label' => 'Calendar vault reader fixture',
+        'level' => 10,
+        'type' => 'custom',
+    ]);
+    $role->permissions()->attach(Permission::query()->whereIn('key', [
+        'vendors.view', 'credentials.view', 'sites.viewAny', 'sites.viewAll',
+    ])->pluck('id'));
+
+    $reader = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $reader->roles()->sync([$role->id]);
+    test()->actingAs($reader);
+
+    return $reader;
+}
+
 test('credential rotation reminders deep-link to the unified /vendors view, not the legacy per-site page', function () {
     $site = Site::factory()->create(['type' => 'house']);
 
@@ -136,6 +167,15 @@ test('credential rotation reminders deep-link to the unified /vendors view, not 
         // Default rotation cadence is 90 days, so this falls due 2026-05-16.
         'last_rotated_at' => Carbon::parse('2026-02-15'),
     ]);
+
+    // Without an authorised reader the calendar exposes no vault metadata.
+    expect(collect(app(SiteCalendarAggregator::class)->itemsForRange(
+        [$site->id],
+        Carbon::parse('2026-05-01'),
+        Carbon::parse('2026-05-31'),
+    ))->firstWhere('source', 'credential'))->toBeNull();
+
+    actAsSiteCalendarVaultReader();
 
     $items = collect(app(SiteCalendarAggregator::class)->itemsForRange(
         [$site->id],
@@ -161,6 +201,15 @@ test('vendor insurance reminders deep-link to the unified /vendors view, not the
         'is_active' => true,
         'insurance_expiry' => Carbon::parse('2026-05-20'),
     ]);
+
+    // Without an authorised reader the calendar exposes no directory records.
+    expect(collect(app(SiteCalendarAggregator::class)->itemsForRange(
+        [$site->id],
+        Carbon::parse('2026-05-01'),
+        Carbon::parse('2026-05-31'),
+    ))->firstWhere('source', 'vendor'))->toBeNull();
+
+    actAsSiteCalendarVaultReader();
 
     $items = collect(app(SiteCalendarAggregator::class)->itemsForRange(
         [$site->id],

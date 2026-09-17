@@ -5,14 +5,21 @@ namespace App\Domain\Governance\Http\Controllers;
 use App\Domain\Governance\Models\ClinicalGovernanceIndicator;
 use App\Domain\Governance\Models\ClinicalGovernanceSnapshot;
 use App\Domain\Governance\Services\ClinicalGovernanceAutomationService;
+use App\Domain\Governance\Support\GovernanceLabels;
 use App\Http\Controllers\Controller;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
+/**
+ * Care quality: medication errors, falls, skin injuries and infections.
+ */
 class ClinicalGovernanceController extends Controller
 {
+    private const STATUS_FILTERS = ['critical', 'warning', 'normal', 'no_data'];
+
     public function __construct(
         protected ClinicalGovernanceAutomationService $automationService,
     ) {}
@@ -21,11 +28,15 @@ class ClinicalGovernanceController extends Controller
     {
         $snapshot = $this->automationService->syncCurrentSnapshot();
         $indicators = $this->automationService->supportedIndicators();
+        $status = (string) $request->query('status', '');
 
         return Inertia::render('Governance/Clinical/Dashboard', [
             'indicators' => $this->mapIndicators($indicators),
-            'latestSnapshot' => $this->mapSnapshot($snapshot, $request),
+            'latestSnapshot' => $this->mapSnapshot($snapshot, $request, $this->automationService->sourcesInUse()),
             'sourceHint' => $this->automationService->sourceHint(),
+            'filters' => array_filter([
+                'status' => in_array($status, self::STATUS_FILTERS, true) ? $status : null,
+            ]),
         ]);
     }
 
@@ -43,6 +54,13 @@ class ClinicalGovernanceController extends Controller
             'reporting_frequency' => 'nullable|in:monthly,quarterly',
             'warning_threshold' => 'nullable|numeric',
             'critical_threshold' => 'nullable|numeric',
+        ], [
+            'name.required' => 'Give the measure a name.',
+            'category.required' => 'Choose what the measure is about.',
+            'category.in' => 'Choose what the measure is about from the list.',
+            'target_value.required' => 'Enter the target.',
+            'target_value.numeric' => 'Enter the target as a number.',
+            'unit.required' => 'Say what is being counted.',
         ]);
 
         ClinicalGovernanceIndicator::create([
@@ -60,7 +78,7 @@ class ClinicalGovernanceController extends Controller
             'is_active' => true,
         ]);
 
-        return redirect()->back()->with('success', 'Clinical indicator added.');
+        return redirect()->back()->with('success', 'Care quality measure added.');
     }
 
     public function recordSnapshot(Request $request)
@@ -72,6 +90,13 @@ class ClinicalGovernanceController extends Controller
             'indicator_values.*.indicator_id' => 'required|exists:clinical_governance_indicators,id',
             'indicator_values.*.value' => 'required|numeric',
             'narrative' => 'nullable|string',
+        ], [
+            'period_start.required' => 'Choose the first day of the period.',
+            'period_end.required' => 'Choose the last day of the period.',
+            'period_end.after' => 'The last day must be after the first day.',
+            'indicator_values.required' => 'Enter at least one figure.',
+            'indicator_values.*.value.required' => 'Enter a figure for each measure.',
+            'indicator_values.*.value.numeric' => 'Enter each figure as a number.',
         ]);
 
         ClinicalGovernanceSnapshot::create([
@@ -82,7 +107,7 @@ class ClinicalGovernanceController extends Controller
             'captured_by' => auth()->id(),
         ]);
 
-        return redirect()->back()->with('success', 'Clinical governance snapshot recorded.');
+        return redirect()->back()->with('success', 'Care quality figures recorded.');
     }
 
     public function trends(Request $request)
@@ -90,9 +115,12 @@ class ClinicalGovernanceController extends Controller
         $this->automationService->syncCurrentSnapshot();
         $snapshots = $this->automationService->recentSnapshots();
         $indicators = $this->automationService->supportedIndicators();
+        $sourcesInUse = $this->automationService->sourcesInUse();
 
         return Inertia::render('Governance/Clinical/Trends', [
-            'snapshots' => $snapshots->map(fn (ClinicalGovernanceSnapshot $snapshot) => $this->mapSnapshot($snapshot, $request))->values(),
+            'snapshots' => $snapshots
+                ->map(fn (ClinicalGovernanceSnapshot $snapshot, int $index) => $this->mapSnapshot($snapshot, $request, $index === 0 ? $sourcesInUse : null))
+                ->values(),
             'indicators' => $this->mapIndicators($indicators),
             'sourceHint' => $this->automationService->sourceHint(),
         ]);
@@ -108,7 +136,7 @@ class ClinicalGovernanceController extends Controller
                 'indicator_code' => $indicator->indicator_code,
                 'name' => $indicator->name,
                 'category' => $indicator->category,
-                'category_label' => ClinicalGovernanceIndicator::CATEGORIES[$indicator->category] ?? str($indicator->category)->headline()->value(),
+                'category_label' => GovernanceLabels::label('care_quality_category', $indicator->category),
                 'definition' => $indicator->definition,
                 'data_source' => $indicator->data_source,
                 'unit' => $indicator->unit,
@@ -121,13 +149,28 @@ class ClinicalGovernanceController extends Controller
         })->values()->all();
     }
 
-    protected function mapSnapshot(ClinicalGovernanceSnapshot $snapshot, Request $request): array
+    /**
+     * @param  array<string, bool>|null  $sourcesInUse  Only for the current month.
+     */
+    protected function mapSnapshot(ClinicalGovernanceSnapshot $snapshot, Request $request, ?array $sourcesInUse = null): array
     {
+        $comparedWith = $snapshot->summary['compared_with'] ?? null;
+        $compareStart = is_array($comparedWith) && ! empty($comparedWith['start']) ? CarbonImmutable::parse($comparedWith['start']) : null;
+        $compareEnd = is_array($comparedWith) && ! empty($comparedWith['end']) ? CarbonImmutable::parse($comparedWith['end']) : null;
+        $isComplete = $snapshot->period_start !== null && $snapshot->period_end !== null
+            && ClinicalGovernanceAutomationService::coversWholeMonth($snapshot->period_start, $snapshot->period_end);
+
         return [
             'id' => $snapshot->id,
             'period_start' => $snapshot->period_start?->toDateString(),
             'period_end' => $snapshot->period_end?->toDateString(),
-            'indicator_values' => collect($snapshot->indicator_values ?? [])->map(function (array $value) use ($request) {
+            'period_label' => ClinicalGovernanceAutomationService::periodLabel($snapshot->period_start, $snapshot->period_end),
+            'short_label' => ClinicalGovernanceAutomationService::shortPeriodLabel($snapshot->period_start, $snapshot->period_end),
+            'is_complete' => $isComplete,
+            'compared_with_label' => $compareStart && $compareEnd
+                ? ($isComplete ? $compareStart->format('F Y') : ClinicalGovernanceAutomationService::dayRange($compareStart, $compareEnd))
+                : null,
+            'indicator_values' => collect($snapshot->indicator_values ?? [])->map(function (array $value) use ($request, $sourcesInUse) {
                 $sourceHref = $value['source_href'] ?? null;
                 $indicatorCode = $value['indicator_code'] ?? null;
 
@@ -146,12 +189,13 @@ class ClinicalGovernanceController extends Controller
                     'value' => (float) ($value['value'] ?? 0),
                     'status' => $value['status'] ?? 'normal',
                     'trend' => $value['trend'] ?? 'stable',
+                    'previous_value' => isset($value['previous_value']) ? (float) $value['previous_value'] : null,
+                    // False only when nobody has recorded anything in the source yet.
+                    'recorded' => $sourcesInUse === null ? true : ($sourcesInUse[$indicatorCode] ?? true),
                     'source_href' => $sourceHref,
-                    'source_label' => $sourceHref ? ($value['source_label'] ?? 'View source') : null,
+                    'source_label' => $sourceHref ? ($value['source_label'] ?? 'Open the records') : null,
                 ];
             })->values()->all(),
-            'narrative' => $snapshot->narrative,
-            'summary' => $snapshot->summary ?? [],
         ];
     }
 

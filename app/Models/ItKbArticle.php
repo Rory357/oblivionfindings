@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 /**
@@ -24,6 +25,14 @@ class ItKbArticle extends Model
     public const STATUSES = ['draft', 'in_review', 'published', 'retired'];
 
     public const AUDIENCES = ['all_staff', 'specific_sites', 'it_agents'];
+
+    public const DOCUMENT_TYPES = ['guide', 'runbook', 'system', 'software', 'network', 'troubleshooting'];
+
+    public const STRUCTURED_FIELDS = [
+        'symptoms', 'prerequisites', 'procedure', 'verification', 'rollback', 'system_purpose', 'support_contact', 'recovery_notes',
+        'software_version', 'deployment_notes', 'licensing_model', 'renewal_notes', 'hosting_notes',
+        'backup_notes', 'recovery_objectives', 'network_notes', 'integration_notes',
+    ];
 
     protected $fillable = [
         'title',
@@ -46,6 +55,12 @@ class ItKbArticle extends Model
         'helpful_yes',
         'helpful_no',
         'deflection_count',
+        'document_type',
+        'structured_content',
+        'related_records',
+        'diagrams',
+        'file_ids',
+        'tags',
     ];
 
     protected $casts = [
@@ -58,11 +73,22 @@ class ItKbArticle extends Model
         'review_started_at' => 'datetime',
         'published_at' => 'datetime',
         'retired_at' => 'datetime',
+        'lock_version' => 'integer',
+        'structured_content' => 'array',
+        'related_records' => 'array',
+        'diagrams' => 'array',
+        'file_ids' => 'array',
+        'tags' => 'array',
     ];
 
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_user_id');
+    }
+
+    public function workingCopy(): HasOne
+    {
+        return $this->hasOne(ItKbWorkingCopy::class, 'article_id');
     }
 
     public function owner(): BelongsTo

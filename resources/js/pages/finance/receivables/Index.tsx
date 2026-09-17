@@ -1,479 +1,388 @@
-import { formatMoney, ReceivablesTabsFooter } from '@/components/finance';
-import { chartColor } from '@/components/finance/chart-palette';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FinanceSectionRail, FinanceTierTwoNav } from '@/components/finance';
+import { formatMoney } from '@/components/finance/money';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+    EntityContextMenu,
+    EntityTable,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
+    PageHeader,
+    PageHeaderFilterCheck,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
-import {
-    ArrowUpFromLine,
-    Clock,
-    DollarSign,
-    FileText,
-    TrendingUp,
-} from 'lucide-react';
-import { useState } from 'react';
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import { Head, router } from '@inertiajs/react';
+import { CalendarRange, FileText, Receipt, User } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
-type InvoiceRow = {
-    id: number;
-    invoice_number: string;
+type BucketKey = 'current' | '1_30' | '31_60' | '61_90' | '90_plus';
+
+type ClientAging = {
+    client_id: number | null;
     client_name: string;
-    issue_date: string;
-    due_date: string;
-    total_amount: number;
-    amount_paid: number;
-    amount_due: number;
-    is_overdue: boolean;
-    days_overdue: number;
+    current: number;
+    '1_30': number;
+    '31_60': number;
+    '61_90': number;
+    '90_plus': number;
+    total: number;
 };
+
+type Totals = Record<BucketKey, number> & { total: number };
 
 type Summary = {
     total_outstanding: number;
     total_overdue: number;
     unpaid_count: number;
+    overdue_count: number;
+    client_count: number;
 };
 
 type PageProps = {
+    clients: ClientAging[];
+    totals: Totals;
     summary: Summary;
-    invoices: InvoiceRow[];
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance' },
-    { title: 'Receivables', href: '/finance/receivables' },
+const ALL = '__all';
+
+const BUCKETS: { key: BucketKey; label: string }[] = [
+    { key: 'current', label: 'Current' },
+    { key: '1_30', label: '1–30 days' },
+    { key: '31_60', label: '31–60 days' },
+    { key: '61_90', label: '61–90 days' },
+    { key: '90_plus', label: '90+ days' },
 ];
 
-function PaymentDialog({
-    invoice,
-    onClose,
-}: {
-    invoice: InvoiceRow;
-    onClose: () => void;
-}) {
-    const form = useForm({
-        invoice_id: invoice.id,
-        amount: invoice.amount_due.toFixed(2),
-        payment_date: new Date().toISOString().split('T')[0],
-        idempotency_key: crypto.randomUUID(),
-        notes: '',
-    });
+const BUCKET_OPTIONS = [
+    { value: ALL, label: 'Any age' },
+    ...BUCKETS.map((bucket) => ({ value: bucket.key, label: bucket.label })),
+];
 
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        form.post('/finance/receivables/allocate', {
-            preserveScroll: true,
-            onSuccess: () => onClose(),
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Receivables', href: '/finance/invoices' },
+    { title: 'Aged AR', href: '/finance/receivables' },
+];
+
+export default function AgedReceivables({
+    clients,
+    totals,
+    summary,
+}: PageProps) {
+    const [search, setSearch] = useState('');
+    const [bucket, setBucket] = useState<string>(ALL);
+    const [overdueOnly, setOverdueOnly] = useState(false);
+    const ctxMenu = useEntityContextMenu<ClientAging>();
+
+    const rows = useMemo(() => {
+        const term = search.trim().toLowerCase();
+        return clients.filter((client) => {
+            if (term && !client.client_name.toLowerCase().includes(term))
+                return false;
+            if (bucket !== ALL && !(client[bucket as BucketKey] > 0))
+                return false;
+            if (overdueOnly && client.total - client.current <= 0) return false;
+            return true;
         });
-    }
+    }, [clients, search, bucket, overdueOnly]);
 
-    return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
-                <Label>Invoice</Label>
-                <p className="text-sm text-muted-foreground">
-                    {invoice.invoice_number} — {invoice.client_name} —
-                    Outstanding: {formatMoney(invoice.amount_due)}
-                </p>
-            </div>
+    const hasFilters = Boolean(search.trim()) || bucket !== ALL || overdueOnly;
 
-            <div className="space-y-1">
-                <Label htmlFor="amount">Amount (NZD)</Label>
-                <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max={invoice.amount_due}
-                    value={form.data.amount}
-                    onChange={(e) => form.setData('amount', e.target.value)}
-                />
-                {form.errors.amount && (
-                    <p className="text-sm text-destructive">
-                        {form.errors.amount}
-                    </p>
-                )}
-            </div>
+    const clearFilters = () => {
+        setSearch('');
+        setBucket(ALL);
+        setOverdueOnly(false);
+    };
 
-            <div className="space-y-1">
-                <Label htmlFor="payment_date">Payment Date</Label>
-                <Input
-                    id="payment_date"
-                    type="date"
-                    value={form.data.payment_date}
-                    onChange={(e) =>
-                        form.setData('payment_date', e.target.value)
-                    }
-                />
-                {form.errors.payment_date && (
-                    <p className="text-sm text-destructive">
-                        {form.errors.payment_date}
-                    </p>
-                )}
-            </div>
+    const overduePct =
+        totals.total > 0
+            ? Math.min(
+                  100,
+                  Math.round(
+                      ((totals.total - totals.current) / totals.total) * 100,
+                  ),
+              )
+            : 0;
 
-            <div className="space-y-1">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                    id="notes"
-                    value={form.data.notes}
-                    onChange={(e) => form.setData('notes', e.target.value)}
-                    placeholder="Optional payment reference or notes"
-                    rows={2}
-                />
-            </div>
+    const statementHref = (client: ClientAging) =>
+        client.client_id
+            ? `/finance/receivables/statements?client_id=${client.client_id}`
+            : '/finance/receivables/statements';
 
-            <DialogFooter>
-                <Button type="button" variant="outline" onClick={onClose}>
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={form.processing}>
-                    {form.processing ? 'Processing...' : 'Record Payment'}
-                </Button>
-            </DialogFooter>
-        </form>
-    );
-}
+    const actionsFor = (client: ClientAging): MenuItem[] =>
+        compactMenu([
+            client.client_id
+                ? {
+                      label: 'Open statement',
+                      icon: FileText,
+                      onClick: () => router.visit(statementHref(client)),
+                  }
+                : null,
+            {
+                label: 'View unpaid invoices',
+                icon: Receipt,
+                onClick: () =>
+                    router.visit(
+                        `/finance/invoices?status=unpaid&search=${encodeURIComponent(
+                            client.client_name,
+                        )}`,
+                    ),
+            },
+        ]);
 
-export default function ReceivablesIndex({ summary, invoices }: PageProps) {
-    const [paymentInvoice, setPaymentInvoice] = useState<InvoiceRow | null>(
-        null,
-    );
+    const amountCell = (value: number, tone?: 'warning' | 'critical') => {
+        if (!value) return <span className="text-muted-foreground">—</span>;
+        return (
+            <span
+                className={
+                    tone === 'critical'
+                        ? 'font-medium text-status-critical tabular-nums'
+                        : tone === 'warning'
+                          ? 'font-medium text-status-warning tabular-nums'
+                          : 'tabular-nums'
+                }
+            >
+                {formatMoney(value)}
+            </span>
+        );
+    };
 
-    const currentNotOverdue = summary.total_outstanding - summary.total_overdue;
-    const pieData = [
+    const columns: EntityTableColumn<ClientAging>[] = [
         {
-            name: 'Outstanding (Current)',
-            value: currentNotOverdue > 0 ? currentNotOverdue : 0,
+            key: 'current',
+            label: 'Current',
+            width: '0.8fr',
+            align: 'right',
+            cell: (client) => amountCell(client.current),
         },
-        { name: 'Overdue', value: summary.total_overdue },
-    ].filter((d) => d.value > 0);
+        {
+            key: '1_30',
+            label: '1–30 days',
+            width: '0.8fr',
+            align: 'right',
+            cell: (client) => amountCell(client['1_30'], 'warning'),
+        },
+        {
+            key: '31_60',
+            label: '31–60 days',
+            width: '0.8fr',
+            align: 'right',
+            cell: (client) => amountCell(client['31_60'], 'warning'),
+        },
+        {
+            key: '61_90',
+            label: '61–90 days',
+            width: '0.8fr',
+            align: 'right',
+            cell: (client) => amountCell(client['61_90'], 'critical'),
+        },
+        {
+            key: '90_plus',
+            label: '90+ days',
+            width: '0.8fr',
+            align: 'right',
+            cell: (client) => amountCell(client['90_plus'], 'critical'),
+        },
+        {
+            key: 'total',
+            label: 'Total owing',
+            width: '0.9fr',
+            align: 'right',
+            cell: (client) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(client.total)}
+                </span>
+            ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={CalendarRange}
+            title="Aged receivables"
+            titleChip={
+                summary.overdue_count > 0 ? (
+                    <PageHeaderStatusChip variant="critical">
+                        {summary.overdue_count} overdue
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="success">
+                        Nothing overdue
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={`Accounts receivable · ${summary.client_count} payers with a balance · ${summary.unpaid_count} unpaid invoices`}
+            actions={
+                <PageHeaderSearch
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search payers…"
+                />
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Outstanding"
+                        href="/finance/invoices?status=unpaid"
+                        ariaLabel="View unpaid invoices"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(totals.total)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Across {summary.client_count} payers
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Within terms"
+                        tone="success"
+                        href="/finance/invoices?status=sent"
+                        ariaLabel="View invoices still within terms"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(totals.current)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Not yet due
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Overdue share"
+                        tone={overduePct > 0 ? 'warning' : 'brand'}
+                        href="/finance/invoices?status=overdue"
+                        ariaLabel="View overdue invoices"
+                    >
+                        <PageHeaderMeterDonut
+                            percent={overduePct}
+                            caption={`${formatMoney(
+                                totals.total - totals.current,
+                            )} past due`}
+                        />
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="90+ days"
+                        tone={totals['90_plus'] > 0 ? 'critical' : 'brand'}
+                        href="/finance/receivables/statements"
+                        ariaLabel="Open client statements"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(totals['90_plus'])}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Issue a statement
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Age"
+                        value={bucket}
+                        allValue={ALL}
+                        options={BUCKET_OPTIONS}
+                        onChange={setBucket}
+                    />
+                    <PageHeaderFilterCheck
+                        label="Overdue only"
+                        checked={overdueOnly}
+                        onChange={setOverdueOnly}
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Receivables" />
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={ArrowUpFromLine}
-                        title="Receivables"
-                        description="Accounts receivable dashboard for outstanding invoices and payments."
-                        stats={[
-                            {
-                                label: 'Outstanding',
-                                value: formatMoney(summary.total_outstanding),
-                            },
-                            {
-                                label: 'Overdue',
-                                value: formatMoney(summary.total_overdue),
-                            },
-                            {
-                                label: 'Unpaid invoices',
-                                value: summary.unpaid_count,
-                            },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Link href="/finance/receivables/aging">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    >
-                                        <TrendingUp className="mr-1.5 h-4 w-4" />
-                                        Aging Report
-                                    </Button>
-                                </Link>
-                                <Link href="/finance/receivables/statements">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    >
-                                        <FileText className="mr-1.5 h-4 w-4" />
-                                        Statements
-                                    </Button>
-                                </Link>
-                            </div>
+            <Head title="Aged receivables" />
+
+            <PageLayout hero={header} tabs={<FinanceTierTwoNav />}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Ageing by payer"
+                        caption={`${rows.length} of ${clients.length} shown`}
+                        right={
+                            <span className="text-caption tabular-nums">
+                                {BUCKETS.map(
+                                    (b) =>
+                                        `${b.label} ${formatMoney(totals[b.key])}`,
+                                ).join(' · ')}
+                            </span>
                         }
-                        footer={<ReceivablesTabsFooter active="aged-ar" />}
                     />
-                }
-            >
-                {/* Summary Cards + PieChart */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Total Outstanding
-                            </CardTitle>
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">
-                                {formatMoney(summary.total_outstanding)}
-                            </div>
-                        </CardContent>
-                    </Card>
 
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Total Overdue
-                            </CardTitle>
-                            <Clock className="h-4 w-4 text-destructive" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-destructive">
-                                {formatMoney(summary.total_overdue)}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Unpaid Invoices
-                            </CardTitle>
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">
-                                {summary.unpaid_count}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Outstanding vs Overdue Pie Chart */}
-                    {pieData.length > 0 && (
-                        <Card>
-                            <CardHeader className="pb-0">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">
-                                    Outstanding vs Overdue
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="pb-4">
-                                <ResponsiveContainer width="100%" height={120}>
-                                    <PieChart>
-                                        <Pie
-                                            data={pieData}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={30}
-                                            outerRadius={50}
-                                            paddingAngle={3}
-                                            dataKey="value"
-                                            nameKey="name"
-                                        >
-                                            {pieData.map((_, index) => (
-                                                <Cell
-                                                    key={`cell-${index}`}
-                                                    fill={chartColor(index)}
-                                                />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip
-                                            formatter={
-                                                ((value: number) =>
-                                                    formatMoney(value)) as any
-                                            }
-                                        />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                <div className="flex justify-center gap-3 text-xs">
-                                    {pieData.map((entry, index) => (
-                                        <div
-                                            key={entry.name}
-                                            className="flex items-center gap-1"
-                                        >
-                                            <div
-                                                className="h-2 w-2 rounded-full"
-                                                style={{
-                                                    backgroundColor:
-                                                        chartColor(index),
-                                                }}
-                                            />
-                                            <span className="text-muted-foreground">
-                                                {entry.name}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
+                    {rows.length === 0 ? (
+                        hasFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                title="No payers match your filters"
+                            />
+                        ) : (
+                            <EmptyList
+                                icon={CalendarRange}
+                                itemName="balance"
+                                title="Nothing outstanding"
+                                description="Every sent invoice has been receipted in full."
+                            />
+                        )
+                    ) : (
+                        <EntityTable
+                            rows={rows}
+                            rowKey={(client) =>
+                                client.client_id ?? client.client_name
+                            }
+                            identityLabel="Payer"
+                            identity={(client) => ({
+                                icon: User,
+                                name: client.client_name,
+                                subline: client.client_id
+                                    ? 'Client'
+                                    : 'Funder or other payer',
+                            })}
+                            columns={columns}
+                            actionsFor={actionsFor}
+                            hrefFor={(client) =>
+                                client.client_id
+                                    ? statementHref(client)
+                                    : `/finance/invoices?status=unpaid&search=${encodeURIComponent(
+                                          client.client_name,
+                                      )}`
+                            }
+                            onRowContextMenu={ctxMenu.open}
+                            minWidth={1040}
+                        />
                     )}
                 </div>
-
-                {/* Outstanding Invoices Table */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">
-                            Outstanding Invoices
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {invoices.length === 0 ? (
-                            <p className="py-8 text-center text-sm text-muted-foreground">
-                                No outstanding invoices.
-                            </p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Invoice #</TableHead>
-                                        <TableHead>Client</TableHead>
-                                        <TableHead>Issue Date</TableHead>
-                                        <TableHead>Due Date</TableHead>
-                                        <TableHead className="text-right">
-                                            Total
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Paid
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Due
-                                        </TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">
-                                            Actions
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {invoices.map((invoice) => (
-                                        <TableRow
-                                            key={invoice.id}
-                                            className={
-                                                invoice.is_overdue
-                                                    ? invoice.days_overdue > 60
-                                                        ? 'bg-status-critical-bg'
-                                                        : 'bg-status-warning-bg'
-                                                    : ''
-                                            }
-                                        >
-                                            <TableCell className="font-medium">
-                                                {invoice.invoice_number}
-                                            </TableCell>
-                                            <TableCell>
-                                                {invoice.client_name}
-                                            </TableCell>
-                                            <TableCell>
-                                                {invoice.issue_date}
-                                            </TableCell>
-                                            <TableCell>
-                                                {invoice.due_date}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {formatMoney(
-                                                    invoice.total_amount,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {formatMoney(
-                                                    invoice.amount_paid,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right font-medium">
-                                                {formatMoney(
-                                                    invoice.amount_due,
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                {invoice.is_overdue ? (
-                                                    <Badge variant="destructive">
-                                                        {invoice.days_overdue}d
-                                                        overdue
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="secondary">
-                                                        Current
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Dialog
-                                                    open={
-                                                        paymentInvoice?.id ===
-                                                        invoice.id
-                                                    }
-                                                    onOpenChange={(open) => {
-                                                        if (!open)
-                                                            setPaymentInvoice(
-                                                                null,
-                                                            );
-                                                    }}
-                                                >
-                                                    <DialogTrigger asChild>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                setPaymentInvoice(
-                                                                    invoice,
-                                                                )
-                                                            }
-                                                        >
-                                                            Record Payment
-                                                        </Button>
-                                                    </DialogTrigger>
-                                                    <DialogContent>
-                                                        <DialogHeader>
-                                                            <DialogTitle>
-                                                                Record Payment
-                                                            </DialogTitle>
-                                                            <DialogDescription>
-                                                                Allocate a
-                                                                payment against
-                                                                this invoice.
-                                                            </DialogDescription>
-                                                        </DialogHeader>
-                                                        {paymentInvoice?.id ===
-                                                            invoice.id && (
-                                                            <PaymentDialog
-                                                                invoice={
-                                                                    invoice
-                                                                }
-                                                                onClose={() =>
-                                                                    setPaymentInvoice(
-                                                                        null,
-                                                                    )
-                                                                }
-                                                            />
-                                                        )}
-                                                    </DialogContent>
-                                                </Dialog>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
             </PageLayout>
+
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={User}
+                    title={ctxMenu.ctx.record.client_name}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
         </AppLayout>
     );
 }

@@ -30,12 +30,15 @@ describe('site profile overview ownership', () => {
 
     it('restores the complete Site-owned overview workflows', () => {
         const overview = readFileSync(resolve(tabs, 'overview.tsx'), 'utf8');
+        const show = readFileSync(
+            resolve(process.cwd(), 'resources/js/pages/sites/show.tsx'),
+            'utf8',
+        );
 
         for (const contract of [
             'EditSiteLineDialog',
-            'EditLocationDialog',
+            'onEditLocation',
             'SiteOverviewMapCard',
-            'SiteGeofenceDialog',
             'EditSafetyDialog',
             'AddSiteNoteDialog',
             'ConfirmAction',
@@ -44,6 +47,12 @@ describe('site profile overview ownership', () => {
             'Open full services register',
         ]) {
             expect(overview, contract).toContain(contract);
+        }
+
+        // The location and geofence dialogs are hoisted to the Site page,
+        // which hands the overview tab its edit triggers.
+        for (const contract of ['EditLocationDialog', 'SiteGeofenceDialog']) {
+            expect(show, contract).toContain(contract);
         }
     });
 });

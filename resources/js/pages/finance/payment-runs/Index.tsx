@@ -1,33 +1,39 @@
+import { FinanceSectionRail, formatMoney } from '@/components/finance';
 import {
-    PayablesTabsFooter,
-    formatMoney,
-    useRowContextMenu,
-    type RowCtxItem,
-} from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
+    PaymentRunDialog,
+    type PaymentRunBankAccount,
+    type PaymentRunBill,
+} from '@/components/finance/payment-run-dialog';
+import {
+    CounterPill,
+    EntityContextMenu,
+    EntityTable,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import { Banknote, Download, Eye, Plus, Send } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { Banknote, Download, Eye, Landmark, Plus } from 'lucide-react';
+import { useState } from 'react';
 
 type PaymentRun = {
     id: number;
@@ -49,278 +55,360 @@ type PaginatedData<T> = {
     total: number;
 };
 
+type Summary = {
+    total: number;
+    draft: number;
+    approved: number;
+    awaiting_bank: number;
+    awaiting_bank_value: number;
+    settled: number;
+    legacy_processing: number;
+    legacy_completed: number;
+};
+
 type PageProps = {
     paymentRuns: PaginatedData<PaymentRun>;
     filters: { status: string };
+    summary: Summary;
+    canManage: boolean;
+    bankAccounts: PaymentRunBankAccount[];
+    payableBills: PaymentRunBill[];
 };
 
+const STATUS_LABELS: Record<string, string> = {
+    draft: 'Draft',
+    approved: 'Approved',
+    prepared: 'Prepared',
+    exported: 'Exported',
+    accepted: 'Bank accepted',
+    settled: 'Settled',
+    reconciled: 'Reconciled',
+    rejected: 'Rejected',
+    failed: 'Failed',
+    processing: 'Processed (legacy)',
+    completed: 'Completed (legacy)',
+};
+
+const formatDate = (date: string | null) =>
+    date
+        ? new Date(date).toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          })
+        : '—';
+
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
-    { title: 'Payment Runs', href: '/finance/payment-runs' },
+    { title: 'Payables', href: '/finance/payables' },
+    { title: 'Payment runs', href: '/finance/payment-runs' },
 ];
 
-export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
-    const handleStatusFilter = (value: string) => {
+export default function PaymentRunsIndex({
+    paymentRuns,
+    filters,
+    summary,
+    canManage,
+    bankAccounts,
+    payableBills,
+}: PageProps) {
+    const [createOpen, setCreateOpen] = useState(false);
+
+    const apply = (status: string) =>
         router.get(
             '/finance/payment-runs',
-            { status: value === 'all' ? '' : value },
+            { status: status === 'all' ? '' : status },
             { preserveState: true, replace: true },
         );
-    };
 
-    const clearFilters = () => {
+    const clearFilters = () =>
         router.get(
             '/finance/payment-runs',
             {},
             { preserveState: true, replace: true },
         );
-    };
 
     const hasFilters = Boolean(filters.status);
 
-    const settledCount = paymentRuns.data.filter((r) =>
-        ['completed', 'settled', 'reconciled'].includes(r.status),
-    ).length;
-    const awaitingBankCount = paymentRuns.data.filter((r) =>
-        ['prepared', 'exported', 'accepted'].includes(r.status),
-    ).length;
-    const draftCount = paymentRuns.data.filter(
-        (r) => r.status === 'draft',
-    ).length;
+    // The two pre-settlement-workflow statuses only appear as filter options
+    // when real rows still carry them, and then read as "(legacy)".
+    const statusOptions = [
+        { value: 'all', label: 'All statuses' },
+        { value: 'draft', label: 'Draft' },
+        { value: 'approved', label: 'Approved' },
+        { value: 'prepared', label: 'Prepared' },
+        { value: 'exported', label: 'Exported' },
+        { value: 'accepted', label: 'Bank accepted' },
+        { value: 'settled', label: 'Settled' },
+        { value: 'reconciled', label: 'Reconciled' },
+        { value: 'rejected', label: 'Rejected' },
+        { value: 'failed', label: 'Failed' },
+        ...(summary.legacy_processing > 0
+            ? [{ value: 'processing', label: 'Processed (legacy)' }]
+            : []),
+        ...(summary.legacy_completed > 0
+            ? [{ value: 'completed', label: 'Completed (legacy)' }]
+            : []),
+    ];
 
-    // Right-click row menu — mirrors the row's only inline action: opening the
-    // payment run (the row onClick navigates to the show route). Approve/Process
-    // live on the detail page behind confirm dialogs, not as inline row actions.
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (run: PaymentRun): RowCtxItem[] => [
+    const ctx = useEntityContextMenu<PaymentRun>();
+
+    const menuFor = (run: PaymentRun): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Open payment run',
+                icon: Eye,
+                onClick: () =>
+                    router.visit(`/finance/payment-runs/${run.id}`),
+            },
+        ]);
+
+    const columns: EntityTableColumn<PaymentRun>[] = [
         {
-            kind: 'item',
-            label: 'Open',
-            icon: Eye,
-            onSelect: () => router.visit(`/finance/payment-runs/${run.id}`),
+            key: 'payment_date',
+            label: 'Payment date',
+            width: '1.2fr',
+            cell: (r) => (
+                <span className="text-muted-foreground">
+                    {formatDate(r.payment_date)}
+                </span>
+            ),
+        },
+        {
+            key: 'bank_account',
+            label: 'Bank account',
+            width: '1.8fr',
+            cell: (r) => (
+                <span className="truncate">
+                    {r.bank_account
+                        ? `${r.bank_account.name} · ${r.bank_account.bank_name}`
+                        : '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'items',
+            label: 'Bills',
+            width: '80px',
+            align: 'center',
+            cell: (r) => <CounterPill tone="neutral">{r.item_count}</CounterPill>,
+        },
+        {
+            key: 'total',
+            label: 'Total',
+            width: '1.2fr',
+            align: 'right',
+            cell: (r) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(r.total_amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '160px',
+            cell: (r) => (
+                <StatusBadge
+                    status={r.status}
+                    label={STATUS_LABELS[r.status]}
+                    className="rounded-[8px] font-semibold"
+                />
+            ),
+        },
+        {
+            key: 'processed_at',
+            label: 'Processed',
+            width: '1.2fr',
+            cell: (r) => (
+                <span className="text-muted-foreground">
+                    {r.processed_at ? formatDate(r.processed_at) : '—'}
+                </span>
+            ),
         },
     ];
 
+    const exportUrl = `/finance/payment-runs/export?${new URLSearchParams(
+        Object.entries({ status: filters.status }).filter(([, v]) => v),
+    ).toString()}`;
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={Banknote}
+            title="Payment runs"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={summary.awaiting_bank > 0 ? 'info' : 'success'}
+                >
+                    {summary.awaiting_bank} awaiting bank
+                </PageHeaderStatusChip>
+            }
+            subline={`Batch payments to vendors · ${summary.total} runs · ${summary.draft} draft`}
+            actions={
+                <>
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={() => {
+                            window.location.href = exportUrl;
+                        }}
+                    >
+                        Export CSV
+                    </PageHeaderGlassButton>
+                    {canManage && (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                        >
+                            New payment run
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="All runs"
+                        href="/finance/payment-runs"
+                        ariaLabel="View all payment runs"
+                    >
+                        <PageHeaderMeterBig>{summary.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Every batch payment recorded
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Awaiting bank"
+                        tone="warning"
+                        href="/finance/payment-runs?status=exported"
+                        ariaLabel="View runs awaiting the bank"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.awaiting_bank_value)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {summary.awaiting_bank} prepared, exported or
+                            accepted
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Settled"
+                        tone="success"
+                        href="/finance/payment-runs?status=settled"
+                        ariaLabel="View settled payment runs"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.settled}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Confirmed and posted
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Draft"
+                        href="/finance/payment-runs?status=draft"
+                        ariaLabel="View draft payment runs"
+                    >
+                        <PageHeaderMeterBig>{summary.draft}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {summary.approved} approved and ready to prepare
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    label="Status"
+                    value={filters.status || 'all'}
+                    options={statusOptions}
+                    onChange={apply}
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Payment Runs" />
+            <Head title="Payment runs" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Send}
-                        title="Payment Runs"
-                        description="Manage batch payments to vendors"
-                        stats={[
-                            { label: 'Total', value: paymentRuns.total },
-                            { label: 'Settled', value: settledCount },
-                            {
-                                label: 'Awaiting bank',
-                                value: awaitingBankCount,
-                            },
-                            { label: 'Drafts', value: draftCount },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button size="sm" variant="outline" asChild>
-                                    <a
-                                        href={`/finance/payment-runs/export?${new URLSearchParams(Object.entries({ status: filters.status }).filter(([, v]) => v)).toString()}`}
+            <PageLayout hero={header}>
+                <ListCaption
+                    title="Payment runs"
+                    caption={`${paymentRuns.data.length} of ${paymentRuns.total} shown`}
+                />
+
+                {paymentRuns.data.length === 0 ? (
+                    hasFilters ? (
+                        <EmptySearch
+                            onClear={clearFilters}
+                            title="No payment runs match your filters"
+                        />
+                    ) : (
+                        <EmptyList
+                            icon={Landmark}
+                            itemName="payment run"
+                            title="No payment runs yet"
+                            description="A payment run batches approved bills into one bank payment. Create one to get started."
+                            action={
+                                canManage ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
                                     >
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Export CSV
-                                    </a>
-                                </Button>
-                                <Link href="/finance/payment-runs/create">
-                                    <Button size="sm">
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        New Payment Run
+                                        New payment run
                                     </Button>
-                                </Link>
-                            </div>
-                        }
-                        footer={<PayablesTabsFooter active="payment-runs" />}
-                    />
-                }
-            >
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Banknote className="h-5 w-5 text-muted-foreground" />
-                                <CardTitle>Payment Runs</CardTitle>
-                            </div>
-                            <Select
-                                value={filters.status || 'all'}
-                                onValueChange={handleStatusFilter}
-                            >
-                                <SelectTrigger
-                                    className="w-[160px]"
-                                    aria-label="Filter by status"
-                                >
-                                    <SelectValue placeholder="Filter by status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Statuses
-                                    </SelectItem>
-                                    <SelectItem value="draft">Draft</SelectItem>
-                                    <SelectItem value="approved">
-                                        Approved
-                                    </SelectItem>
-                                    <SelectItem value="processing">
-                                        Legacy processing
-                                    </SelectItem>
-                                    <SelectItem value="prepared">
-                                        Prepared
-                                    </SelectItem>
-                                    <SelectItem value="exported">
-                                        Exported
-                                    </SelectItem>
-                                    <SelectItem value="accepted">
-                                        Bank accepted
-                                    </SelectItem>
-                                    <SelectItem value="settled">
-                                        Settled
-                                    </SelectItem>
-                                    <SelectItem value="reconciled">
-                                        Reconciled
-                                    </SelectItem>
-                                    <SelectItem value="rejected">
-                                        Rejected
-                                    </SelectItem>
-                                    <SelectItem value="completed">
-                                        Legacy completed
-                                    </SelectItem>
-                                    <SelectItem value="failed">
-                                        Failed
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        {paymentRuns.data.length === 0 ? (
-                            hasFilters ? (
-                                <EmptySearch
-                                    onClear={clearFilters}
-                                    title="No payment runs match your filters"
-                                    className="border-0"
-                                />
-                            ) : (
-                                <EmptyList
-                                    icon={Banknote}
-                                    itemName="payment run"
-                                    title="No payment runs yet"
-                                    description="Payment runs let you batch payments to vendors. Create one to get started."
-                                    className="border-0"
-                                    action={
-                                        <Link href="/finance/payment-runs/create">
-                                            <Button size="sm">
-                                                New payment run
-                                            </Button>
-                                        </Link>
-                                    }
-                                />
-                            )
-                        ) : (
-                            <>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Run #</TableHead>
-                                            <TableHead>Payment Date</TableHead>
-                                            <TableHead>Bank Account</TableHead>
-                                            <TableHead className="text-center">
-                                                Items
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Total Amount
-                                            </TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>Processed At</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {paymentRuns.data.map((run) => {
-                                            return (
-                                                <TableRow
-                                                    key={run.id}
-                                                    className="cursor-pointer hover:bg-muted/50"
-                                                    onClick={() =>
-                                                        router.visit(
-                                                            `/finance/payment-runs/${run.id}`,
-                                                        )
-                                                    }
-                                                    onContextMenu={rowMenu.open(
-                                                        rowMenuItems(run),
-                                                    )}
-                                                >
-                                                    <TableCell className="font-mono font-medium">
-                                                        {run.run_number}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {run.payment_date}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {run.bank_account
-                                                            ? `${run.bank_account.name} (${run.bank_account.bank_name})`
-                                                            : '-'}
-                                                    </TableCell>
-                                                    <TableCell className="text-center">
-                                                        {run.item_count}
-                                                    </TableCell>
-                                                    <TableCell className="text-right font-mono tabular-nums">
-                                                        {formatMoney(
-                                                            run.total_amount,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <StatusBadge
-                                                            status={run.status}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground">
-                                                        {run.processed_at ||
-                                                            '-'}
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
-
-                                {paymentRuns.last_page > 1 && (
-                                    <div className="mt-4 flex items-center justify-center gap-1">
-                                        {paymentRuns.links.map((link, i) => (
-                                            <Button
-                                                key={i}
-                                                variant={
-                                                    link.active
-                                                        ? 'default'
-                                                        : 'outline'
-                                                }
-                                                size="sm"
-                                                disabled={!link.url}
-                                                onClick={() => {
-                                                    if (link.url) {
-                                                        router.visit(link.url);
-                                                    }
-                                                }}
-                                                dangerouslySetInnerHTML={{
-                                                    __html: link.label,
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {rowMenu.element}
+                                ) : undefined
+                            }
+                        />
+                    )
+                ) : (
+                    <>
+                        <EntityTable
+                            rows={paymentRuns.data}
+                            rowKey={(r) => r.id}
+                            identityLabel="Run"
+                            identity={(r) => ({
+                                icon: Banknote,
+                                name: r.run_number,
+                            })}
+                            columns={columns}
+                            actionsFor={menuFor}
+                            hrefFor={(r) => `/finance/payment-runs/${r.id}`}
+                            onOpen={(r) =>
+                                router.visit(`/finance/payment-runs/${r.id}`)
+                            }
+                            onRowContextMenu={ctx.open}
+                            minWidth={1140}
+                        />
+                        <LaravelPagination
+                            links={paymentRuns.links}
+                            lastPage={paymentRuns.last_page}
+                        />
+                    </>
+                )}
             </PageLayout>
+
+            {ctx.ctx && (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Banknote}
+                    title={ctx.ctx.record.run_number}
+                    items={menuFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            )}
+
+            {canManage && (
+                <PaymentRunDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    bankAccounts={bankAccounts}
+                    bills={payableBills}
+                />
+            )}
         </AppLayout>
     );
 }

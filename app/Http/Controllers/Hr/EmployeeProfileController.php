@@ -29,6 +29,7 @@ use App\Domain\Hr\Services\EmployeeRoleAssignmentService;
 use App\Domain\Hr\Services\HrEquipmentAccessProjectionService;
 use App\Domain\Hr\Services\OrgChartService;
 use App\Domain\Hr\Services\PeopleMutationLockService;
+use App\Domain\It\Services\ItProvisioningHrSourceService;
 use App\Domain\It\Services\ItProvisioningWorkflowService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\StoreEmployeeRequest;
@@ -1920,8 +1921,13 @@ class EmployeeProfileController extends Controller
 
             $tracked = ['position_role', 'primary_site_id', 'employment_type'];
             $before = collect($tracked)->mapWithKeys(fn (string $field) => [$field => $profile->{$field}])->all();
+            $previousStartDate = $profile->start_date?->toDateString();
             $profile->update($validated);
             $profile->refresh();
+
+            if (array_key_exists('start_date', $validated) && $previousStartDate !== $profile->start_date?->toDateString()) {
+                app(ItProvisioningHrSourceService::class)->syncProfileStartDate($profile, $user);
+            }
 
             $changes = [];
             foreach ($tracked as $field) {

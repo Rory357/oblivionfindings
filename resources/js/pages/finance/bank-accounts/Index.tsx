@@ -1,18 +1,37 @@
 import {
     BankAccountDialog,
-    BankingTabsFooter,
+    FinanceSectionRail,
     formatMoney,
-    useRowContextMenu,
     type AccountOption,
     type EditableBankAccount,
-    type RowCtxItem,
 } from '@/components/finance';
 import { chartColor } from '@/components/finance/chart-palette';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import {
+    EntityCard,
+    EntityCardGrid,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterCheck,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyList } from '@/components/ui/empty-state';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -20,7 +39,6 @@ import {
     AlertCircle,
     Banknote,
     Building2,
-    DollarSign,
     Eye,
     Landmark,
     Pencil,
@@ -50,12 +68,29 @@ interface Props {
     glAccounts: AccountOption[];
 }
 
-const accountTypeLabels: Record<string, string> = {
+const ACCOUNT_TYPE_LABELS: Record<string, string> = {
     cheque: 'Cheque',
     savings: 'Savings',
-    term_deposit: 'Term Deposit',
-    credit_card: 'Credit Card',
+    term_deposit: 'Term deposit',
+    credit_card: 'Credit card',
 };
+
+const ALL = '__all';
+
+const TYPE_OPTIONS = [
+    { value: ALL, label: 'Any type' },
+    ...Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => ({
+        value,
+        label,
+    })),
+];
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Banking', href: '/finance/banking' },
+    { title: 'Bank accounts', href: '/finance/bank-accounts' },
+];
 
 export default function BankAccountsIndex({
     bankAccounts,
@@ -66,11 +101,10 @@ export default function BankAccountsIndex({
     const [editAccount, setEditAccount] = useState<EditableBankAccount | null>(
         null,
     );
-
-    const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Bank Accounts', href: '/finance/bank-accounts' },
-    ];
+    const [search, setSearch] = useState('');
+    const [type, setType] = useState(ALL);
+    const [includeInactive, setIncludeInactive] = useState(true);
+    const ctxMenu = useEntityContextMenu<BankAccount>();
 
     const openEdit = (account: BankAccount) =>
         setEditAccount({
@@ -85,28 +119,24 @@ export default function BankAccountsIndex({
             is_active: account.is_active,
         });
 
-    // Right-click row menu — mirrors the card's existing inline actions (Open first).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (account: BankAccount): RowCtxItem[] => {
-        const items: RowCtxItem[] = [
+    const openAccount = (account: BankAccount) =>
+        router.visit(`/finance/bank-accounts/${account.id}`);
+
+    const actionsFor = (account: BankAccount): MenuItem[] =>
+        compactMenu([
             {
-                kind: 'item',
-                label: 'Open',
+                label: 'Open account',
                 icon: Eye,
-                onSelect: () =>
-                    router.visit(`/finance/bank-accounts/${account.id}`),
+                onClick: () => openAccount(account),
             },
-        ];
-        if (canManage) {
-            items.push({
-                kind: 'item',
-                label: 'Edit',
-                icon: Pencil,
-                onSelect: () => openEdit(account),
-            });
-        }
-        return items;
-    };
+            canManage
+                ? {
+                      label: 'Edit account',
+                      icon: Pencil,
+                      onClick: () => openEdit(account),
+                  }
+                : null,
+        ]);
 
     const totalCash = useMemo(
         () => bankAccounts.reduce((sum, a) => sum + a.current_balance, 0),
@@ -123,7 +153,6 @@ export default function BankAccountsIndex({
                 .map((a) => ({ name: a.name, value: a.current_balance })),
         [bankAccounts],
     );
-
     const activeCount = useMemo(
         () => bankAccounts.filter((a) => a.is_active).length,
         [bankAccounts],
@@ -132,312 +161,360 @@ export default function BankAccountsIndex({
         () => bankAccounts.reduce((sum, a) => sum + a.unreconciled_count, 0),
         [bankAccounts],
     );
+    const positiveCash = useMemo(
+        () =>
+            bankAccounts.reduce(
+                (sum, a) => sum + Math.max(0, a.current_balance),
+                0,
+            ),
+        [bankAccounts],
+    );
+
+    const term = search.trim().toLowerCase();
+    const visible = useMemo(
+        () =>
+            bankAccounts.filter((account) => {
+                if (!includeInactive && !account.is_active) return false;
+                if (type !== ALL && account.account_type !== type) return false;
+                if (!term) return true;
+                return [
+                    account.name,
+                    account.bank_name,
+                    account.account_number ?? '',
+                    account.gl_account?.code ?? '',
+                ]
+                    .join(' ')
+                    .toLowerCase()
+                    .includes(term);
+            }),
+        [bankAccounts, includeInactive, type, term],
+    );
+
+    const hasFilters = Boolean(term) || type !== ALL || !includeInactive;
+    const clearFilters = () => {
+        setSearch('');
+        setType(ALL);
+        setIncludeInactive(true);
+    };
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={Banknote}
+            title="Bank accounts"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={unreconciledTotal > 0 ? 'warning' : 'success'}
+                >
+                    {unreconciledTotal > 0
+                        ? `${unreconciledTotal} unreconciled`
+                        : 'All reconciled'}
+                </PageHeaderStatusChip>
+            }
+            subline={`Banking · ${bankAccounts.length} accounts · ${activeCount} active`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search accounts, banks…"
+                    />
+                    {canManage && (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                        >
+                            New bank account
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Total cash"
+                        tone={totalCash >= 0 ? 'success' : 'critical'}
+                        href="/finance/cash-position"
+                        ariaLabel="View the cash position"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(totalCash)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Across {bankAccounts.length} accounts
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Active accounts"
+                        onClick={() => {
+                            setIncludeInactive(false);
+                            setType(ALL);
+                            setSearch('');
+                        }}
+                        ariaLabel="Show only active accounts"
+                    >
+                        <PageHeaderMeterBig>{activeCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {bankAccounts.length - activeCount} inactive
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Unreconciled"
+                        tone={unreconciledTotal > 0 ? 'warning' : 'brand'}
+                        href="/finance/bank-transactions?status=unreconciled"
+                        ariaLabel="View unreconciled bank transactions"
+                    >
+                        <PageHeaderMeterBig>
+                            {unreconciledTotal}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Transactions still to match
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {primaryAccount ? (
+                        <PageHeaderMeterBlock
+                            label="Primary account"
+                            href={`/finance/bank-accounts/${primaryAccount.id}`}
+                            ariaLabel={`Open ${primaryAccount.name}`}
+                        >
+                            <PageHeaderMeterBig>
+                                {formatMoney(primaryAccount.current_balance)}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {primaryAccount.name}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Type"
+                        value={type}
+                        allValue={ALL}
+                        options={TYPE_OPTIONS}
+                        onChange={setType}
+                    />
+                    <PageHeaderFilterCheck
+                        label="Include inactive"
+                        checked={includeInactive}
+                        onChange={setIncludeInactive}
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Bank Accounts" />
+            <Head title="Bank accounts" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Banknote}
-                        title="Bank Accounts"
-                        description="Manage your organisation's bank accounts and balances"
-                        stats={[
-                            { label: 'Accounts', value: bankAccounts.length },
-                            { label: 'Active', value: activeCount },
-                            { label: 'Unreconciled', value: unreconciledTotal },
-                        ]}
-                        actions={
-                            canManage && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => setCreateOpen(true)}
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add Bank Account
-                                </Button>
-                            )
-                        }
-                        footer={<BankingTabsFooter active="accounts" />}
-                    />
-                }
-            >
-                {bankAccounts.length === 0 ? (
-                    <Card>
-                        <CardContent className="p-0">
-                            <EmptyList
-                                icon={Building2}
-                                itemName="bank account"
-                                title="No bank accounts yet"
-                                description="Get started by adding your first bank account."
-                                className="border-0"
-                                action={
-                                    canManage ? (
-                                        <Button
-                                            size="sm"
-                                            onClick={() => setCreateOpen(true)}
-                                        >
-                                            Add bank account
-                                        </Button>
-                                    ) : undefined
-                                }
-                            />
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <>
-                        {/* KPI Cards */}
-                        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-status-info p-2">
-                                            <DollarSign className="h-5 w-5 text-status-info" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-muted-foreground">
-                                                Total Cash
-                                            </p>
-                                            <p
-                                                className={`font-mono text-2xl font-semibold tabular-nums ${totalCash >= 0 ? 'text-status-success' : 'text-status-critical'}`}
-                                            >
-                                                {formatMoney(totalCash)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-primary/10 p-2">
-                                            <Landmark className="h-5 w-5 text-primary" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-muted-foreground">
-                                                Account Count
-                                            </p>
-                                            <p className="text-2xl font-semibold">
-                                                {bankAccounts.length}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-status-warning p-2">
-                                            <Star className="h-5 w-5 text-status-warning" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-muted-foreground">
-                                                Primary Account
-                                            </p>
-                                            <p
-                                                className={`font-mono text-2xl font-semibold tabular-nums ${(primaryAccount?.current_balance ?? 0) >= 0 ? 'text-status-success' : 'text-status-critical'}`}
-                                            >
-                                                {primaryAccount
-                                                    ? formatMoney(
-                                                          primaryAccount.current_balance,
-                                                      )
-                                                    : 'N/A'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        {/* PieChart - Balance Distribution */}
-                        {pieData.length > 0 && (
-                            <Card className="mb-6">
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Balance Distribution
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="h-[280px]">
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height="100%"
-                                        >
-                                            <PieChart>
-                                                <Pie
-                                                    data={pieData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={60}
-                                                    outerRadius={100}
-                                                    paddingAngle={2}
-                                                    dataKey="value"
-                                                    nameKey="name"
-                                                    label={({
-                                                        name,
-                                                        percent,
-                                                    }) =>
-                                                        `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`
-                                                    }
-                                                >
-                                                    {pieData.map(
-                                                        (_entry, index) => (
-                                                            <Cell
-                                                                key={`cell-${index}`}
-                                                                fill={chartColor(
-                                                                    index,
-                                                                )}
-                                                            />
-                                                        ),
-                                                    )}
-                                                </Pie>
-                                                <Tooltip
-                                                    formatter={(
-                                                        value?: number,
-                                                    ) => [
-                                                        formatMoney(value ?? 0),
-                                                        'Balance',
-                                                    ]}
-                                                />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Account Cards */}
-                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {bankAccounts.map((account) => (
-                                <Card
-                                    key={account.id}
-                                    role="link"
-                                    tabIndex={0}
-                                    aria-label={`Open ${account.name}`}
-                                    onClick={() =>
-                                        router.visit(
-                                            `/finance/bank-accounts/${account.id}`,
-                                        )
-                                    }
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter')
-                                            router.visit(
-                                                `/finance/bank-accounts/${account.id}`,
-                                            );
-                                    }}
-                                    onContextMenu={rowMenu.open(
-                                        rowMenuItems(account),
-                                    )}
-                                    className="h-full cursor-pointer transition-shadow hover:shadow-md"
-                                >
-                                    <CardHeader className="pb-3">
-                                        <div className="flex items-start justify-between">
-                                            <div>
-                                                <CardTitle className="text-lg">
-                                                    {account.name}
-                                                </CardTitle>
-                                                <p className="mt-1 text-sm text-muted-foreground">
-                                                    {account.bank_name}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                {account.is_primary && (
-                                                    <Badge
-                                                        variant="default"
-                                                        className="border-status-info/30 bg-status-info-bg text-status-info"
-                                                    >
-                                                        Primary
-                                                    </Badge>
-                                                )}
-                                                {!account.is_active && (
-                                                    <Badge variant="secondary">
-                                                        Inactive
-                                                    </Badge>
-                                                )}
-                                                {canManage && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="h-7 w-7 p-0"
-                                                        aria-label={`Edit ${account.name}`}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            openEdit(account);
-                                                        }}
-                                                    >
-                                                        <Pencil className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {bankAccounts.length === 0 ? (
+                        <EmptyList
+                            icon={Building2}
+                            itemName="bank account"
+                            title="No bank accounts yet"
+                            description="Add your first bank account to start tracking balances and reconciliations."
+                            action={
+                                canManage ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
+                                        New bank account
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <>
+                            {pieData.length > 0 && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-section-title">
+                                            Balance distribution
+                                        </CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm text-muted-foreground">
-                                                    Type
-                                                </span>
-                                                <Badge variant="outline">
-                                                    {accountTypeLabels[
-                                                        account.account_type
-                                                    ] || account.account_type}
-                                                </Badge>
-                                            </div>
-
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm text-muted-foreground">
-                                                    Current Balance
-                                                </span>
-                                                <span
-                                                    className={`font-mono text-lg font-semibold tabular-nums ${account.current_balance >= 0 ? 'text-status-success' : 'text-status-critical'}`}
-                                                >
-                                                    {formatMoney(
-                                                        account.current_balance,
-                                                    )}
-                                                </span>
-                                            </div>
-
-                                            {account.gl_account && (
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-sm text-muted-foreground">
-                                                        GL Account
-                                                    </span>
-                                                    <span className="font-mono text-sm">
-                                                        {
-                                                            account.gl_account
-                                                                .code
+                                        <div className="h-[280px]">
+                                            <ResponsiveContainer
+                                                width="100%"
+                                                height="100%"
+                                            >
+                                                <PieChart>
+                                                    <Pie
+                                                        data={pieData}
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        innerRadius={60}
+                                                        outerRadius={100}
+                                                        paddingAngle={2}
+                                                        dataKey="value"
+                                                        nameKey="name"
+                                                        label={({
+                                                            name,
+                                                            percent,
+                                                        }) =>
+                                                            `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`
                                                         }
-                                                    </span>
-                                                </div>
-                                            )}
-
-                                            {account.unreconciled_count > 0 && (
-                                                <div className="flex items-center gap-2 rounded-md bg-status-warning px-3 py-2 text-status-warning">
-                                                    <AlertCircle className="h-4 w-4 shrink-0" />
-                                                    <span className="text-sm font-medium">
-                                                        {
-                                                            account.unreconciled_count
-                                                        }{' '}
-                                                        unreconciled transaction
-                                                        {account.unreconciled_count !==
-                                                        1
-                                                            ? 's'
-                                                            : ''}
-                                                    </span>
-                                                </div>
-                                            )}
+                                                    >
+                                                        {pieData.map(
+                                                            (_entry, index) => (
+                                                                <Cell
+                                                                    key={`cell-${index}`}
+                                                                    fill={chartColor(
+                                                                        index,
+                                                                    )}
+                                                                />
+                                                            ),
+                                                        )}
+                                                    </Pie>
+                                                    <Tooltip
+                                                        formatter={(
+                                                            value?: number,
+                                                        ) => [
+                                                            formatMoney(
+                                                                value ?? 0,
+                                                            ),
+                                                            'Balance',
+                                                        ]}
+                                                    />
+                                                </PieChart>
+                                            </ResponsiveContainer>
                                         </div>
                                     </CardContent>
                                 </Card>
-                            ))}
-                        </div>
-                    </>
-                )}
+                            )}
+
+                            <ListCaption
+                                title="Bank accounts"
+                                caption={`${visible.length} of ${bankAccounts.length} shown`}
+                            />
+
+                            {visible.length === 0 ? (
+                                <EmptySearch
+                                    onClear={clearFilters}
+                                    title="No bank accounts match your filters"
+                                />
+                            ) : (
+                                <EntityCardGrid>
+                                    {visible.map((account) => (
+                                        <EntityCard
+                                            key={account.id}
+                                            meridian={
+                                                !account.is_active
+                                                    ? 'warning'
+                                                    : account.unreconciled_count >
+                                                        0
+                                                      ? 'warning'
+                                                      : 'success'
+                                            }
+                                            icon={Landmark}
+                                            name={account.name}
+                                            subline={account.bank_name}
+                                            sublineIcon={Building2}
+                                            href={`/finance/bank-accounts/${account.id}`}
+                                            onOpen={() => openAccount(account)}
+                                            onContextMenu={(event) =>
+                                                ctxMenu.open(event, account)
+                                            }
+                                            actions={actionsFor(account)}
+                                            muted={!account.is_active}
+                                            chips={
+                                                <>
+                                                    <EntityChip>
+                                                        {ACCOUNT_TYPE_LABELS[
+                                                            account.account_type
+                                                        ] ??
+                                                            account.account_type}
+                                                    </EntityChip>
+                                                    {account.is_primary ? (
+                                                        <EntityStatusChip
+                                                            variant="info"
+                                                            icon={Star}
+                                                        >
+                                                            Primary
+                                                        </EntityStatusChip>
+                                                    ) : null}
+                                                    {!account.is_active ? (
+                                                        <EntityStatusChip variant="neutral">
+                                                            Inactive
+                                                        </EntityStatusChip>
+                                                    ) : null}
+                                                </>
+                                            }
+                                            metric={{
+                                                label: 'Current balance',
+                                                value: formatMoney(
+                                                    account.current_balance,
+                                                ),
+                                                percent:
+                                                    positiveCash > 0
+                                                        ? Math.round(
+                                                              (Math.max(
+                                                                  0,
+                                                                  account.current_balance,
+                                                              ) /
+                                                                  positiveCash) *
+                                                                  100,
+                                                          )
+                                                        : null,
+                                                tone:
+                                                    account.current_balance >= 0
+                                                        ? 'success'
+                                                        : 'critical',
+                                            }}
+                                            alerts={
+                                                account.unreconciled_count >
+                                                0 ? (
+                                                    <EntityStatusChip
+                                                        variant="warning"
+                                                        icon={AlertCircle}
+                                                    >
+                                                        {
+                                                            account.unreconciled_count
+                                                        }{' '}
+                                                        unreconciled
+                                                        {account.unreconciled_count ===
+                                                        1
+                                                            ? ' transaction'
+                                                            : ' transactions'}
+                                                    </EntityStatusChip>
+                                                ) : undefined
+                                            }
+                                            footer={{
+                                                personIcon: Landmark,
+                                                primary:
+                                                    account.account_number ??
+                                                    'No account number',
+                                                secondary: account.gl_account
+                                                    ? `GL ${account.gl_account.code} · ${account.gl_account.name}`
+                                                    : 'No GL account linked',
+                                            }}
+                                            openLabel="Open"
+                                        />
+                                    ))}
+                                </EntityCardGrid>
+                            )}
+                        </>
+                    )}
+                </div>
             </PageLayout>
 
-            {rowMenu.element}
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={Landmark}
+                    title={ctxMenu.ctx.record.name}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
 
             {canManage && (
                 <BankAccountDialog

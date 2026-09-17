@@ -31,7 +31,7 @@ function w06BrowserPath(string $path): string
 function w06BrowserSources(): array
 {
     $files = ['w06-draft-browser-environment.ps1', 'w06-draft-browser-runtime.php', 'w06-draft-browser-bootstrap.php',
-        'w06-draft-browser-router.php', 'w06-draft-browser-fixtures.php', 'w06-draft-browser-teardown.php', 'w11-mailbox-browser-fixture.php', 'w11-merge-browser-scenario.php', 'w12-delivery-browser-fixture.php', 'w13-api-browser-fixture.php', 'w14-monitoring-browser-fixture.php', 'w15-catalogue-browser-fixture.php'];
+        'w06-draft-browser-router.php', 'w06-draft-browser-fixtures.php', 'w06-draft-browser-teardown.php', 'w11-mailbox-browser-fixture.php', 'w11-merge-browser-scenario.php', 'w12-delivery-browser-fixture.php', 'w13-api-browser-fixture.php', 'w14-monitoring-browser-fixture.php', 'w15-catalogue-browser-fixture.php', 'w21-workspace-browser-fixture.php', 'w23-vendor-vault-browser-fixture.php'];
     $hashes = [];
     foreach ($files as $name) {
         w06BrowserRequire(is_file(__DIR__.'/'.$name), 'A required verification source is missing.');
@@ -64,6 +64,9 @@ function w06BrowserGuard(bool $requireReady = false): array
     w06BrowserRequire(w06BrowserEnv('IT_API_BROWSER_FIXTURES') === (($manifest['api_fixtures'] ?? false) ? 'true' : 'false'), 'API fixture mode differs from its reviewed owner.');
     w06BrowserRequire(w06BrowserEnv('IT_MONITORING_BROWSER_FIXTURES') === (($manifest['monitoring_fixtures'] ?? false) ? 'true' : 'false'), 'Monitoring fixture mode differs from its reviewed owner.');
     w06BrowserRequire(w06BrowserEnv('IT_CATALOGUE_BROWSER_FIXTURES') === (($manifest['catalogue_fixtures'] ?? false) ? 'true' : 'false'), 'Catalogue fixture mode differs from its reviewed owner.');
+    w06BrowserRequire(w06BrowserEnv('IT_WORKSPACE_BROWSER_FIXTURES') === (($manifest['workspace_fixtures'] ?? false) ? 'true' : 'false'), 'Workspace fixture mode differs from its reviewed owner.');
+    w06BrowserRequire(w06BrowserEnv('IT_VENDOR_BROWSER_FIXTURES') === (($manifest['vendor_fixtures'] ?? false) ? 'true' : 'false'), 'Vendor fixture mode differs from its reviewed owner.');
+    w06BrowserRequire(! ($manifest['vendor_fixtures'] ?? false) || ($manifest['workspace_fixtures'] ?? false), 'Vendor fixtures require the exact-file Workspace scanner.');
     $database = W06_BROWSER_DATABASE_PREFIX.$token;
     w06BrowserRequire(($manifest['token'] ?? null) === $token && ($manifest['database'] ?? null) === $database
         && ($manifest['source_hashes'] ?? null) === w06BrowserSources()
@@ -72,7 +75,8 @@ function w06BrowserGuard(bool $requireReady = false): array
         && w06BrowserEnv('DB_CONNECTION') === 'mysql' && w06BrowserEnv('DB_HOST') === '127.0.0.1'
         && w06BrowserEnv('DB_PORT') === '3306' && w06BrowserEnv('DB_DATABASE') === $database
         && in_array(w06BrowserEnv('DB_URL'), [null, '', 'null'], true), 'Exact isolated application/database environment failed.');
-    w06BrowserRequire((int) ($manifest['port'] ?? 0) === 8766 && w06BrowserEnv('APP_URL') === 'http://127.0.0.1:8766'
+    w06BrowserRequire(in_array((int) ($manifest['port'] ?? 0), [8766, 8767], true)
+        && w06BrowserEnv('APP_URL') === 'http://127.0.0.1:'.$manifest['port']
         && w06BrowserEnv('SESSION_COOKIE') === 'it_draft_browser_'.$token
         && w06BrowserEnv('SESSION_DRIVER') === 'database', 'Isolated host/session environment differs.');
     w06BrowserRequire(w06BrowserEnv('IT_DRAFTS_ENABLED') === 'true' && w06BrowserEnv('IT_DRAFT_RETENTION_DAYS') === '2'
@@ -81,7 +85,7 @@ function w06BrowserGuard(bool $requireReady = false): array
         w06BrowserRequire(is_file($root.'/ready.json'), 'The isolated schema/fixtures are not ready.');
     }
     if (PHP_SAPI === 'cli-server') {
-        w06BrowserRequire(ini_get('upload_max_filesize') === '16M' && ini_get('post_max_size') === '64M'
+        w06BrowserRequire(ini_get('upload_max_filesize') === '20M' && ini_get('post_max_size') === '64M'
             && (int) ini_get('max_file_uploads') === 20, 'Isolated PHP upload ceilings differ from the reviewed validation headroom.');
     }
 
@@ -123,6 +127,10 @@ function w06BrowserApplication(array $context): Application
     });
     $app->booting(function () use ($context): void {
         Http::preventStrayRequests();
+        if ($context['workspace_fixtures'] ?? false) {
+            require_once __DIR__.'/w21-workspace-browser-fixture.php';
+            w22BrowserInstallKnowledgeScanner($context);
+        }
         if ($context['mailbox_fixtures'] ?? false) {
             require_once __DIR__.'/w11-mailbox-browser-fixture.php';
             w11BrowserInstallMailboxHttp($context);

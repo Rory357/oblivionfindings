@@ -6,6 +6,7 @@ use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\MeetingAgendaItem;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 final class ExecutiveMeetingAccessService
 {
@@ -51,19 +52,17 @@ final class ExecutiveMeetingAccessService
             return true;
         }
 
-        $hasPresentAttendance = $meeting->attendances()
-            ->where('board_member_id', $boardMember->id)
-            ->where('status', 'present')
-            ->whereNotNull('marked_by')
-            ->exists();
-        if ($hasPresentAttendance) {
-            return true;
-        }
-
         if ($meeting->board_committee_id) {
+            $today = today()->toDateString();
             if ($boardMember->committeeMemberships()
                 ->where('board_committee_id', $meeting->board_committee_id)
                 ->where('is_active', true)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('appointed_at')->orWhereDate('appointed_at', '<=', $today);
+                })
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('term_end')->orWhereDate('term_end', '>=', $today);
+                })
                 ->exists()) {
                 return true;
             }
@@ -117,6 +116,28 @@ final class ExecutiveMeetingAccessService
         return false;
     }
 
+    /**
+     * The agenda items a viewer is permitted to see, in their loaded order.
+     *
+     * This is the single audience contract for agenda items: the member
+     * meeting workspace renders exactly these records, and readiness counts
+     * (checklists, Home cards) must be derived from the same collection so a
+     * confidential item never inflates a count the viewer cannot open.
+     * Without a viewer only non-confidential items are counted.
+     *
+     * @return Collection<int, MeetingAgendaItem>
+     */
+    public function visibleAgendaItems(?User $user, GovernanceMeeting $meeting): Collection
+    {
+        $meeting->loadMissing('agendaItems');
+
+        return $meeting->agendaItems
+            ->filter(fn (MeetingAgendaItem $item) => $user !== null
+                ? $this->canViewAgendaItem($user, $meeting, $item)
+                : ! $item->is_confidential)
+            ->values();
+    }
+
     public function canManageConfidentialAgenda(User $user, GovernanceMeeting $meeting): bool
     {
         if ($this->hasExecutiveAuthority($user)) {
@@ -155,14 +176,17 @@ final class ExecutiveMeetingAccessService
                             if ($boardMemberId !== null && $isActive) {
                                 $allowed->orWhere('chair_id', $boardMemberId)
                                     ->orWhere('secretary_id', $boardMemberId)
-                                    ->orWhereHas('attendances', fn (Builder $att) => $att
-                                        ->where('board_member_id', $boardMemberId)
-                                        ->where('status', 'present')
-                                        ->whereNotNull('marked_by')
-                                    )
                                     ->orWhereHas('committee.members', fn (Builder $cm) => $cm
                                         ->where('board_members.id', $boardMemberId)
                                         ->where('committee_memberships.is_active', true)
+                                        ->where(function ($term) {
+                                            $term->whereNull('committee_memberships.appointed_at')
+                                                ->orWhereDate('committee_memberships.appointed_at', '<=', today());
+                                        })
+                                        ->where(function ($term) {
+                                            $term->whereNull('committee_memberships.term_end')
+                                                ->orWhereDate('committee_memberships.term_end', '>=', today());
+                                        })
                                     );
                             }
                         });

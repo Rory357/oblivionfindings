@@ -33,8 +33,24 @@ class FxRevaluationController extends Controller
                 'created_at' => $r->created_at->toIso8601String(),
             ]);
 
+        // Header meters describe the whole register, not the page in front of
+        // the user — a page-local count reads as an organisation total.
+        $byStatus = FinFxRevaluation::forOrganization($orgId)
+            ->selectRaw('status, count(*) as aggregate, sum(total_gain_loss) as gain_loss')
+            ->groupBy('status')
+            ->get();
+
+        $summary = [
+            'total' => (int) $byStatus->sum('aggregate'),
+            'posted' => (int) ($byStatus->firstWhere('status', 'posted')?->aggregate ?? 0),
+            'draft' => (int) ($byStatus->firstWhere('status', 'draft')?->aggregate ?? 0),
+            'net_gain_loss' => (float) $byStatus->sum('gain_loss'),
+            'posted_gain_loss' => (float) ($byStatus->firstWhere('status', 'posted')?->gain_loss ?? 0),
+        ];
+
         return Inertia::render('finance/fx-revaluations/Index', [
             'revaluations' => $revaluations,
+            'summary' => $summary,
         ]);
     }
 

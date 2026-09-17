@@ -23,7 +23,7 @@ import {
     type SetupCommandOutcome,
     useSetupCreateCommand,
 } from '@/pages/it/setup/use-setup-create-command';
-import { router, useForm } from '@inertiajs/react';
+import { Link, router, useForm } from '@inertiajs/react';
 import {
     CheckCircle2,
     GitMerge,
@@ -579,6 +579,20 @@ export function ItProvisioningTemplates({
                                         >
                                             <Pencil className="h-4 w-4" />
                                         </Button>
+                                        <Button
+                                            asChild
+                                            variant="outline"
+                                            size="sm"
+                                        >
+                                            <Link
+                                                href={
+                                                    '/it/provisioning/templates/' +
+                                                    template.id
+                                                }
+                                            >
+                                                Review publication
+                                            </Link>
+                                        </Button>
                                     </div>
                                     <div className="mt-3 flex flex-wrap gap-1.5 text-[10.5px]">
                                         <StatusBadge
@@ -753,7 +767,7 @@ export function ItProvisioningTemplates({
                     saved ? (
                         <WizardSuccessPane
                             title="Template saved"
-                            blurb="New workflows use the saved version. Existing workflows keep the instructions captured when they started."
+                            blurb="The author draft is saved. Review and publish it in Provisioning templates before new workflows can use it. Existing work keeps its original instructions."
                             actions={
                                 <Button
                                     onClick={() => {
@@ -808,7 +822,7 @@ export function ItProvisioningTemplates({
                                         ? 'Choose the lifecycle and which employees this template matches.'
                                         : step === 1
                                           ? 'Define the work, its accountable team and the evidence needed to complete it.'
-                                          : 'Confirm the matching rules and instructions. Saving creates a new version for future workflows.'}
+                                          : 'Confirm the matching rules and instructions. Saving creates an author draft; publish it from Provisioning templates after review.'}
                                 </p>
                             </div>
                             {Object.keys(form.errors).length > 0 ||
@@ -1601,7 +1615,7 @@ export function ItProvisioningTemplates({
                                                 label="Availability"
                                                 value={
                                                     form.data.is_active
-                                                        ? 'Active for new workflows'
+                                                        ? 'Enabled author draft; publication required'
                                                         : 'Inactive'
                                                 }
                                             />

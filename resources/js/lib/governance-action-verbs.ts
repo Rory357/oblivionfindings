@@ -27,24 +27,24 @@ export type WorkflowStatus = 'overdue' | 'due_soon' | 'pending' | string;
 
 const VERBS: Record<string, Record<string, string>> = {
     meeting: {
-        overdue: 'Approve minutes',
-        due_soon: 'Review agenda',
+        overdue: 'Open minutes',
+        due_soon: 'Open agenda',
         pending: 'Open meeting',
     },
     resolution: {
-        overdue: 'Cast vote',
-        due_soon: 'Cast vote',
-        pending: 'Review resolution',
+        overdue: 'Vote',
+        due_soon: 'Vote',
+        pending: 'Read resolution',
     },
     risk: {
-        overdue: 'Acknowledge risk',
-        due_soon: 'Review mitigation',
+        overdue: 'Review risk',
+        due_soon: 'Review risk',
         pending: 'Open risk',
     },
     compliance: {
-        overdue: 'Upload evidence',
-        due_soon: 'Upload evidence',
-        pending: 'Open obligation',
+        overdue: 'Open requirement',
+        due_soon: 'Open requirement',
+        pending: 'Open requirement',
     },
     budget: {
         overdue: 'Approve budget',
@@ -52,24 +52,24 @@ const VERBS: Record<string, Record<string, string>> = {
         pending: 'Open budget',
     },
     spend: {
-        overdue: 'Approve spend',
-        due_soon: 'Approve spend',
+        overdue: 'Review request',
+        due_soon: 'Review request',
         pending: 'Review request',
     },
     action: {
-        overdue: 'Mark complete',
-        due_soon: 'Update progress',
-        pending: 'Assign owner',
+        overdue: 'Update action',
+        due_soon: 'Update action',
+        pending: 'Open action',
     },
     policy: {
-        overdue: 'Sign policy',
-        due_soon: 'Sign policy',
+        overdue: 'Read and confirm',
+        due_soon: 'Read and confirm',
         pending: 'Read policy',
     },
     conflict: {
-        overdue: 'Declare conflict',
-        due_soon: 'Declare conflict',
-        pending: 'Open register',
+        overdue: 'Declare a conflict',
+        due_soon: 'Declare a conflict',
+        pending: 'Open interests',
     },
     ceo_report: {
         overdue: 'Submit report',
@@ -77,7 +77,7 @@ const VERBS: Record<string, Record<string, string>> = {
         pending: 'Open report',
     },
     pack: {
-        overdue: 'Upload pack',
+        overdue: 'Read board pack',
         due_soon: 'Read board pack',
         pending: 'Read board pack',
     },
@@ -85,14 +85,14 @@ const VERBS: Record<string, Record<string, string>> = {
 
 const AREA_DEFAULTS: Record<string, string> = {
     meeting: 'Open meeting',
-    resolution: 'Review resolution',
+    resolution: 'Read resolution',
     risk: 'Open risk',
-    compliance: 'Open obligation',
+    compliance: 'Open requirement',
     budget: 'Open budget',
     spend: 'Review request',
     action: 'Open action',
     policy: 'Read policy',
-    conflict: 'Open register',
+    conflict: 'Open interests',
     ceo_report: 'Open report',
     pack: 'Read board pack',
 };

@@ -11,6 +11,7 @@ use App\Domain\Finance\Models\FinDonorFundReport;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Services\AccountsPayableService;
 use App\Domain\Finance\Services\DonorFundService;
 use App\Models\User;
@@ -149,6 +150,11 @@ class DonorFundReportingTest extends TestCase
             'gst_amount' => '0.00',
             'line_total' => $amount,
             'account_id' => $this->account('6500')->id,
+            // A stored rate of 0 cannot say whether the line is zero-rated or
+            // exempt, and the organisation has both, so the line names its rate
+            // (GstTaxRateResolver::resolveStoredRate).
+            'tax_rate_id' => FinTaxRate::query()
+                ->where('organization_id', 1)->where('code', 'GST0')->value('id'),
         ]);
 
         return app(AccountsPayableService::class)->approveBill($bill, $user->id);

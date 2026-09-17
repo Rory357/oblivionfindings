@@ -1,0 +1,26 @@
+// Isolated artifact packaging. Reads app components; writes only this directory.
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { build, transform } from 'esbuild';
+import { compile } from '@tailwindcss/node';
+import { Scanner } from '@tailwindcss/oxide';
+const dir = path.dirname(fileURLToPath(import.meta.url));
+const repo = path.resolve(dir, '../../../../..');
+const result = await build({entryPoints:[path.join(dir,'mockup.tsx')],absWorkingDir:repo,bundle:true,write:false,minify:true,format:'iife',jsx:'automatic',metafile:true,define:{'process.env.NODE_ENV':'"production"'},alias:{'@':path.join(repo,'resources/js'),'@inertiajs/react':path.join(dir,'inertia-mock.tsx')}});
+const inputs = Object.keys(result.metafile.inputs).filter(p=>!p.includes('node_modules')&&/\.[jt]sx?$/.test(p));
+const files = await Promise.all(inputs.map(async p=>({content:await fs.readFile(path.resolve(repo,p),'utf8'),extension:path.extname(p).slice(1)})));
+const scanner = new Scanner({sources:[]});
+const candidates = scanner.scanFiles(files);
+const cssSource = await fs.readFile(path.join(repo,'resources/css/app.css'),'utf8');
+const compiler = await compile(cssSource,{base:path.join(repo,'resources/css'),onDependency:()=>{}});
+const productCss = (await transform(compiler.build(candidates),{loader:'css',minify:true})).code;
+const customCss = (await fs.readFile(path.join(dir,'mockup.css'),'utf8'))+'\n'+(await fs.readFile(path.join(dir,'action-overview.css'),'utf8'));
+const fragment = `<link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet">\n<style>${productCss}\n${customCss}</style>\n<div id="service-desk-overview-mockup"></div>\n<script>${result.outputFiles[0].text.replace(/<\/script/gi,'<\\/script')}</script>\n`;
+await fs.writeFile(path.join(dir,'service-desk-overview.html'),fragment);
+await fs.writeFile(path.join(dir,'index.html'),`<!doctype html><html lang="en-NZ"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Service Desk Overview · Interactive mockup</title></head><body>${fragment}</body></html>`);
+const evidence = [];
+for(const p of [...inputs,'resources/css/app.css']) evidence.push({path:p,sha256:createHash('sha256').update(await fs.readFile(path.resolve(repo,p))).digest('hex')});
+await fs.writeFile(path.join(dir,'source-snapshot.json'),JSON.stringify(evidence,null,2));
+console.log(JSON.stringify({artifact:path.join(dir,'index.html'),bytes:Buffer.byteLength(fragment),sourceFiles:inputs.length}));

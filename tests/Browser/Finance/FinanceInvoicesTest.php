@@ -13,12 +13,12 @@ test('finance invoices index loads', function () {
     });
 });
 
-test('finance invoices create page loads', function () {
+test('finance invoices create url redirects to the index (modal flow)', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/invoices/create')
-            ->waitForText('Invoice', 10)
-            ->assertSee('Invoice');
+            ->waitForText('Invoices', 10)
+            ->assertPathIs('/finance/invoices');
     });
 });

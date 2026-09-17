@@ -2,10 +2,13 @@
 
 namespace App\Contracts;
 
+use App\Models\CalendarSyncConnection;
+use App\Models\Identity;
+
 /**
  * A source of OAuth credentials that can drive GoogleCalendarService /
- * MicrosoftGraphService. Implemented by both the per-user {@see \App\Models\Identity}
- * and the org-level {@see \App\Models\CalendarSyncConnection}, so the same calendar
+ * MicrosoftGraphService. Implemented by both the per-user {@see Identity}
+ * and the org-level {@see CalendarSyncConnection}, so the same calendar
  * API services work for personal "add to my calendar" and admin resource-calendar sync.
  */
 interface CalendarOAuthToken

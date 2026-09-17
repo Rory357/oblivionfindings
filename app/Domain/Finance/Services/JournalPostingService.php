@@ -130,7 +130,13 @@ class JournalPostingService
                 'total_amount' => $totalDebits,
             ]);
 
-            event(new JournalPosted($journal));
+            // Announce the posting only once it is durable. Dispatched inside
+            // the transaction, a listener (or a queued job it fires) could act
+            // on a journal that a later rollback erased — and the event still
+            // reached them. DB::afterCommit defers to the OUTERMOST commit, so
+            // a caller that wraps posting in its own transaction is covered
+            // too; with no transaction open it runs immediately.
+            DB::afterCommit(fn () => event(new JournalPosted($journal)));
 
             return $journal->refresh();
         });
@@ -166,6 +172,12 @@ class JournalPostingService
             $organizationChanged = false;
 
             try {
+                // Three attempts: two workers reversing at once contend for the
+                // sequence mutex, and MySQL rolls the whole transaction back on
+                // a deadlock, so a retry is clean. The closure re-reads under
+                // the lock and returns any reversal that already exists, so
+                // retrying converges on the one reversal rather than making a
+                // second.
                 return DB::transaction(function () use (
                     $journalId,
                     $organizationId,
@@ -241,7 +253,7 @@ class JournalPostingService
                     $journal->forceFill(['reversed_by_journal_id' => $reversingJournal->id])->save();
 
                     return $reversingJournal->load('lines');
-                });
+                }, 3);
             } catch (RuntimeException $exception) {
                 if ($organizationChanged && $attempt === 0) {
                     continue;
@@ -306,10 +318,31 @@ class JournalPostingService
         if (DB::transactionLevel() < 1) {
             throw new RuntimeException('The journal sequence mutex must be acquired inside a database transaction.');
         }
-        if ($organizationId === null || $organizationId < 1) {
+        // Organisation 0 is a real organisation for JOURNAL NUMBERING, not a
+        // sentinel: this app is single-tenant, FinanceSeeder seeds the default
+        // chart of accounts under org 0, the live ledger holds accounts and a
+        // sequence row there, and the operational GL capture paths (groceries,
+        // fuel, maintenance, leave provisions) post as org 0. Rejecting it here
+        // made those postings throw. Only an unknown (null) or negative
+        // organisation is refused.
+        //
+        // Bulk operations deliberately differ: FixedAssetService::runDepreciation
+        // still treats 0 as absent, so an unset id cannot depreciate a ledger.
+        if ($organizationId === null || $organizationId < 0) {
             throw new InvalidArgumentException('An organisation is required to allocate a journal number.');
         }
 
+        // This insert must stay UNCONDITIONAL, and must stay the first
+        // statement of the transaction. Guarding it with a `->exists()` check
+        // looks like an optimisation but breaks the mutex: `exists()` is a
+        // non-locking consistent read, so under REPEATABLE READ it pins the
+        // transaction's snapshot before the row is locked. The `lockForUpdate`
+        // below still sees the latest committed row (locking reads bypass the
+        // snapshot), but the plain read of `next_number` in
+        // generateJournalNumber() afterwards does not — against a row another
+        // worker has only just created it reads NULL, and the sequence is
+        // rejected as invalid. Writing first establishes no read snapshot,
+        // which is what keeps the subsequent reads current.
         $inserted = DB::table('fin_journal_sequences')->insertOrIgnore([
             'organization_id' => $organizationId,
             'next_number' => 1,

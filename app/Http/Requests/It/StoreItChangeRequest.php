@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\BindsItBrowserActor;
+use App\Http\Requests\It\Concerns\NormalizesItChangeWindow;
 use App\Models\ItChange;
 use App\Models\ItTicket;
 use Illuminate\Foundation\Http\FormRequest;
@@ -9,15 +11,21 @@ use Illuminate\Validation\Rule;
 
 class StoreItChangeRequest extends FormRequest
 {
+    use BindsItBrowserActor;
+    use NormalizesItChangeWindow;
+
     public function authorize(): bool
     {
-        return (bool) $this->user()?->canDo('it.manage');
+        return $this->hasCurrentBrowserActor() && (bool) $this->user()?->canDo('it.manage');
     }
 
     /** @return array<string, array<int, mixed>> */
     public function rules(): array
     {
         return [
+            ...$this->browserActorRules(),
+            'wizard' => ['sometimes', 'boolean'],
+            'maintenance_timezone' => ['sometimes', 'required', Rule::in([config('app.worker_timezone', 'Pacific/Auckland')])],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
             'category' => ['required', Rule::in(ItTicket::CATEGORIES)],

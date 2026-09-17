@@ -10,12 +10,10 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\Permission;
-use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -198,83 +196,6 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         $this->assertSame(2, $controlledKpis->firstWhere('key', 'mar')['value']);
         $this->assertSame(1, collect($controlledCompliance->inertiaProps('charts.cdTrend'))->sum('total'));
         $this->assertSame(2, collect($controlledCompliance->inertiaProps('charts.marTrend'))->sum('missed'));
-    }
-
-    public function test_legacy_today_medication_queue_requires_current_assigned_action_authority(): void
-    {
-        Carbon::setTestNow(Carbon::parse('2026-08-28 09:00:00', config('app.worker_timezone')));
-
-        try {
-            $site = Site::factory()->create();
-            $client = Client::factory()->create(['site_id' => $site->id]);
-            $ordinaryMedication = $this->medication($client, 'Ordinary due medicine');
-            $controlledMedication = $this->medication($client, 'Controlled due medicine', true);
-            $unverifiedMedication = $this->medication($client, 'Unverified medicine');
-            $unverifiedMedication->forceFill(['approval_status' => 'pending_verification'])->saveQuietly();
-            $worker = $this->userWithPermissions([
-                'medications.administer.record',
-            ], $site);
-            Shift::factory()->inProgress()->create([
-                'client_id' => $client->id,
-                'site_id' => $site->id,
-                'user_id' => $worker->id,
-                'starts_at' => now()->subHour()->utc(),
-                'ends_at' => now()->addHours(3)->utc(),
-                'actual_starts_at' => now()->subHour()->utc(),
-            ]);
-
-            $due = collect($this->actingAs($worker)->get(route('today'))->assertOk()->inertiaProps('dueMeds'));
-            $dueMedicationIds = $due->pluck('medication_id')
-                ->map(fn (mixed $id): int => (int) $id)
-                ->unique()
-                ->values();
-            $this->assertSame([$ordinaryMedication->id], $dueMedicationIds->all());
-            $this->assertFalse($dueMedicationIds->contains($controlledMedication->id));
-            $this->assertFalse($dueMedicationIds->contains($unverifiedMedication->id));
-
-            $unassigned = $this->userWithPermissions([
-                'medications.administer.record',
-                'medications.controlled.record',
-            ], $site);
-            $this->assertSame(
-                [],
-                collect($this->actingAs($unassigned)->get(route('today'))->assertOk()->inertiaProps('dueMeds'))->all(),
-            );
-
-            $managerWithoutAction = $this->userWithPermissions(['shifts.manageAny'], $site);
-            $this->assertSame(
-                [],
-                collect($this->actingAs($managerWithoutAction)->get(route('today'))->assertOk()->inertiaProps('dueMeds'))->all(),
-            );
-
-            $controlledWorker = $this->userWithPermissions([
-                'medications.administer.record',
-                'medications.controlled.record',
-            ], $site);
-            Shift::factory()->inProgress()->create([
-                'client_id' => $client->id,
-                'site_id' => $site->id,
-                'user_id' => $controlledWorker->id,
-                'starts_at' => now()->subHour()->utc(),
-                'ends_at' => now()->addHours(3)->utc(),
-                'actual_starts_at' => now()->subHour()->utc(),
-            ]);
-            $controlledDue = collect($this->actingAs($controlledWorker)
-                ->get(route('today'))
-                ->assertOk()
-                ->inertiaProps('dueMeds'));
-            $controlledDueMedicationIds = $controlledDue->pluck('medication_id')
-                ->map(fn (mixed $id): int => (int) $id)
-                ->unique()
-                ->values();
-            $this->assertEqualsCanonicalizing(
-                [$ordinaryMedication->id, $controlledMedication->id],
-                $controlledDueMedicationIds->all(),
-            );
-            $this->assertFalse($controlledDueMedicationIds->contains($unverifiedMedication->id));
-        } finally {
-            Carbon::setTestNow();
-        }
     }
 
     /** @return array<string, mixed> */

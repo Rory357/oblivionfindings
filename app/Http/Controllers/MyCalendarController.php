@@ -177,6 +177,8 @@ class MyCalendarController extends Controller
             }
         }
 
+        $events = [...$events, ...app(\App\Domain\It\Services\ItTicketBookingService::class)->calendar($request->user(), $start, $end)];
+
         return response()->json($events)
             ->header('X-Calendar-Unavailable', json_encode((object) $unavailable))
             ->header('Cache-Control', 'no-store, private');

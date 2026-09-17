@@ -194,7 +194,8 @@ class GovernancePermissionsSeeder extends Seeder
                 'governance.performance.view',
                 'governance.strategy.view',
                 'governance.budgets.view',
-                'governance.budgets.approve',
+                // Budget approval belongs to finance approvers (chair, treasurer,
+                // admin), not every board member — owner decision 15 Sep 2026.
                 'governance.packs.view',
                 'governance.actions.view',
                 'governance.policies.view',
@@ -204,10 +205,6 @@ class GovernancePermissionsSeeder extends Seeder
                 'governance.evaluations.view',
                 'governance.documents.view',
                 'governance.clinical.view',
-                'governance.te-tiriti.view',
-                'governance.evidence.view',
-                'governance.audit.view',
-                'governance.spend.view',
             ];
             foreach ($memberPerms as $key) {
                 $perm = Permission::where('key', $key)->first();
@@ -276,6 +273,7 @@ class GovernancePermissionsSeeder extends Seeder
             $treasurerExtra = [
                 'governance.budgets.create',
                 'governance.budgets.submit',
+                'governance.budgets.approve',
                 'governance.spend.request',
             ];
             foreach ($treasurerExtra as $key) {

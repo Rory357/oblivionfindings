@@ -1,7 +1,8 @@
-...........⨯........................................
-  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-   FAILED  Tests\Feature\MyDayPersonHandoverTest > it records an explicit unsupported person and presents privacy-fi…
-  Failed asserting that two arrays are identical.
+
+  [90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[31;1m⨯[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\MyDayPersonHandoverTest[22m [90m>[39m it records an explicit unsupported person and presents privacy-fi…   
+[39;1m  Failed asserting that two arrays are identical.
 --- Expected
 +++ Actual
 @@ @@
@@ -11,9 +12,9 @@
      1 => 'recorded',
 -    2 => 'not_started',
 +    2 => 'not_supported',
- ]
+ ][39;22m
 
-  at tests\Feature\MyDayPersonHandoverTest.php:204
+  at [32mtests\Feature\MyDayPersonHandoverTest.php[39m:[32m204[39m
     200▕     array_pop($this->input['worker_notes']['people']);
     201▕     $saved = $this->postJson('/attendance/handover', $this->input)->assertOk();
     202▕     expect(ShiftHandover::findOrFail($saved->json('handover_id'))->handover_notes)->toBe('Did not support this person this shift.');
@@ -24,8 +25,9 @@
     207▕     $summary = app(HandoverWorkerNotes::class)->shiftSummary($this->shift, $this->worker->fresh());
     208▕     expect(array_column($summary['people'], 'id'))->not->toContain($this->people[1]->id);
 
-  1   tests\Feature\MyDayPersonHandoverTest.php:204
+  [33m1   [39m[39;1mtests\Feature\MyDayPersonHandoverTest.php[39;22m:[39;1m204[39;22m
 
 
-  Tests:    1 failed, 51 passed (291 assertions)
-  Duration: 599.61s
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m51 passed[39;22m[90m (291 assertions)[39m
+  [90mDuration:[39m [39m599.61s[39m
+

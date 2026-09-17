@@ -26,6 +26,15 @@ const state = vi.hoisted(() => ({
 vi.mock('@inertiajs/react', async () => {
     const { useState } = await import('react');
     return {
+        Link: ({
+            children,
+            href,
+            ...props
+        }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+            <a href={href} {...props}>
+                {children}
+            </a>
+        ),
         router: {
             on: vi.fn(() => () => {}),
             reload: state.reload,

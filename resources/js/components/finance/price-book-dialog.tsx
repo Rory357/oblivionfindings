@@ -3,13 +3,23 @@ import { BookOpen, ListChecks, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { AmountField } from './money';
 import {
     Field,
     ReviewCard,
     ReviewRow,
     Segmented,
+    SelectInput,
     StepHead,
     useWizard,
     WizardShell,
@@ -342,6 +352,199 @@ export function PriceBookDialog({
                 </div>
             )}
         </WizardShell>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Rate items                                                         */
+/* ------------------------------------------------------------------ */
+
+/** An existing rate item to prefill the item dialog with (edit mode). */
+export type EditablePriceBookItem = {
+    id: number;
+    service_code: string | null;
+    name: string;
+    unit: string;
+    rate: number | string;
+    description?: string | null;
+};
+
+const UNIT_OPTIONS = [
+    { value: 'hour', label: 'Per hour' },
+    { value: 'day', label: 'Per day' },
+    { value: 'week', label: 'Per week' },
+    { value: 'each', label: 'Each' },
+    { value: 'km', label: 'Per km' },
+];
+
+/**
+ * Add / edit one price-book rate item. A one-screen form, so it is a simple
+ * dialog (POPUP_STYLE_GUIDE §"Simple dialog"), not a wizard. Field names match
+ * `PriceBookController::storeItem/updateItem` (`code`, `unit_price`).
+ */
+export function PriceBookItemDialog({
+    open,
+    onClose,
+    priceBookId,
+    item,
+}: {
+    open: boolean;
+    onClose: () => void;
+    priceBookId: number;
+    /** When provided, the dialog opens in EDIT mode (prefilled, PUTs the update). */
+    item?: EditablePriceBookItem | null;
+}) {
+    return (
+        <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+            <DialogContent
+                className="max-h-[90vh] overflow-y-auto"
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
+            >
+                {open && (
+                    <PriceBookItemBody
+                        onClose={onClose}
+                        priceBookId={priceBookId}
+                        item={item ?? null}
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function PriceBookItemBody({
+    onClose,
+    priceBookId,
+    item,
+}: {
+    onClose: () => void;
+    priceBookId: number;
+    item: EditablePriceBookItem | null;
+}) {
+    const isEdit = !!item;
+    const form = useForm<{
+        name: string;
+        code: string;
+        unit: string;
+        unit_price: string;
+        description: string;
+    }>({
+        name: item?.name ?? '',
+        code: item?.service_code ?? '',
+        unit: item?.unit ?? 'hour',
+        unit_price: item ? String(item.rate ?? '') : '',
+        description: item?.description ?? '',
+    });
+    const { data, setData, processing, errors } = form;
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.transform((d) => ({
+            ...d,
+            code: d.code || null,
+            description: d.description || null,
+        }));
+        const opts = {
+            preserveScroll: true,
+            onSuccess: () => onClose(),
+        };
+        if (isEdit && item) {
+            form.put(
+                `/finance/price-books/${priceBookId}/items/${item.id}`,
+                opts,
+            );
+        } else {
+            form.post(`/finance/price-books/${priceBookId}/items`, opts);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-primary" />
+                    {isEdit ? 'Edit rate item' : 'Add rate item'}
+                </DialogTitle>
+                <DialogDescription>
+                    A rate item is one priced service line that quotes and
+                    invoices can be built from.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Name" span required error={errors.name}>
+                    <Input
+                        value={data.name}
+                        onChange={(e) => setData('name', e.target.value)}
+                        placeholder="e.g. Personal care"
+                    />
+                </Field>
+                <Field
+                    label="Service code"
+                    hint="optional"
+                    error={errors.code}
+                >
+                    <Input
+                        value={data.code}
+                        onChange={(e) => setData('code', e.target.value)}
+                        placeholder="e.g. SVC-001"
+                    />
+                </Field>
+                <Field label="Unit" error={errors.unit}>
+                    <SelectInput
+                        value={data.unit}
+                        onChange={(v) => setData('unit', v)}
+                        placeholder="Per hour"
+                        options={UNIT_OPTIONS}
+                        ariaLabel="Rate unit"
+                    />
+                </Field>
+                <Field
+                    label="Rate (NZD, ex GST)"
+                    span
+                    required
+                    error={errors.unit_price}
+                >
+                    <AmountField
+                        value={data.unit_price}
+                        onValueChange={(v) => setData('unit_price', v)}
+                        aria-label="Rate"
+                    />
+                </Field>
+                <Field
+                    label="Description"
+                    span
+                    hint="optional"
+                    error={errors.description}
+                >
+                    <Textarea
+                        rows={2}
+                        value={data.description}
+                        onChange={(e) => setData('description', e.target.value)}
+                        placeholder="What this rate covers"
+                    />
+                </Field>
+            </div>
+
+            <DialogFooter className="mt-4">
+                <Button type="button" variant="outline" onClick={onClose}>
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    disabled={
+                        processing ||
+                        !data.name.trim() ||
+                        data.unit_price === ''
+                    }
+                >
+                    {isEdit ? 'Save changes' : 'Add item'}
+                </Button>
+            </DialogFooter>
+        </form>
     );
 }
 

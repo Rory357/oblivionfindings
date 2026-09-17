@@ -1,26 +1,25 @@
-import { formatMoney, ReceivablesTabsFooter } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FinanceSectionRail, formatMoney } from '@/components/finance';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    type EntityTableColumn,
+} from '@/components/lists';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { EmptyList } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { ArrowLeftRight, Wallet } from 'lucide-react';
+import { ArrowLeftRight, Receipt } from 'lucide-react';
 
 type Allocation = {
     id: number;
@@ -31,6 +30,7 @@ type Allocation = {
     allocatable_id: number | null;
     notes: string | null;
     created_at: string;
+    review_state: 'traceable' | 'review_required';
 };
 
 type Props = {
@@ -45,13 +45,52 @@ type Props = {
     filters: {
         type: string;
     };
+    typeTotals: Record<
+        'receivable' | 'payable',
+        { count: number; total_amount: number }
+    >;
+    legacyReview: {
+        state: 'clear' | 'review_required';
+        count: number;
+        total_amount: number;
+        correction_policy: string;
+    };
 };
 
-const ANY = '__ANY__';
+const ALL = '__all';
+
+const TYPE_OPTIONS = [
+    { value: ALL, label: 'Any type' },
+    { value: 'receivable', label: 'Receipts (from clients)' },
+    { value: 'payable', label: 'Payments (to vendors)' },
+];
+
+const TYPE_LABELS: Record<string, string> = {
+    receivable: 'Receipt',
+    payable: 'Payment',
+};
+
+/** `allocatable_type` arrives as a class basename — show the record it means. */
+const TARGET_LABELS: Record<string, string> = {
+    FinInvoice: 'Invoice',
+    FinBill: 'Bill',
+    FinCreditNote: 'Credit note',
+    FinPaymentRun: 'Payment run',
+    FinBankTransaction: 'Bank transaction',
+};
+
+const TARGET_HREFS: Record<string, string> = {
+    FinInvoice: '/finance/invoices',
+    FinBill: '/finance/bills',
+    FinCreditNote: '/finance/credit-notes',
+    FinPaymentRun: '/finance/payment-runs',
+};
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
-    { title: 'Payment Allocations', href: '/finance/payment-allocations' },
+    { title: 'Receivables', href: '/finance/invoices' },
+    { title: 'Allocations', href: '/finance/payment-allocations' },
 ];
 
 const formatDate = (date: string) =>
@@ -64,171 +103,217 @@ const formatDate = (date: string) =>
 export default function PaymentAllocationsIndex({
     allocations,
     filters,
+    typeTotals,
+    legacyReview,
 }: Props) {
-    const totalAllocated = allocations.data.reduce(
-        (total, allocation) => total + allocation.amount,
-        0,
+    const targetLabel = (allocation: Allocation) => {
+        if (!allocation.allocatable_type) return 'Unlinked';
+        const label =
+            TARGET_LABELS[allocation.allocatable_type] ??
+            allocation.allocatable_type;
+        return allocation.allocatable_id
+            ? `${label} #${allocation.allocatable_id}`
+            : label;
+    };
+
+    const columns: EntityTableColumn<Allocation>[] = [
+        {
+            key: 'type',
+            label: 'Type',
+            width: '0.7fr',
+            cell: (allocation) => (
+                <EntityStatusChip
+                    variant={
+                        allocation.type === 'receivable' ? 'success' : 'info'
+                    }
+                >
+                    {TYPE_LABELS[allocation.type] ?? allocation.type}
+                </EntityStatusChip>
+            ),
+        },
+        {
+            key: 'target',
+            label: 'Applied to',
+            width: '1fr',
+            cell: (allocation) => targetLabel(allocation),
+        },
+        {
+            key: 'amount',
+            label: 'Amount',
+            width: '0.8fr',
+            align: 'right',
+            cell: (allocation) => (
+                <span className="font-medium tabular-nums">
+                    {formatMoney(allocation.amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'review_state',
+            label: 'Traceability',
+            width: '0.9fr',
+            cell: (allocation) => (
+                <EntityStatusChip
+                    variant={
+                        allocation.review_state === 'traceable'
+                            ? 'success'
+                            : 'warning'
+                    }
+                >
+                    {allocation.review_state === 'traceable'
+                        ? 'Journal-backed'
+                        : 'Needs review'}
+                </EntityStatusChip>
+            ),
+        },
+        {
+            key: 'notes',
+            label: 'Notes',
+            width: '1.2fr',
+            cell: (allocation) => (
+                <span className="truncate text-muted-foreground">
+                    {allocation.notes || '—'}
+                </span>
+            ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            variant="index"
+            icon={ArrowLeftRight}
+            title="Payment allocations"
+            titleChip={
+                legacyReview.count > 0 ? (
+                    <PageHeaderStatusChip variant="warning">
+                        {legacyReview.count} need review
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="success">
+                        All journal-backed
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={`How receipts and payments have been applied · ${allocations.total} allocations on record`}
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Allocations"
+                        href="/finance/payment-allocations"
+                        ariaLabel="View every allocation"
+                    >
+                        <PageHeaderMeterBig>
+                            {allocations.total}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Receipts and payments applied
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Receipts"
+                        tone="success"
+                        href="/finance/payment-allocations?type=receivable"
+                        ariaLabel="View receipt allocations"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(typeTotals.receivable.total_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {typeTotals.receivable.count} applied to invoices
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Payments"
+                        href="/finance/payment-allocations?type=payable"
+                        ariaLabel="View payment allocations"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(typeTotals.payable.total_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {typeTotals.payable.count} applied to bills
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Needs review"
+                        tone={legacyReview.count > 0 ? 'warning' : 'brand'}
+                        href="/finance/receivables"
+                        ariaLabel="View aged receivables"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(legacyReview.total_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {legacyReview.count} rows without a journal
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    label="Type"
+                    value={filters.type || ALL}
+                    allValue={ALL}
+                    options={TYPE_OPTIONS}
+                    onChange={(value) =>
+                        router.get(
+                            '/finance/payment-allocations',
+                            value === ALL ? {} : { type: value },
+                            { preserveState: true, preserveScroll: true },
+                        )
+                    }
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
     );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Payment Allocations" />
+            <Head title="Payment allocations" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={ArrowLeftRight}
-                        title="Payment Allocations"
-                        description="Track how incoming payments have been allocated across invoices and bills."
-                        stats={[
-                            { label: 'Allocations', value: allocations.total },
-                            {
-                                label: 'Total (this page)',
-                                value: formatMoney(totalAllocated),
-                            },
-                        ]}
-                        actions={
-                            <div className="w-44">
-                                <Select
-                                    value={filters.type || ANY}
-                                    onValueChange={(value) =>
-                                        router.get(
-                                            '/finance/payment-allocations',
-                                            {
-                                                type:
-                                                    value === ANY ? '' : value,
-                                            },
-                                            {
-                                                preserveState: true,
-                                                preserveScroll: true,
-                                            },
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20">
-                                        <SelectValue placeholder="All types" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={ANY}>
-                                            All types
-                                        </SelectItem>
-                                        <SelectItem value="payable">
-                                            Payable
-                                        </SelectItem>
-                                        <SelectItem value="receivable">
-                                            Receivable
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        }
-                        footer={<ReceivablesTabsFooter active="allocations" />}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Allocation history"
+                        caption={`${allocations.data.length} of ${allocations.total} shown`}
                     />
-                }
-            >
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-lg bg-primary/10 p-3">
-                                <Wallet className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Allocations
-                                </p>
-                                <p className="text-2xl font-bold">
-                                    {allocations.total}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <p className="text-sm text-muted-foreground">
-                                Total allocated
-                            </p>
-                            <p className="text-2xl font-bold">
-                                {formatMoney(
-                                    allocations.data.reduce(
-                                        (total, allocation) =>
-                                            total + allocation.amount,
-                                        0,
-                                    ),
-                                )}
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Allocation History</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead>Target</TableHead>
-                                        <TableHead className="text-right">
-                                            Amount
-                                        </TableHead>
-                                        <TableHead>Notes</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {allocations.data.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={5}
-                                                className="py-8 text-center text-muted-foreground"
-                                            >
-                                                No payment allocations found for
-                                                the selected filter.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        allocations.data.map((allocation) => (
-                                            <TableRow key={allocation.id}>
-                                                <TableCell>
-                                                    {formatDate(
-                                                        allocation.payment_date,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="capitalize"
-                                                    >
-                                                        {allocation.type}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {allocation.allocatable_type ||
-                                                        'Unlinked'}
-                                                    {allocation.allocatable_id
-                                                        ? ` #${allocation.allocatable_id}`
-                                                        : ''}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums">
-                                                    {formatMoney(
-                                                        allocation.amount,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="max-w-sm truncate text-muted-foreground">
-                                                    {allocation.notes || '-'}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
+                    {allocations.data.length === 0 ? (
+                        <EmptyList
+                            icon={ArrowLeftRight}
+                            itemName="allocation"
+                            title="No allocations yet"
+                            description="Receipts and vendor payments appear here once they are applied to an invoice or bill."
+                        />
+                    ) : (
+                        <>
+                            <EntityTable
+                                rows={allocations.data}
+                                rowKey={(allocation) => allocation.id}
+                                identityLabel="Allocation"
+                                identity={(allocation) => ({
+                                    icon: Receipt,
+                                    name: formatDate(allocation.payment_date),
+                                    subline: targetLabel(allocation),
+                                })}
+                                columns={columns}
+                                actionsFor={() => []}
+                                hrefFor={(allocation) =>
+                                    allocation.allocatable_id &&
+                                    TARGET_HREFS[allocation.allocatable_type]
+                                        ? `${TARGET_HREFS[allocation.allocatable_type]}/${allocation.allocatable_id}`
+                                        : '/finance/payment-allocations'
+                                }
+                                minWidth={1020}
+                            />
+                            <LaravelPagination
+                                links={allocations.links}
+                                lastPage={allocations.last_page}
+                            />
+                        </>
+                    )}
+                </div>
             </PageLayout>
         </AppLayout>
     );

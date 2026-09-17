@@ -1,0 +1,114 @@
+
+  [90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[31;1m⨯[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[31;1m⨯[39;22m[31;1m⨯[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m
+  [90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m
+  [90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[31;1m⨯[39;22m[31;1m⨯[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Governance\GovernanceBoardPacksTest[22m [90m>[39m board pack audit activity is manager only                
+[39;1m  Expected response status code [200] but received 403.
+Failed asserting that 403 is identical to 200.[39;22m
+
+  at [32mtests\Feature\Governance\GovernanceBoardPacksTest.php[39m:[32m826[39m
+    822▕             ],
+    823▕         ]);
+    824▕ 
+    825▕         $viewerResponse = $this->actingAs($viewer)->get('/governance/audit-log');
+  ➜ 826▕         $viewerResponse->assertOk();
+    827▕         $viewerResponse->assertInertia(fn ($page) => $page
+    828▕             ->has('entries.data', 1)
+    829▕             ->where('entries.data.0.entity_type', 'Resolution')
+    830▕             ->where('entityTypes', fn ($types) => ! collect($types)->contains('BoardPack'))
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Governance\GovernanceBudgetsTest[22m [90m>[39m adjustment above threshold succeeds with carried closed…    
+[39;1m  Session has unexpected errors: 
+
+{
+    "default": [
+        "The board resolution does not authorize this specific budget adjustment subject.",
+        "The board resolution does not authorize this specific budget adjustment subject."
+    ]
+}
+Failed asserting that true is false.
+
+The following errors occurred during the last request:
+
+The board resolution does not authorize this specific budget adjustment subject.
+The board resolution does not authorize this specific budget adjustment subject.[39;22m
+
+  at [32mtests\Feature\Governance\GovernanceBudgetsTest.php[39m:[32m309[39m
+    305▕         $response = $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/adjustments/{$adjustment->id}/approve", [
+    306▕             'approval_resolution_id' => $resolution->id,
+    307▕         ]);
+    308▕         $response->assertRedirect();
+  ➜ 309▕         $response->assertSessionHasNoErrors();
+    310▕ 
+    311▕         $adjustment->refresh();
+    312▕         $this->assertEquals('approved', $adjustment->status);
+    313▕         $this->assertEquals($resolution->id, $adjustment->approval_resolution_id);
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Governance\GovernanceBudgetsTest[22m [90m>[39m carried resolution cannot be reused across multiple adju…   
+[39;1m  Session has unexpected errors: 
+
+{
+    "default": [
+        "The board resolution does not authorize this specific budget adjustment subject.",
+        "The board resolution does not authorize this specific budget adjustment subject."
+    ]
+}
+Failed asserting that true is false.
+
+The following errors occurred during the last request:
+
+The board resolution does not authorize this specific budget adjustment subject.
+The board resolution does not authorize this specific budget adjustment subject.[39;22m
+
+  at [32mtests\Feature\Governance\GovernanceBudgetsTest.php[39m:[32m375[39m
+    371▕         // Approve adjustment 1 with resolution
+    372▕         $resp1 = $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/adjustments/{$adj1->id}/approve", [
+    373▕             'approval_resolution_id' => $resolution->id,
+    374▕         ]);
+  ➜ 375▕         $resp1->assertSessionHasNoErrors();
+    376▕         $this->assertEquals('approved', $adj1->refresh()->status);
+    377▕ 
+    378▕         // Adjustment 2
+    379▕         $this->actingAs($admin)->post("/governance/budgets/{$budget->id}/adjust", [
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Sites\Calendar\SiteCalendarAggregatorTest[22m [90m>[39m credential rotation reminders deep-link to the…    
+[39;1m  Expecting null not to be null .[39;22m
+
+  at [32mtests\Feature\Sites\Calendar\SiteCalendarAggregatorTest.php[39m:[32m147[39m
+    143▕         Carbon::parse('2026-05-31'),
+    144▕     ));
+    145▕ 
+    146▕     $credential = $items->firstWhere('source', 'credential');
+  ➜ 147▕     expect($credential)->not->toBeNull();
+    148▕     expect($credential->link)->toBe("/vendors?site_id={$site->id}&tab=credentials");
+    149▕     // Must never point back at the retired per-site index page.
+    150▕     expect($credential->link)->not->toContain("/sites/{$site->id}/credentials");
+    151▕ });
+
+  [33m1   [39m[39;1mtests\Feature\Sites\Calendar\SiteCalendarAggregatorTest.php[39;22m:[39;1m147[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Sites\Calendar\SiteCalendarAggregatorTest[22m [90m>[39m vendor insurance reminders deep-link to the uni…   
+[39;1m  Expecting null not to be null .[39;22m
+
+  at [32mtests\Feature\Sites\Calendar\SiteCalendarAggregatorTest.php[39m:[32m172[39m
+    168▕         Carbon::parse('2026-05-31'),
+    169▕     ));
+    170▕ 
+    171▕     $vendor = $items->firstWhere('source', 'vendor');
+  ➜ 172▕     expect($vendor)->not->toBeNull();
+    173▕     expect($vendor->link)->toBe("/vendors?site_id={$site->id}&tab=vendors");
+    174▕     expect($vendor->link)->not->toContain("/sites/{$site->id}/vendors");
+    175▕ });
+    176▕
+
+  [33m1   [39m[39;1mtests\Feature\Sites\Calendar\SiteCalendarAggregatorTest.php[39;22m:[39;1m172[39;22m
+
+
+  [90mTests:[39m    [31;1m5 failed[39;22m[90m,[39m[39m [39m[32;1m294 passed[39;22m[90m (2200 assertions)[39m
+  [90mDuration:[39m [39m731.02s[39m
+

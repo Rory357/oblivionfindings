@@ -12,6 +12,8 @@ class ItTicketCommandReceipt extends Model
 
     public const CREATE_OPERATION = 'ticket.create';
 
+    public const CATALOGUE_OPERATION = 'catalogue.submit';
+
     /** Audience is fingerprinted so changing it cannot reuse a reply identity. */
     public const COMMENT_OPERATION = 'ticket.comment';
 

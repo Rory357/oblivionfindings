@@ -1,17 +1,43 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
+import { careQualityStatusLabel } from '@/lib/governance-labels';
 import { Head, Link } from '@inertiajs/react';
 import {
     ArrowUpRight,
     HeartPulse,
+    Info,
     Minus,
     TrendingDown,
     TrendingUp,
+    X,
 } from 'lucide-react';
+import { useState } from 'react';
+
+import {
+    ClinicalViewToggle,
+    comparisonText,
+    formatCount,
+    indicatorChip,
+    indicatorStatusKey,
+    targetLabel,
+    unitLabel,
+    type Snapshot,
+    type SnapshotValue,
+} from './_shared';
 
 type Indicator = {
     id: number;
@@ -29,266 +55,319 @@ type Indicator = {
     is_automated: boolean;
 };
 
-type SnapshotValue = {
-    indicator_id: number;
-    indicator_code: string;
-    value: number;
-    status: 'normal' | 'warning' | 'critical';
-    trend: 'up' | 'down' | 'stable';
-    source_href: string | null;
-    source_label: string | null;
-};
-
-type Snapshot = {
-    id: number;
-    period_start: string | null;
-    period_end: string | null;
-    indicator_values: SnapshotValue[];
-    narrative: string | null;
-};
-
 type Props = {
     indicators: Indicator[];
     latestSnapshot: Snapshot | null;
     sourceHint: string;
+    filters?: { status?: string };
 };
 
-const statusStyles: Record<SnapshotValue['status'], string> = {
-    normal: 'bg-status-success-bg text-status-success',
-    warning: 'bg-status-warning-bg text-status-warning',
-    critical: 'bg-status-critical-bg text-status-critical',
-};
+const STATUS_FILTERS = [
+    { value: 'all', label: 'All measures' },
+    { value: 'critical', label: careQualityStatusLabel('critical') },
+    { value: 'warning', label: careQualityStatusLabel('warning') },
+    { value: 'normal', label: careQualityStatusLabel('normal') },
+    { value: 'no_data', label: careQualityStatusLabel('no_data') },
+];
 
-function formatPeriod(start: string | null, end: string | null): string {
-    if (!start || !end) {
-        return 'Current period';
-    }
-
-    return `${new Date(start).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    })} - ${new Date(end).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    })}`;
+function plural(count: number, one: string, many: string): string {
+    return `${count} ${count === 1 ? one : many}`;
 }
 
 export default function ClinicalDashboard({
     indicators,
     latestSnapshot,
     sourceHint,
+    filters = {},
 }: Props) {
-    const getLatestValue = (indicatorId: number): SnapshotValue | null =>
+    const [status, setStatus] = useState(filters.status ?? 'all');
+
+    const latestValue = (indicatorId: number): SnapshotValue | null =>
         latestSnapshot?.indicator_values.find(
             (value) => value.indicator_id === indicatorId,
         ) ?? null;
 
-    const grouped = indicators.reduce<Record<string, Indicator[]>>(
-        (carry, indicator) => {
-            carry[indicator.category_label] =
-                carry[indicator.category_label] ?? [];
-            carry[indicator.category_label].push(indicator);
+    const statusOf = (indicator: Indicator) =>
+        indicatorStatusKey(latestValue(indicator.id));
 
-            return carry;
+    const counts = indicators.reduce<Record<string, number>>(
+        (acc, indicator) => {
+            const key = statusOf(indicator);
+            acc[key] = (acc[key] ?? 0) + 1;
+            return acc;
         },
         {},
     );
+    const withData = indicators.length - (counts.no_data ?? 0);
+    const onTargetPct =
+        withData > 0 ? ((counts.normal ?? 0) / withData) * 100 : 0;
+    const visible = indicators.filter(
+        (indicator) => status === 'all' || statusOf(indicator) === status,
+    );
+    const period = latestSnapshot?.period_label ?? 'This month';
+    const comparedWith = latestSnapshot?.compared_with_label ?? null;
+
+    const titleChip =
+        withData === 0 ? (
+            <PageHeaderStatusChip variant="neutral">
+                {careQualityStatusLabel('no_data')}
+            </PageHeaderStatusChip>
+        ) : (counts.critical ?? 0) > 0 ? (
+            <PageHeaderStatusChip variant="critical">
+                {plural(counts.critical ?? 0, 'needs action', 'need action')}
+            </PageHeaderStatusChip>
+        ) : (counts.warning ?? 0) > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {plural(
+                    counts.warning ?? 0,
+                    'needs watching',
+                    'need watching',
+                )}
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                {careQualityStatusLabel('normal')}
+            </PageHeaderStatusChip>
+        );
+
+    const header = (
+        <PageHeader
+            icon={HeartPulse}
+            title="Care quality"
+            titleChip={titleChip}
+            subline={`Medication errors, falls, skin injuries and infections · ${period}`}
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Measures"
+                        ariaLabel="Show all measures"
+                        onClick={() => setStatus('all')}
+                    >
+                        <PageHeaderMeterBig>{indicators.length}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            counted automatically
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label={careQualityStatusLabel('critical')}
+                        ariaLabel="Show measures that need action"
+                        onClick={() => setStatus('critical')}
+                        tone={(counts.critical ?? 0) > 0 ? 'critical' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>{counts.critical ?? 0}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            3 or more this month
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label={careQualityStatusLabel('warning')}
+                        ariaLabel="Show measures that need watching"
+                        onClick={() => setStatus('warning')}
+                        tone={(counts.warning ?? 0) > 0 ? 'warning' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>{counts.warning ?? 0}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            1 or 2 this month
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label={careQualityStatusLabel('normal')}
+                        value={`${counts.normal ?? 0}/${withData}`}
+                        ariaLabel="Show measures on target"
+                        onClick={() => setStatus('normal')}
+                        tone="success"
+                    >
+                        <PageHeaderMeterDonut
+                            percent={onTargetPct}
+                            caption={
+                                withData === 0
+                                    ? 'No data yet'
+                                    : `${counts.normal ?? 0} of ${withData} with data`
+                            }
+                        />
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Month by month"
+                        ariaLabel="Open month by month"
+                        href="/governance/clinical/trends"
+                    >
+                        <PageHeaderMeterBig>
+                            <span className="text-base">
+                                {latestSnapshot?.short_label ?? 'This month'}
+                            </span>
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {comparedWith
+                                ? `compared with ${comparedWith}`
+                                : 'compare past months'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <ClinicalViewToggle value="dashboard" />
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={status}
+                        options={STATUS_FILTERS}
+                        onChange={setStatus}
+                    />
+                </>
+            }
+            rail={<GovernanceSectionRail />}
+        />
+    );
 
     return (
-        <AppLayout>
-            <Head title="Clinical Governance" />
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Care quality', href: '/governance/clinical' },
+            ]}
+        >
+            <Head title="Care quality" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        icon={HeartPulse}
-                        title="Clinical Governance"
-                        description="Automated clinical indicator snapshot for Governance oversight."
-                        stats={[
-                            { label: 'Indicators', value: indicators.length },
-                            {
-                                label: 'Active',
-                                value: indicators.filter((i) => i.is_active)
-                                    .length,
-                            },
-                            {
-                                label: 'Automated',
-                                value: indicators.filter((i) => i.is_automated)
-                                    .length,
-                            },
-                        ]}
-                        actions={
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                asChild
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Link href="/governance/clinical/trends">
-                                    Trends
-                                </Link>
-                            </Button>
-                        }
-                    />
-                }
-            >
-                <Card className="border-status-info/30 bg-status-info-bg">
-                    <CardContent className="flex flex-col gap-2 p-4 text-sm text-status-info sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <p className="font-medium">Automated source</p>
-                            <p className="text-status-info">{sourceHint}</p>
-                        </div>
-                        <Badge
-                            variant="secondary"
-                            className="w-fit bg-white text-status-info"
-                        >
-                            {formatPeriod(
-                                latestSnapshot?.period_start ?? null,
-                                latestSnapshot?.period_end ?? null,
-                            )}
-                        </Badge>
-                    </CardContent>
-                </Card>
-
-                {Object.entries(grouped).map(
-                    ([categoryLabel, categoryIndicators]) => (
-                        <div key={categoryLabel} className="space-y-3">
-                            <h2 className="text-lg font-semibold text-foreground">
-                                {categoryLabel}
-                            </h2>
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                {categoryIndicators.map((indicator) => {
-                                    const latestValue = getLatestValue(
-                                        indicator.id,
-                                    );
-
-                                    return (
-                                        <Card key={indicator.id}>
-                                            <CardContent className="space-y-4 p-5">
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div>
-                                                        <p className="text-sm font-semibold text-foreground">
-                                                            {indicator.name}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {indicators.length === 0 ? (
+                        <EmptyState
+                            icon={HeartPulse}
+                            title="No care quality measures yet"
+                            description="Measures appear here once medication errors or care events are being recorded."
+                        />
+                    ) : visible.length === 0 ? (
+                        <EmptyState
+                            icon={HeartPulse}
+                            title="No measures match this status"
+                            description="Choose another status to see the other measures."
+                            action={
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setStatus('all')}
+                                >
+                                    <X className="h-3.5 w-3.5" />
+                                    Show all measures
+                                </Button>
+                            }
+                        />
+                    ) : (
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+                            {visible.map((indicator) => {
+                                const value = latestValue(indicator.id);
+                                const chip = indicatorChip(value);
+                                const recorded = Boolean(value?.recorded);
+                                const unit = unitLabel(indicator.unit);
+                                const comparison =
+                                    value && recorded
+                                        ? comparisonText(value, comparedWith)
+                                        : null;
+                                return (
+                                    <Card key={indicator.id}>
+                                        <CardContent className="flex h-full flex-col gap-4 p-5">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <h2 className="text-sm font-semibold text-foreground">
+                                                        {indicator.name}
+                                                    </h2>
+                                                    {indicator.definition ? (
+                                                        <p className="text-caption mt-1">
+                                                            {indicator.definition}
                                                         </p>
-                                                        <p className="mt-1 text-xs text-muted-foreground">
-                                                            {indicator.definition ??
-                                                                indicator.data_source ??
-                                                                'Automated indicator'}
-                                                        </p>
-                                                    </div>
-                                                    <Badge
-                                                        className={cn(
-                                                            'capitalize',
-                                                            latestValue
-                                                                ? statusStyles[
-                                                                      latestValue
-                                                                          .status
-                                                                  ]
-                                                                : 'bg-muted text-foreground',
-                                                        )}
-                                                    >
-                                                        {latestValue?.status ??
-                                                            'No data'}
-                                                    </Badge>
+                                                    ) : null}
                                                 </div>
+                                                <StatusBadge variant={chip.variant}>
+                                                    {chip.label}
+                                                </StatusBadge>
+                                            </div>
 
-                                                <div className="flex items-end justify-between gap-3">
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className="text-3xl font-bold text-foreground">
-                                                            {latestValue
-                                                                ? latestValue.value
-                                                                : '—'}
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-page-title tabular-nums">
+                                                        {value && recorded
+                                                            ? formatCount(value.value)
+                                                            : '—'}
+                                                    </span>
+                                                    {unit ? (
+                                                        <span className="text-caption">
+                                                            {unit}
                                                         </span>
-                                                        {indicator.unit && (
-                                                            <span className="text-xs tracking-wide text-muted-foreground uppercase">
-                                                                {indicator.unit}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-muted-foreground">
-                                                        {latestValue?.trend ===
-                                                        'up' ? (
-                                                            <TrendingUp className="h-4 w-4" />
-                                                        ) : latestValue?.trend ===
-                                                          'down' ? (
-                                                            <TrendingDown className="h-4 w-4" />
+                                                    ) : null}
+                                                </div>
+                                                {comparison && value ? (
+                                                    <p className="text-caption flex items-center gap-1.5">
+                                                        {value.trend === 'up' ? (
+                                                            <TrendingUp
+                                                                className="h-3.5 w-3.5"
+                                                                aria-hidden="true"
+                                                            />
+                                                        ) : value.trend === 'down' ? (
+                                                            <TrendingDown
+                                                                className="h-3.5 w-3.5"
+                                                                aria-hidden="true"
+                                                            />
                                                         ) : (
-                                                            <Minus className="h-4 w-4" />
+                                                            <Minus
+                                                                className="h-3.5 w-3.5"
+                                                                aria-hidden="true"
+                                                            />
                                                         )}
-                                                    </div>
-                                                </div>
+                                                        {comparison}
+                                                    </p>
+                                                ) : null}
+                                            </div>
 
-                                                <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                                                    <span>
-                                                        Target:{' '}
-                                                        {indicator.target_direction ===
-                                                        'below'
-                                                            ? '≤'
-                                                            : indicator.target_direction ===
-                                                                'above'
-                                                              ? '≥'
-                                                              : '='}{' '}
-                                                        {indicator.target_value ??
-                                                            '—'}
-                                                    </span>
-                                                    <span className="capitalize">
-                                                        {
-                                                            indicator.reporting_frequency
-                                                        }
-                                                    </span>
-                                                </div>
+                                            <p className="text-caption">
+                                                {targetLabel(
+                                                    indicator.target_direction,
+                                                    indicator.target_value,
+                                                )}
+                                            </p>
 
-                                                {latestValue?.source_href &&
-                                                    latestValue.source_label && (
-                                                        <Link
-                                                            href={
-                                                                latestValue.source_href
-                                                            }
-                                                        >
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="h-8 px-0 text-status-info"
-                                                            >
-                                                                {
-                                                                    latestValue.source_label
-                                                                }
-                                                                <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
-                                                            </Button>
-                                                        </Link>
-                                                    )}
-                                            </CardContent>
-                                        </Card>
-                                    );
-                                })}
-                            </div>
+                                            {value?.source_href &&
+                                            value.source_label ? (
+                                                <Button
+                                                    asChild
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="mt-auto h-8 w-fit px-0 text-primary"
+                                                >
+                                                    <Link href={value.source_href}>
+                                                        {value.source_label}
+                                                        <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                                                    </Link>
+                                                </Button>
+                                            ) : null}
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
                         </div>
-                    ),
-                )}
+                    )}
 
-                {latestSnapshot?.narrative && (
                     <Card>
-                        <CardContent className="space-y-2 p-5">
-                            <p className="text-sm font-semibold text-foreground">
-                                Narrative
-                            </p>
-                            <p className="text-sm leading-6 text-muted-foreground">
-                                {latestSnapshot.narrative}
-                            </p>
+                        <CardContent className="flex items-start gap-3 py-4">
+                            <Info
+                                className="mt-0.5 h-5 w-5 shrink-0 text-primary"
+                                aria-hidden="true"
+                            />
+                            <div className="flex flex-col gap-1">
+                                <h2 className="text-sm font-semibold text-foreground">
+                                    Where these numbers come from
+                                </h2>
+                                <p className="text-subtle">{sourceHint}</p>
+                                <p className="text-subtle">
+                                    Each number covers {period}.
+                                    {comparedWith
+                                        ? ` Up and down compare it with the same days last month (${comparedWith}).`
+                                        : ''}
+                                </p>
+                            </div>
                         </CardContent>
                     </Card>
-                )}
-
-                {indicators.length === 0 && (
-                    <Card>
-                        <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                            No automated clinical governance indicators are
-                            available yet.
-                        </CardContent>
-                    </Card>
-                )}
+                </div>
             </PageLayout>
         </AppLayout>
     );

@@ -46,7 +46,7 @@ test('knowledge discovery filters draft bodies and published suggestions to curr
     $secondary = Site::factory()->create();
     $hiddenSite = Site::factory()->create();
     $agent = knowledgeAccessActor($primary);
-    $agent->hrEmployeeProfile()->update(['secondary_site_ids' => [$secondary->id]]);
+    $agent->hrEmployeeProfile()->firstOrFail()->update(['secondary_site_ids' => [$secondary->id]]);
     $general = ItKbArticle::factory()->create(['title' => 'General draft']);
     $agents = ItKbArticle::factory()->published()->create(['audience' => 'it_agents']);
     $local = ItKbArticle::factory()->published()->create([
@@ -65,7 +65,7 @@ test('knowledge discovery filters draft bodies and published suggestions to curr
         'audience' => 'specific_sites', 'site_scope' => [$hiddenSite->id],
     ]);
 
-    $this->actingAs($agent)->get('/it')->assertOk()
+    $this->actingAs($agent)->get('/it/knowledge')->assertOk()
         ->assertInertia(fn ($page) => $page
             ->has('kbArticles', 4)
             ->where('kbArticles', fn ($articles) => collect($articles)->pluck('id')->sort()->values()->all()
@@ -86,8 +86,8 @@ test('knowledge discovery filters draft bodies and published suggestions to curr
         ItKbArticle::query()->where('audience', 'specific_sites'), $agent, publishedOnly: true,
     )->latest('updated_at')->limit(1)->pluck('id')->all())->toBe([$local->id]);
 
-    $agent->hrEmployeeProfile()->update(['secondary_site_ids' => []]);
-    $this->actingAs($agent)->get('/it')->assertOk()
+    $agent->hrEmployeeProfile()->firstOrFail()->update(['secondary_site_ids' => []]);
+    $this->actingAs($agent)->get('/it/knowledge')->assertOk()
         ->assertInertia(fn ($page) => $page->has('kbArticles', 3));
     $this->actingAs($agent)->patch("/it/kb/{$secondaryDraft->id}", [
         'audience' => 'all_staff', 'body' => 'Stale editor attempts to widen the old audience.',
@@ -135,7 +135,7 @@ test('knowledge service reauthorizes the canonical audience and preserves permit
     ]);
     expect(app(ItKbAccessService::class)->canReadPublished($actor, $sharedGuide))->toBeTrue()
         ->and(app(ItKbAccessService::class)->canManage($actor, $sharedGuide))->toBeFalse();
-    $this->actingAs($actor)->get('/it')->assertOk()
+    $this->actingAs($actor)->get('/it/knowledge')->assertOk()
         ->assertInertia(fn ($page) => $page->has('kbArticles', 1)
             ->where('kbArticles.0.id', $sharedGuide->id)->where('kbArticles.0.can.manage', false));
     $this->actingAs($actor)->patch("/it/kb/{$sharedGuide->id}", ['body' => 'Partial-site editor attempt.'])
@@ -148,7 +148,7 @@ test('knowledge service reauthorizes the canonical audience and preserves permit
     app(ItKbLifecycleService::class)->submitForReview($permitted, $actor);
     app(ItKbLifecycleService::class)->publish($permitted, $actor);
     expect($permitted->fresh()->status)->toBe('published');
-    $this->actingAs($actor)->get('/it')->assertOk()
+    $this->actingAs($actor)->get('/it/knowledge')->assertOk()
         ->assertInertia(fn ($page) => $page->where('kbArticles', fn ($articles) => collect($articles)->firstWhere('id', $permitted->id)['can']['manage'] === true));
 
     $reader = knowledgeAccessActor($site, ['it.request']);
@@ -161,7 +161,7 @@ test('knowledge service reauthorizes the canonical audience and preserves permit
     expect($permitted->fresh()->view_count)->toBe(1)
         ->and($permitted->fresh()->helpful_yes)->toBe(1);
 
-    $actor->hrEmployeeProfile()->update(['end_date' => now()->subDay()->toDateString()]);
+    $actor->hrEmployeeProfile()->firstOrFail()->update(['end_date' => now()->subDay()->toDateString()]);
     expect(fn () => app(ItKbLifecycleService::class)->retire($permitted, $actor, 'Stale author attempt.'))
         ->toThrow(ModelNotFoundException::class);
     expect($permitted->fresh()->status)->toBe('published');

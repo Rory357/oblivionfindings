@@ -3,8 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\Shift;
-use App\Services\ShiftSignalService;
+use App\Models\Timesheet;
 use App\Services\Operations\TimesheetReconciliationService;
+use App\Services\ShiftSignalService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -17,7 +18,9 @@ class DetectShiftOrphans extends Command
     protected $description = 'Detect orphaned shift/timesheet/attendance records and emit control room signals';
 
     public const TYPE_MISSING_TIMESHEET = 'orphan_completed_shift_no_timesheet';
+
     public const TYPE_ORPHAN_ATTENDANCE = 'orphan_attendance_no_timesheet';
+
     public const TYPE_ORPHAN_TIMESHEET = 'orphan_timesheet_no_shift';
 
     public function handle(
@@ -161,11 +164,11 @@ class DetectShiftOrphans extends Command
         bool $dryRun,
         array &$summary,
     ): void {
-        $orphans = \App\Models\Timesheet::query()
+        $orphans = Timesheet::query()
             ->with(['shift:id', 'attendanceSession:id'])
             ->where('created_at', '>=', $cutoff)
             ->get()
-            ->filter(function (\App\Models\Timesheet $timesheet): bool {
+            ->filter(function (Timesheet $timesheet): bool {
                 if ($timesheet->shift_id && ! $timesheet->shift) {
                     return true;
                 }

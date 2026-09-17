@@ -3,6 +3,8 @@
 namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Models\FinBankTransaction;
+use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinPaymentMatch;
 use App\Domain\Finance\Services\PaymentMatchingService;
 use App\Http\Controllers\Controller;
@@ -22,10 +24,14 @@ class PaymentMatchController extends Controller
     {
         $orgId = $request->user()->organization_id;
 
-        $matches = $this->service->scopeMatchesForActor(
+        // One query factory, so the header's totals are counted over exactly the
+        // rows this actor may see — never over the current page of results.
+        $visible = fn () => $this->service->scopeMatchesForActor(
             FinPaymentMatch::forOrganization($orgId),
             $request->user(),
-        )
+        );
+
+        $matches = $visible()
             ->with([
                 'bankTransaction:id,bank_account_id,transaction_date,description,reference,amount',
                 'bankTransaction.bankAccount:id,name',
@@ -53,6 +59,18 @@ class PaymentMatchController extends Controller
                 $matchableData = [
                     'id' => $matchable->id,
                     'type' => class_basename($matchable),
+                    // Friendly label + a real link, so the matched record is
+                    // reachable from the row instead of being a dead name.
+                    'type_label' => match (true) {
+                        $matchable instanceof FinBill => 'Bill',
+                        $matchable instanceof FinInvoice => 'Invoice',
+                        default => class_basename($matchable),
+                    },
+                    'url' => match (true) {
+                        $matchable instanceof FinBill => '/finance/bills/'.$matchable->id,
+                        $matchable instanceof FinInvoice => '/finance/invoices/'.$matchable->id,
+                        default => null,
+                    },
                     'number' => $matchable->bill_number ?? $matchable->invoice_number ?? '-',
                     'amount_due' => (float) ($matchable->total_amount ?? 0) - (float) ($matchable->amount_paid ?? 0),
                     'total_amount' => (float) ($matchable->total_amount ?? 0),
@@ -86,6 +104,15 @@ class PaymentMatchController extends Controller
             'filters' => [
                 'status' => $request->status ?? '',
                 'min_confidence' => $request->min_confidence ?? '',
+            ],
+            'summary' => [
+                'total' => (int) $visible()->count(),
+                'suggested' => (int) $visible()->where('status', 'suggested')->count(),
+                'confirmed' => (int) $visible()->whereIn('status', ['confirmed', 'auto_confirmed'])->count(),
+                'rejected' => (int) $visible()->where('status', 'rejected')->count(),
+                'unreconciled_transactions' => (int) FinBankTransaction::forOrganization($orgId)
+                    ->unreconciled()
+                    ->count(),
             ],
         ]);
     }

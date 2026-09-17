@@ -45,6 +45,10 @@ class FixedAssetController extends Controller
         }
 
         $assets = $query->withCount('depreciations')
+            ->with([
+                'glAssetAccount:id,code,name',
+                'glDepreciationAccount:id,code,name',
+            ])
             ->orderBy('asset_name')
             ->paginate(25)
             ->withQueryString()
@@ -64,6 +68,14 @@ class FixedAssetController extends Controller
                 'gl_asset_account_id' => $asset->gl_asset_account_id,
                 'gl_depreciation_account_id' => $asset->gl_depreciation_account_id,
                 'gl_expense_account_id' => $asset->gl_expense_account_id,
+                // …and the mapped accounts themselves, so the row's Dispose
+                // action can preview the disposal journal without a round trip.
+                'gl_asset_account' => $asset->glAssetAccount
+                    ? ['code' => $asset->glAssetAccount->code, 'name' => $asset->glAssetAccount->name]
+                    : null,
+                'gl_depreciation_account' => $asset->glDepreciationAccount
+                    ? ['code' => $asset->glDepreciationAccount->code, 'name' => $asset->glDepreciationAccount->name]
+                    : null,
                 'notes' => $asset->notes,
                 'has_depreciations' => $asset->depreciations_count > 0,
             ]);

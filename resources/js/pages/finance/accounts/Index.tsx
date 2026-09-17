@@ -1,37 +1,48 @@
 import {
-    LedgerTabsFooter,
+    FinanceSectionRail,
     NewAccountDialog,
     formatMoney,
-    useRowContextMenu,
-    type RowCtxItem,
+    type EditableAccount,
 } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import {
+    EntityContextMenu,
+    EntityKebab,
+    EntityStatusChip,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
+import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
     ChevronDown,
     ChevronRight,
-    DollarSign,
     Download,
     Eye,
+    Pencil,
     Plus,
-    Search,
     Wallet,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -46,6 +57,9 @@ type Account = {
     is_active: boolean;
     gst_applicable: boolean;
     description: string | null;
+    parent_id: number | null;
+    default_tax_rate_id: number | null;
+    funding_stream_id: number | null;
     balance: number;
     children: Account[];
 };
@@ -69,6 +83,15 @@ type PageProps = {
     fundingStreams?: RefItem[];
 };
 
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'General ledger', href: '/finance/ledger' },
+    { title: 'Chart of accounts', href: '/finance/accounts' },
+];
+
+const TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const;
+
 const typeLabels: Record<string, string> = {
     asset: 'Assets',
     liability: 'Liabilities',
@@ -77,25 +100,36 @@ const typeLabels: Record<string, string> = {
     expense: 'Expenses',
 };
 
-const typeColors: Record<string, string> = {
-    asset: 'bg-status-info-bg text-status-info border-status-info/30',
-    liability:
-        'bg-status-critical-bg text-status-critical border-status-critical/30',
-    equity: 'bg-primary/10 text-primary border-primary/30',
-    revenue:
-        'bg-status-success-bg text-status-success border-status-success/30',
-    expense:
-        'bg-status-warning-bg text-status-warning border-status-warning/30',
-};
+const ACTIVE_OPTIONS = [
+    { value: 'all', label: 'All accounts' },
+    { value: 'active', label: 'Active only' },
+    { value: 'inactive', label: 'Inactive only' },
+];
+
+const editableFrom = (account: Account): EditableAccount => ({
+    id: account.id,
+    code: account.code,
+    name: account.name,
+    type: account.type,
+    sub_type: account.sub_type,
+    parent_id: account.parent_id,
+    description: account.description,
+    gst_applicable: account.gst_applicable,
+    is_active: account.is_active,
+    default_tax_rate_id: account.default_tax_rate_id,
+    funding_stream_id: account.funding_stream_id,
+});
 
 function AccountRow({
     account,
     depth = 0,
-    onRowContextMenu,
+    actionsFor,
+    onContextMenu,
 }: {
     account: Account;
     depth?: number;
-    onRowContextMenu: (account: Account) => (e: React.MouseEvent) => void;
+    actionsFor: (account: Account) => MenuItem[];
+    onContextMenu: (e: React.MouseEvent, account: Account) => void;
 }) {
     const [isOpen, setIsOpen] = useState(true);
     const hasChildren = account.children.length > 0;
@@ -103,10 +137,10 @@ function AccountRow({
     return (
         <div>
             <div
-                className="group flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 hover:bg-muted/50"
+                className="flex h-[46px] cursor-pointer items-center gap-2 border-b border-border px-3 transition-colors hover:bg-primary/5"
                 style={{ paddingLeft: `${depth * 24 + 12}px` }}
                 onClick={() => router.visit(`/finance/accounts/${account.id}`)}
-                onContextMenu={onRowContextMenu(account)}
+                onContextMenu={(e) => onContextMenu(e, account)}
             >
                 {hasChildren ? (
                     <Button
@@ -114,7 +148,9 @@ function AccountRow({
                         variant="ghost"
                         size="icon"
                         aria-label={
-                            isOpen ? 'Collapse account' : 'Expand account'
+                            isOpen
+                                ? `Collapse ${account.name}`
+                                : `Expand ${account.name}`
                         }
                         onClick={(e) => {
                             e.stopPropagation();
@@ -132,36 +168,46 @@ function AccountRow({
                     <span className="w-5" />
                 )}
 
-                <span className="w-20 shrink-0 font-mono text-sm text-muted-foreground">
+                <span className="w-20 shrink-0 text-[12.5px] text-muted-foreground tabular-nums">
                     {account.code}
                 </span>
-                <span className="flex-1 truncate text-sm">{account.name}</span>
-                {account.is_system && (
-                    <Badge variant="outline" className="text-xs">
-                        System
-                    </Badge>
-                )}
-                {!account.is_active && (
-                    <Badge variant="secondary" className="text-xs">
+                <span className="flex-1 truncate text-[13px] font-semibold text-foreground">
+                    {account.name}
+                </span>
+                {account.is_system ? (
+                    <EntityStatusChip variant="info">System</EntityStatusChip>
+                ) : null}
+                {!account.is_active ? (
+                    <EntityStatusChip variant="neutral">
                         Inactive
-                    </Badge>
-                )}
-                <span className="w-32 text-right font-mono text-sm tabular-nums">
+                    </EntityStatusChip>
+                ) : null}
+                <span className="w-32 text-right text-[12.5px] font-semibold tabular-nums">
                     {formatMoney(account.balance)}
                 </span>
+                <span
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center justify-end"
+                >
+                    <EntityKebab
+                        actions={actionsFor(account)}
+                        label={`Actions for ${account.name}`}
+                    />
+                </span>
             </div>
-            {hasChildren && isOpen && (
+            {hasChildren && isOpen ? (
                 <div>
                     {account.children.map((child) => (
                         <AccountRow
                             key={child.id}
                             account={child}
                             depth={depth + 1}
-                            onRowContextMenu={onRowContextMenu}
+                            actionsFor={actionsFor}
+                            onContextMenu={onContextMenu}
                         />
                     ))}
                 </div>
-            )}
+            ) : null}
         </div>
     );
 }
@@ -169,11 +215,13 @@ function AccountRow({
 function AccountTypeSection({
     type,
     accounts,
-    onRowContextMenu,
+    actionsFor,
+    onContextMenu,
 }: {
     type: string;
     accounts: Account[];
-    onRowContextMenu: (account: Account) => (e: React.MouseEvent) => void;
+    actionsFor: (account: Account) => MenuItem[];
+    onContextMenu: (e: React.MouseEvent, account: Account) => void;
 }) {
     const [isOpen, setIsOpen] = useState(true);
 
@@ -188,36 +236,35 @@ function AccountTypeSection({
     return (
         <Collapsible open={isOpen} onOpenChange={setIsOpen}>
             <CollapsibleTrigger asChild>
-                <div className="flex cursor-pointer items-center justify-between rounded-lg bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50">
-                    <div className="flex items-center gap-3">
+                <div className="flex h-8 cursor-pointer items-center justify-between border-b border-border bg-muted/60 px-3 transition-colors hover:bg-muted">
+                    <div className="flex items-center gap-2">
                         {isOpen ? (
-                            <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         ) : (
-                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         )}
-                        <Badge variant="outline" className={typeColors[type]}>
+                        <span className="text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
                             {typeLabels[type]}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">
+                        </span>
+                        <span className="text-[11.5px] text-muted-foreground">
                             {accounts.length} account
                             {accounts.length !== 1 ? 's' : ''}
                         </span>
                     </div>
-                    <span className="font-mono text-sm font-semibold tabular-nums">
+                    <span className="text-[12.5px] font-semibold tabular-nums">
                         {formatMoney(totalBalance)}
                     </span>
                 </div>
             </CollapsibleTrigger>
             <CollapsibleContent>
-                <div className="mt-1 ml-2">
-                    {accounts.map((account) => (
-                        <AccountRow
-                            key={account.id}
-                            account={account}
-                            onRowContextMenu={onRowContextMenu}
-                        />
-                    ))}
-                </div>
+                {accounts.map((account) => (
+                    <AccountRow
+                        key={account.id}
+                        account={account}
+                        actionsFor={actionsFor}
+                        onContextMenu={onContextMenu}
+                    />
+                ))}
             </CollapsibleContent>
         </Collapsible>
     );
@@ -258,6 +305,18 @@ function filterAccounts(
     return walk(nodes);
 }
 
+const countTree = (nodes: Account[]): number =>
+    nodes.reduce((t, n) => t + 1 + countTree(n.children), 0);
+
+const countTreeWhere = (
+    nodes: Account[],
+    predicate: (account: Account) => boolean,
+): number =>
+    nodes.reduce(
+        (t, n) => t + (predicate(n) ? 1 : 0) + countTreeWhere(n.children, predicate),
+        0,
+    );
+
 export default function AccountsIndex({
     accountTree,
     accountTypes,
@@ -267,25 +326,24 @@ export default function AccountsIndex({
     fundingStreams = [],
 }: PageProps) {
     const [createOpen, setCreateOpen] = useState(false);
+    const [editAccount, setEditAccount] = useState<EditableAccount | null>(null);
     const [search, setSearch] = useState('');
     const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Chart of Accounts', href: '/finance/accounts' },
-    ];
 
-    const TYPES = [
-        'asset',
-        'liability',
-        'equity',
-        'revenue',
-        'expense',
-    ] as const;
+    const ctx = useEntityContextMenu<Account>();
 
-    const countTree = (nodes: Account[]): number =>
-        nodes.reduce((t, n) => t + 1 + countTree(n.children), 0);
     const totalAccounts = TYPES.reduce(
         (sum, type) => sum + countTree(accountTree[type] || []),
+        0,
+    );
+    const activeAccounts = TYPES.reduce(
+        (sum, type) =>
+            sum + countTreeWhere(accountTree[type] || [], (a) => a.is_active),
+        0,
+    );
+    const systemAccounts = TYPES.reduce(
+        (sum, type) =>
+            sum + countTreeWhere(accountTree[type] || [], (a) => a.is_system),
         0,
     );
 
@@ -303,107 +361,180 @@ export default function AccountsIndex({
         0,
     );
 
-    // Right-click row menu — mirrors the account row's existing navigation (Open).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (account: Account): RowCtxItem[] => [
-        {
-            kind: 'item',
-            label: 'Open',
-            icon: Eye,
-            onSelect: () => router.visit(`/finance/accounts/${account.id}`),
-        },
-    ];
+    const actionsFor = (account: Account): MenuItem[] => {
+        const items: MenuItem[] = [
+            {
+                label: 'Open account',
+                icon: Eye,
+                onClick: () => router.visit(`/finance/accounts/${account.id}`),
+            },
+        ];
+        if (canManage) {
+            items.push({
+                label: 'Edit account',
+                icon: Pencil,
+                onClick: () => setEditAccount(editableFrom(account)),
+            });
+        }
+        return items;
+    };
+
+    const header = (
+        <PageHeader
+            icon={Wallet}
+            title="Chart of accounts"
+            titleChip={
+                <PageHeaderStatusChip variant="success">
+                    {activeAccounts} active
+                </PageHeaderStatusChip>
+            }
+            subline={`General ledger · ${totalAccounts} accounts · ${accountTypes.length} account types`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search code or name…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={() => {
+                            window.location.href = '/finance/accounts/export';
+                        }}
+                    >
+                        Export CSV
+                    </PageHeaderGlassButton>
+                    {canManage ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                        >
+                            New account
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Accounts"
+                        href="/finance/accounts"
+                        ariaLabel="View the whole chart of accounts"
+                    >
+                        <PageHeaderMeterBig>{totalAccounts}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            across {accountTypes.length} account types
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Active"
+                        tone="success"
+                        ariaLabel="Show only active accounts"
+                        onClick={() => setActiveFilter('active')}
+                    >
+                        <PageHeaderMeterDonut
+                            percent={
+                                totalAccounts === 0
+                                    ? 0
+                                    : (activeAccounts / totalAccounts) * 100
+                            }
+                            caption={`${activeAccounts} of ${totalAccounts} in use`}
+                        />
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Inactive"
+                        tone="warning"
+                        ariaLabel="Show only inactive accounts"
+                        onClick={() => setActiveFilter('inactive')}
+                    >
+                        <PageHeaderMeterBig>
+                            {totalAccounts - activeAccounts}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            retired from posting
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="System accounts"
+                        ariaLabel="View journals posted by the system accounts"
+                        href="/finance/journals"
+                    >
+                        <PageHeaderMeterBig>
+                            {systemAccounts}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            reserved by automatic postings
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    label="Active state"
+                    value={activeFilter}
+                    allValue="all"
+                    options={ACTIVE_OPTIONS}
+                    onChange={(value) =>
+                        setActiveFilter(value as ActiveFilter)
+                    }
+                />
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Chart of Accounts" />
+            <Head title="Chart of accounts" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Wallet}
-                        title="Chart of Accounts"
-                        description="Manage your organisation's account structure"
-                        stats={[
-                            { label: 'Total accounts', value: totalAccounts },
-                            {
-                                label: 'Account types',
-                                value: accountTypes.length,
-                            },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button size="sm" variant="outline" asChild>
-                                    <a href="/finance/accounts/export">
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Export CSV
-                                    </a>
-                                </Button>
-                                {canManage && (
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Account tree"
+                        caption={`${visibleCount} of ${totalAccounts} shown`}
+                    />
+
+                    {visibleCount === 0 ? (
+                        <EmptyState
+                            icon={Wallet}
+                            heading={
+                                hasFilters
+                                    ? 'No accounts match your search'
+                                    : 'No accounts yet'
+                            }
+                            description={
+                                hasFilters
+                                    ? 'Clear the search or the active-state filter to see the whole chart.'
+                                    : 'Add your first account to start building the chart of accounts.'
+                            }
+                            action={
+                                hasFilters ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearch('');
+                                            setActiveFilter('all');
+                                        }}
+                                    >
+                                        Clear filters
+                                    </Button>
+                                ) : canManage ? (
                                     <Button
                                         size="sm"
                                         onClick={() => setCreateOpen(true)}
                                     >
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Add Account
+                                        New account
                                     </Button>
-                                )}
-                            </div>
-                        }
-                        footer={<LedgerTabsFooter active="accounts" />}
-                    />
-                }
-            >
-                <Card>
-                    <CardHeader className="gap-4">
-                        <div className="flex items-center gap-2">
-                            <DollarSign className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>Account Tree</CardTitle>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
-                            <div className="relative">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search code or name..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-9"
-                                />
-                            </div>
-                            <Select
-                                value={activeFilter}
-                                onValueChange={(v) =>
-                                    setActiveFilter(v as ActiveFilter)
-                                }
-                            >
-                                <SelectTrigger
-                                    className="sm:w-44"
-                                    aria-label="Filter by active state"
-                                >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All accounts
-                                    </SelectItem>
-                                    <SelectItem value="active">
-                                        Active only
-                                    </SelectItem>
-                                    <SelectItem value="inactive">
-                                        Inactive only
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                        {visibleCount === 0 ? (
-                            <div className="py-12 text-center text-sm text-muted-foreground">
-                                No accounts match your search.
-                            </div>
-                        ) : (
-                            TYPES.filter(
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <Card className="gap-0 overflow-hidden rounded-[14px] py-0">
+                            {TYPES.filter(
                                 (type) =>
                                     !hasFilters ||
                                     filteredTree[type].length > 0,
@@ -412,27 +543,49 @@ export default function AccountsIndex({
                                     key={type}
                                     type={type}
                                     accounts={filteredTree[type]}
-                                    onRowContextMenu={(account) =>
-                                        rowMenu.open(rowMenuItems(account))
+                                    actionsFor={actionsFor}
+                                    onContextMenu={(e, account) =>
+                                        ctx.open(e, account)
                                     }
                                 />
-                            ))
-                        )}
-                    </CardContent>
-                </Card>
-
-                {canManage && (
-                    <NewAccountDialog
-                        open={createOpen}
-                        onClose={() => setCreateOpen(false)}
-                        parentAccounts={parentAccounts}
-                        taxRates={taxRates}
-                        fundingStreams={fundingStreams}
-                    />
-                )}
-
-                {rowMenu.element}
+                            ))}
+                        </Card>
+                    )}
+                </div>
             </PageLayout>
+
+            {ctx.ctx ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Wallet}
+                    title={`${ctx.ctx.record.code} — ${ctx.ctx.record.name}`}
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
+
+            {canManage ? (
+                <NewAccountDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    parentAccounts={parentAccounts}
+                    taxRates={taxRates}
+                    fundingStreams={fundingStreams}
+                />
+            ) : null}
+
+            {canManage && editAccount ? (
+                <NewAccountDialog
+                    key={editAccount.id}
+                    open
+                    account={editAccount}
+                    onClose={() => setEditAccount(null)}
+                    parentAccounts={parentAccounts}
+                    taxRates={taxRates}
+                    fundingStreams={fundingStreams}
+                />
+            ) : null}
         </AppLayout>
     );
 }

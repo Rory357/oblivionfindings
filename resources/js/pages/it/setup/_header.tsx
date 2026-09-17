@@ -19,6 +19,7 @@ import {
     KeyRound,
     LayoutGrid,
     List,
+    MessageSquareText,
     Network,
     Plus,
     Route,
@@ -30,6 +31,7 @@ export const SETUP_TABS = [
     { key: 'queues', label: 'Queues', icon: Network },
     { key: 'services', label: 'Services', icon: Boxes },
     { key: 'catalogue', label: 'Catalogue', icon: BookOpenCheck },
+    { key: 'automation', label: 'Automation', icon: MessageSquareText },
     { key: 'provisioning', label: 'Workflows', icon: GitMerge },
     { key: 'api', label: 'API', icon: KeyRound },
     { key: 'operations', label: 'Operations', icon: Activity },
@@ -47,6 +49,7 @@ export function SetupHeader({
     services,
     generatedAt,
     onCreate,
+    createLabel,
 }: {
     tab: SetupTab;
     onNavigate: (
@@ -64,6 +67,8 @@ export function SetupHeader({
     services: Service[];
     generatedAt?: string;
     onCreate?: () => void;
+    /** Noun for the primary action when the tab is not a team/queue/service register. */
+    createLabel?: string;
 }) {
     const activeTeams = teams.filter((row) => row.is_active).length;
     const activeQueues = queues.filter((row) => row.is_active).length;
@@ -71,6 +76,16 @@ export function SetupHeader({
     const gaps = queues.filter((row) => row.readiness.gaps.length > 0).length;
     const title = SETUP_TABS.find((item) => item.key === tab)!.label;
     const registers = ['teams', 'queues', 'services'].includes(tab);
+    const layoutToggle = registers || tab === 'automation';
+    const createNoun =
+        createLabel ??
+        (tab === 'teams'
+            ? 'team'
+            : tab === 'queues'
+              ? 'queue'
+              : tab === 'services'
+                ? 'service'
+                : 'record');
     return (
         <PageHeader
             className="overflow-clip!"
@@ -97,12 +112,7 @@ export function SetupHeader({
                     />
                     {onCreate && (
                         <PageHeaderPrimaryButton icon={Plus} onClick={onCreate}>
-                            New{' '}
-                            {tab === 'teams'
-                                ? 'team'
-                                : tab === 'queues'
-                                  ? 'queue'
-                                  : 'service'}
+                            New {createNoun}
                         </PageHeaderPrimaryButton>
                     )}
                 </>
@@ -183,22 +193,26 @@ export function SetupHeader({
                 </>
             }
             filters={
-                registers ? (
+                layoutToggle ? (
                     <>
-                        <PageHeaderFilterSelect
-                            label="Availability"
-                            value={state}
-                            onChange={(value) => onNavigate(tab, value, layout)}
-                            options={[
-                                { value: 'all', label: 'All records' },
-                                { value: 'active', label: 'Active' },
-                                { value: 'inactive', label: 'Inactive' },
-                                {
-                                    value: 'attention',
-                                    label: 'Configuration needs attention',
-                                },
-                            ]}
-                        />
+                        {registers && (
+                            <PageHeaderFilterSelect
+                                label="Availability"
+                                value={state}
+                                onChange={(value) =>
+                                    onNavigate(tab, value, layout)
+                                }
+                                options={[
+                                    { value: 'all', label: 'All records' },
+                                    { value: 'active', label: 'Active' },
+                                    { value: 'inactive', label: 'Inactive' },
+                                    {
+                                        value: 'attention',
+                                        label: 'Configuration needs attention',
+                                    },
+                                ]}
+                            />
+                        )}
                         <PageHeaderViewToggle
                             value={layout}
                             onChange={(value) => onNavigate(tab, state, value)}

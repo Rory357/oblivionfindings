@@ -1,0 +1,10 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\Herd\oblivionfindings\phpunit.xml
+
+....                                                                4 / 4 (100%)
+
+Time: 00:00.060, Memory: 36.00 MB
+
+[30;42mOK (4 tests, 8 assertions)[0m

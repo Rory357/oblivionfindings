@@ -42,6 +42,29 @@ export default async function globalSetup(): Promise<void> {
     writeFileSync(
         runScript,
         `<?php
+$pdo = new PDO('mysql:host=127.0.0.1;port=3306', 'testUser', 'test101', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+$pdo->exec("CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+$disposableConfigCache = sys_get_temp_dir() . '/oblivion_gov_config_${timestamp}.php';
+putenv("DB_DATABASE=${dbName}");
+$_ENV['DB_DATABASE'] = '${dbName}';
+$_SERVER['DB_DATABASE'] = '${dbName}';
+putenv("APP_CONFIG_CACHE={$disposableConfigCache}");
+$_ENV['APP_CONFIG_CACHE'] = $disposableConfigCache;
+$_SERVER['APP_CONFIG_CACHE'] = $disposableConfigCache;
+putenv("MAIL_MAILER=array");
+$_ENV['MAIL_MAILER'] = 'array';
+$_SERVER['MAIL_MAILER'] = 'array';
+putenv("QUEUE_CONNECTION=sync");
+$_ENV['QUEUE_CONNECTION'] = 'sync';
+$_SERVER['QUEUE_CONNECTION'] = 'sync';
+putenv("CACHE_STORE=array");
+$_ENV['CACHE_STORE'] = 'array';
+$_SERVER['CACHE_STORE'] = 'array';
+putenv("SESSION_DRIVER=file");
+$_ENV['SESSION_DRIVER'] = 'file';
+$_SERVER['SESSION_DRIVER'] = 'file';
+
 require '${root.replace(/\\/g, '/')}/vendor/autoload.php';
 $app = require '${root.replace(/\\/g, '/')}/bootstrap/app.php';
 $app->make(\\Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();
@@ -49,15 +72,10 @@ $app->make(\\Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();
 use Illuminate\\Support\\Facades\\Artisan;
 use Illuminate\\Support\\Facades\\DB;
 
-$pdo = new PDO('mysql:host=127.0.0.1;port=3306', 'testUser', 'test101', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-$pdo->exec("CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-
-putenv("DB_DATABASE=${dbName}");
-$_ENV['DB_DATABASE'] = '${dbName}';
-$_SERVER['DB_DATABASE'] = '${dbName}';
-config(['database.connections.mysql.database' => '${dbName}']);
-DB::purge('mysql');
-DB::reconnect('mysql');
+$resolvedDb = config('database.connections.mysql.database');
+if ($resolvedDb !== '${dbName}' || !str_starts_with($resolvedDb, '${GOVERNANCE_DISPOSABLE_DB_PREFIX}')) {
+    throw new RuntimeException("Resolved DB {$resolvedDb} does not match disposable ${dbName}");
+}
 
 Artisan::call('migrate', ['--force' => true]);
 \\Tests\\Support\\GovernanceSyntheticFixtures::seed();

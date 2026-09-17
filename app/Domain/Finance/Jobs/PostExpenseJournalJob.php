@@ -36,15 +36,15 @@ class PostExpenseJournalJob implements ShouldQueue
 
             Log::info('Expense claim journal posted successfully.', [
                 'expense_claim_id' => $this->expenseClaim->id,
-                'claim_number'     => $this->expenseClaim->claim_number,
-                'journal_id'       => $journal->id,
-                'journal_number'   => $journal->journal_number,
+                'claim_number' => $this->expenseClaim->claim_number,
+                'journal_id' => $journal->id,
+                'journal_number' => $journal->journal_number,
             ]);
         } catch (\Throwable $e) {
             Log::error('Failed to post expense claim journal.', [
                 'expense_claim_id' => $this->expenseClaim->id,
-                'claim_number'     => $this->expenseClaim->claim_number,
-                'error'            => $e->getMessage(),
+                'claim_number' => $this->expenseClaim->claim_number,
+                'error' => $e->getMessage(),
             ]);
 
             throw $e;

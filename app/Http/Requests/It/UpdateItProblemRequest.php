@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\BindsItBrowserActor;
 use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use App\Models\ItTicket;
 use Illuminate\Foundation\Http\FormRequest;
@@ -9,19 +10,22 @@ use Illuminate\Validation\Rule;
 
 class UpdateItProblemRequest extends FormRequest
 {
+    use BindsItBrowserActor;
     use ConcealsInaccessibleItWork;
 
     public function authorize(): bool
     {
         $this->workableProblemOrNotFound();
 
-        return (bool) $this->user()?->canDo('it.manage');
+        return $this->hasCurrentBrowserActor() && (bool) $this->user()?->canDo('it.manage');
     }
 
     /** @return array<string, array<int, mixed>> */
     public function rules(): array
     {
         return [
+            ...$this->browserActorRules(),
+            'expected_version' => ['required', 'integer', 'min:1'],
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string', 'max:10000'],
             'category' => ['sometimes', Rule::in(ItTicket::CATEGORIES)],

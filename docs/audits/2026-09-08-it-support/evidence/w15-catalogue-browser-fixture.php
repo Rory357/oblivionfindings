@@ -2,7 +2,10 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItCatalogManagementService;
+use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
+use App\Domain\It\Services\ItProvisioningTemplatePublicationService;
 use App\Domain\It\Services\ItProvisioningTemplateService;
+use App\Domain\It\Services\ItProvisioningWorkflowLifecycleService;
 use App\Domain\It\Services\ItProvisioningWorkflowService;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
@@ -40,6 +43,20 @@ function w15BrowserCreateCatalogueFixtures(array $context, array $fixtures): arr
                     ['key' => 'employee', 'label' => 'Employee', 'type' => 'employee', 'required' => true, 'visibility' => 'requester'],
                     ['key' => 'user', 'label' => 'User', 'type' => 'user', 'required' => true, 'visibility' => 'requester'],
                     ['key' => 'asset', 'label' => 'Equipment', 'type' => 'asset', 'required' => true, 'visibility' => 'requester'],
+                ];
+            }
+            if (in_array($case, ['service', 'approval'], true)) {
+                $data['form_schema']['fields'][] = [
+                    'key' => 'fulfilment_note', 'label' => 'IT fulfilment note', 'type' => 'textarea',
+                    'required' => false, 'visibility' => 'internal', 'max' => 2000,
+                ];
+                $data['form_schema']['fields'][] = [
+                    'key' => 'supporting_files', 'label' => 'Supporting files', 'type' => 'attachment',
+                    'required' => false, 'visibility' => 'requester', 'max' => 3,
+                ];
+                $data['form_schema']['fields'][] = [
+                    'key' => 'it_evidence', 'label' => 'IT evidence', 'type' => 'attachment',
+                    'required' => false, 'visibility' => 'internal', 'max' => 2,
                 ];
             }
             $item = $management->create($actor, $data);
@@ -87,13 +104,35 @@ function w15BrowserCreateCatalogueFixtures(array $context, array $fixtures): arr
                 'responsible_team_id' => null, 'stage' => 1, 'sort_order' => 0,
                 'dependency_task_keys' => [], 'trigger_fields' => [], 'approval_required' => true,
                 'evidence_required' => true, 'due_offset_days' => 0, 'fulfiller_fields' => ['work_email'],
+            ], [
+                'task_key' => 'verify', 'title' => 'Verify synthetic staff access',
+                'description' => 'Original downstream verification; retain the account prerequisite.',
+                'category' => 'other', 'action' => 'verify', 'request_type' => 'other',
+                'responsible_team_id' => null, 'stage' => 2, 'sort_order' => 1,
+                'dependency_task_keys' => ['account'], 'trigger_fields' => [], 'approval_required' => false,
+                'evidence_required' => true, 'due_offset_days' => 1, 'fulfiller_fields' => [],
             ]],
+        ]);
+        $template = app(ItProvisioningTemplatePublicationService::class)->publish($template, $actor, true, [
+            'expected_version' => $template->lock_version, 'expected_published_version_id' => null,
+            'reason' => 'Synthetic browser fixture publication reviewed for this isolated schema only.',
         ]);
         $profile = HrEmployeeProfile::query()->where('user_id', $fixtures['actors']['requester']['id'])->firstOrFail();
         $workflow = app(ItProvisioningWorkflowService::class)->launch($profile, 'joiner', 'synthetic_browser',
             (int) $profile->id, 'w15:'.$context['token'].':version-history', (int) $actor->id);
+        $workflow = app(ItProvisioningWorkflowLifecycleService::class)->change($workflow, $actor, 'assign', [
+            'owner_user_id' => $actor->id, 'cover_user_id' => $fixtures['actors']['cover']['id'],
+            'reason' => 'Explicit synthetic fixture responsibility only; no operating organisation staffing changed.',
+        ]);
+        foreach ($workflow->requests()->get() as $task) {
+            app(ItProvisioningRequestLifecycleService::class)->fail($task, $actor,
+                'Synthetic failure for reviewed retry and per-row browser outcome verification.');
+        }
 
         return ['items' => $items, 'entity_assets' => $entityAssets, 'template' => ['id' => $template->id, 'name' => $template->name],
-            'workflow' => ['id' => $workflow->id, 'template_version_id' => $workflow->template_version_id], 'synthetic_only' => true];
+            'workflow' => ['id' => $workflow->id, 'template_version_id' => $workflow->template_version_id,
+                'task_ids' => $workflow->requests()->pluck('id')->all(), 'owner_id' => $actor->id,
+                'cover_id' => $fixtures['actors']['cover']['id'], 'approval_primary_id' => $fixtures['actors']['restricted']['id']],
+            'synthetic_only' => true];
     });
 }

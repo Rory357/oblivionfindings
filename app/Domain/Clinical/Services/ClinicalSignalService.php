@@ -6,8 +6,8 @@ use App\Domain\Clinical\Enums\News2Band;
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Enums\AlertSeverity;
-use App\Models\User;
 use App\Models\ControlRoom\SignalSource;
+use App\Models\User;
 use App\Services\ControlRoom\SignalProcessingService;
 use Illuminate\Support\Facades\Log;
 
@@ -22,9 +22,13 @@ use Illuminate\Support\Facades\Log;
 class ClinicalSignalService
 {
     public const TYPE_CLINICAL_EVENT = 'clinical_event';
+
     public const TYPE_FALL = 'clinical_fall';
+
     public const TYPE_SEIZURE = 'clinical_seizure';
+
     public const TYPE_CHOKING = 'clinical_choking';
+
     public const TYPE_DETERIORATION = 'clinical_deterioration';
 
     protected ?SignalSource $signalSource = null;
@@ -76,7 +80,7 @@ class ClinicalSignalService
             $this->resolveSignalType($event),
             $event->client_id,
             AlertSeverity::HIGH,
-            'Escalated: ' . $this->buildMessage($event),
+            'Escalated: '.$this->buildMessage($event),
             [
                 'clinical_event_id' => $event->id,
                 'event_type' => $event->event_type->value,
@@ -106,8 +110,8 @@ class ClinicalSignalService
 
         $observation->loadMissing('client');
         $clientName = $observation->client?->first_name
-            ? trim($observation->client->first_name . ' ' . ($observation->client->last_name ?? ''))
-            : 'Client #' . $observation->client_id;
+            ? trim($observation->client->first_name.' '.($observation->client->last_name ?? ''))
+            : 'Client #'.$observation->client_id;
 
         $this->emit(
             self::TYPE_DETERIORATION,
@@ -202,8 +206,8 @@ class ClinicalSignalService
     {
         $label = $event->event_type->label();
         $clientName = $event->client?->first_name
-            ? trim($event->client->first_name . ' ' . ($event->client->last_name ?? ''))
-            : 'Client #' . $event->client_id;
+            ? trim($event->client->first_name.' '.($event->client->last_name ?? ''))
+            : 'Client #'.$event->client_id;
 
         return "{$label} reported for {$clientName}";
     }

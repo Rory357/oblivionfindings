@@ -1,0 +1,106 @@
+[
+  {
+    "path": "resources/js/lib/utils.ts",
+    "sha256": "b08a18240aa7920bbf717c7055eadefa9af65c7e8e3ca79405636badcd5984bb"
+  },
+  {
+    "path": "resources/js/components/ui/dropdown-menu.tsx",
+    "sha256": "20fb391990bb612d0ceb1fd535596c772ecfa389ee543fc629852f46347dba1e"
+  },
+  {
+    "path": "resources/js/components/lists/entity-menu.tsx",
+    "sha256": "73ef3dfecf6cac04969e5576b7a8e7ada157160e7f0ab47bf4ce0fd4c0ebea3b"
+  },
+  {
+    "path": "resources/js/components/ui/button.tsx",
+    "sha256": "e8ae39c3616c4aaf689014c4eb9de6235e5e4ff16e581c2be2e970cd36191cc1"
+  },
+  {
+    "path": "resources/js/components/ui/card.tsx",
+    "sha256": "117ccee128241aba7db9cf9dba94b43f9ebafda920965b425fe8d093c1a174a6"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/mockups/service-desk-overview/inertia-mock.tsx",
+    "sha256": "030d768ccb99d05f8253a864d5e2d0339ecda520c99d1cde02c51b6e53bb911b"
+  },
+  {
+    "path": "resources/js/components/ui/empty-state.tsx",
+    "sha256": "bd8e649012a1fa133a75b5ddef97a7736e6ddf6a4a4372c14aea916468e01866"
+  },
+  {
+    "path": "resources/js/components/ui/popover.tsx",
+    "sha256": "00702c92103d2bf0752fac030c9fc6f671c55a5732534a6fc306df618f30e652"
+  },
+  {
+    "path": "resources/js/components/ui/select.tsx",
+    "sha256": "37b4199b0e16742df3779184479f6594e3f6d7f441802e6169e9e7a1aecd8f1f"
+  },
+  {
+    "path": "resources/js/lib/status-colors.ts",
+    "sha256": "8302d588c1615b9d4229ff2d9c81d233c7267a0136eb919e8dcbab7a921d2634"
+  },
+  {
+    "path": "resources/js/components/ui/status-badge.tsx",
+    "sha256": "d1d83d69c9f091a1dea57b7f7312f794097f2a8278dd70d7ba14a288d459c130"
+  },
+  {
+    "path": "resources/js/components/ui/table.tsx",
+    "sha256": "ecdacd882fca829486e3dc1af55c3edb792bc56ec02d5f4c956a35158422934d"
+  },
+  {
+    "path": "resources/js/lib/datetime.ts",
+    "sha256": "d558321f11b5e545c6b8e1eff6347e1c088cf725a32d0ee38438a3b219baec60"
+  },
+  {
+    "path": "resources/js/components/it/it-overview-workboard.ts",
+    "sha256": "9505cc8680d74f09f1ea5b890a4139686310c729025322ffc8bca395c9241f19"
+  },
+  {
+    "path": "resources/js/components/it/sla-evidence.tsx",
+    "sha256": "49d4e05c46e371b5fec9ba3661c3ba3b68377996d49b0e7037a93bac8616dd4d"
+  },
+  {
+    "path": "resources/js/components/it/it-overview-board.tsx",
+    "sha256": "b3002728d62e6a6fed9e6ff053b5669c343ff9978b73ade5585349cda690d051"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/mockups/service-desk-overview/production-adapter.tsx",
+    "sha256": "d3b841a0a08ae40efab1e9382a240176b5c1fa5ca45239ce04f3b5588fbdee65"
+  },
+  {
+    "path": "resources/js/components/ui/avatar.tsx",
+    "sha256": "e637ab3522c01631eac2e456588ef301314e2bb7940ebf7cd96e698a868d47bc"
+  },
+  {
+    "path": "resources/js/components/ui/overlay-focus-return.tsx",
+    "sha256": "eff96459e2116ecc9493ed8960aa660b6fe85fb8b01f62eb47320ec75c4975ae"
+  },
+  {
+    "path": "resources/js/components/ui/dialog.tsx",
+    "sha256": "8828e54055de44b0ef62e6558e88257bb12cdb8f0ec99ea5490eaa661b765531"
+  },
+  {
+    "path": "resources/js/components/ui/tooltip.tsx",
+    "sha256": "ec0e4cd4f31ae0d2fb34b3220eb879591d25224a2358b99d9e4a9426eaccc4eb"
+  },
+  {
+    "path": "resources/js/components/page/page-header.tsx",
+    "sha256": "e15b177a22105005b9e7e4af7f83662f4a7eb39768f0adba89b0c5476628c992"
+  },
+  {
+    "path": "resources/js/components/it/it-hero.tsx",
+    "sha256": "c619b7fa70580e1077508529745851cd4f8fa54bfb1280265c220d0c46eac476"
+  },
+  {
+    "path": "resources/js/components/event-horizon-wordmark.tsx",
+    "sha256": "47f9991b491c021f9790d08aa4f3fa042899047af265623a63c065d2ece0de8f"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/mockups/service-desk-overview/production-entry.tsx",
+    "sha256": "b9358b368167723ec87cf69fd5109e046f885e02663094427cf1c620ca1b2ce9"
+  },
+  {
+    "path": "resources/css/app.css",
+    "sha256": "9bdd5b72256683924f1aa71846ed5e03e6bd659f7b05ea1d0f5af67a0bc9cf31"
+  }
+]

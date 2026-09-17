@@ -69,6 +69,10 @@ class QuoteController extends Controller
             'pending' => $baseQuery()->whereIn('status', ['draft', 'sent'])->count(),
             'accepted' => $baseQuery()->where('status', 'accepted')->count(),
             'converted' => $baseQuery()->where('status', 'converted')->count(),
+            // Money still in play — the header's "Value in play" meter.
+            'pending_value' => (float) $baseQuery()
+                ->whereIn('status', ['draft', 'sent'])
+                ->sum('total_amount'),
         ];
 
         return inertia('finance/quotes/Index', [
@@ -157,11 +161,17 @@ class QuoteController extends Controller
         abort_unless($auth && $auth->canDo('finance.ar.view'), 403);
 
         $quote = $this->accessibleQuotes($auth)
-            ->with(['client:id,first_name,last_name', 'lineItems'])
+            ->with(['client:id,first_name,last_name', 'creator:id,name', 'lineItems'])
             ->findOrFail($quote);
+
+        $canManage = (bool) $auth->canDo('finance.ar.manage');
 
         return inertia('finance/quotes/Show', [
             'quote' => $quote,
+            'canManage' => $canManage,
+            // Reference data so "Edit" opens the quote modal prefilled here too.
+            'clients' => $canManage ? $this->clientOptions($auth) : [],
+            'priceBooks' => $canManage ? $this->priceBookOptions() : [],
         ]);
     }
 
@@ -241,6 +251,12 @@ class QuoteController extends Controller
             'valid_until' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'status' => ['nullable', 'string', 'in:draft,sent,accepted,declined,expired'],
+            // A draft quote's lines are editable (the quote modal's line editor);
+            // omitting the key leaves the existing lines untouched.
+            'line_items' => ['sometimes', 'array', 'min:1'],
+            'line_items.*.description' => ['required', 'string', 'max:255'],
+            'line_items.*.quantity' => ['required', 'numeric', 'min:0'],
+            'line_items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
 
         $this->lifecycle->update($auth, (int) $quote, $data);

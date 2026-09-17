@@ -8,15 +8,33 @@ use App\Domain\Governance\Models\ActionItem;
 use App\Domain\Governance\Models\Budget;
 use App\Domain\Governance\Models\BudgetAdjustment;
 use App\Domain\Governance\Models\ComplianceObligation;
+use App\Domain\Governance\Models\ConflictDeclaration;
 use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Models\GovernancePolicy;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\RiskRegisterEntry;
+use App\Domain\Governance\Models\Vote;
+use App\Domain\Governance\Support\GovernanceLabels;
+use App\Domain\Governance\Support\GovernanceWording;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
+/**
+ * Board priorities (Home) and the meeting preparation checklist.
+ *
+ * Audience rule: every priority source is filtered by the viewer's matching
+ * register permission / record audience — the same gate as the page its link
+ * opens — so a count or title never leaks and no link returns 403. Meeting and
+ * resolution administration only reaches people who can carry it out.
+ *
+ * Wording rule (vocabulary.md): titles lead with a short plain phrase and the
+ * record's own title — never a reference code (codes travel in
+ * `source.reference` and render last, muted); money via GovernanceLabels::money,
+ * enums via GovernanceLabels::label, NZ dates; sentence-case button labels.
+ */
 class GovernanceWorkflowService
 {
     public function __construct(
@@ -31,7 +49,19 @@ class GovernanceWorkflowService
         return $this->workQuery;
     }
 
-    public function dashboardWorkflow(User|int|null $user = null, int $limit = 15): array
+    /** Priority tabs the dashboard panel can page through. */
+    public const PRIORITY_TABS = ['all', 'meetings', 'actions', 'risks', 'compliance', 'policies'];
+
+    /**
+     * Ranked board priorities for one viewer.
+     *
+     * `actions` is one page of the ranked list for `$tab` (`$limit` per page).
+     * `summary` always describes the viewer's complete population, and
+     * `pagination` states exactly how much of the tab has been returned so a
+     * client can reach every counted item — a total is never a promise the
+     * payload cannot keep.
+     */
+    public function dashboardWorkflow(User|int|null $user = null, int $limit = 100, int $page = 1, string $tab = 'all'): array
     {
         if (is_int($user)) {
             $user = User::find($user);
@@ -40,9 +70,10 @@ class GovernanceWorkflowService
         $actions = collect()
             ->merge($this->meetingActions($user))
             ->merge($this->resolutionActions($user))
-            ->merge($this->riskActions())
-            ->merge($this->complianceActions())
-            ->merge($this->budgetActions())
+            ->merge($this->riskActions($user))
+            ->merge($this->complianceActions($user))
+            ->merge($this->budgetActions($user))
+            ->merge($this->policyActions($user))
             ->merge($this->actionItemActions($user));
 
         $total = $actions->count();
@@ -50,9 +81,25 @@ class GovernanceWorkflowService
         $overdue = $actions->where('status', 'overdue')->count();
         $actionItemsOverdue = $actions->filter(fn (array $a) => ($a['source']['type'] ?? null) === 'action_item' && ($a['status'] ?? null) === 'overdue')->count();
 
+        $byTab = collect(self::PRIORITY_TABS)
+            ->mapWithKeys(fn (string $key) => [$key => $actions->filter(fn (array $a) => $this->matchesPriorityTab($key, $a))->count()])
+            ->all();
+
+        $tab = in_array($tab, self::PRIORITY_TABS, true) ? $tab : 'all';
+        $perPage = max(1, $limit);
+        $page = max(1, $page);
+
+        // Stable sort: filtering the ranked population and ranking the filtered
+        // subset give the same order, so tab pages agree with the "all" ranking.
         $ranked = $actions
+            ->filter(fn (array $a) => $this->matchesPriorityTab($tab, $a))
             ->sortByDesc(fn (array $action) => $this->actionRank($action))
             ->values();
+
+        $tabTotal = $ranked->count();
+        $lastPage = max(1, (int) ceil($tabTotal / $perPage));
+        $pageItems = $ranked->slice(($page - 1) * $perPage, $perPage)->values();
+        $from = $pageItems->isEmpty() ? 0 : (($page - 1) * $perPage) + 1;
 
         return [
             'summary' => [
@@ -60,9 +107,39 @@ class GovernanceWorkflowService
                 'critical' => $critical,
                 'overdue' => $overdue,
                 'action_items_overdue' => $actionItemsOverdue,
+                'by_tab' => $byTab,
             ],
-            'actions' => $ranked->take($limit)->values()->all(),
+            'actions' => $pageItems->all(),
+            'pagination' => [
+                'tab' => $tab,
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $tabTotal,
+                'last_page' => $lastPage,
+                'from' => $from,
+                'to' => $from === 0 ? 0 : $from + $pageItems->count() - 1,
+                'has_more' => $page < $lastPage,
+            ],
         ];
+    }
+
+    /**
+     * Single definition of which ranked priorities belong to a dashboard tab;
+     * used for both the tab counts and the paged tab lists.
+     */
+    protected function matchesPriorityTab(string $tab, array $action): bool
+    {
+        $areaKey = $action['area_key'] ?? null;
+        $area = $action['area'] ?? null;
+
+        return match ($tab) {
+            'meetings' => $areaKey === 'meetings' || $area === 'Meetings',
+            'actions' => in_array($areaKey, ['action_items', 'actions'], true) || $area === 'Action Items',
+            'risks' => in_array($areaKey, ['risks', 'risk_register'], true) || in_array($area, ['Risks', 'Risk Register'], true),
+            'compliance' => $areaKey === 'compliance' || $area === 'Compliance',
+            'policies' => $areaKey === 'policies' || $area === 'Policies',
+            default => true,
+        };
     }
 
     public function meetingChecklist(GovernanceMeeting $meeting, ?User $user = null): array
@@ -76,7 +153,17 @@ class GovernanceWorkflowService
             'resolutions',
         ]);
 
-        $agendaCount = $meeting->agendaItems->count();
+        // Counts and completed steps come from the same permitted records the
+        // viewer's meeting workspace renders — a confidential agenda item or a
+        // resolution the viewer cannot open never makes a step look ready.
+        $agendaCount = app(ExecutiveMeetingAccessService::class)
+            ->visibleAgendaItems($user, $meeting)
+            ->count();
+        $visibleResolutions = $user !== null
+            ? $meeting->resolutions->filter(
+                fn (Resolution $resolution) => app(GovernanceRecordAccessService::class)->canViewResolution($user, $resolution)
+            )
+            : $meeting->resolutions;
         $attendanceCount = $meeting->attendances->count();
         $quorum = $meeting->calculateQuorum();
         $pack = $user
@@ -86,7 +173,7 @@ class GovernanceWorkflowService
             && ($this->boardPackAccess->canManage($user) || $pack !== null);
         $ceoReport = $meeting->ceoReport;
         $minutes = $meeting->minutes;
-        $resolutions = $meeting->resolutions->whereIn('status', ['draft', 'open'])->count();
+        $resolutions = $visibleResolutions->whereIn('status', ['draft', 'open'])->count();
         $isPastMeeting = $meeting->scheduled_at?->isPast() ?? false;
         $previousMeeting = $this->previousMeeting($meeting);
         $previousOpenActions = $this->previousMeetingOpenActions($previousMeeting);
@@ -95,8 +182,10 @@ class GovernanceWorkflowService
         $minutesApproved = in_array($minutesStatus, ['approved', 'signed', 'archived'], true);
         $minutesSigned = in_array($minutesStatus, ['signed', 'archived'], true);
         $ceoSubmitted = in_array($ceoReport?->status, ['submitted', 'included_in_pack'], true);
+        $ceoNotNeeded = ! $meeting->isFullBoard() && ! $meeting->ceoReport && ! $meeting->ceo_report_deadline;
         $packDistributedCount = count(array_unique($pack?->distributed_to ?? []));
         $packReadCount = $pack?->readCount() ?? 0;
+        $canRecordAttendance = $user !== null && $user->can('update', $meeting);
 
         $items = collect([
             [
@@ -104,118 +193,128 @@ class GovernanceWorkflowService
                 'label' => 'Agenda prepared',
                 'status' => $agendaCount > 0 ? 'done' : 'todo',
                 'detail' => $agendaCount > 0
-                    ? "{$agendaCount} agenda item(s) ready for board pre-read."
-                    : 'Add agenda items so pack generation has content.',
-                'action_label' => 'Open Agenda',
+                    ? GovernanceWording::count($agendaCount, 'agenda item').' '.($agendaCount === 1 ? 'is' : 'are').' ready.'
+                    : 'Add agenda items so the board pack has something in it.',
+                'action_label' => 'Open agenda',
                 'action_url' => "/governance/meetings/{$meeting->id}?tab=agenda",
                 'blocked_by' => null,
             ],
             [
                 'key' => 'quorum',
-                'label' => 'Attendance and quorum confirmed',
+                'label' => 'Attendance recorded',
                 'status' => $quorum['met'] ? 'done' : ($attendanceCount > 0 ? 'in_progress' : 'todo'),
-                'detail' => $attendanceCount > 0
-                    ? "Present {$quorum['present']} / Required {$quorum['required']}."
-                    : 'Attendance is unrecorded. Will be marked when meeting commences.',
-                'action_label' => ($user && $user->can('update', $meeting)) ? 'Record Attendance' : 'View Attendance',
+                'detail' => match (true) {
+                    $attendanceCount === 0 => "Attendance hasn't been recorded yet. It's recorded at the meeting.",
+                    (bool) $quorum['met'] => GovernanceWording::count((int) $quorum['present'], 'member')
+                        ." recorded as present — {$quorum['required']} were needed for decisions to be valid.",
+                    default => "{$quorum['present']} of the {$quorum['required']} members needed for decisions to be valid are recorded as present.",
+                },
+                'action_label' => $canRecordAttendance ? 'Record attendance' : 'View attendance',
                 'action_url' => "/governance/meetings/{$meeting->id}?tab=attendance",
-                'blocked_by' => ($user && $user->can('update', $meeting)) ? null : ($attendanceCount > 0 ? null : 'Awaiting secretary to record attendance'),
+                'blocked_by' => $canRecordAttendance ? null : ($attendanceCount > 0 ? null : 'Waiting for the secretary to record attendance'),
             ],
             [
                 'key' => 'ceo_report',
                 'label' => 'CEO report ready',
-                'status' => (! $meeting->isFullBoard() && ! $meeting->ceoReport && ! $meeting->ceo_report_deadline)
-                    ? 'not_applicable'
-                    : ($ceoSubmitted ? 'done' : 'todo'),
-                'detail' => (! $meeting->isFullBoard() && ! $meeting->ceoReport && ! $meeting->ceo_report_deadline)
-                    ? 'CEO report is not required for committee meetings (Not applicable).'
-                    : ($ceoSubmitted
-                        ? 'CEO report has been submitted for board pre-read.'
-                        : ($meeting->ceo_report_deadline
-                            ? 'CEO report is still pending. Due '.$meeting->ceo_report_deadline->format('j M Y g:i A').'.'
-                            : 'CEO report is pending for this meeting.')),
-                'action_label' => 'Open CEO Report',
+                'status' => $ceoNotNeeded ? 'not_applicable' : ($ceoSubmitted ? 'done' : 'todo'),
+                'detail' => match (true) {
+                    $ceoNotNeeded => 'Committee meetings don\'t need a CEO report.',
+                    $ceoSubmitted => 'The CEO report has been submitted.',
+                    $meeting->ceo_report_deadline !== null => 'The CEO report is due '.GovernanceLabels::date($meeting->ceo_report_deadline, true).'.',
+                    default => 'The CEO report hasn\'t been submitted yet.',
+                },
+                'action_label' => 'Open CEO report',
                 'action_url' => $ceoReport ? "/governance/ceo-reports/{$ceoReport->id}" : '/governance/ceo-reports',
                 'blocked_by' => null,
             ],
             [
                 'key' => 'pack_generated',
-                'label' => 'Board pack generated',
+                'label' => 'Board pack prepared',
                 'status' => $pack !== null ? 'done' : ($agendaCount > 0 ? 'todo' : 'blocked'),
                 'detail' => $pack !== null
-                    ? 'Pack generated and available for distribution.'
-                    : 'Generate board pack once agenda is ready.',
-                'action_label' => 'Open Pack Section',
+                    ? 'The board pack is ready to send.'
+                    : 'Generate a draft pack once the agenda is ready. Nothing is sent to members until it is distributed.',
+                'action_label' => 'Open meeting',
                 'action_url' => "/governance/meetings/{$meeting->id}",
-                'blocked_by' => $agendaCount > 0 ? null : 'Agenda is empty',
+                'blocked_by' => $agendaCount > 0 ? null : 'The agenda is empty',
             ],
             [
                 'key' => 'pack_distributed',
-                'label' => 'Board pack distributed',
+                'label' => 'Board pack sent to members',
                 'status' => $pack?->distributed_at ? 'done' : ($pack !== null ? 'todo' : 'blocked'),
                 'detail' => $pack?->distributed_at
-                    ? "Pack sent to {$packDistributedCount} board member(s); {$packReadCount} marked as read."
-                    : 'Distribute pack to start pre-read and voting preparation.',
-                'action_label' => $pack !== null ? 'Open Pack' : 'Open Meeting',
+                    ? 'Sent to '.GovernanceWording::count($packDistributedCount, 'member').'; '
+                        .$packReadCount.' '.($packReadCount === 1 ? 'has' : 'have').' confirmed reading it.'
+                    : 'Send the board pack so members can read it before the meeting.',
+                'action_label' => $pack !== null ? 'Open board pack' : 'Open meeting',
                 'action_url' => $pack !== null
                     ? "/governance/packs/{$pack->id}"
                     : "/governance/meetings/{$meeting->id}",
-                'blocked_by' => $pack !== null ? null : 'Pack not generated',
+                'blocked_by' => $pack !== null ? null : 'The board pack hasn\'t been prepared',
             ],
             [
                 'key' => 'resolutions',
-                'label' => 'Decision resolutions prepared',
+                'label' => 'Resolutions ready',
                 'status' => $resolutions > 0 ? 'done' : 'todo',
                 'detail' => $resolutions > 0
-                    ? "{$resolutions} resolution(s) ready/open."
-                    : 'No decision resolutions tabled yet for this meeting.',
-                'action_label' => 'Open Resolutions',
+                    ? GovernanceWording::count($resolutions, 'resolution').' '.($resolutions === 1 ? 'is' : 'are').' in draft or open for voting.'
+                    : 'No resolutions have been added to this meeting yet.',
+                'action_label' => 'Open resolutions',
                 'action_url' => "/governance/meetings/{$meeting->id}?tab=resolutions",
                 'blocked_by' => null,
             ],
             [
                 'key' => 'minutes_drafted',
-                'label' => 'Minutes drafted',
+                'label' => 'Minutes written',
                 'status' => $minutes !== null ? 'done' : ($isPastMeeting ? 'todo' : 'blocked'),
-                'detail' => $minutes !== null
-                    ? "Minutes currently {$minutes->status}."
-                    : 'Draft minutes immediately after the meeting.',
-                'action_label' => 'Open Minutes',
+                'detail' => match ($minutesStatus) {
+                    null => 'Write the minutes after the meeting.',
+                    'draft' => 'A draft of the minutes has been started.',
+                    'reviewed' => 'The draft minutes have been sent to the chair for approval.',
+                    'approved' => 'The minutes are approved.',
+                    'signed' => 'The minutes are approved and signed.',
+                    'archived' => 'The minutes are signed and archived.',
+                    default => 'The minutes have been started.',
+                },
+                'action_label' => 'Open minutes',
                 'action_url' => "/governance/meetings/{$meeting->id}?tab=minutes",
-                'blocked_by' => $minutes === null && ! $isPastMeeting ? 'Meeting has not occurred yet' : null,
+                'blocked_by' => $minutes === null && ! $isPastMeeting ? 'The meeting hasn\'t happened yet' : null,
             ],
             [
                 'key' => 'minutes_approved',
                 'label' => 'Minutes approved',
                 'status' => $minutesApproved ? 'done' : ($minutes !== null ? 'todo' : 'blocked'),
-                'detail' => $minutesApproved
-                    ? 'Minutes approved by chair/delegate.'
-                    : 'Submit and approve draft minutes.',
-                'action_label' => 'Review Minutes',
+                'detail' => match (true) {
+                    $minutesApproved => 'The minutes have been approved.',
+                    $minutesStatus === 'reviewed' => 'Waiting for the chair to approve the minutes.',
+                    default => 'Send the draft minutes to the chair for approval.',
+                },
+                'action_label' => 'Review minutes',
                 'action_url' => "/governance/meetings/{$meeting->id}?tab=minutes",
-                'blocked_by' => $minutes !== null ? null : 'Minutes not drafted',
+                'blocked_by' => $minutes !== null ? null : 'The minutes haven\'t been written',
             ],
             [
                 'key' => 'minutes_signed',
-                'label' => 'Minutes signed and archived',
+                'label' => 'Minutes signed',
                 'status' => $minutesSigned ? 'done' : ($minutesApproved ? 'todo' : 'blocked'),
                 'detail' => $minutesSigned
-                    ? 'Minutes are signed/archived for audit trail.'
-                    : 'Sign approved minutes to close the meeting cycle.',
-                'action_label' => 'Finalize Minutes',
+                    ? 'The minutes are signed and filed.'
+                    : 'Sign the approved minutes to finish this meeting.',
+                'action_label' => 'Finalise minutes',
                 'action_url' => "/governance/meetings/{$meeting->id}?tab=minutes",
-                'blocked_by' => $minutesApproved ? null : 'Minutes not approved',
+                'blocked_by' => $minutesApproved ? null : 'The minutes haven\'t been approved',
             ],
             [
                 'key' => 'follow_through',
-                'label' => 'Previous meeting follow-through reviewed',
+                'label' => 'Actions from the last meeting checked',
                 'status' => $previousOpenActions->isEmpty() ? 'done' : 'todo',
                 'detail' => $previousMeeting
                     ? ($previousOpenActions->isEmpty()
-                        ? "No open action items remain from {$previousMeeting->title}."
-                        : "{$previousOpenActions->count()} action item(s) are still open from {$previousMeeting->title}.")
-                    : 'No previous meeting in this committee/cycle.',
-                'action_label' => 'Open Action Items',
+                        ? "No actions are still open from {$previousMeeting->title}."
+                        : GovernanceWording::count($previousOpenActions->count(), 'action').' '
+                            .($previousOpenActions->count() === 1 ? 'is' : 'are')." still open from {$previousMeeting->title}.")
+                    : 'There is no earlier meeting to check.',
+                'action_label' => 'Open actions',
                 'action_url' => '/governance/actions',
                 'blocked_by' => null,
             ],
@@ -230,7 +329,6 @@ class GovernanceWorkflowService
         $boardMember = $user?->boardMember;
         $isInvitedMember = $boardMember !== null && $meeting->isInvited($boardMember);
         $userRsvp = $isInvitedMember ? $meeting->rsvps->firstWhere('board_member_id', $boardMember->id) : null;
-        $canRecordAttendance = $user !== null && $user->can('update', $meeting);
 
         $nextStep = null;
 
@@ -239,36 +337,46 @@ class GovernanceWorkflowService
             if ($userRsvp === null && ! $isPastMeeting) {
                 $nextStep = [
                     'key' => 'rsvp',
-                    'label' => 'Submit meeting RSVP',
+                    'label' => 'Reply to the meeting invitation',
                     'status' => 'todo',
-                    'detail' => 'Confirm your attendance or send apologies for this meeting.',
-                    'action_label' => 'Submit RSVP',
+                    'detail' => "Let the secretary know whether you're attending, or send apologies.",
+                    'action_label' => 'Respond',
                     'action_url' => "/governance/meetings/{$meeting->id}?tab=attendance",
                     'blocked_by' => null,
                 ];
-            } elseif ($pack !== null && $pack->distributed_at && ! in_array($user->id, $pack->read_by_user_ids ?? [], true)) {
+            } elseif ($pack !== null && $pack->distributed_at && ! $pack->hasMemberRead($boardMember->id)) {
                 $nextStep = [
                     'key' => 'pack_read',
-                    'label' => 'Read board pack',
+                    'label' => 'Read the board pack',
                     'status' => 'todo',
-                    'detail' => 'Review distributed board pack and papers prior to the meeting.',
-                    'action_label' => 'Read Pack',
+                    'detail' => "Read the board pack and confirm you've read it before the meeting.",
+                    'action_label' => 'Read pack',
                     'action_url' => "/governance/packs/{$pack->id}",
                     'blocked_by' => null,
                 ];
             } else {
-                $openResolutions = $meeting->resolutions->whereIn('status', ['open', 'voting_open']);
+                $openResolutions = $visibleResolutions
+                    ->whereIn('status', ['open', 'voting_open'])
+                    ->filter(fn (Resolution $resolution) => ($resolution->purpose ?? 'decision') === 'decision');
                 if ($openResolutions->isNotEmpty()) {
-                    $votedCount = \App\Domain\Governance\Models\ResolutionVote::whereIn('resolution_id', $openResolutions->pluck('id'))
+                    // Voting or declaring a conflict both settle a paper for this member.
+                    $settledIds = Vote::query()
+                        ->whereIn('resolution_id', $openResolutions->pluck('id'))
                         ->where('board_member_id', $boardMember->id)
-                        ->count();
-                    if ($votedCount < $openResolutions->count()) {
+                        ->pluck('resolution_id')
+                        ->merge(ConflictDeclaration::query()
+                            ->whereIn('resolution_id', $openResolutions->pluck('id'))
+                            ->where('board_member_id', $boardMember->id)
+                            ->pluck('resolution_id'))
+                        ->map(fn ($id) => (int) $id)
+                        ->unique();
+                    if ($settledIds->count() < $openResolutions->count()) {
                         $nextStep = [
                             'key' => 'vote_resolutions',
-                            'label' => 'Review and vote on resolutions',
+                            'label' => 'Vote on resolutions',
                             'status' => 'todo',
-                            'detail' => 'Review proposed motions and cast your vote before the deadline.',
-                            'action_label' => 'Review & Vote',
+                            'detail' => 'Read each paper and vote before voting closes.',
+                            'action_label' => 'Vote',
                             'action_url' => "/governance/meetings/{$meeting->id}?tab=resolutions",
                             'blocked_by' => null,
                         ];
@@ -282,12 +390,15 @@ class GovernanceWorkflowService
                 ?? $items->first(fn (array $item) => $item['status'] === 'blocked');
 
             if ($nextStep && $nextStep['key'] === 'quorum' && ! $canRecordAttendance) {
-                $nextStep['label'] = 'Awaiting attendance recording';
-                $nextStep['detail'] = 'Attendance will be recorded by the board secretary or chair.';
-                $nextStep['action_label'] = 'View Attendance';
-                $nextStep['blocked_by'] = 'Awaiting secretary to record attendance';
+                $nextStep['label'] = 'Waiting for attendance to be recorded';
+                $nextStep['detail'] = 'The secretary or chair records attendance at the meeting.';
+                $nextStep['action_label'] = 'View attendance';
+                $nextStep['blocked_by'] = 'Waiting for the secretary to record attendance';
             }
         }
+
+        // Every step carries its status in words, so no screen shows a raw key.
+        $withLabel = fn (array $step): array => [...$step, 'status_label' => self::checklistStatusLabel((string) $step['status'])];
 
         return [
             'counts' => [
@@ -295,9 +406,22 @@ class GovernanceWorkflowService
                 'remaining' => $items->whereIn('status', ['todo', 'in_progress'])->count(),
                 'blocked' => $items->where('status', 'blocked')->count(),
             ],
-            'next_step' => $nextStep,
-            'items' => $items->values()->all(),
+            'next_step' => $nextStep ? $withLabel($nextStep) : null,
+            'items' => $items->map($withLabel)->values()->all(),
         ];
+    }
+
+    /** A meeting checklist step's status in plain words. */
+    public static function checklistStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'done' => 'Done',
+            'in_progress' => 'In progress',
+            'todo' => 'To do',
+            'blocked' => 'Waiting on an earlier step',
+            'not_applicable' => 'Not needed',
+            default => GovernanceLabels::humanise($status),
+        };
     }
 
     protected function previousMeeting(GovernanceMeeting $meeting): ?GovernanceMeeting
@@ -348,14 +472,13 @@ class GovernanceWorkflowService
         }
 
         $meetingQuery = GovernanceMeeting::query()
-            ->with(['boardPack', 'minutes', 'chair.user'])
+            ->with(['boardPack', 'minutes', 'chair.user', 'secretary.user'])
             ->withCount(['agendaItems', 'attendances'])
             ->whereNotIn('status', ['archived', 'cancelled'])
             ->orderBy('scheduled_at');
 
         if ($user !== null) {
-            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                ->scopeMeetings($meetingQuery, $user);
+            app(GovernanceRecordAccessService::class)->scopeMeetings($meetingQuery, $user);
         }
 
         $meetings = $meetingQuery->get();
@@ -364,111 +487,128 @@ class GovernanceWorkflowService
         $canManagePacks = $user !== null && $this->boardPackAccess->canManage($user);
 
         foreach ($meetings as $meeting) {
-            $daysToMeeting = (int) now()->startOfDay()->diffInDays($meeting->scheduled_at?->startOfDay(), false);
-            $isSoon = $daysToMeeting <= 7;
-            $isPast = $daysToMeeting < 0;
-            $quorum = $meeting->calculateQuorum();
+            // NZ calendar days until the meeting (0 = today, negative = held).
+            $daysToMeeting = GovernanceWording::daysFromToday($meeting->scheduled_at);
+            $isSoon = $daysToMeeting !== null && $daysToMeeting <= 7;
+            $isPast = $daysToMeeting !== null && $daysToMeeting < 0;
+            $hasStartedToday = $daysToMeeting !== null && $daysToMeeting <= 0;
+            $minutesSettled = in_array($meeting->minutes?->status, ['approved', 'signed', 'archived'], true)
+                || in_array($meeting->status, ['minutes_approved', 'minutes_signed'], true);
+            $title = (string) $meeting->title;
 
-            if ($meeting->agenda_items_count === 0) {
+            // Meeting administration tasks are priorities only for people who
+            // can carry them out (the same abilities the meeting workspace
+            // uses); ordinary members never see "Record attendance" or
+            // "Write minutes" work they cannot do. No viewer = board-wide.
+            $canAdminister = $user === null || $user->can('update', $meeting);
+            $canDraftMinutes = $user === null || $user->can('manageMinutes', $meeting);
+            $canApproveMinutes = $user === null || $user->can('approveMinutes', $meeting);
+            $canSignMinutes = $user === null || $user->can('signMinutes', $meeting);
+
+            if ($canAdminister && $meeting->agenda_items_count === 0 && ! $minutesSettled) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:agenda",
                     'Meetings',
-                    "Prepare agenda for {$meeting->title}",
-                    'No agenda items are recorded yet.',
+                    "Add agenda items for {$title}",
+                    $this->meetingWhen($meeting).' No agenda items have been added yet.',
                     $isSoon ? 'critical' : 'high',
                     $this->dueStatus($meeting->scheduled_at),
                     $meeting->scheduled_at,
-                    'Open Meeting',
+                    'Open meeting',
                     "/governance/meetings/{$meeting->id}?tab=agenda",
                     $meeting->chair?->user?->name
                 ));
             }
 
-            if ($canManagePacks && $meeting->agenda_items_count > 0 && $meeting->boardPack === null && $daysToMeeting <= 14) {
+            if ($canManagePacks && $meeting->agenda_items_count > 0 && $meeting->boardPack === null
+                && $daysToMeeting !== null && $daysToMeeting <= 14 && ! $isPast) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:pack-generate",
                     'Meetings',
-                    "Generate board pack for {$meeting->title}",
-                    'Agenda is ready but no board pack has been generated.',
+                    "Prepare the board pack for {$title}",
+                    $this->meetingWhen($meeting).' The agenda is ready but the board pack hasn\'t been prepared.',
                     $isSoon ? 'high' : 'medium',
                     $this->dueStatus($meeting->scheduled_at),
                     $meeting->scheduled_at,
-                    'Open Meeting',
+                    'Open meeting',
                     "/governance/meetings/{$meeting->id}",
                     $meeting->chair?->user?->name
                 ));
             }
 
-            if ($canManagePacks && $meeting->boardPack !== null && $meeting->boardPack->distributed_at === null && $isSoon) {
+            if ($canManagePacks && $meeting->boardPack !== null && $meeting->boardPack->distributed_at === null && $isSoon && ! $isPast) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:pack-distribute",
                     'Meetings',
-                    "Distribute board pack for {$meeting->title}",
-                    'Pack generated but not distributed to board members.',
+                    "Send the board pack for {$title}",
+                    $this->meetingWhen($meeting).' The board pack is ready but hasn\'t been sent to members.',
                     'high',
                     $this->dueStatus($meeting->scheduled_at),
                     $meeting->scheduled_at,
-                    'Open Pack',
+                    'Open board pack',
                     "/governance/packs/{$meeting->boardPack->id}",
                     $meeting->chair?->user?->name
                 ));
             }
 
-            if (! $quorum['met'] && $isSoon) {
+            // Attendance can only be recorded once the meeting is under way, so
+            // this is raised on (or after) the meeting day — never a week early.
+            $quorum = $hasStartedToday && $canAdminister && ! $minutesSettled ? $meeting->calculateQuorum() : null;
+            if ($quorum !== null && ! $quorum['met']) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:quorum",
                     'Meetings',
-                    "Confirm attendance/quorum for {$meeting->title}",
-                    "Present {$quorum['present']} / Required {$quorum['required']}.",
-                    $isSoon ? 'high' : 'medium',
+                    "Record who attended {$title}",
+                    "{$quorum['present']} of the {$quorum['required']} members needed for decisions to be valid are recorded as present.",
+                    'high',
                     $this->dueStatus($meeting->scheduled_at),
                     $meeting->scheduled_at,
-                    'Record Attendance',
+                    'Record attendance',
                     "/governance/meetings/{$meeting->id}?tab=attendance",
-                    $meeting->chair?->user?->name
+                    $meeting->secretary?->user?->name ?? $meeting->chair?->user?->name
                 ));
             }
 
-            if ($isPast && $meeting->minutes === null) {
+            if ($canDraftMinutes && $isPast && $meeting->minutes === null) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:minutes-draft",
                     'Meetings',
-                    "Draft minutes for {$meeting->title}",
-                    'Meeting has passed but minutes are not drafted.',
+                    "Write the minutes for {$title}",
+                    'The meeting was on '.GovernanceLabels::date($meeting->scheduled_at).' and no minutes have been started.',
                     'critical',
                     'overdue',
                     $meeting->scheduled_at,
-                    'Open Minutes',
+                    'Open minutes',
                     "/governance/meetings/{$meeting->id}?tab=minutes",
                     $meeting->secretary?->user?->name
                 ));
             }
 
-            if ($meeting->minutes !== null && $meeting->minutes->status === 'draft') {
+            if ($canApproveMinutes && $meeting->minutes !== null && $meeting->minutes->status === 'draft') {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:minutes-approve",
                     'Meetings',
-                    "Approve minutes for {$meeting->title}",
-                    'Draft minutes are waiting for approval.',
+                    "Approve the minutes for {$title}",
+                    'The draft minutes are waiting for approval.',
                     'high',
                     $isPast ? 'overdue' : 'pending',
                     $meeting->scheduled_at,
-                    'Open Minutes',
+                    'Open minutes',
                     "/governance/meetings/{$meeting->id}?tab=minutes",
                     $meeting->chair?->user?->name
                 ));
             }
 
-            if ($meeting->minutes !== null && $meeting->minutes->status === 'approved') {
+            if ($canSignMinutes && $meeting->minutes !== null && $meeting->minutes->status === 'approved') {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:minutes-sign",
                     'Meetings',
-                    "Sign minutes for {$meeting->title}",
-                    'Minutes approved but not yet signed.',
+                    "Sign the minutes for {$title}",
+                    'The minutes are approved but not signed yet.',
                     'medium',
                     $isPast ? 'due_soon' : 'pending',
                     $meeting->scheduled_at,
-                    'Open Minutes',
+                    'Open minutes',
                     "/governance/meetings/{$meeting->id}?tab=minutes",
                     $meeting->chair?->user?->name
                 ));
@@ -478,70 +618,108 @@ class GovernanceWorkflowService
         return $actions;
     }
 
+    /**
+     * Opening and closing voting are chair/secretary jobs: a resolution only
+     * becomes a priority for viewers who pass ResolutionPolicy::openVoting /
+     * closeVoting AND hold the route permission (governance.resolutions.manage).
+     * Members' own votes live in My work, never here.
+     */
     protected function resolutionActions(?User $user = null): Collection
     {
         if (! Schema::hasTable('resolutions')) {
             return collect();
         }
 
+        if ($user !== null && ! $user->canDo('governance.resolutions.manage')) {
+            return collect();
+        }
+
         $query = Resolution::query()
-            ->with('proposedBy:id,name')
+            ->with(['proposedBy:id,name', 'meeting'])
             ->whereIn('status', ['open', 'draft'])
             ->orderByRaw('CASE WHEN deadline IS NULL THEN 1 ELSE 0 END')
             ->orderBy('deadline');
 
         if ($user !== null) {
-            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                ->scopeResolutions($query, $user);
+            app(GovernanceRecordAccessService::class)->scopeResolutions($query, $user);
         }
 
-        $resolutions = $query->get();
+        return $query->get()
+            ->filter(fn (Resolution $resolution) => $user === null
+                || $user->can($resolution->status === 'open' ? 'closeVoting' : 'openVoting', $resolution))
+            ->map(function (Resolution $resolution) use ($user): array {
+                $isOpen = $resolution->status === 'open';
+                $deadline = $resolution->deadline;
+                $dueStatus = $isOpen ? $this->dueStatus($deadline) : 'pending';
+                $title = (string) $resolution->title;
 
-        return $resolutions->map(function (Resolution $resolution): array {
-            $dueStatus = $resolution->status === 'open'
-                ? $this->dueStatus($resolution->deadline)
-                : 'pending';
+                $priority = match (true) {
+                    $isOpen && $dueStatus === 'overdue' => 'critical',
+                    $isOpen && $dueStatus === 'due_soon' => 'high',
+                    default => 'medium',
+                };
 
-            $priority = match (true) {
-                $resolution->status === 'open' && $dueStatus === 'overdue' => 'critical',
-                $resolution->status === 'open' && $dueStatus === 'due_soon' => 'high',
-                $resolution->status === 'open' => 'medium',
-                default => 'medium',
-            };
+                $forDecision = ($resolution->purpose ?? 'decision') === 'decision';
 
-            $title = $resolution->status === 'open'
-                ? "Close voting for {$resolution->resolution_reference}"
-                : "Open voting for draft {$resolution->resolution_reference}";
+                [$heading, $detail] = match (true) {
+                    ! $isOpen && $forDecision => [
+                        "Draft resolution: {$title}",
+                        'Voting hasn\'t opened yet. Open voting when the paper is ready.',
+                    ],
+                    ! $isOpen => [
+                        "Draft paper: {$title}",
+                        GovernanceLabels::label('resolution_purpose', $resolution->purpose)
+                            .' — publish it to members when it\'s ready. It doesn\'t go to a vote.',
+                    ],
+                    $deadline === null => [
+                        "Open for voting: {$title}",
+                        'No voting deadline has been set. Close voting when the board is ready to record the result.',
+                    ],
+                    $deadline->isPast() => [
+                        "Voting has ended: {$title}",
+                        'The voting deadline was '.GovernanceLabels::date($deadline, true).'. Close voting to record the result.',
+                    ],
+                    default => [
+                        'Voting closes '.GovernanceWording::relativeDay($deadline).": {$title}",
+                        'Voting closes '.GovernanceLabels::date($deadline, true).'. Close voting after that to record the result.',
+                    ],
+                };
 
-            $detail = $resolution->status === 'open'
-                ? "Resolution: {$resolution->title}"
-                : "Draft resolution has not entered voting yet: {$resolution->title}";
+                $href = $user !== null
+                    ? $this->workQuery->decisionWorkspaceHref($user, $resolution)
+                    : "/governance/resolutions/{$resolution->id}";
 
-            return $this->makeAction(
-                "resolution:{$resolution->id}",
-                GovernanceArea::Resolutions,
-                $title,
-                $detail,
-                $priority,
-                $dueStatus,
-                $resolution->deadline,
-                'Open Resolution',
-                "/governance/resolutions/{$resolution->id}",
-                $resolution->proposedBy?->name,
-                kind: GovernanceWorkKind::Vote,
-                source: [
-                    'type' => 'resolution',
-                    'id' => $resolution->id,
-                    'reference' => $resolution->resolution_reference ?? "RES-{$resolution->id}",
-                    'href' => "/governance/resolutions/{$resolution->id}",
-                ],
-            );
-        });
+                return $this->makeAction(
+                    "resolution:{$resolution->id}",
+                    GovernanceArea::Resolutions,
+                    $heading,
+                    $detail,
+                    $priority,
+                    $dueStatus,
+                    $deadline,
+                    'Open paper',
+                    $href,
+                    $resolution->proposedBy?->name,
+                    kind: GovernanceWorkKind::Act,
+                    source: [
+                        'type' => 'resolution',
+                        'id' => $resolution->id,
+                        'reference' => (string) ($resolution->resolution_reference ?? ''),
+                        'href' => "/governance/resolutions/{$resolution->id}",
+                    ],
+                );
+            })
+            ->values();
     }
 
-    protected function riskActions(): Collection
+    /** Risks above the board's limit — only for viewers who can open the risk register. */
+    protected function riskActions(?User $user = null): Collection
     {
         if (! Schema::hasTable('risk_register_entries')) {
+            return collect();
+        }
+
+        if ($user !== null && ! $user->canDo('governance.risks.view')) {
             return collect();
         }
 
@@ -555,38 +733,53 @@ class GovernanceWorkflowService
         return $risks->map(function (RiskRegisterEntry $risk): array {
             $dueStatus = $this->dueStatus($risk->next_review_date);
             $priority = $risk->residual_score >= 20 || $dueStatus === 'overdue' ? 'critical' : 'high';
+            $reviewDate = $risk->next_review_date?->toDateString();
+
+            $detail = $risk->appetite_threshold !== null
+                ? "Risk after controls is {$risk->residual_score} — the board's limit is {$risk->appetite_threshold}."
+                : 'This risk is higher than the board has agreed to accept.';
+            if ($reviewDate !== null) {
+                $detail .= $dueStatus === 'overdue'
+                    ? ' Its review was due on '.GovernanceLabels::date($reviewDate).'.'
+                    : ' Next review '.GovernanceWording::relativeDay($reviewDate).' ('.GovernanceLabels::date($reviewDate).').';
+            }
 
             return $this->makeAction(
                 "risk:{$risk->id}",
                 GovernanceArea::Risks,
-                "Review risk {$risk->risk_reference}",
-                "Above appetite (score {$risk->residual_score}): {$risk->title}",
+                "Risk above the board's limit: {$risk->title}",
+                $detail,
                 $priority,
                 $dueStatus,
                 $risk->next_review_date,
-                'Open Risk',
+                'Open risk',
                 "/governance/risks/{$risk->id}",
                 $risk->riskOwner?->name,
                 kind: GovernanceWorkKind::Know,
                 source: [
                     'type' => 'risk',
                     'id' => $risk->id,
-                    'reference' => $risk->risk_reference ?? "R-{$risk->id}",
+                    'reference' => (string) ($risk->risk_reference ?? ''),
                     'href' => "/governance/risks/{$risk->id}",
                 ],
             );
-        });
+        })->values();
     }
 
-    protected function complianceActions(): Collection
+    /** Requirements due within 30 days or overdue — only for viewers who can open Compliance. */
+    protected function complianceActions(?User $user = null): Collection
     {
         if (! Schema::hasTable('compliance_obligations')) {
             return collect();
         }
 
+        if ($user !== null && ! $user->can('viewAny', ComplianceObligation::class)) {
+            return collect();
+        }
+
         $obligations = ComplianceObligation::query()
             ->with('owner:id,name')
-            ->where('status', '!=', 'complete')
+            ->whereNotIn('status', ['complete', 'cancelled'])
             ->whereDate('due_date', '<=', now()->addDays(30))
             ->orderBy('due_date')
             ->get();
@@ -598,32 +791,44 @@ class GovernanceWorkflowService
                 'due_soon' => 'high',
                 default => 'medium',
             };
+            $dueDate = $obligation->due_date?->toDateString();
+            $title = (string) $obligation->obligation_title;
+
+            $heading = $dueStatus === 'overdue'
+                ? "Requirement overdue: {$title}"
+                : 'Requirement due '.GovernanceWording::relativeDay($dueDate).": {$title}";
 
             return $this->makeAction(
                 "compliance:{$obligation->id}",
                 GovernanceArea::Compliance,
-                "Complete obligation {$obligation->obligation_code}",
-                "{$obligation->obligation_title} ({$obligation->getFrameworkLabel()})",
+                $heading,
+                GovernanceLabels::label('compliance_framework', $obligation->framework)
+                    .' · '.($dueStatus === 'overdue' ? 'Was due ' : 'Due ').GovernanceLabels::date($dueDate),
                 $priority,
                 $dueStatus,
                 $obligation->due_date,
-                'Open Obligation',
+                'Open requirement',
                 "/governance/compliance/{$obligation->id}",
                 $obligation->owner?->name,
                 kind: GovernanceWorkKind::Act,
                 source: [
                     'type' => 'compliance',
                     'id' => $obligation->id,
-                    'reference' => $obligation->obligation_code ?? "COMP-{$obligation->id}",
+                    'reference' => (string) ($obligation->obligation_code ?? ''),
                     'href' => "/governance/compliance/{$obligation->id}",
                 ],
             );
-        });
+        })->values();
     }
 
-    protected function budgetActions(): Collection
+    /** Budgets and budget changes waiting for the board — only for viewers who can open Budgets. */
+    protected function budgetActions(?User $user = null): Collection
     {
         if (! Schema::hasTable('budgets')) {
+            return collect();
+        }
+
+        if ($user !== null && ! $user->can('viewAny', Budget::class)) {
             return collect();
         }
 
@@ -636,15 +841,19 @@ class GovernanceWorkflowService
             ->get();
 
         foreach ($proposedBudgets as $budget) {
+            $year = $this->financialYear($budget->fiscal_year);
+
             $actions->push($this->makeAction(
                 "budget:{$budget->id}:proposed",
-                'Budgets',
-                "Board decision on proposed budget {$budget->fiscal_year}",
-                "{$budget->title} is waiting for board approval.",
+                GovernanceArea::Budgets,
+                "Budget waiting for the board: {$budget->title}",
+                trim(($year !== null ? "The {$year} budget" : 'This budget')
+                    .($budget->total_budget !== null ? ' of '.GovernanceLabels::money($budget->total_budget) : '')
+                    .' is waiting for the board\'s approval.'),
                 'high',
                 'pending',
                 null,
-                'Open Budget',
+                'Open budget',
                 "/governance/budgets/{$budget->id}",
                 null
             ));
@@ -660,18 +869,22 @@ class GovernanceWorkflowService
 
             foreach ($pendingAdjustments as $adjustment) {
                 $priority = $adjustment->threshold_applies ? 'high' : 'medium';
-                $detail = Str::limit($adjustment->reason, 120);
+                $budgetTitle = $adjustment->budget?->title ?? 'a budget';
+                $reason = trim((string) $adjustment->reason);
 
                 $actions->push($this->makeAction(
                     "budget-adjustment:{$adjustment->id}",
-                    'Budgets',
-                    "Review budget adjustment ({$adjustment->adjustment_type})",
-                    "\${$adjustment->amount} - {$detail}",
+                    GovernanceArea::Budgets,
+                    "Budget change waiting for approval: {$budgetTitle}",
+                    GovernanceLabels::label('budget_change_type', $adjustment->adjustment_type)
+                        .' of '.GovernanceLabels::money($adjustment->amount)
+                        .($reason !== '' ? ' — '.Str::limit($reason, 120) : ''),
                     $priority,
                     'pending',
                     null,
-                    'Open Budget',
-                    "/governance/budgets/{$adjustment->budget_id}",
+                    'Review budget change',
+                    // Straight to the budget's changes tab (older ?tab=adjustments links still work).
+                    "/governance/budgets/{$adjustment->budget_id}?tab=changes",
                     null
                 ));
             }
@@ -680,9 +893,71 @@ class GovernanceWorkflowService
         return $actions;
     }
 
+    /** Policy reviews due within 30 days or overdue — only for viewers who can open Policies. */
+    protected function policyActions(?User $user = null): Collection
+    {
+        if (! Schema::hasTable('governance_policies')) {
+            return collect();
+        }
+
+        if ($user !== null && ! $user->can('viewAny', GovernancePolicy::class)) {
+            return collect();
+        }
+
+        $horizon = now()->addDays(30)->toDateString();
+
+        $policies = GovernancePolicy::query()
+            ->with('owner:id,name')
+            ->whereIn('status', ['approved', 'active', 'published'])
+            ->where(function ($query) use ($horizon) {
+                $query->whereDate('next_review_date', '<=', $horizon)
+                    ->orWhere(function ($fallback) use ($horizon) {
+                        $fallback->whereNull('next_review_date')
+                            ->whereDate('review_due', '<=', $horizon);
+                    });
+            })
+            ->get();
+
+        return $policies->map(function (GovernancePolicy $policy): array {
+            $reviewDate = ($policy->next_review_date ?? $policy->review_due)?->toDateString();
+            $dueStatus = $this->dueStatus($reviewDate);
+            $title = (string) $policy->title;
+
+            $heading = $dueStatus === 'overdue'
+                ? "Policy review overdue: {$title}"
+                : 'Policy review due '.GovernanceWording::relativeDay($reviewDate).": {$title}";
+
+            return $this->makeAction(
+                "policy:{$policy->id}:review",
+                GovernanceArea::Policies,
+                $heading,
+                GovernanceLabels::label('policy_category', $policy->category).' policy · '
+                    .($dueStatus === 'overdue' ? 'Review was due ' : 'Review due ').GovernanceLabels::date($reviewDate),
+                $dueStatus === 'overdue' ? 'high' : 'medium',
+                $dueStatus,
+                $reviewDate,
+                'Open policy',
+                "/governance/policies/{$policy->id}",
+                $policy->owner?->name,
+                kind: GovernanceWorkKind::Know,
+                source: [
+                    'type' => 'policy',
+                    'id' => $policy->id,
+                    'reference' => (string) ($policy->policy_code ?? ''),
+                    'href' => "/governance/policies/{$policy->id}",
+                ],
+            );
+        })->values();
+    }
+
+    /** Open board actions — only for viewers who can open the Actions register. */
     protected function actionItemActions(?User $user = null): Collection
     {
         if (! Schema::hasTable('action_items')) {
+            return collect();
+        }
+
+        if ($user !== null && ! $user->canDo('governance.actions.view')) {
             return collect();
         }
 
@@ -692,13 +967,12 @@ class GovernanceWorkflowService
             ->orderBy('due_date');
 
         if ($user !== null) {
-            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
-                ->scopeActionItems($query, $user);
+            app(GovernanceRecordAccessService::class)->scopeActionItems($query, $user);
         }
 
         $items = $query->get();
 
-        return $items->map(function (ActionItem $item): array {
+        return $items->map(function (ActionItem $item) use ($user): array {
             $isBlocked = $item->status === 'blocked';
             $dueStatus = $isBlocked ? 'blocked' : $this->dueStatus($item->due_date);
             $priority = match (true) {
@@ -710,15 +984,39 @@ class GovernanceWorkflowService
                 default => 'medium',
             };
 
+            $title = Str::limit(trim((string) ($item->title ?: $item->description)) ?: 'Action', 80);
+            $dueDate = $item->due_date?->toDateString();
+
+            $heading = match (true) {
+                $isBlocked => "Action blocked: {$title}",
+                $dueStatus === 'overdue' => "Action overdue: {$title}",
+                $dueDate !== null => 'Action due '.GovernanceWording::relativeDay($dueDate).": {$title}",
+                default => "Open action: {$title}",
+            };
+
+            $detail = match (true) {
+                $isBlocked => 'Blocked — '.rtrim((string) ($item->blocked_reason ?: 'no reason recorded'), '.').'.',
+                $dueStatus === 'overdue' => 'Was due '.GovernanceLabels::date($dueDate).'.',
+                $dueDate !== null => 'Due '.GovernanceLabels::date($dueDate).'.',
+                default => 'No due date set.',
+            };
+
+            // A written title means the description adds detail worth showing.
+            if ($item->getRawOriginal('title') && $item->description && ! $isBlocked) {
+                $detail .= ' '.Str::limit((string) $item->description, 120);
+            }
+
+            $isMine = $user !== null && (int) $item->assigned_to === (int) $user->id;
+
             return $this->makeAction(
                 "action-item:{$item->id}",
                 GovernanceArea::ActionItems,
-                "Complete {$item->action_reference}",
-                Str::limit($item->description, 120),
+                $heading,
+                $detail,
                 $priority,
                 $dueStatus,
                 $item->due_date,
-                'Open Action',
+                $isMine ? 'Update action' : 'Open action',
                 "/governance/actions/{$item->id}",
                 $item->assignedTo?->name,
                 assigneeUserId: $item->assigned_to,
@@ -726,11 +1024,11 @@ class GovernanceWorkflowService
                 source: [
                     'type' => 'action_item',
                     'id' => $item->id,
-                    'reference' => $item->action_reference ?? "ACT-{$item->id}",
+                    'reference' => (string) ($item->action_reference ?? ''),
                     'href' => "/governance/actions/{$item->id}",
                 ],
             );
-        });
+        })->values();
     }
 
     protected function makeAction(
@@ -773,20 +1071,46 @@ class GovernanceWorkflowService
             'source' => $source ?? [
                 'type' => $areaKey,
                 'id' => (int) filter_var($id, FILTER_SANITIZE_NUMBER_INT),
-                'reference' => $id,
+                // Internal ids ("meeting:12:agenda") are not references — never show them.
+                'reference' => '',
                 'href' => $actionUrl,
             ],
         ];
     }
 
-    protected function dueStatus(mixed $date): string
+    /** "In 4 days — 18 September 2026." for meeting preparation details. */
+    protected function meetingWhen(GovernanceMeeting $meeting): string
     {
-        $carbon = $this->parseDate($date);
-        if ($carbon === null) {
-            return 'pending';
+        if ($meeting->scheduled_at === null) {
+            return 'The meeting date is still to be confirmed.';
         }
 
-        $days = now()->startOfDay()->diffInDays($carbon->copy()->startOfDay(), false);
+        return 'The meeting is '.GovernanceWording::relativeDay($meeting->scheduled_at)
+            .' ('.GovernanceLabels::date($meeting->scheduled_at).').';
+    }
+
+    protected function financialYear(mixed $fiscalYear): ?string
+    {
+        if ($fiscalYear === null || $fiscalYear === '') {
+            return null;
+        }
+
+        try {
+            $label = GovernanceLabels::financialYear(is_numeric($fiscalYear) ? (int) $fiscalYear : (string) $fiscalYear);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $label === 'Not set' ? null : $label;
+    }
+
+    /** Due state from NZ calendar days: overdue (past), due soon (≤ 7 days), pending. */
+    protected function dueStatus(mixed $date): string
+    {
+        $days = GovernanceWording::daysFromToday($date instanceof \Carbon\CarbonInterface || is_string($date) ? $date : null);
+        if ($days === null) {
+            return 'pending';
+        }
 
         return match (true) {
             $days < 0 => 'overdue',

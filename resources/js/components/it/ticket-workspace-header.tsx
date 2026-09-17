@@ -16,6 +16,7 @@ import {
     PageHeaderSearchTrigger,
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
+import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -24,6 +25,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { StatusVariant } from '@/components/ui/status-badge';
+import { formatDateTime, formatDurationMinutes } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -50,6 +52,11 @@ import {
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { SLA_LABELS, type SlaVerdict } from './sla-evidence';
+import {
+    PRIORITY_LABELS,
+    type TicketWork,
+    type WorkNote,
+} from './ticket-work-types';
 
 export const TICKET_WORKSPACE_GROUPS: GroupedProfileNavGroup[] = [
     {
@@ -67,6 +74,9 @@ export const TICKET_WORKSPACE_GROUPS: GroupedProfileNavGroup[] = [
         icon: ListChecks,
         tabs: [
             { key: 'tasks', label: 'Tasks & evidence', icon: ClipboardCheck },
+            { key: 'time', label: 'Time entries', icon: Timer },
+            { key: 'schedule', label: 'Technician schedule', icon: UserPlus },
+            { key: 'costs', label: 'Parts & expenses', icon: ListChecks },
             { key: 'approvals', label: 'Approvals', icon: ShieldCheck },
         ],
     },
@@ -80,6 +90,7 @@ export const TICKET_WORKSPACE_GROUPS: GroupedProfileNavGroup[] = [
                 label: 'Classification & ownership',
                 icon: FileText,
             },
+            { key: 'people', label: 'People & diagnostics', icon: UserPlus },
             { key: 'links', label: 'Linked records', icon: Link2 },
             { key: 'sla', label: 'Service levels', icon: Timer },
         ],
@@ -88,18 +99,33 @@ export const TICKET_WORKSPACE_GROUPS: GroupedProfileNavGroup[] = [
         key: 'activity',
         label: 'Activity',
         icon: Activity,
-        tabs: [{ key: 'history', label: 'History', icon: Activity }],
+        tabs: [
+            { key: 'history', label: 'History', icon: Activity },
+            { key: 'corrections', label: 'Work corrections', icon: FileText },
+        ],
     },
 ];
 
 export function ticketWorkspaceTab(
     value: string | null | undefined,
     canViewWork = true,
+    canRecordWork = canViewWork,
 ): string {
     return TICKET_WORKSPACE_GROUPS.some(
         (group) =>
             (canViewWork || group.key !== 'work') &&
-            group.tabs.some((tab) => tab.key === value),
+            group.tabs.some(
+                (tab) =>
+                    tab.key === value &&
+                    (canRecordWork ||
+                        ![
+                            'time',
+                            'schedule',
+                            'costs',
+                            'people',
+                            'corrections',
+                        ].includes(tab.key)),
+            ),
     )
         ? value!
         : 'messages';
@@ -108,6 +134,8 @@ export function ticketWorkspaceTab(
 type HeaderAction = { label: string; run: () => void; icon: LucideIcon };
 
 export function TicketWorkspaceHeader({
+    work,
+    priority,
     id,
     reference,
     title,
@@ -125,6 +153,8 @@ export function TicketWorkspaceHeader({
     primary,
     actions,
 }: {
+    work?: TicketWork | null;
+    priority?: string;
     id: number;
     reference: string | null;
     title: string;
@@ -159,10 +189,27 @@ export function TicketWorkspaceHeader({
     };
 }) {
     const [searchOpen, setSearchOpen] = useState(false);
+    const follow = work?.details?.follow_up as WorkNote['follow_up'];
+    const nextVisit = work?.bookings?.find((booking) =>
+        ['requested', 'accepted'].includes(booking.status),
+    );
     useGroupedProfileSearchShortcut(() => setSearchOpen(true));
     const groups = TICKET_WORKSPACE_GROUPS.filter(
         (item) => tasks !== null || item.key !== 'work',
-    );
+    ).map((item) => ({
+        ...item,
+        tabs: item.tabs.filter(
+            (tab) =>
+                work?.ready ||
+                ![
+                    'time',
+                    'schedule',
+                    'costs',
+                    'people',
+                    'corrections',
+                ].includes(tab.key),
+        ),
+    }));
     const group =
         groups.find((item) => item.tabs.some((tab) => tab.key === activeTab)) ??
         groups[0];
@@ -197,7 +244,21 @@ export function TicketWorkspaceHeader({
                 }
                 subline={
                     <>
-                        {reference ?? `Ticket ${id}`} · {subline}
+                        {reference ?? `Ticket ${id}`} ·{' '}
+                        {priority && (
+                            <>
+                                <Button
+                                    variant="link"
+                                    type="button"
+                                    className="frontline-focus rounded px-1 font-semibold underline"
+                                    onClick={() => go('properties')}
+                                >
+                                    {PRIORITY_LABELS[priority] ?? priority}
+                                </Button>{' '}
+                                ·{' '}
+                            </>
+                        )}
+                        {subline}
                     </>
                 }
                 actions={
@@ -213,6 +274,14 @@ export function TicketWorkspaceHeader({
                             >
                                 {primary.label}
                             </PageHeaderPrimaryButton>
+                        )}
+                        {work?.ready && (
+                            <PageHeaderGlassButton
+                                icon={UserPlus}
+                                onClick={() => go('schedule')}
+                            >
+                                Schedule technician
+                            </PageHeaderGlassButton>
                         )}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -285,16 +354,27 @@ export function TicketWorkspaceHeader({
                 meters={
                     <>
                         <PageHeaderMeterBlock
-                            label="Conversation"
-                            href={href('messages')}
+                            label={
+                                work?.ready ? 'Next follow-up' : 'Conversation'
+                            }
+                            href={href(work?.ready ? 'people' : 'messages')}
                             preserveState
                             preserveScroll
                             ariaLabel="View ticket conversation"
                         >
-                            <PageHeaderMeterBig>{replies}</PageHeaderMeterBig>
+                            <PageHeaderMeterBig>
+                                {work?.ready
+                                    ? follow
+                                        ? 'Follow up'
+                                        : 'Not set'
+                                    : replies}
+                            </PageHeaderMeterBig>
                             <PageHeaderMeterCaption>
-                                {replies === 1 ? 'Reply' : 'Replies'} · {files}{' '}
-                                {files === 1 ? 'file' : 'files'}
+                                {work?.ready
+                                    ? follow
+                                        ? `${work.follow_up_owner} · ${formatDateTime(follow.due_at)}`
+                                        : 'Set the next action with a note'
+                                    : `${replies} replies · ${files} files`}
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         {tasks !== null && (
@@ -347,17 +427,50 @@ export function TicketWorkspaceHeader({
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock
-                            label="Linked records"
-                            href={href('links')}
+                            label={
+                                work?.ready ? 'Next visit' : 'Linked records'
+                            }
+                            href={href(work?.ready ? 'schedule' : 'links')}
                             preserveState
                             preserveScroll
                             ariaLabel="View permitted linked records"
                         >
-                            <PageHeaderMeterBig>{related}</PageHeaderMeterBig>
+                            <PageHeaderMeterBig>
+                                {work?.ready
+                                    ? nextVisit
+                                        ? nextVisit.technician_name
+                                        : 'No visit'
+                                    : related}
+                            </PageHeaderMeterBig>
                             <PageHeaderMeterCaption>
-                                Related systems and work
+                                {work?.ready
+                                    ? nextVisit
+                                        ? formatDateTime(nextVisit.starts_at)
+                                        : 'Schedule additional technician time'
+                                    : 'Related systems and work'}
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
+                        {work?.ready && (
+                            <PageHeaderMeterBlock
+                                label="Time logged"
+                                href={href('time')}
+                                preserveState
+                                preserveScroll
+                                ariaLabel="View actual time entries"
+                            >
+                                <PageHeaderMeterBig>
+                                    {formatDurationMinutes(
+                                        work.totals?.minutes ?? 0,
+                                    )}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {formatDurationMinutes(
+                                        work.totals?.after_hours_minutes ?? 0,
+                                    )}{' '}
+                                    after hours
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        )}
                     </>
                 }
                 rail={

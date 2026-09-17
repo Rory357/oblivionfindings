@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ClockInCard from '@/components/clock-in-card';
 
@@ -28,6 +28,10 @@ vi.mock('@inertiajs/react', () => ({
 describe('ClockInCard', () => {
     beforeEach(() => {
         window.localStorage.clear();
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
     it('uses the shared end-of-shift checklist instead of its legacy confirm dialog', () => {
@@ -64,18 +68,32 @@ describe('ClockInCard', () => {
         expect(screen.getByText('End shift for Ari Kauri')).toBeVisible();
     });
 
-    it('recovers handover drafts in the shared checklist', async () => {
-        window.localStorage.setItem(
-            'oblivion:clockout-handover:v1:u99:s20',
-            JSON.stringify({
-                data: {
-                    meds_completed: true,
-                    shift_rating: 'calm',
-                    handover_notes: 'Saved handover draft.',
-                    follow_up_needed: false,
-                },
-                meta: {},
-                savedAt: Date.now() - 1000,
+    it('restores the saved server handover draft in the shared checklist', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: () =>
+                    Promise.resolve({
+                        people: [{ id: 7, name: 'Ari Kauri' }],
+                        handover_id: 31,
+                        review_url: null,
+                        expected_version: 2,
+                        status: 'draft',
+                        saved_at: new Date().toISOString(),
+                        worker_notes: {
+                            shared_notes: 'Saved handover draft.',
+                            people: [
+                                {
+                                    client_id: 7,
+                                    notes: 'Slept well.',
+                                    no_updates: false,
+                                    not_supported: false,
+                                    follow_up_needed: false,
+                                },
+                            ],
+                        },
+                    }),
             }),
         );
 
@@ -117,8 +135,11 @@ describe('ClockInCard', () => {
         fireEvent.click(clockOutButton as Element);
 
         expect(
-            await screen.findByText('Resume your unfinished handover?'),
+            await screen.findByDisplayValue('Saved handover draft.'),
         ).toBeVisible();
-        expect(screen.getByDisplayValue('Saved handover draft.')).toBeVisible();
+        expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+            '/attendance/shifts/20/handover-draft',
+            expect.objectContaining({ cache: 'no-store' }),
+        );
     });
 });

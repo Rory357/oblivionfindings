@@ -2,82 +2,60 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * Loading skeleton matching the cockpit layout — KPI band, 3-zone grid,
- * panels and rails. Rendered while the dashboard JSON is being fetched.
+ * Loading skeleton matching Governance Home — Next meeting + My work, the
+ * board priorities list and the assurance tiles. Rendered while the
+ * dashboard JSON is being fetched, so the page doesn't jump on arrival.
  */
 export function CockpitSkeleton() {
     return (
         <div
-            className="space-y-6"
+            className="flex flex-col gap-5"
             aria-busy="true"
             aria-live="polite"
+            aria-label="Loading governance home"
             data-dusk="cockpit-skeleton"
         >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {Array.from({ length: 4 }).map((_, idx) => (
+            <div className="grid gap-5 lg:grid-cols-[1.25fr_1fr]">
+                {Array.from({ length: 2 }).map((_, idx) => (
                     <Card key={idx}>
-                        <CardContent className="p-5">
-                            <Skeleton className="h-3 w-24" />
-                            <Skeleton className="mt-3 h-8 w-16" />
-                            <Skeleton className="mt-3 h-3 w-32" />
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
-                <Card>
-                    <CardHeader>
-                        <Skeleton className="h-5 w-40" />
-                        <Skeleton className="mt-2 h-3 w-72" />
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {Array.from({ length: 5 }).map((_, idx) => (
-                            <Skeleton
-                                key={idx}
-                                className="h-16 w-full rounded-lg"
-                            />
-                        ))}
-                    </CardContent>
-                </Card>
-                <div className="space-y-6">
-                    <Card>
                         <CardHeader>
-                            <Skeleton className="h-5 w-32" />
+                            <Skeleton className="h-5 w-40" />
+                            <Skeleton className="mt-2 h-3 w-64" />
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                            {Array.from({ length: 4 }).map((_, idx) => (
+                        <CardContent className="flex flex-col gap-2">
+                            {Array.from({ length: 4 }).map((__, row) => (
                                 <Skeleton
-                                    key={idx}
-                                    className="h-12 w-full rounded-lg"
+                                    key={row}
+                                    className="h-14 w-full rounded-lg"
                                 />
                             ))}
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader>
-                            <Skeleton className="h-5 w-40" />
-                        </CardHeader>
-                        <CardContent>
-                            <Skeleton className="h-40 w-full rounded-lg" />
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-                {Array.from({ length: 2 }).map((_, idx) => (
-                    <Card key={idx}>
-                        <CardHeader>
-                            <Skeleton className="h-5 w-44" />
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <Skeleton className="h-20 w-full rounded-lg" />
-                            <Skeleton className="h-20 w-full rounded-lg" />
-                        </CardContent>
-                    </Card>
                 ))}
             </div>
+
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-5 w-48" />
+                    <Skeleton className="mt-2 h-3 w-72" />
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                    {Array.from({ length: 4 }).map((_, idx) => (
+                        <Skeleton key={idx} className="h-16 w-full rounded-lg" />
+                    ))}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-5 w-36" />
+                </CardHeader>
+                <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {Array.from({ length: 4 }).map((_, idx) => (
+                        <Skeleton key={idx} className="h-24 w-full rounded-lg" />
+                    ))}
+                </CardContent>
+            </Card>
         </div>
     );
 }

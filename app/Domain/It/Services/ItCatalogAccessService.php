@@ -2,6 +2,7 @@
 
 namespace App\Domain\It\Services;
 
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\ItCatalogItem;
 use App\Models\Site;
 use App\Models\User;
@@ -15,7 +16,8 @@ final class ItCatalogAccessService
     /** The caller supplies the immutable published contract, not the draft. */
     public function canDiscover(User $actor, ItCatalogItem $contract): bool
     {
-        if (! $actor->isApproved() || (! $actor->canDo('it.request') && ! $actor->canDo('it.manage'))
+        if (! $actor->isApproved() || ! app(HrCurrentStaffService::class)->isCurrent($actor)
+            || (! $actor->canDo('it.request') && ! $actor->canDo('it.manage'))
             || ($contract->internal_only && ! $actor->canDo('it.manage'))) {
             return false;
         }
@@ -38,6 +40,7 @@ final class ItCatalogAccessService
 
         return [
             ...$contract->discoveryPayload($actor->canDo('it.manage')),
+            'can_request_for_others' => $actor->canDo('it.manage'),
             'site_options' => collect($ids)->filter(fn (int $id) => $sites->has($id))
                 ->map(fn (int $id) => ['id' => $id, 'name' => $sites[$id]->name])->values()->all(),
         ];

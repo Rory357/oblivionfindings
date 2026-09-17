@@ -13,12 +13,12 @@ test('finance bills index loads', function () {
     });
 });
 
-test('finance bills create page loads', function () {
+test('finance bills create URL redirects to the register', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/bills/create')
-            ->waitForText('Bill', 10)
-            ->assertSee('Bill');
+            ->waitForText('Bills', 10)
+            ->assertSee('Bills');
     });
 });

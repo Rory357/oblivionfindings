@@ -1,0 +1,432 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/provisioning-tracking.test.tsx (4 tests | 1 failed) 564ms
+   × opens protected submitted files and includes their field labels in request search 371ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/provisioning-tracking.test.tsx > opens protected submitted files and includes their field labels in request search
+TestingLibraryElementError: Unable to find an accessible element with the role "link" and name "proof.txt (opens in a new tab)"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "Back":
+  <a
+    aria-label="Back"
+    class="mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 transition-colors outline-none hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    href="/it?tab=my-tickets"
+  />
+
+  Name "proof.txt(opens in a new tab)":
+  <a
+    class="frontline-focus rounded-sm text-sm font-semibold break-words text-primary hover:underline"
+    href="/it/attachments/7"
+    rel="noreferrer"
+    target="_blank"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Headset request":
+  <h1
+    class="text-[22px] leading-tight font-bold tracking-tight max-w-full min-w-0 break-words whitespace-normal"
+  />
+
+  Name "Submitted details":
+  <h2
+    class="text-section-title"
+  />
+
+  Name "Submitted files":
+  <h3
+    class="text-sm font-semibold"
+  />
+
+  Name "Request progress":
+  <h2
+    class="text-section-title"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  Name "":
+  <p
+    class="text-subtle mt-1"
+  />
+
+  Name "":
+  <p
+    class="text-caption mt-1"
+  />
+
+  Name "":
+  <p
+    class="mt-3 text-sm"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search this request…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Refresh status":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+    type="button"
+  />
+
+  Name "View request status":
+  <button
+    aria-label="View request status"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View approval":
+  <button
+    aria-label="View approval"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View submitted details":
+  <button
+    aria-label="View submitted details"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View activity":
+  <button
+    aria-label="View activity"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "Request":
+  <button
+    aria-pressed="true"
+    class="inline-flex shrink-0 items-center gap-[7px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 min-h-[46px] rounded-t-xl bg-background px-[18px] pb-3 font-semibold text-primary"
+    data-test="it-provisioning-tracking-group-request"
+    type="button"
+  />
+
+  Name "Find a section":
+  <button
+    aria-label="Find a section"
+    class="mb-2 ml-auto inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80 focus-visible:outline-none"
+    data-test="it-provisioning-tracking-search"
+    title="Find a section (/)"
+    type="button"
+  />
+
+  --------------------------------------------------
+  toolbar:
+
+  Name "Request workspace":
+  <div
+    aria-label="Request workspace"
+    class="scrollbar-none flex items-end gap-1.5 overflow-x-auto pt-2"
+    role="toolbar"
+  />
+
+  --------------------------------------------------
+  tablist:
+
+  Name "Request sections":
+  <div
+    aria-label="Request sections"
+    class="flex flex-wrap items-center gap-1"
+    role="tablist"
+  />
+
+  --------------------------------------------------
+  tab:
+
+  Name "Request details":
+  <button
+    aria-controls="it-provisioning-tracking-panel"
+    aria-selected="true"
+    class="relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none bg-primary/12 text-primary"
+    data-test="it-provisioning-tracking-tab-details"
+    id="it-provisioning-tracking-tab-details"
+    role="tab"
+    tabindex="0"
+    type="button"
+  />
+
+  Name "Activity":
+  <button
+    aria-controls="it-provisioning-tracking-panel"
+    aria-selected="false"
+    class="relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none text-muted-foreground hover:bg-accent hover:text-foreground"
+    data-test="it-provisioning-tracking-tab-activity"
+    id="it-provisioning-tracking-tab-activity"
+    role="tab"
+    tabindex="-1"
+    type="button"
+  />
+
+  --------------------------------------------------
+  region:
+
+  Name "Submitted details":
+  <section
+    aria-label="Submitted details"
+    class="min-w-0 rounded-xl border border-border bg-card p-5"
+    id="it-provisioning-tracking-panel"
+  />
+
+  Name "Submitted files":
+  <section
+    aria-label="Submitted files"
+    class="mt-5"
+  />
+
+  --------------------------------------------------
+  term:
+
+  Name "":
+  <dt
+    class="text-sm font-semibold"
+  />
+
+  Name "":
+  <dt
+    class="text-muted-foreground"
+  />
+
+  Name "":
+  <dt
+    class="text-muted-foreground"
+  />
+
+  Name "":
+  <dt
+    class="text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  definition:
+
+  Name "":
+  <dd
+    class="mt-1 text-sm break-words whitespace-pre-wrap"
+  />
+
+  Name "":
+  <dd />
+
+  Name "":
+  <dd />
+
+  Name "":
+  <dd />
+
+  --------------------------------------------------
+  list:
+
+  Name "":
+  <ul
+    class="mt-3 divide-y divide-border"
+  />
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  <li
+    class="py-3"
+  />
+
+  --------------------------------------------------
+  complementary:
+
+  Name "Request progress":
+  <aside
+    aria-label="Request progress"
+    class="min-w-0 self-start rounded-xl border border-border bg-card p-5"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <header
+        class="eh-header text-primary-foreground"
+      >
+        <div
+          class="relative z-[1] flex h-full flex-col"
+        >
+          <div
+            class="flex flex-col px-[22px] pt-[18px]"
+          >
+            <div
+              class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6 lg:flex-wrap"
+            >
+              <div
+                class="flex min-w-0 items-start gap-[13px] lg:flex-[1_0_28rem]"
+              >
+                <a
+                  aria-label="Back"
+                  class="mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 transition-colors outline-none hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+                  href="/it?tab=my-tickets"
+                >
+                  <svg
+                    class="lucide lucide-chevron-left size-4"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="m15 18-6-6 6-6"
+                    />
+                  </svg>
+                </a>
+                <span
+                  class="eh-mark-ring"
+                >
+                  <svg
+                    class="lucide lucide-package size-5"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"
+                    />
+                    <path
+                      d="M12 22V12"
+                    />
+                    <polyline
+                      points="3.29 7 12 12 20.71 7"
+                    />
+                    <path
+                      d="m7.5 4.27 9 5.15"
+                    />
+                  </svg>
+                </span>
+                <div
+                  class="flex min-w-0 flex-col"
+                >
+                  <div
+                    class="flex flex-wrap items-center gap-2"
+                  >
+                    <h1
+                      class="text-[22px] leading-tight font-bold tracking-tight max-w-full min-w-0 break-words whitespace-normal"
+                    >
+                      Headset request
+                    </h1>
+                    <span
+                      class="inline-flex items-center gap-1 border px-2.5 py-0.5 text-xs bg-status-warning-bg text-status-warning border-status-warning/30 rounded-[8px] font-semibold"
+                    >
+                      Waiting for IT
+                    </span>
+                  </div>
+                  <p
+                    class="mt-[3px] text-[13px] text-primary-foreground/65"
+                  >
+                    IT-P000004 · equipment request · Submitted Sat 12 Sept, 12:00 pm
+                  </p>
+                </div>
+              </div>
+              <div
+                class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end lg:ml-auto"
+              >
+                <div
+                  class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                >
+                  <svg
+                    class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle
+                      cx="11"
+                      cy="11"
+                      r="8"
+                    />
+                    <path
+                      d="m21 21-4.3-4.3"
+                    />
+                  </svg>
+                  <input
+                    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                    placeholder="Search this request…"
+                    type="search"
+                    value=""
+                  />[3...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/it/__tests__/provisioning-tracking.test.tsx:65:25
+     63|         />,
+     64|     );
+     65|     const link = screen.getByRole('link', {
+       |                         ^
+     66|         name: 'proof.txt (opens in a new tab)',
+     67|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  1 failed | 58 passed (59)
+   Start at  22:31:30
+   Duration  8.34s (transform 1.70s, setup 892ms, import 12.37s, tests 7.33s, environment 9.00s)
+

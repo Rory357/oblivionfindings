@@ -39,8 +39,11 @@ class GovernancePolicyPolicy
 
     public function attest(User $user, GovernancePolicy $policy): bool
     {
-        // Any user with view permission may attest to a policy applicable to them.
-        return $user->canDo('governance.policies.view');
+        // Read and confirm: only approved policies that ask for confirmation and
+        // whose effective date (NZ calendar date) has arrived.
+        return $user->canDo('governance.policies.view')
+            && $policy->needsConfirmation()
+            && $policy->isInEffect();
     }
 
     public function newVersion(User $user, GovernancePolicy $policy): bool

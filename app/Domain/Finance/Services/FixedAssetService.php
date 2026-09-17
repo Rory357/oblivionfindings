@@ -110,6 +110,10 @@ class FixedAssetService
      */
     public function runDepreciation(?int $orgId, string $depreciationDate): array
     {
+        // Bulk depreciation treats 0 as absent, not as organisation 0: a caller
+        // passing an unset id must not silently depreciate a whole ledger.
+        // (Journal NUMBERING deliberately differs — org 0 is a real
+        // organisation there; see JournalPostingService::lockJournalSequence.)
         if ($orgId === null || $orgId < 1) {
             throw new InvalidArgumentException('An organisation is required to run fixed-asset depreciation.');
         }

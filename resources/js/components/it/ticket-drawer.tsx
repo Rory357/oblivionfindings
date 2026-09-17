@@ -31,6 +31,7 @@ import type { SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
 import { ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PRIORITY_LABELS } from './ticket-work-types';
 
 const statusVariant: Record<string, StatusVariant> = {
     open: 'warning',
@@ -205,7 +206,8 @@ export function TicketDrawer({
                                         }
                                         size="sm"
                                     >
-                                        {label(t.priority)}
+                                        {PRIORITY_LABELS[t.priority] ??
+                                            label(t.priority)}
                                     </StatusBadge>
                                 </>
                             ) : null}

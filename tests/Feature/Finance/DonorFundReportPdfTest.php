@@ -7,6 +7,7 @@ use App\Domain\Finance\Models\FinDonorFund;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Services\AccountsPayableService;
 use App\Domain\Finance\Services\DonorFundService;
 use App\Models\User;
@@ -87,6 +88,11 @@ it('covers the donor fund receipt expenditure report PDF cycle', function () {
         'gst_amount' => '0.00',
         'line_total' => '125.00',
         'account_id' => $expenseAccount->id,
+        // A stored rate of 0 cannot say whether the line is zero-rated or
+        // exempt, and the organisation has both, so the line names its rate
+        // (GstTaxRateResolver::resolveStoredRate).
+        'tax_rate_id' => FinTaxRate::query()
+            ->where('organization_id', 1)->where('code', 'GST0')->value('id'),
     ]);
     $bill = app(AccountsPayableService::class)->approveBill($bill, $user->id);
     $expenditure = $service->recordExpenditure($fund, [

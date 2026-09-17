@@ -45,6 +45,74 @@ class FinanceCalendarItem
         public array $meta = [],
     ) {}
 
+    /**
+     * The shared calendar's source key for a provider key: the SiteCalendar
+     * parts build CSS variables straight from it (`var(--src-{source})`), so
+     * the wire format is dashed to match the `--src-*` token convention.
+     */
+    public static function sourceSlug(string $providerKey): string
+    {
+        return str_replace('_', '-', $providerKey);
+    }
+
+    /** The provider key behind a dashed source slug. */
+    public static function providerKey(string $slug): string
+    {
+        return str_replace('-', '_', $slug);
+    }
+
+    /**
+     * The obligation as a shared {@see CalendarItem} — the shape SiteCalendar
+     * consumes. The finance-specific fields (amount, direction, counterparty)
+     * ride in `desc`, which the calendar shows in its entry detail.
+     *
+     * @return array<string, mixed>
+     */
+    public function toCalendarItem(): array
+    {
+        return [
+            'id' => $this->id,
+            'source' => self::sourceSlug($this->source),
+            'group' => 'auto',
+            'title' => $this->title,
+            'start' => $this->start,
+            'end' => null,
+            'allDay' => true,
+            'status' => $this->status,
+            'owner' => null,
+            'room' => null,
+            'ref' => $this->ref,
+            'site' => null,
+            'link' => $this->link,
+            'editable' => false,
+            'desc' => $this->describe(),
+        ];
+    }
+
+    /** "$1,234.00 · Money out · Acme Ltd" — null when there is nothing to add. */
+    private function describe(): ?string
+    {
+        $parts = [];
+
+        if ($this->amount !== null) {
+            $parts[] = '$'.number_format($this->amount, 2);
+        }
+
+        if ($this->direction !== null) {
+            $parts[] = $this->direction === 'inflow' ? 'Money in' : 'Money out';
+        }
+
+        if ($this->counterparty !== null && $this->counterparty !== '') {
+            $parts[] = $this->counterparty;
+        }
+
+        if (isset($this->meta['period']) && is_string($this->meta['period'])) {
+            $parts[] = $this->meta['period'];
+        }
+
+        return $parts === [] ? null : implode(' · ', $parts);
+    }
+
     public function toArray(): array
     {
         return [

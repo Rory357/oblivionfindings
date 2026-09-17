@@ -1,52 +1,68 @@
 import {
     DonorFundDialog,
+    FinanceSectionRail,
     formatMoney,
     type DonorFundFundingStream,
     type DonorFundGlAccount,
+    type EditableDonorFund,
 } from '@/components/finance';
-import { chartColor } from '@/components/finance/chart-palette';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import {
+    EmptyValue,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    useEntityContextMenu,
+    type EntityTableColumn,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
 import { PageProps, type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Banknote,
     Download,
+    Eye,
     HandHeart,
-    Heart,
+    Pencil,
     Plus,
-    Search,
+    Receipt,
+    X,
 } from 'lucide-react';
 import { useState } from 'react';
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface Fund {
     id: number;
     fund_code: string;
     fund_name: string;
     donor_name: string | null;
+    donor_contact: string | null;
     fund_type: string;
+    gl_account_id: number | null;
+    funding_stream_id: number | null;
+    restrictions: string | null;
+    reporting_requirements: string | null;
     total_received: number;
     total_spent: number;
     available_balance: number;
@@ -97,14 +113,9 @@ interface Props extends PageProps {
     fundingStreams: DonorFundFundingStream[];
 }
 
-const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('en-NZ', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
+const shortDate = (value: string) => formatDateOnly(value.slice(0, 10), value);
 
-const fundTypeLabels: Record<string, string> = {
+const FUND_TYPE_LABELS: Record<string, string> = {
     grant: 'Grant',
     donation: 'Donation',
     bequest: 'Bequest',
@@ -113,16 +124,32 @@ const fundTypeLabels: Record<string, string> = {
     sponsorship: 'Sponsorship',
 };
 
-const statusBadge: Record<string, { label: string; variant: StatusVariant }> = {
+const FUND_STATUS: Record<string, { label: string; variant: StatusVariant }> = {
     active: { label: 'Active', variant: 'success' },
-    fully_spent: { label: 'Fully Spent', variant: 'warning' },
+    fully_spent: { label: 'Fully spent', variant: 'warning' },
     expired: { label: 'Expired', variant: 'critical' },
     returned: { label: 'Returned', variant: 'neutral' },
 };
 
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'All statuses' },
+    { value: 'active', label: 'Active' },
+    { value: 'fully_spent', label: 'Fully spent' },
+    { value: 'expired', label: 'Expired' },
+    { value: 'returned', label: 'Returned' },
+];
+
+const RESTRICTED_OPTIONS = [
+    { value: 'all', label: 'Restricted and unrestricted' },
+    { value: 'restricted', label: 'Restricted only' },
+    { value: 'unrestricted', label: 'Unrestricted only' },
+];
+
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
-    { title: 'Donor Funds', href: '/finance/donor-funds' },
+    { title: 'Tax & compliance', href: '/finance/tax' },
+    { title: 'Donor funds', href: '/finance/donor-funds' },
 ];
 
 export default function DonorFundsIndex({
@@ -134,15 +161,18 @@ export default function DonorFundsIndex({
     fundingStreams = [],
 }: Props) {
     const [createOpen, setCreateOpen] = useState(false);
+    const [editTarget, setEditTarget] = useState<Fund | null>(null);
     const [search, setSearch] = useState(filters.search ?? '');
-    const [status, setStatus] = useState(filters.status ?? '');
-    const [restricted, setRestricted] = useState(filters.restricted ?? '');
 
-    const applyFilters = () => {
+    const status = filters.status ?? 'all';
+    const restricted = filters.restricted ?? 'all';
+
+    const apply = (next: Partial<Filters>) => {
+        const merged: Filters = { search, status, restricted, ...next };
         const params: Record<string, string> = {};
-        if (search) params.search = search;
-        if (status && status !== 'all') params.status = status;
-        if (restricted && restricted !== 'all') params.restricted = restricted;
+        Object.entries(merged).forEach(([key, value]) => {
+            if (value && value !== 'all') params[key] = value;
+        });
         router.get('/finance/donor-funds', params, {
             preserveState: true,
             preserveScroll: true,
@@ -151,294 +181,374 @@ export default function DonorFundsIndex({
 
     const clearFilters = () => {
         setSearch('');
-        setStatus('');
-        setRestricted('');
         router.get('/finance/donor-funds', {}, { preserveState: true });
     };
 
     const hasFilters = Boolean(
-        search ||
-        (status && status !== 'all') ||
-        (restricted && restricted !== 'all'),
+        filters.search || status !== 'all' || restricted !== 'all',
     );
-    const pieData = [
-        { name: 'Restricted', value: summary.restricted_balance },
-        { name: 'Unrestricted', value: summary.unrestricted_balance },
-    ].filter((d) => d.value > 0);
+
+    const exportUrl = `/finance/donor-funds/export?${new URLSearchParams(
+        Object.entries({
+            search: filters.search ?? '',
+            status: status !== 'all' ? status : '',
+            restricted: restricted !== 'all' ? restricted : '',
+        }).filter(([, v]) => v) as [string, string][],
+    ).toString()}`;
+
+    const restrictedShare =
+        summary.restricted_balance + summary.unrestricted_balance === 0
+            ? 0
+            : (summary.restricted_balance /
+                  (summary.restricted_balance + summary.unrestricted_balance)) *
+              100;
+
+    const ctx = useEntityContextMenu<Fund>();
+
+    /** The ONE menu feeding both the kebab and the right-click menu. */
+    const actionsFor = (fund: Fund): MenuItem[] => {
+        const items: MenuItem[] = [
+            {
+                label: 'Open fund',
+                icon: Eye,
+                onClick: () => router.visit(`/finance/donor-funds/${fund.id}`),
+            },
+        ];
+        if (canManage) {
+            items.push(
+                {
+                    label: 'Edit fund',
+                    icon: Pencil,
+                    onClick: () => setEditTarget(fund),
+                },
+                { separator: true },
+                {
+                    label: 'Record receipt',
+                    icon: Banknote,
+                    onClick: () =>
+                        router.visit(
+                            `/finance/donor-funds/${fund.id}?action=receipt`,
+                        ),
+                },
+                {
+                    label: 'Record expenditure',
+                    icon: Receipt,
+                    onClick: () =>
+                        router.visit(
+                            `/finance/donor-funds/${fund.id}?action=expenditure`,
+                        ),
+                },
+            );
+        }
+        return items;
+    };
+
+    const columns: EntityTableColumn<Fund>[] = [
+        {
+            key: 'donor',
+            label: 'Donor',
+            width: '1fr',
+            cell: (fund) =>
+                fund.donor_name ? (
+                    <span className="truncate">{fund.donor_name}</span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'type',
+            label: 'Type',
+            width: '140px',
+            cell: (fund) => (
+                <EntityChip>
+                    {FUND_TYPE_LABELS[fund.fund_type] ?? fund.fund_type}
+                </EntityChip>
+            ),
+        },
+        {
+            key: 'received',
+            label: 'Received',
+            width: '150px',
+            align: 'right',
+            cell: (fund) => (
+                <span className="tabular-nums">
+                    {formatMoney(fund.total_received)}
+                </span>
+            ),
+        },
+        {
+            key: 'spent',
+            label: 'Spent',
+            width: '150px',
+            align: 'right',
+            cell: (fund) => (
+                <span className="tabular-nums">
+                    {formatMoney(fund.total_spent)}
+                </span>
+            ),
+        },
+        {
+            key: 'available',
+            label: 'Available',
+            width: '180px',
+            align: 'right',
+            cell: (fund) => {
+                const utilisation = fund.budget_amount
+                    ? Math.round((fund.total_spent / fund.budget_amount) * 100)
+                    : null;
+                return (
+                    <span className="font-semibold tabular-nums">
+                        {formatMoney(fund.available_balance)}
+                        {utilisation !== null ? (
+                            <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                {utilisation}% used
+                            </span>
+                        ) : null}
+                    </span>
+                );
+            },
+        },
+        {
+            key: 'restricted',
+            label: 'Restriction',
+            width: '150px',
+            cell: (fund) => (
+                <StatusBadge
+                    status={fund.is_restricted ? 'restricted' : 'unrestricted'}
+                />
+            ),
+        },
+        {
+            key: 'end_date',
+            label: 'End date',
+            width: '150px',
+            cell: (fund) => {
+                if (!fund.end_date) return <EmptyValue />;
+                const past = new Date(fund.end_date) < new Date();
+                return past ? (
+                    <EntityStatusChip variant="critical">
+                        {shortDate(fund.end_date)}
+                    </EntityStatusChip>
+                ) : (
+                    <span className="whitespace-nowrap text-muted-foreground">
+                        {shortDate(fund.end_date)}
+                    </span>
+                );
+            },
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '160px',
+            cell: (fund) => {
+                const badge = FUND_STATUS[fund.status] ?? FUND_STATUS.active;
+                const reportDue =
+                    fund.next_report_due &&
+                    new Date(fund.next_report_due) <= new Date();
+                return (
+                    <span className="flex items-center gap-1.5">
+                        <StatusBadge
+                            variant={badge.variant}
+                            label={badge.label}
+                        />
+                        {reportDue ? (
+                            <AlertTriangle
+                                className="h-4 w-4 text-status-warning"
+                                aria-label="Report overdue"
+                            />
+                        ) : null}
+                    </span>
+                );
+            },
+        },
+    ];
+
+    const editableFund: EditableDonorFund | null = editTarget
+        ? {
+              id: editTarget.id,
+              fund_code: editTarget.fund_code,
+              fund_name: editTarget.fund_name,
+              donor_name: editTarget.donor_name,
+              donor_contact: editTarget.donor_contact,
+              fund_type: editTarget.fund_type,
+              gl_account_id: editTarget.gl_account_id,
+              funding_stream_id: editTarget.funding_stream_id,
+              budget_amount: editTarget.budget_amount,
+              start_date: editTarget.start_date,
+              end_date: editTarget.end_date,
+              restrictions: editTarget.restrictions,
+              reporting_requirements: editTarget.reporting_requirements,
+              next_report_due: editTarget.next_report_due,
+              is_restricted: editTarget.is_restricted,
+              status: editTarget.status,
+          }
+        : null;
+
+    const header = (
+        <PageHeader
+            icon={HandHeart}
+            title="Donor funds"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={summary.expiring_soon > 0 ? 'warning' : 'success'}
+                >
+                    {summary.total_funds} fund
+                    {summary.total_funds === 1 ? '' : 's'}
+                </PageHeaderStatusChip>
+            }
+            subline={`Tax & compliance · donations, grants and restricted funding · ${formatMoney(
+                summary.total_available,
+            )} still available`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') apply({ search });
+                        }}
+                        placeholder="Search fund, code or donor…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={() => {
+                            window.location.href = exportUrl;
+                        }}
+                    >
+                        Export CSV
+                    </PageHeaderGlassButton>
+                    {canManage ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                        >
+                            New fund
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Received"
+                        tone="success"
+                        href="/finance/donor-funds"
+                        ariaLabel="View every donor fund"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.total_received)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            donated across {summary.total_funds} fund
+                            {summary.total_funds === 1 ? '' : 's'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Spent"
+                        href="/finance/donor-funds"
+                        ariaLabel="View every donor fund"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.total_spent)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            applied to approved expenditure
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Available"
+                        tone="success"
+                        href="/finance/donor-funds?status=active"
+                        ariaLabel="View active donor funds"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.total_available)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            still to be spent
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Restricted"
+                        href="/finance/donor-funds?restricted=restricted"
+                        ariaLabel="View restricted donor funds"
+                    >
+                        <PageHeaderMeterDonut
+                            percent={restrictedShare}
+                            caption={`${formatMoney(summary.restricted_balance)} restricted · ${formatMoney(
+                                summary.unrestricted_balance,
+                            )} unrestricted`}
+                        />
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Expiring soon"
+                        tone={summary.expiring_soon > 0 ? 'warning' : 'brand'}
+                        href="/finance/donor-funds?status=active"
+                        ariaLabel="View active donor funds"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.expiring_soon}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            funds close to their end date
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={status}
+                        allValue="all"
+                        options={STATUS_OPTIONS}
+                        onChange={(value) => apply({ status: value })}
+                    />
+                    <PageHeaderFilterSelect
+                        label="Restriction"
+                        value={restricted}
+                        allValue="all"
+                        options={RESTRICTED_OPTIONS}
+                        onChange={(value) => apply({ restricted: value })}
+                    />
+                    {hasFilters ? (
+                        <PageHeaderFilterButton icon={X} onClick={clearFilters}>
+                            Clear filters
+                        </PageHeaderFilterButton>
+                    ) : null}
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Donor Funds" />
+            <Head title="Donor funds" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={HandHeart}
-                        title="Donor Funds"
-                        description="Track donations, grants, and restricted funding"
-                        stats={[
-                            {
-                                label: 'Total funds',
-                                value: summary.total_funds,
-                            },
-                            {
-                                label: 'Received',
-                                value: formatMoney(summary.total_received),
-                            },
-                            {
-                                label: 'Available',
-                                value: formatMoney(summary.total_available),
-                            },
-                            {
-                                label: 'Expiring soon',
-                                value: summary.expiring_soon,
-                            },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button size="sm" variant="outline" asChild>
-                                    <a
-                                        href={`/finance/donor-funds/export?${new URLSearchParams(Object.entries({ search, status: status !== 'all' ? status : '', restricted: restricted !== 'all' ? restricted : '' }).filter(([, v]) => v)).toString()}`}
-                                    >
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Export CSV
-                                    </a>
-                                </Button>
-                                {canManage && (
-                                    <Button
-                                        size="sm"
-                                        onClick={() => setCreateOpen(true)}
-                                    >
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        New Fund
-                                    </Button>
-                                )}
-                            </div>
-                        }
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Funds"
+                        caption={`${funds.data.length} of ${summary.total_funds} shown`}
                     />
-                }
-            >
-                {/* Summary Cards + PieChart */}
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:col-span-2">
-                        <Card>
-                            <CardContent className="p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    Total Funds
-                                </p>
-                                <p className="text-2xl font-bold">
-                                    {summary.total_funds}
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    Total Received
-                                </p>
-                                <p className="text-xl font-bold">
-                                    {formatMoney(summary.total_received)}
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    Total Spent
-                                </p>
-                                <p className="text-xl font-bold">
-                                    {formatMoney(summary.total_spent)}
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    Available
-                                </p>
-                                <p className="text-xl font-bold text-status-success">
-                                    {formatMoney(summary.total_available)}
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    Restricted
-                                </p>
-                                <p className="text-xl font-bold">
-                                    {formatMoney(summary.restricted_balance)}
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    Expiring Soon
-                                </p>
-                                <p
-                                    className={`text-2xl font-bold ${summary.expiring_soon > 0 ? 'text-status-warning' : ''}`}
-                                >
-                                    {summary.expiring_soon}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    </div>
 
-                    {/* Restricted vs Unrestricted Pie Chart */}
-                    {pieData.length > 0 && (
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">
-                                    Restricted vs Unrestricted
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <ResponsiveContainer width="100%" height={180}>
-                                    <PieChart>
-                                        <Pie
-                                            data={pieData}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={45}
-                                            outerRadius={70}
-                                            paddingAngle={3}
-                                            dataKey="value"
-                                            nameKey="name"
-                                        >
-                                            {pieData.map((_, index) => (
-                                                <Cell
-                                                    key={`cell-${index}`}
-                                                    fill={chartColor(index)}
-                                                />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip
-                                            formatter={
-                                                ((value: number) =>
-                                                    formatMoney(value)) as any
-                                            }
-                                        />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                <div className="flex justify-center gap-4 text-xs">
-                                    {pieData.map((entry, index) => (
-                                        <div
-                                            key={entry.name}
-                                            className="flex items-center gap-1.5"
-                                        >
-                                            <div
-                                                className="h-2.5 w-2.5 rounded-full"
-                                                style={{
-                                                    backgroundColor:
-                                                        chartColor(index),
-                                                }}
-                                            />
-                                            <span className="text-muted-foreground">
-                                                {entry.name}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
-
-                {/* Filters */}
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                            <div className="relative">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search fund, code, donor..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={(e) =>
-                                        e.key === 'Enter' && applyFilters()
-                                    }
-                                    className="pl-9"
-                                />
-                            </div>
-                            <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger aria-label="Filter by status">
-                                    <SelectValue placeholder="All statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All statuses
-                                    </SelectItem>
-                                    <SelectItem value="active">
-                                        Active
-                                    </SelectItem>
-                                    <SelectItem value="fully_spent">
-                                        Fully spent
-                                    </SelectItem>
-                                    <SelectItem value="expired">
-                                        Expired
-                                    </SelectItem>
-                                    <SelectItem value="returned">
-                                        Returned
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={restricted}
-                                onValueChange={setRestricted}
-                            >
-                                <SelectTrigger aria-label="Filter by restriction">
-                                    <SelectValue placeholder="All funds" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All funds
-                                    </SelectItem>
-                                    <SelectItem value="restricted">
-                                        Restricted
-                                    </SelectItem>
-                                    <SelectItem value="unrestricted">
-                                        Unrestricted
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <div className="flex gap-2">
-                                <Button
-                                    onClick={applyFilters}
-                                    variant="secondary"
-                                    className="shrink-0"
-                                >
-                                    Filter
-                                </Button>
-                                <Button
-                                    onClick={clearFilters}
-                                    variant="ghost"
-                                    className="shrink-0"
-                                >
-                                    Clear
-                                </Button>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Funds Table */}
-                {funds.data.length === 0 ? (
-                    <Card>
-                        {hasFilters ? (
+                    {funds.data.length === 0 ? (
+                        hasFilters ? (
                             <EmptySearch
                                 onClear={clearFilters}
                                 title="No funds match your filters"
-                                className="border-0"
                             />
                         ) : (
                             <EmptyList
-                                icon={Heart}
+                                icon={HandHeart}
                                 itemName="donor fund"
                                 title="No donor funds yet"
                                 description="Create your first fund to start tracking donations and grants."
-                                className="border-0"
                                 action={
                                     canManage ? (
                                         <Button
@@ -450,177 +560,52 @@ export default function DonorFundsIndex({
                                     ) : undefined
                                 }
                             />
-                        )}
-                    </Card>
-                ) : (
-                    <Card>
-                        <CardContent className="p-0">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Code</TableHead>
-                                        <TableHead>Fund Name</TableHead>
-                                        <TableHead>Donor</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead className="text-right">
-                                            Received
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Spent
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Available
-                                        </TableHead>
-                                        <TableHead>Restricted</TableHead>
-                                        <TableHead>End Date</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {funds.data.map((fund) => {
-                                        const badge =
-                                            statusBadge[fund.status] ??
-                                            statusBadge.active;
-                                        const utilisation = fund.budget_amount
-                                            ? Math.round(
-                                                  (fund.total_spent /
-                                                      fund.budget_amount) *
-                                                      100,
-                                              )
-                                            : null;
-                                        return (
-                                            <TableRow key={fund.id}>
-                                                <TableCell className="font-mono text-sm">
-                                                    <Link
-                                                        href={`/finance/donor-funds/${fund.id}`}
-                                                        className="text-primary hover:underline"
-                                                    >
-                                                        {fund.fund_code}
-                                                    </Link>
-                                                </TableCell>
-                                                <TableCell className="font-medium">
-                                                    <Link
-                                                        href={`/finance/donor-funds/${fund.id}`}
-                                                        className="hover:underline"
-                                                    >
-                                                        {fund.fund_name}
-                                                    </Link>
-                                                </TableCell>
-                                                <TableCell className="text-sm">
-                                                    {fund.donor_name ?? '-'}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="outline">
-                                                        {fundTypeLabels[
-                                                            fund.fund_type
-                                                        ] ?? fund.fund_type}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {formatMoney(
-                                                        fund.total_received,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {formatMoney(
-                                                        fund.total_spent,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right font-medium text-status-success">
-                                                    {formatMoney(
-                                                        fund.available_balance,
-                                                    )}
-                                                    {utilisation !== null && (
-                                                        <span className="ml-1 text-xs text-muted-foreground">
-                                                            ({utilisation}%)
-                                                        </span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {fund.is_restricted ? (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="border-status-warning/30 text-status-warning"
-                                                        >
-                                                            Restricted
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="border-border text-muted-foreground"
-                                                        >
-                                                            Unrestricted
-                                                        </Badge>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-sm">
-                                                    {fund.end_date ? (
-                                                        <span
-                                                            className={
-                                                                new Date(
-                                                                    fund.end_date,
-                                                                ) < new Date()
-                                                                    ? 'text-destructive'
-                                                                    : ''
-                                                            }
-                                                        >
-                                                            {formatDate(
-                                                                fund.end_date,
-                                                            )}
-                                                        </span>
-                                                    ) : (
-                                                        '-'
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <StatusBadge
-                                                        variant={badge.variant}
-                                                        label={badge.label}
-                                                    />
-                                                    {fund.next_report_due &&
-                                                        new Date(
-                                                            fund.next_report_due,
-                                                        ) <= new Date() && (
-                                                            <AlertTriangle className="ml-1 inline h-4 w-4 text-status-warning" />
-                                                        )}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-
-                            {funds.last_page > 1 && (
-                                <div className="flex items-center justify-center gap-1 border-t p-4">
-                                    {funds.links.map((link, i) => (
-                                        <Button
-                                            key={i}
-                                            variant={
-                                                link.active
-                                                    ? 'default'
-                                                    : 'ghost'
-                                            }
-                                            size="sm"
-                                            disabled={!link.url}
-                                            onClick={() =>
-                                                link.url &&
-                                                router.get(
-                                                    link.url,
-                                                    {},
-                                                    { preserveState: true },
-                                                )
-                                            }
-                                            dangerouslySetInnerHTML={{
-                                                __html: link.label,
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
+                        )
+                    ) : (
+                        <>
+                            <EntityTable
+                                rows={funds.data}
+                                rowKey={(fund) => fund.id}
+                                identityLabel="Fund"
+                                minWidth={1400}
+                                identity={(fund) => ({
+                                    icon: HandHeart,
+                                    name: fund.fund_name,
+                                    subline: fund.fund_code,
+                                })}
+                                hrefFor={(fund) =>
+                                    `/finance/donor-funds/${fund.id}`
+                                }
+                                columns={columns}
+                                actionsFor={actionsFor}
+                                onOpen={(fund) =>
+                                    router.visit(
+                                        `/finance/donor-funds/${fund.id}`,
+                                    )
+                                }
+                                onRowContextMenu={(e, fund) =>
+                                    ctx.open(e, fund)
+                                }
+                            />
+                            <LaravelPagination
+                                links={funds.links}
+                                lastPage={funds.last_page}
+                            />
+                        </>
+                    )}
+                </div>
             </PageLayout>
+
+            {ctx.ctx ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={HandHeart}
+                    title={ctx.ctx.record.fund_name}
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
 
             {canManage && (
                 <DonorFundDialog
@@ -630,6 +615,17 @@ export default function DonorFundsIndex({
                     fundingStreams={fundingStreams}
                 />
             )}
+
+            {canManage && editableFund ? (
+                <DonorFundDialog
+                    key={editableFund.id}
+                    open
+                    onClose={() => setEditTarget(null)}
+                    glAccounts={glAccounts}
+                    fundingStreams={fundingStreams}
+                    fund={editableFund}
+                />
+            ) : null}
         </AppLayout>
     );
 }

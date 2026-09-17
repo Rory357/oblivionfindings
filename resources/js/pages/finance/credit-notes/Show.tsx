@@ -1,22 +1,26 @@
+import { ConfirmDialog, FinanceSectionRail } from '@/components/finance';
 import { formatMoney } from '@/components/finance/money';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { StatusBadge } from '@/components/ui/status-badge';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    EntityTable,
+    ListCaption,
+    type EntityTableColumn,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { PageProps } from '@/types';
+import { PageProps, type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle, FileText } from 'lucide-react';
+import { CheckCircle, FileMinus, FileText } from 'lucide-react';
+import { useState } from 'react';
 
 interface CreditNoteLine {
     id: number;
@@ -53,7 +57,20 @@ interface CreditNote {
 
 interface Props extends PageProps {
     creditNote: CreditNote;
+    canApprove: boolean;
 }
+
+const TYPE_LABELS: Record<string, string> = {
+    payable: 'Accounts payable',
+    receivable: 'Accounts receivable',
+};
+
+const CHIP_VARIANTS: Record<string, StatusVariant> = {
+    draft: 'neutral',
+    approved: 'success',
+    applied: 'success',
+    cancelled: 'neutral',
+};
 
 const formatDate = (date: string | null) =>
     date
@@ -62,7 +79,7 @@ const formatDate = (date: string | null) =>
               month: 'short',
               year: 'numeric',
           })
-        : '-';
+        : '—';
 
 const formatDateTime = (date: string | null) =>
     date
@@ -73,276 +90,344 @@ const formatDateTime = (date: string | null) =>
               hour: '2-digit',
               minute: '2-digit',
           })
-        : '-';
+        : '—';
 
-const typeConfig: Record<string, { label: string; className: string }> = {
-    payable: {
-        label: 'Accounts Payable',
-        className: 'bg-primary/10 text-primary',
-    },
-    receivable: {
-        label: 'Accounts Receivable',
-        className: 'bg-status-info-bg text-status-info',
-    },
-};
+function DetailRow({
+    label,
+    children,
+}: {
+    label: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div>
+            <dt className="text-caption">{label}</dt>
+            <dd className="mt-1 text-sm">{children}</dd>
+        </div>
+    );
+}
 
-export default function CreditNoteShow({ auth, creditNote }: Props) {
+export default function CreditNoteShow({ creditNote, canApprove }: Props) {
     const isDraft = creditNote.status === 'draft';
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [processing, setProcessing] = useState(false);
 
-    const handleApprove = () => {
-        router.post(`/finance/credit-notes/${creditNote.id}/approve`);
-    };
+    const approve = () =>
+        router.post(
+            `/finance/credit-notes/${creditNote.id}/approve`,
+            {},
+            {
+                onStart: () => setProcessing(true),
+                onFinish: () => setProcessing(false),
+                onSuccess: () => setConfirmOpen(false),
+            },
+        );
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Payables', href: '/finance/payables' },
+        { title: 'Credit notes', href: '/finance/credit-notes' },
+        {
+            title: creditNote.credit_note_number,
+            href: `/finance/credit-notes/${creditNote.id}`,
+        },
+    ];
+
+    const lineColumns: EntityTableColumn<CreditNoteLine>[] = [
+        {
+            key: 'qty',
+            label: 'Qty',
+            width: '70px',
+            align: 'right',
+            cell: (l) => (
+                <span className="tabular-nums">
+                    {Number(l.quantity).toFixed(2)}
+                </span>
+            ),
+        },
+        {
+            key: 'unit',
+            label: 'Unit price',
+            width: '1fr',
+            align: 'right',
+            cell: (l) => (
+                <span className="tabular-nums">
+                    {formatMoney(l.unit_price)}
+                </span>
+            ),
+        },
+        {
+            key: 'account',
+            label: 'Account',
+            width: '1.8fr',
+            cell: (l) => (
+                <span className="truncate text-muted-foreground">
+                    {l.account
+                        ? `${l.account.code} · ${l.account.name}`
+                        : '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'gst',
+            label: 'GST',
+            width: '1fr',
+            align: 'right',
+            cell: (l) => (
+                <span className="tabular-nums text-muted-foreground">
+                    {formatMoney(l.gst_amount)}
+                </span>
+            ),
+        },
+        {
+            key: 'total',
+            label: 'Line total',
+            width: '1.1fr',
+            align: 'right',
+            cell: (l) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(l.line_total)}
+                </span>
+            ),
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/finance/credit-notes"
+            icon={FileMinus}
+            title={creditNote.credit_note_number}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={CHIP_VARIANTS[creditNote.status] ?? 'neutral'}
+                >
+                    {creditNote.status === 'draft'
+                        ? 'Draft'
+                        : creditNote.status === 'approved'
+                          ? 'Approved'
+                          : creditNote.status === 'applied'
+                            ? 'Applied'
+                            : 'Cancelled'}
+                </PageHeaderStatusChip>
+            }
+            subline={[
+                TYPE_LABELS[creditNote.type] ?? creditNote.type,
+                creditNote.vendor?.name ?? 'No party recorded',
+                formatDate(creditNote.credit_date),
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                canApprove && isDraft ? (
+                    <PageHeaderPrimaryButton
+                        icon={CheckCircle}
+                        onClick={() => setConfirmOpen(true)}
+                    >
+                        Approve
+                    </PageHeaderPrimaryButton>
+                ) : undefined
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Total credit"
+                        href={`/finance/credit-notes/${creditNote.id}`}
+                        ariaLabel="View this credit note's total"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(creditNote.total_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {formatMoney(creditNote.subtotal)} plus GST
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="GST"
+                        href={`/finance/credit-notes/${creditNote.id}`}
+                        ariaLabel="View this credit note's GST"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(creditNote.gst_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {creditNote.lines.length} line
+                            {creditNote.lines.length === 1 ? '' : 's'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Type"
+                        href={`/finance/credit-notes?type=${creditNote.type}`}
+                        ariaLabel="View credit notes of this type"
+                    >
+                        <PageHeaderMeterBig>
+                            {creditNote.type === 'payable' ? 'AP' : 'AR'}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {TYPE_LABELS[creditNote.type] ?? creditNote.type}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Ledger journal"
+                        tone={creditNote.journal ? 'success' : 'warning'}
+                        href={
+                            creditNote.journal
+                                ? `/finance/journals/${creditNote.journal.id}`
+                                : '/finance/journals'
+                        }
+                        ariaLabel="View the ledger journal for this credit note"
+                    >
+                        <PageHeaderMeterBig>
+                            {creditNote.journal
+                                ? creditNote.journal.journal_number
+                                : 'Not posted'}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {creditNote.journal
+                                ? `Posted ${formatDate(creditNote.journal.posted_at)}`
+                                : 'Approving posts a journal'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
-        <AppLayout
-            user={auth.user}
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance' },
-                { title: 'Credit Notes', href: '/finance/credit-notes' },
-                {
-                    title: creditNote.credit_note_number,
-                    href: `/finance/credit-notes/${creditNote.id}`,
-                },
-            ]}
-        >
-            <Head title={`Credit Note ${creditNote.credit_note_number}`} />
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title={`Credit note ${creditNote.credit_note_number}`} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/credit-notes"
-                        title={
-                            <span className="flex flex-wrap items-center gap-3">
-                                {creditNote.credit_note_number}
-                                <StatusBadge status={creditNote.status} />
-                                <Badge
-                                    className={
-                                        typeConfig[creditNote.type]
-                                            ?.className ??
-                                        'bg-muted text-foreground'
-                                    }
-                                >
-                                    {typeConfig[creditNote.type]?.label ??
-                                        creditNote.type}
-                                </Badge>
-                            </span>
-                        }
-                        description={creditNote.vendor?.name ?? 'Unknown'}
-                        actions={
-                            isDraft && (
-                                <Button onClick={handleApprove}>
-                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                    Approve
-                                </Button>
-                            )
-                        }
-                    />
-                }
-            >
-                <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    {/* Credit Note Info */}
+            <PageLayout hero={header}>
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">
-                                Credit Note Details
+                            <CardTitle className="text-section-title">
+                                Credit note details
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-3 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    Credit Date
-                                </span>
-                                <span className="font-medium">
+                        <CardContent>
+                            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <DetailRow label="Credit date">
                                     {formatDate(creditNote.credit_date)}
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    Type
-                                </span>
-                                <span className="font-medium">
-                                    {creditNote.type === 'payable'
-                                        ? 'Accounts Payable'
-                                        : 'Accounts Receivable'}
-                                </span>
-                            </div>
-                            {creditNote.approved_by && (
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">
-                                        Approved By
-                                    </span>
-                                    <span className="font-medium">
+                                </DetailRow>
+                                <DetailRow label="Type">
+                                    {TYPE_LABELS[creditNote.type] ??
+                                        creditNote.type}
+                                </DetailRow>
+                                <DetailRow label="Vendor / client">
+                                    {creditNote.vendor ? (
+                                        <Link
+                                            href={`/finance/vendors/${creditNote.vendor.id}`}
+                                            className="text-primary hover:underline"
+                                        >
+                                            {creditNote.vendor.name}
+                                        </Link>
+                                    ) : (
+                                        '—'
+                                    )}
+                                </DetailRow>
+                                {creditNote.approved_by && (
+                                    <DetailRow label="Approved by">
                                         {creditNote.approved_by.name}
-                                    </span>
-                                </div>
-                            )}
-                            {creditNote.approved_at && (
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">
-                                        Approved At
-                                    </span>
-                                    <span className="font-medium">
-                                        {formatDateTime(creditNote.approved_at)}
-                                    </span>
-                                </div>
-                            )}
-                            {creditNote.reason && (
-                                <div className="border-t pt-2">
-                                    <span className="mb-1 block text-muted-foreground">
-                                        Reason
-                                    </span>
-                                    <p className="whitespace-pre-wrap text-foreground">
-                                        {creditNote.reason}
-                                    </p>
-                                </div>
-                            )}
+                                        {creditNote.approved_at
+                                            ? ` · ${formatDateTime(creditNote.approved_at)}`
+                                            : ''}
+                                    </DetailRow>
+                                )}
+                                {creditNote.reason && (
+                                    <div className="sm:col-span-2">
+                                        <dt className="text-caption">Reason</dt>
+                                        <dd className="mt-1 text-sm whitespace-pre-wrap">
+                                            {creditNote.reason}
+                                        </dd>
+                                    </div>
+                                )}
+                            </dl>
                         </CardContent>
                     </Card>
 
-                    {/* Amounts */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Amounts</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    Subtotal
-                                </span>
-                                <span>{formatMoney(creditNote.subtotal)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    GST
-                                </span>
-                                <span>
-                                    {formatMoney(creditNote.gst_amount)}
-                                </span>
-                            </div>
-                            <Separator />
-                            <div className="flex justify-between font-bold">
-                                <span>Total</span>
-                                <span>
-                                    {formatMoney(creditNote.total_amount)}
-                                </span>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* GL Journal */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                GL Journal
+                            <CardTitle className="text-section-title">
+                                Ledger journal
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {creditNote.journal ? (
-                                <div className="space-y-3 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">
-                                            Journal #
-                                        </span>
+                                <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <DetailRow label="Journal">
                                         <Link
                                             href={`/finance/journals/${creditNote.journal.id}`}
-                                            className="font-medium text-status-info hover:underline"
+                                            className="text-primary hover:underline"
                                         >
-                                            {creditNote.journal.journal_number}
+                                            {
+                                                creditNote.journal
+                                                    .journal_number
+                                            }
                                         </Link>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">
-                                            Status
-                                        </span>
-                                        <Badge className="bg-status-success-bg text-status-success">
-                                            {creditNote.journal.status}
-                                        </Badge>
-                                    </div>
-                                    {creditNote.journal.posted_at && (
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">
-                                                Posted
-                                            </span>
-                                            <span className="font-medium">
-                                                {formatDateTime(
-                                                    creditNote.journal
-                                                        .posted_at,
-                                                )}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
+                                    </DetailRow>
+                                    <DetailRow label="Status">
+                                        <StatusBadge
+                                            status={creditNote.journal.status}
+                                            className="rounded-[8px] font-semibold"
+                                        />
+                                    </DetailRow>
+                                    <DetailRow label="Posted">
+                                        {formatDateTime(
+                                            creditNote.journal.posted_at,
+                                        )}
+                                    </DetailRow>
+                                </dl>
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
-                                    <FileText className="mb-2 h-8 w-8" />
-                                    <p className="text-sm">
-                                        No journal posted yet
-                                    </p>
-                                </div>
+                                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <FileText className="size-4" />
+                                    No journal posted yet — approving this
+                                    credit note posts one to the ledger.
+                                </p>
                             )}
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Line Items */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle>Line Items</CardTitle>
-                    </CardHeader>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Description</TableHead>
-                                <TableHead className="text-right">
-                                    Qty
-                                </TableHead>
-                                <TableHead className="text-right">
-                                    Unit Price
-                                </TableHead>
-                                <TableHead className="text-right">
-                                    GST %
-                                </TableHead>
-                                <TableHead>Account</TableHead>
-                                <TableHead className="text-right">
-                                    GST
-                                </TableHead>
-                                <TableHead className="text-right">
-                                    Total
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {creditNote.lines.map((line) => (
-                                <TableRow key={line.id}>
-                                    <TableCell>{line.description}</TableCell>
-                                    <TableCell className="text-right">
-                                        {Number(line.quantity).toFixed(2)}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {formatMoney(line.unit_price)}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {Number(line.gst_rate).toFixed(2)}%
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {line.account
-                                            ? `${line.account.code} - ${line.account.name}`
-                                            : '-'}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {formatMoney(line.gst_amount)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-medium">
-                                        {formatMoney(line.line_total)}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </Card>
+                <ListCaption
+                    title="Line items"
+                    caption={`${creditNote.lines.length} line${creditNote.lines.length === 1 ? '' : 's'} · ${formatMoney(creditNote.total_amount)} total`}
+                />
+                <EntityTable
+                    rows={creditNote.lines}
+                    rowKey={(l) => l.id}
+                    identityLabel="Description"
+                    identity={(l) => ({ icon: FileText, name: l.description })}
+                    columns={lineColumns}
+                    actionsFor={() => []}
+                    minWidth={960}
+                />
             </PageLayout>
+
+            <ConfirmDialog
+                variant="default"
+                open={confirmOpen}
+                onClose={() => setConfirmOpen(false)}
+                title="Approve this credit note?"
+                description={
+                    <>
+                        This approves{' '}
+                        <span className="font-medium text-foreground">
+                            {creditNote.credit_note_number}
+                        </span>{' '}
+                        for {formatMoney(creditNote.total_amount)} and{' '}
+                        <span className="font-medium text-foreground">
+                            posts a journal to the ledger
+                        </span>
+                        . A credit note can&rsquo;t be edited once approved.
+                    </>
+                }
+                confirmText="Approve credit note"
+                processing={processing}
+                onConfirm={approve}
+            />
         </AppLayout>
     );
 }

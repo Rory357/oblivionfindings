@@ -1,0 +1,54 @@
+resources/js/components/it/__tests__/it-overview-board.test.tsx(97,19): error TS2352: Conversion of type '{ [k: string]: { total: number; ids: never[]; }; }' to type 'Record<"waiting" | "breached" | "mine" | "unmeasured" | "awaiting_it" | "attention" | "unassigned" | "breaching" | "awaiting_reply" | "waiting_requester" | "aging" | "all_open", { ...; }>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ [k: string]: { total: number; ids: never[]; }; }' is missing the following properties from type 'Record<"waiting" | "breached" | "mine" | "unmeasured" | "awaiting_it" | "attention" | "unassigned" | "breaching" | "awaiting_reply" | "waiting_requester" | "aging" | "all_open", { ...; }>': waiting, breached, mine, unmeasured, and 8 more.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(130,1): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(142,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(144,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(146,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(147,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(148,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(149,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(150,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(153,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(158,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(163,1): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(180,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(181,9): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(183,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(201,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(202,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(206,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(208,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(211,1): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(222,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(237,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(240,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(243,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(246,1): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(256,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(257,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(258,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(261,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(265,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(268,1): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(269,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(272,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(275,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(278,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(281,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/__tests__/it-overview-board.test.tsx(284,5): error TS2304: Cannot find name 'expect'.
+resources/js/components/it/it-overview-board.tsx(170,29): error TS18047: 'assignmentIntent' is possibly 'null'.
+resources/js/components/today-retirement.test.tsx(84,64): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/today-retirement.test.tsx(87,65): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/today-retirement.test.tsx(93,25): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.

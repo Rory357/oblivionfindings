@@ -1,13 +1,20 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { FinanceSectionRail } from '@/components/finance';
+import { ListCaption } from '@/components/lists';
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+    PageHeader,
+    PageHeaderFilterCheck,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import {
     Table,
@@ -20,8 +27,8 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { ArrowLeftRight, Link2, Save } from 'lucide-react';
-import { FormEvent } from 'react';
+import { ArrowLeftRight, Link2, Save, SearchX } from 'lucide-react';
+import { FormEvent, useState } from 'react';
 
 type LocalAccount = {
     id: number;
@@ -50,15 +57,24 @@ const providerLabels: Record<string, string> = {
     myob: 'MYOB',
 };
 
-const typeColors: Record<string, string> = {
-    asset: 'bg-status-info-bg text-status-info border-status-info/30',
-    liability: 'bg-primary/10 text-primary border-primary/30',
-    equity: 'bg-primary/10 text-primary border-primary/30',
-    revenue:
-        'bg-status-success-bg text-status-success border-status-success/30',
-    expense:
-        'bg-status-critical-bg text-status-critical border-status-critical/30',
+/** Account types in chart-of-accounts order, with their display labels. */
+const TYPE_ORDER = [
+    'asset',
+    'liability',
+    'equity',
+    'revenue',
+    'expense',
+] as const;
+
+const typeLabels: Record<string, string> = {
+    asset: 'Assets',
+    liability: 'Liabilities',
+    equity: 'Equity',
+    revenue: 'Revenue',
+    expense: 'Expenses',
 };
+
+const typeLabel = (type: string) => typeLabels[type] ?? type;
 
 export default function AccountMapping({
     integration,
@@ -67,14 +83,20 @@ export default function AccountMapping({
     const providerName = providerLabels[integration.provider];
     const externalIdLabel =
         integration.provider === 'xero'
-            ? 'Xero Account ID'
-            : 'MYOB Account UID';
+            ? 'Xero account ID'
+            : 'MYOB account UID';
+
+    const [search, setSearch] = useState('');
+    const [typeFilter, setTypeFilter] = useState('all');
+    const [unmappedOnly, setUnmappedOnly] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
         { title: 'Finance', href: '/finance' },
+        { title: 'Settings', href: '/finance/settings' },
         { title: 'Integrations', href: '/finance/integrations' },
         {
-            title: `${providerName} Mapping`,
+            title: providerName,
             href: `/finance/integrations/${integration.id}/mapping`,
         },
     ];
@@ -89,7 +111,7 @@ export default function AccountMapping({
         initialMapping[String(account.id)] = mapped;
     });
 
-    const { data, setData, put, processing, transform } = useForm({
+    const { data, setData, put, processing, transform, isDirty } = useForm({
         account_mapping: initialMapping,
         tax_mapping: integration.tax_mapping ?? {},
     });
@@ -101,8 +123,11 @@ export default function AccountMapping({
         });
     }
 
-    function handleSubmit(e: FormEvent) {
-        e.preventDefault();
+    const mappedFor = (account: LocalAccount) =>
+        data.account_mapping[String(account.id)] ?? '';
+
+    function handleSubmit(e?: FormEvent) {
+        e?.preventDefault();
         // Filter out empty mappings
         const filteredMapping: Record<string, string> = {};
         Object.entries(data.account_mapping).forEach(([key, value]) => {
@@ -124,170 +149,298 @@ export default function AccountMapping({
     const mappedCount = Object.values(data.account_mapping).filter(
         (v) => v && v.trim(),
     ).length;
+    const mappedPct =
+        localAccounts.length === 0
+            ? 0
+            : (mappedCount / localAccounts.length) * 100;
 
-    // Group accounts by type
-    const groupedAccounts = localAccounts.reduce<
-        Record<string, LocalAccount[]>
-    >((acc, account) => {
-        const type = account.type;
-        if (!acc[type]) acc[type] = [];
-        acc[type].push(account);
-        return acc;
-    }, {});
+    const query = search.trim().toLowerCase();
+    const shown = localAccounts.filter((account) => {
+        const matchesText =
+            query === '' ||
+            account.code.toLowerCase().includes(query) ||
+            account.name.toLowerCase().includes(query) ||
+            (account.sub_type ?? '').toLowerCase().includes(query);
+        const matchesType = typeFilter === 'all' || account.type === typeFilter;
+        const matchesMapped = !unmappedOnly || !mappedFor(account).trim();
+        return matchesText && matchesType && matchesMapped;
+    });
 
-    const typeOrder = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+    // Group the visible accounts by type, keeping chart-of-accounts order.
+    const groupedAccounts = shown.reduce<Record<string, LocalAccount[]>>(
+        (acc, account) => {
+            (acc[account.type] ??= []).push(account);
+            return acc;
+        },
+        {},
+    );
+    const groupOrder = [
+        ...TYPE_ORDER.filter((t) => groupedAccounts[t]?.length),
+        ...Object.keys(groupedAccounts)
+            .filter(
+                (t) => !TYPE_ORDER.includes(t as (typeof TYPE_ORDER)[number]),
+            )
+            .sort(),
+    ];
+
+    const typeOptions = [
+        { value: 'all', label: 'All account types' },
+        ...TYPE_ORDER.filter((t) =>
+            localAccounts.some((a) => a.type === t),
+        ).map((t) => ({ value: t, label: typeLabels[t] })),
+    ];
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            icon={ArrowLeftRight}
+            backHref="/finance/integrations"
+            title={`${providerName} account mapping`}
+            titleChip={
+                isDirty ? (
+                    <PageHeaderStatusChip variant="warning">
+                        Unsaved changes
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip
+                        variant={
+                            mappedCount === localAccounts.length &&
+                            localAccounts.length > 0
+                                ? 'success'
+                                : 'info'
+                        }
+                    >
+                        {mappedCount} of {localAccounts.length} mapped
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={`Settings · Integrations · ${integration.tenant_id ?? 'no tenant configured'} · leave an account blank to keep it out of the sync`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search code, name or sub type…"
+                    />
+                    <PageHeaderPrimaryButton
+                        icon={Save}
+                        onClick={() => handleSubmit()}
+                        disabled={processing}
+                    >
+                        {processing ? 'Saving…' : 'Save mapping'}
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Mapped"
+                        value={`${Math.round(mappedPct)}%`}
+                        tone="success"
+                        ariaLabel="Show every account"
+                        onClick={() => {
+                            setUnmappedOnly(false);
+                            setTypeFilter('all');
+                            setSearch('');
+                        }}
+                    >
+                        <PageHeaderMeterBar percent={mappedPct} />
+                        <PageHeaderMeterCaption>
+                            {mappedCount} of {localAccounts.length} accounts
+                            carry a {providerName} ID
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Unmapped"
+                        tone="warning"
+                        ariaLabel="Show only unmapped accounts"
+                        onClick={() => setUnmappedOnly(true)}
+                    >
+                        <PageHeaderMeterBig>
+                            {localAccounts.length - mappedCount}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            skipped when this connection syncs
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Active accounts"
+                        href="/finance/accounts"
+                        ariaLabel="View the chart of accounts"
+                    >
+                        <PageHeaderMeterBig>
+                            {localAccounts.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            in the chart of accounts
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Account type"
+                        value={typeFilter}
+                        allValue="all"
+                        options={typeOptions}
+                        onChange={setTypeFilter}
+                    />
+                    <PageHeaderFilterCheck
+                        label="Unmapped only"
+                        checked={unmappedOnly}
+                        onChange={setUnmappedOnly}
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`${providerName} Account Mapping`} />
+            <Head title={`${providerName} account mapping`} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        variant="compact"
-                        backHref="/finance/integrations"
-                        title={`${providerName} Account Mapping`}
-                        description={`Map your local chart of accounts to ${providerName} accounts for synchronisation`}
-                        actions={
-                            <>
-                                <Badge variant="outline">
-                                    {mappedCount} / {localAccounts.length}{' '}
-                                    mapped
-                                </Badge>
+            <PageLayout hero={header}>
+                {shown.length === 0 ? (
+                    <EmptyState
+                        icon={localAccounts.length === 0 ? Link2 : SearchX}
+                        heading={
+                            localAccounts.length === 0
+                                ? 'No active accounts to map'
+                                : 'No accounts match these filters'
+                        }
+                        description={
+                            localAccounts.length === 0
+                                ? 'Add accounts to the chart of accounts before mapping them to ' +
+                                  providerName +
+                                  '.'
+                                : 'Clear the search, account type or unmapped-only filter to see every account.'
+                        }
+                        action={
+                            localAccounts.length === 0 ? undefined : (
                                 <Button
-                                    onClick={handleSubmit}
-                                    disabled={processing}
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        setSearch('');
+                                        setTypeFilter('all');
+                                        setUnmappedOnly(false);
+                                    }}
                                 >
-                                    <Save className="mr-2 h-4 w-4" />
-                                    {processing ? 'Saving...' : 'Save Mapping'}
+                                    Clear filters
                                 </Button>
-                            </>
+                            )
                         }
                     />
-                }
-            >
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
-                            <div>
-                                <CardTitle>Account Mapping</CardTitle>
-                                <CardDescription>
-                                    Enter the {externalIdLabel} for each local
-                                    account. Leave blank to skip accounts you
-                                    don't want to sync.
-                                </CardDescription>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleSubmit}>
-                            {typeOrder.map((type) => {
-                                const accounts = groupedAccounts[type];
-                                if (!accounts || accounts.length === 0)
-                                    return null;
+                ) : (
+                    /* The mapping workbench is an editable grid — one text
+                     * input per account — so it stays a plain table rather
+                     * than an EntityTable, which is a browse surface. */
+                    <form
+                        onSubmit={handleSubmit}
+                        className="flex flex-col gap-5"
+                    >
+                        {groupOrder.map((type) => {
+                            const accounts = groupedAccounts[type];
+                            const groupMapped = accounts.filter((a) =>
+                                mappedFor(a).trim(),
+                            ).length;
 
-                                return (
-                                    <div key={type} className="mb-6">
-                                        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-                                            <Badge
-                                                variant="outline"
-                                                className={typeColors[type]}
-                                            >
-                                                {type}
-                                            </Badge>
-                                            <span>
-                                                ({accounts.length} accounts)
-                                            </span>
-                                        </h3>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead className="w-24">
-                                                        Code
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        Account Name
-                                                    </TableHead>
-                                                    <TableHead className="w-32">
-                                                        Sub Type
-                                                    </TableHead>
-                                                    <TableHead className="w-20 text-center">
-                                                        <Link2 className="mx-auto h-4 w-4" />
-                                                    </TableHead>
-                                                    <TableHead className="w-72">
-                                                        {externalIdLabel}
-                                                    </TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {accounts.map((account) => (
-                                                    <TableRow key={account.id}>
-                                                        <TableCell className="font-mono text-sm">
-                                                            {account.code}
-                                                        </TableCell>
-                                                        <TableCell className="font-medium">
-                                                            {account.name}
-                                                        </TableCell>
-                                                        <TableCell className="text-sm text-muted-foreground">
-                                                            {account.sub_type?.replace(
-                                                                /_/g,
-                                                                ' ',
-                                                            ) || '-'}
-                                                        </TableCell>
-                                                        <TableCell className="text-center">
-                                                            {data
-                                                                .account_mapping[
-                                                                String(
-                                                                    account.id,
-                                                                )
-                                                            ] ? (
-                                                                <ArrowLeftRight className="mx-auto h-4 w-4 text-status-success" />
-                                                            ) : (
-                                                                <span className="text-muted-foreground/30">
-                                                                    -
-                                                                </span>
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Input
-                                                                value={
-                                                                    data
-                                                                        .account_mapping[
-                                                                        String(
-                                                                            account.id,
-                                                                        )
-                                                                    ] || ''
-                                                                }
-                                                                onChange={(e) =>
-                                                                    handleMappingChange(
-                                                                        account.id,
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                placeholder={`${providerName} ID`}
-                                                                className="h-8 text-sm"
+                            return (
+                                <section
+                                    key={type}
+                                    className="flex flex-col gap-5"
+                                >
+                                    <ListCaption
+                                        title={typeLabel(type)}
+                                        caption={`${groupMapped} of ${accounts.length} mapped`}
+                                    />
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="w-24">
+                                                    Code
+                                                </TableHead>
+                                                <TableHead>
+                                                    Account name
+                                                </TableHead>
+                                                <TableHead className="w-32">
+                                                    Sub type
+                                                </TableHead>
+                                                <TableHead className="w-20 text-center">
+                                                    <Link2
+                                                        aria-label="Mapped"
+                                                        className="mx-auto h-4 w-4"
+                                                    />
+                                                </TableHead>
+                                                <TableHead className="w-72">
+                                                    {externalIdLabel}
+                                                </TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {accounts.map((account) => (
+                                                <TableRow key={account.id}>
+                                                    <TableCell className="font-mono text-sm">
+                                                        {account.code}
+                                                    </TableCell>
+                                                    <TableCell className="font-medium">
+                                                        {account.name}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-muted-foreground">
+                                                        {account.sub_type?.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        ) || '—'}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        {mappedFor(
+                                                            account,
+                                                        ).trim() ? (
+                                                            <ArrowLeftRight
+                                                                aria-label={`${account.name} is mapped`}
+                                                                className="mx-auto h-4 w-4 text-status-success"
                                                             />
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                );
-                            })}
-
-                            <div className="flex justify-end border-t pt-4">
-                                <Button type="submit" disabled={processing}>
-                                    <Save className="mr-2 h-4 w-4" />
-                                    {processing ? 'Saving...' : 'Save Mapping'}
-                                </Button>
-                            </div>
-                        </form>
-                    </CardContent>
-                </Card>
+                                                        ) : (
+                                                            <span className="text-muted-foreground/40">
+                                                                —
+                                                            </span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Input
+                                                            aria-label={`${externalIdLabel} for ${account.code} ${account.name}`}
+                                                            value={mappedFor(
+                                                                account,
+                                                            )}
+                                                            onChange={(e) =>
+                                                                handleMappingChange(
+                                                                    account.id,
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder={`${providerName} ID`}
+                                                            className="h-8 text-sm"
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </section>
+                            );
+                        })}
+                        {/* Keep Enter-to-save working without a second visible
+                         * Save button — the header primary is the only one. */}
+                        <button type="submit" className="sr-only">
+                            Save mapping
+                        </button>
+                    </form>
+                )}
             </PageLayout>
         </AppLayout>
     );

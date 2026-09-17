@@ -22,7 +22,10 @@ class SiteVendorController extends Controller
     {
         $user = $request->user();
         $canVendors = (bool) ($user?->canDo('vendors.view') ?? false);
-        $canCredentials = (bool) ($user?->canDo('credentials.view') ?? false);
+        $vault = app(\App\Services\Sites\SiteCredentialAccess::class);
+        $canCredentials = $user->canDo('credentials.view') || $vault->query($user)->exists();
+        $commercial = app(\App\Services\Sites\VendorCommercialAccess::class)->capable($user);
+        if (! $canVendors && ! $canCredentials && $commercial) return redirect('/vendors/renewals');
 
         abort_unless($canVendors || $canCredentials, 403);
 
@@ -38,9 +41,8 @@ class SiteVendorController extends Controller
 
         // Vendor data — only loaded and serialised when the user can see it.
         $vendors = $canVendors
-            ? $scopeBySite(SiteVendor::query()
+            ? app(\App\Services\SiteVendorAccessService::class)->query($user)
                 ->with('site:id,name,type')
-                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes)))
                 ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
                 ->when($request->service_type, fn ($q) => $q->where('service_type', $request->service_type))
                 ->when($request->vendor_status === 'active', fn ($q) => $q->where('is_active', true))
@@ -57,39 +59,10 @@ class SiteVendorController extends Controller
         // Credential data — same gate. Credentials carry no plaintext value
         // here (the list view never includes the secret), but the metadata
         // itself is still restricted to credentials.view holders.
-        $credentials = $canCredentials
-            ? $scopeBySite(SiteCredential::query()
-                ->with(['site:id,name,type', 'vendor:id,company_name,service_type'])
-                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes)))
-                ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
-                ->when($request->credential_type, fn ($q) => $q->where('credential_type', $request->credential_type))
-                ->when($request->requires_reauth === 'yes', fn ($q) => $q->where('requires_reauth', true))
-                ->when($request->requires_reauth === 'no', fn ($q) => $q->where('requires_reauth', false))
-                ->orderBy('label')
-                ->limit(1000)
-                ->get()
-                ->map(fn (SiteCredential $credential) => [
-                    'id' => $credential->id,
-                    'site_id' => $credential->site_id,
-                    'site_name' => $credential->site?->name,
-                    'site_type' => $credential->site?->type,
-                    'label' => $credential->label,
-                    'credential_type' => $credential->credential_type,
-                    'username' => $credential->username,
-                    'url' => $credential->url,
-                    'notes' => $credential->notes,
-                    'vendor_id' => $credential->vendor_id,
-                    'vendor_name' => $credential->vendor?->company_name,
-                    'vendor_service_type' => $credential->vendor?->service_type,
-                    'requires_reauth' => (bool) $credential->requires_reauth,
-                    'is_shareable' => (bool) $credential->is_shareable,
-                    'password_strength' => $credential->password_strength,
-                    'has_totp' => $credential->hasTotp(),
-                    'last_rotated_at' => $credential->last_rotated_at?->toDateTimeString(),
-                    'value_preview' => '********',
-                ])
-                ->values()
-            : collect();
+        $credentials = $canCredentials ? $vault->presentMany($user, $vault->query($user)
+            ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
+            ->when($request->credential_type, fn ($q) => $q->where('credential_type', $request->credential_type))
+            ->orderBy('label')->limit(1000)->get()) : collect();
 
         $sites = $scopeBySite(Site::query()
             ->active()
@@ -98,28 +71,17 @@ class SiteVendorController extends Controller
             ->orderBy('name')
             ->get();
 
-        $serviceTypes = $canVendors
-            ? $scopeBySite(SiteVendor::query()
-                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes)))
-                ->select('service_type')
-                ->distinct()
-                ->orderBy('service_type')
-                ->pluck('service_type')
-                ->values()
-            : collect();
-
-        $credentialTypes = $canCredentials
-            ? $scopeBySite(SiteCredential::query()
-                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes)))
-                ->select('credential_type')
-                ->distinct()
-                ->orderBy('credential_type')
-                ->pluck('credential_type')
-                ->values()
-            : collect();
+        $serviceTypes = $canVendors ? app(\App\Services\SiteVendorAccessService::class)->query($user)->select('service_type')->distinct()->orderBy('service_type')->pluck('service_type') : collect();
+        $credentialTypes = $canCredentials ? $vault->query($user)->select('credential_type')->distinct()->orderBy('credential_type')->pluck('credential_type') : collect();
+        $selectedCredential = $request->filled('credential_id')
+            ? $vault->query($user)->find((int) $request->credential_id) : null;
+        $returnTo = (string) $request->query('return_to', '');
+        $returnTo = preg_match('#^/it/(knowledge(?:/[0-9]+)?|tickets/[0-9]+)(?:\?[a-zA-Z0-9_%=&.+-]*)?$#', $returnTo) ? $returnTo : null;
 
         return inertia('sites/vendors-credentials/global', [
             'vendors' => $vendors,
+            'selectedCredential' => $selectedCredential ? $vault->presentation($user, $selectedCredential) : null,
+            'returnTo' => $returnTo,
             'credentials' => $credentials,
             'sites' => $sites,
             'serviceTypes' => $serviceTypes,
@@ -138,7 +100,8 @@ class SiteVendorController extends Controller
                 // affordances hide instead of dead-ending in a 403.
                 'vendorsManage' => $canSiteWrite && (bool) ($user?->canDo('vendors.manage') ?? false),
                 'credentialsManage' => $canSiteWrite && (bool) ($user?->canDo('credentials.manage') ?? false),
-                'credentialsReveal' => $canSiteWrite && (bool) ($user?->canDo('credentials.reveal') ?? false),
+                'credentialsReveal' => $credentials->contains(fn ($c) => $c['can_reveal']),
+                'contracts' => $commercial,
                 'credentialsAudit' => (bool) ($user?->canDo('credentials.audit') ?? false),
                 // Type catalogue is application-wide configuration.
                 'manageCredentialTypes' => (bool) ($user?->canDo('credentials.manage') ?? false),
@@ -166,7 +129,12 @@ class SiteVendorController extends Controller
         }
 
         DB::transaction(function () use ($site, $validated, $vendor): void {
-            $this->lockedVendor($site, (int) $vendor->id)->update($validated);
+            $locked = $this->lockedVendor($site, (int) $vendor->id);
+            $locked->update($validated);
+            if (\Illuminate\Support\Facades\Schema::hasTable('vendor_agreements')) {
+                $locked->increment('lock_version');
+                app(\App\Services\Sites\VendorAgreements::class)->vendorChanged($locked);
+            }
         }, attempts: 1);
 
         return back(303)->with('success', 'Vendor updated.');
@@ -187,7 +155,7 @@ class SiteVendorController extends Controller
 
         $logs = SiteCredentialAuditLog::query()
             ->with(['user:id,name', 'site:id,name,type', 'credential:id,label,credential_type,site_id'])
-            ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            ->whereHas('site', fn ($q) => $q->active()->notArchived()->whereNull('archived_at')->whereIn('type', $allowedSiteTypes))
             // Per-user assignment scoping, matching globalIndex / the per-site flow.
             ->whereIn('site_id', $accessibleSiteIds)
             ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
@@ -218,7 +186,12 @@ class SiteVendorController extends Controller
                     'target_type' => $log->credential_type ?? $log->credential?->credential_type ?? 'credential',
                     'site_name' => $log->site?->name ?? '—',
                     'ip' => $log->ip_address ?? '—',
-                    'result' => in_array($log->action, ['reauth_failed', 'denied'], true) ? 'denied' : 'ok',
+                    'result' => match ($log->action) {
+                        'reauth_failed', 'denied' => 'denied',
+                        'copy_reported_failed' => 'failed',
+                        'copy_intent' => 'intent',
+                        default => 'ok',
+                    },
                 ];
             })
             ->values();
@@ -296,6 +269,10 @@ class SiteVendorController extends Controller
         DB::transaction(function () use ($request, $site, $validated, $vendor): void {
             $locked = $this->lockedVendor($site, (int) $vendor->id);
             $locked->update($this->prepareVendorComplianceData($validated, $request, $locked));
+            if (\Illuminate\Support\Facades\Schema::hasTable('vendor_agreements')) {
+                $locked->increment('lock_version');
+                app(\App\Services\Sites\VendorAgreements::class)->vendorChanged($locked);
+            }
         }, attempts: 1);
 
         return back(303)->with('success', 'Vendor updated successfully.');
@@ -309,7 +286,7 @@ class SiteVendorController extends Controller
 
         $deleted = DB::transaction(function () use ($site, $vendor): bool {
             $locked = $this->lockedVendor($site, (int) $vendor->id);
-            if ($locked->credentials()->exists()) {
+            if ($locked->credentials()->exists() || (\Illuminate\Support\Facades\Schema::hasTable('vendor_agreements') && $locked->agreements()->exists())) {
                 return false;
             }
 
@@ -319,17 +296,19 @@ class SiteVendorController extends Controller
         if (! $deleted) {
             return back(303)->with(
                 'error',
-                'Cannot delete vendor with associated credentials. Please delete credentials first.',
+                'This vendor has retained credentials or agreements. Retire the vendor to preserve its linked records and cancel future renewal follow-ups.',
             );
         }
 
         return back(303)->with('success', 'Vendor deleted successfully.');
     }
 
-    private function vendorPayload(SiteVendor $vendor, bool $withSite = false): array
+    public function vendorPayload(SiteVendor $vendor, bool $withSite = false): array
     {
         return [
             'id' => $vendor->id,
+            'lock_version' => $vendor->lock_version ?? 1,
+            'visibility' => $vendor->visibility ?? 'site',
             'site_id' => $vendor->site_id,
             'site_name' => $withSite ? $vendor->site?->name : null,
             'site_type' => $withSite ? $vendor->site?->type : null,

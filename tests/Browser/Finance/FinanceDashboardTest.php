@@ -23,12 +23,14 @@ test('finance accounts index loads', function () {
     });
 });
 
-test('finance accounts create page loads', function () {
+// The routed create form is retired — adding an account is the wizard on the
+// chart, so the old URL redirects there.
+test('finance accounts create url redirects to the chart', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/finance/accounts/create')
-            ->waitForText('Account', 10)
-            ->assertSee('Account');
+            ->waitForText('Chart of accounts', 10)
+            ->assertPathIs('/finance/accounts');
     });
 });

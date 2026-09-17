@@ -331,6 +331,105 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+describe('ticket note modal', () => {
+    it('opens on request and retains separate notes and time when closed or switched', () => {
+        render(
+            <TicketReplyComposer
+                {...props}
+                modal
+                ticketWork={{
+                    ready: true,
+                    timezone: 'Pacific/Auckland',
+                    bookings: [],
+                    recipients: [],
+                }}
+            />,
+        );
+        expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
+        fireEvent.change(
+            screen.getByRole('textbox', { name: 'Internal note' }),
+            { target: { value: 'Private diagnostics' } },
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Add time entry' }));
+        fireEvent.change(screen.getByLabelText('Started · entry 1'), {
+            target: { value: '2026-07-01T18:00' },
+        });
+        fireEvent.click(screen.getByLabelText('Work done after hours'));
+        fireEvent.click(screen.getByRole('button', { name: 'Public reply' }));
+        write('Customer update');
+        expect(
+            screen.queryByLabelText('Started · entry 1'),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Continue note' }));
+        expect(screen.getByRole('textbox', { name: 'Your reply' })).toHaveValue(
+            'Customer update',
+        );
+        fireEvent.click(screen.getByRole('button', { name: /Internal note/ }));
+        expect(
+            screen.getByRole('textbox', { name: 'Internal note' }),
+        ).toHaveValue('Private diagnostics');
+        expect(screen.getByLabelText('Started · entry 1')).toHaveValue(
+            '2026-07-01T18:00',
+        );
+        expect(screen.getByLabelText('Work done after hours')).toBeChecked();
+    });
+
+    it('keeps submission recovery available and closes only after the matching note is saved', async () => {
+        render(<TicketReplyComposer {...props} modal />);
+        fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
+        fireEvent.change(
+            screen.getByRole('textbox', { name: 'Internal note' }),
+            { target: { value: 'Reviewed diagnostic result' } },
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
+        await waitFor(() =>
+            expect(
+                mocks.commands.get('internal').submit,
+            ).toHaveBeenCalledOnce(),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        act(() => mocks.commands.get('internal').unknown());
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Continue note' }));
+        expect(
+            screen.getByRole('button', { name: 'Retry original reply' }),
+        ).toBeInTheDocument();
+        act(() =>
+            mocks.commands
+                .get('internal')
+                .complete({ ...committed, is_internal: true }),
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
+        expect(
+            screen.getByRole('textbox', { name: 'Internal note' }),
+        ).toHaveValue('');
+    });
+
+    it('opens the requested audience from the ticket action without exposing another audience', () => {
+        const { container } = render(
+            <TicketReplyComposer {...props} modal canInternal={false} />,
+        );
+        act(() =>
+            container
+                .querySelector('[data-ticket-composer]')
+                ?.dispatchEvent(
+                    new CustomEvent('ticket-open-note', { detail: 'internal' }),
+                ),
+        );
+        expect(
+            screen.getByRole('textbox', { name: 'Your reply' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('textbox', { name: 'Internal note' }),
+        ).not.toBeInTheDocument();
+    });
+});
+
 const restoredReply = (withDraft = false): ItDraftBrowserRestored => ({
     snapshot: {
         fields: { body: 'Newer unsent browser text' },

@@ -49,7 +49,7 @@ lucide-react icons, Recharts.
 | Live | `live` / `live-bg` | In-progress/running things (distinct from info) |
 | Category | `category-ops/hr/compliance/incidents/governance/sites/fleet/finance` (+ `-bg`) | Module-level tinting, hue-rotated from brand |
 | Charts | `--chart-1`…`--chart-5` | Recharts fills — `fill="var(--chart-1)"` |
-| Calendar sources | `--src-event/inspection/compliance/…` (+ `-bg`, `-ln`) | Site Calendar obligation sources only |
+| Calendar sources | `--src-event/inspection/compliance/…` (+ `-bg`, `-ln`); Governance calendar: `--src-meetings/decisions/obligations/policies`; Finance calendar: `--src-invoice-due/bill-due/payment-run/gst-due/payroll/period-close` | Shared SiteCalendar sources only (Sites + Governance + Finance adapters) |
 | Sidebar | `sidebar-*` | The app sidebar only |
 
 Status → **always** `<StatusBadge>` (`components/ui/status-badge.tsx`) or
@@ -434,6 +434,32 @@ before.
   point — every card/row keeps the kebab AND the right-click context
   menu with the full existing `MenuItem` set — and reintroducing
   readiness/onboarding displays (removed 2026-09-06).
+- **One sidebar link per register** (corrected 2026-09-14, Governance) —
+  a module sub-panel that lists every register as its own link (Governance
+  had 26 for chairs/secretaries). Group sibling registers into hubs: the
+  sidebar shows ONE entry per hub and the siblings become the hub's
+  connected-tab header rail, each keeping its canonical URL so deep links
+  and server authorisation are unchanged. Keep the config in one place
+  (reference: `lib/governance-sections.ts` + `GovernanceSectionRail`, with
+  the sidebar entry staying lit across the hub). Don't orphan a module
+  that has no other entry (Roadmap became a Strategy hub tab), and never
+  use hidden nav as the security boundary.
+- **Auditor and developer language in member-facing copy** (corrected
+  2026-09-14, Governance: "for a normal person it is difficult to
+  understand") — reference codes used as names (`RES-2026-004` as a title
+  or breadcrumb), raw enum values (`full_board`, `no_quorum`,
+  `charitable_trust`), formulas (`floor(N/2)+1`), Title Case, US spelling,
+  and words like immutable, frozen, snapshot, electorate, recuse,
+  attestation, fingerprint or "bound". Write for a volunteer: follow
+  `docs/audits/2026-09-14-governance-plain-language-ux/vocabulary.md` —
+  sentence case, NZ English, the record title first with the code as a
+  muted `refSuffix()`, every enum through `lib/governance-labels.ts`
+  (server: `GovernanceLabels`), a `GovernanceTermHint` for any term that
+  needs explaining, "Not available" instead of a green 0 when data is
+  missing, a confirm dialog that states the effect for consequential
+  actions, and visible text saying why something is blocked and who can
+  unblock it. Server-generated titles, flash and validation messages
+  count as UI copy.
 - **A global "Live"/sync chip in the top bar** — removed from the
   approved shell (2026-09-05); live/sync status belongs on the page
   surfaces that need it, not in the global chrome.
@@ -466,6 +492,40 @@ before.
   If a utility's token isn't in `app.css` `@theme`, it doesn't exist.
 
 ---
+
+- **Section captions inside a sidebar module** (corrected 2026-09-16:
+  "the left nav bar has headings in them which is not easy to
+  differentiate") — small uppercase captions ("Fleet", "Assets",
+  "Payroll") splitting a module's sub-links into sections, in either the
+  expanded rail or the collapsed-rail flyout. They read as more nav rows
+  and compete with the links. Each module renders ONE continuous list of
+  links (`flattenSidebarGroups` in `app-sidebar.tsx`), with no caption
+  and no extra gap between the former sections; keep the group builders
+  for ordering only. The module header rows themselves stay.
+- **Sidebar rail that snaps to the top on every click** (corrected
+  2026-09-16) — pages render their layout inline, so the shell remounts on
+  each Inertia visit and a fresh scroll container starts at offset 0.
+  `preserveScroll` on the links does not cover this. The rail's offset is
+  remembered across mounts (`persistScrollTop`/`readStoredScrollTop` in
+  `app-sidebar.tsx`) and restored in a layout effect; any new scrollable
+  chrome that survives a visit needs the same treatment.
+- **Browser `prompt()` / `confirm()` as a form** (corrected 2026-09-16,
+  Finance) — collecting a reference, a reason or any other evidence through
+  a chain of `window.prompt()` calls. There is no validation, no labels, no
+  cancel semantics past the first step, and the sequence aborts silently
+  half-way. Evidence and references are collected in a dialog with real
+  fields and validation; the gate itself is
+  `components/confirm-dialog.tsx`.
+- **Hero numbers repeated as body KPI cards** (corrected 2026-09-16,
+  Finance) — the same figures rendered in the header meter row and again in
+  a card grid below it (and, on one page, a third time in a table footer).
+  A number lives once, in the meter row, where it links to the list it
+  came from. Residual in-body stats use `components/ops-stat-card.tsx`.
+- **Page-local counts labelled as totals** (corrected 2026-09-16, Finance)
+  — meter or stat blocks reading "Posted (this page)" / "Active (this
+  page)", counted from the current page of a paginated list. Either the
+  controller returns the real total for the current filter, or the block
+  goes; a label that admits the number is wrong is not a fix.
 
 ## Conformance sweep (run on request)
 

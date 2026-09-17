@@ -6,6 +6,7 @@ use App\Domain\It\Data\ItAttachmentStorageReservation;
 use App\Domain\It\Data\ItScannedEmailAttachment;
 use App\Models\ItAttachment;
 use App\Models\ItAttachmentStorageIntent;
+use App\Models\ItCatalogSubmission;
 use App\Models\ItInboundEmail;
 use App\Models\ItMailboxConnection;
 use App\Models\ItTicket;
@@ -29,7 +30,7 @@ use Throwable;
 final class ItAttachmentStorageIntentService
 {
     /** @return array<int, ItAttachmentStorageReservation> */
-    public function reserveDirect(ItTicket|ItTicketComment $parent, array $files, User $actor): array
+    public function reserveDirect(ItTicket|ItTicketComment|ItCatalogSubmission $parent, array $files, User $actor): array
     {
         $files = array_values($files);
         $this->validateFiles($files);
@@ -68,7 +69,7 @@ final class ItAttachmentStorageIntentService
     }
 
     /** Caller holds its business locks; intent rows are then locked by ascending ID. */
-    public function storeReservedDirect(ItTicket|ItTicketComment $parent, array $files, User $actor, array $reservations, array &$storedPaths): void
+    public function storeReservedDirect(ItTicket|ItTicketComment|ItCatalogSubmission $parent, array $files, User $actor, array $reservations, array &$storedPaths): void
     {
         $files = array_values($files);
         if (DB::transactionLevel() < 1) {
@@ -398,7 +399,7 @@ final class ItAttachmentStorageIntentService
         return ['content_sha256' => $hash, 'original_name_sha256' => hash('sha256', $file->getClientOriginalName()), 'size' => (int) $file->getSize()];
     }
 
-    private function assertParent(ItTicket|ItTicketComment $parent, User $actor): void
+    private function assertParent(ItTicket|ItTicketComment|ItCatalogSubmission $parent, User $actor): void
     {
         if (! $parent->exists || (int) $parent->id < 1 || (int) $actor->id < 1
             || $parent->getConnection()->getDatabaseName() !== DB::connection()->getDatabaseName()) {

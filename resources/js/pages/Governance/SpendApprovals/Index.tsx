@@ -1,15 +1,50 @@
-import { FilterBar, FilterField } from '@/components/filter-bar';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import { useDialogDeepLink } from '@/components/governance/governance-dialog-deep-link';
+import {
+    EmptyValue,
+    EntityChip,
+    EntityContextMenu,
+    EntityStatusChip,
+    EntityTable,
+    ListCaption,
+    PersonCell,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import AppLayout from '@/layouts/app-layout';
-import { statusColors } from '@/lib/status-colors';
+import { formatDateLong } from '@/lib/datetime';
+import { formatNzd, governanceStatus, refSuffix } from '@/lib/governance-labels';
 import { PageProps } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, HandCoins, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { ExternalLink, HandCoins, Info, Plus, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+    SpendApprovalWizardDialog,
+    whoApprovesText,
+    type SpendApprovalFormOptions,
+} from './_dialogs';
+
+type Person = { id: number; name: string };
 
 interface Approval {
     id: number;
@@ -20,10 +55,10 @@ interface Approval {
     currency: string;
     status: string;
     requires_board: boolean;
-    requested_by_id?: number;
-    requestedBy?: { id: number; name: string } | null;
-    decidedBy?: { id: number; name: string } | null;
-    resolution?: { id: number; title: string; outcome: string } | null;
+    requested_by?: Person | number | null;
+    requestedBy?: Person | null;
+    decided_by?: Person | number | null;
+    decidedBy?: Person | null;
     submitted_at: string | null;
     decided_at: string | null;
     created_at: string;
@@ -32,6 +67,7 @@ interface Approval {
 interface Props extends PageProps {
     approvals: {
         data: Approval[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
         current_page: number;
         last_page: number;
         total: number;
@@ -43,274 +79,424 @@ interface Props extends PageProps {
     };
     summary: {
         pending: number;
-        approved_ytd: number;
-        rejected_ytd: number;
+        waiting: number;
+        drafts: number;
+        approved_this_year: number;
+        rejected_this_year: number;
+        financial_year: string;
     };
     categories: Record<string, string>;
     thresholds: Record<string, number>;
+    can_create?: boolean;
+    form_options?: { sites: SpendApprovalFormOptions['sites'] } | null;
 }
 
+const ALL = '__all';
+
 const STATUSES = [
-    { value: 'draft', label: 'Draft' },
-    { value: 'submitted', label: 'Submitted' },
+    { value: ALL, label: 'Any status' },
+    { value: 'submitted', label: 'Waiting for decision' },
+    { value: 'draft', label: 'Drafts' },
     { value: 'approved', label: 'Approved' },
-    { value: 'rejected', label: 'Rejected' },
+    { value: 'rejected', label: 'Not approved' },
     { value: 'expired', label: 'Expired' },
 ];
 
-const formatNzd = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', {
-        style: 'currency',
-        currency: 'NZD',
-    }).format(amount || 0);
+const personName = (
+    camel: Person | null | undefined,
+    snake: Person | number | null | undefined,
+) => camel?.name ?? (snake && typeof snake === 'object' ? snake.name : null);
 
 export default function SpendApprovalsIndex({
-    auth,
     approvals,
     filters,
     summary,
     categories,
     thresholds,
+    can_create = false,
+    form_options = null,
 }: Props) {
-    const [values, setValues] = useState<Record<string, any>>({
-        status: filters.status,
-        category: filters.category,
-        search: filters.search,
-    });
+    const [search, setSearch] = useState(filters.search ?? '');
+    const [createOpen, setCreateOpen] = useDialogDeepLink(
+        'create',
+        can_create && Boolean(form_options),
+    );
+    const ctxMenu = useEntityContextMenu<Approval>();
 
-    const applyFilters = (next: Record<string, any>) => {
-        setValues(next);
-        router.get('/governance/spend-approvals', next, {
+    useEffect(() => {
+        setSearch(filters.search ?? '');
+    }, [filters.search]);
+
+    const go = (next: Partial<Props['filters']>) => {
+        const merged = { ...filters, ...next };
+        const query = Object.fromEntries(
+            Object.entries(merged).filter(([, value]) => value),
+        );
+        router.get('/governance/spend-approvals', query, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
         });
     };
 
-    const fields: FilterField[] = [
-        {
-            type: 'search',
-            key: 'search',
-            label: 'Search',
-            placeholder: 'Title, reference, description',
-            width: 'lg',
-        },
-        {
-            type: 'select',
-            key: 'status',
-            label: 'Status',
-            placeholder: 'Any status',
-            width: 'md',
-            options: STATUSES,
-        },
-        {
-            type: 'select',
-            key: 'category',
-            label: 'Category',
-            placeholder: 'Any category',
-            width: 'md',
-            options: Object.entries(categories).map(([value, label]) => ({
-                value,
-                label,
-            })),
-        },
-    ];
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            if ((filters.search ?? '') !== search) {
+                go({ search: search.trim() || null });
+            }
+        }, 350);
+        return () => clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
+
+    const hasFilters = Boolean(
+        filters.status || filters.category || filters.search,
+    );
+    const open = (approval: Approval) =>
+        router.visit(`/governance/spend-approvals/${approval.id}`);
+
+    const actionsFor = (approval: Approval): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'Open request',
+                icon: ExternalLink,
+                onClick: () => open(approval),
+            },
+        ]);
+
+    const header = (
+        <PageHeader
+            icon={HandCoins}
+            title="Spend approvals"
+            subline="Permission for a single purchase or contract over the limit"
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search title or reference…"
+                    />
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <PageHeaderGlassButton icon={Info}>
+                                Who approves what
+                            </PageHeaderGlassButton>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-96">
+                            <p className="text-section-title">
+                                Who approves what
+                            </p>
+                            <p className="text-subtle mt-1">
+                                The limit depends on the kind of spend.
+                            </p>
+                            <ul className="mt-3 flex flex-col gap-2.5">
+                                {Object.entries(thresholds).map(
+                                    ([key, value]) => (
+                                        <li key={key}>
+                                            <p className="text-sm font-medium">
+                                                {categories[key] ?? key}
+                                            </p>
+                                            <p className="text-caption">
+                                                {whoApprovesText(value)}
+                                            </p>
+                                        </li>
+                                    ),
+                                )}
+                            </ul>
+                        </PopoverContent>
+                    </Popover>
+                    {can_create && form_options ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                        >
+                            New request
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Waiting for decision"
+                        href="/governance/spend-approvals?status=submitted"
+                        tone={summary.waiting > 0 ? 'warning' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>{summary.waiting}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Sent for a decision
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Drafts"
+                        href="/governance/spend-approvals?status=draft"
+                    >
+                        <PageHeaderMeterBig>{summary.drafts}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Not sent for a decision yet
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Approved this year"
+                        href="/governance/spend-approvals?status=approved"
+                        tone={summary.approved_this_year > 0 ? 'success' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>
+                            {formatNzd(summary.approved_this_year)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Financial year {summary.financial_year}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Not approved this year"
+                        href="/governance/spend-approvals?status=rejected"
+                        tone={summary.rejected_this_year > 0 ? 'critical' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>
+                            {formatNzd(summary.rejected_this_year)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Financial year {summary.financial_year}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={filters.status ?? ALL}
+                        allValue={ALL}
+                        options={
+                            filters.status === 'pending'
+                                ? [
+                                      ...STATUSES,
+                                      {
+                                          value: 'pending',
+                                          label: 'Drafts and waiting',
+                                      },
+                                  ]
+                                : STATUSES
+                        }
+                        onChange={(value) =>
+                            go({ status: value === ALL ? null : value })
+                        }
+                    />
+                    <PageHeaderFilterSelect
+                        label="Kind of spend"
+                        value={filters.category ?? ALL}
+                        allValue={ALL}
+                        options={[
+                            { value: ALL, label: 'Any kind' },
+                            ...Object.entries(categories).map(
+                                ([value, label]) => ({ value, label }),
+                            ),
+                        ]}
+                        onChange={(value) =>
+                            go({ category: value === ALL ? null : value })
+                        }
+                    />
+                </>
+            }
+            rail={<GovernanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 {
-                    title: 'Spend Approvals',
+                    title: 'Spend approvals',
                     href: '/governance/spend-approvals',
                 },
             ]}
         >
-            <Head title="Spend Approvals" />
+            <Head title="Spend approvals" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        icon={HandCoins}
-                        category="governance"
-                        title="Spend Approvals"
-                        description="Board / finance committee sign-off for spend above configured thresholds."
-                        stats={[
-                            { label: 'Pending', value: summary.pending },
-                            {
-                                label: 'Approved YTD',
-                                value: formatNzd(summary.approved_ytd),
-                            },
-                            {
-                                label: 'Rejected YTD',
-                                value: formatNzd(summary.rejected_ytd),
-                            },
-                        ]}
-                        actions={
-                            <Button asChild>
-                                <Link href="/governance/spend-approvals/create">
-                                    <Plus className="mr-2 h-4 w-4" /> New
-                                    Request
-                                </Link>
-                            </Button>
-                        }
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Spend requests"
+                        caption={`${approvals.data.length} of ${approvals.total} shown`}
                     />
-                }
-            >
-                <Card className="mb-4">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-base">
-                            Approval thresholds
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        {Object.entries(thresholds).map(([key, value]) => (
-                            <div key={key} className="rounded-lg border p-3">
-                                <p className="text-xs tracking-wide text-muted-foreground uppercase">
-                                    {categories[key] ?? key}
-                                </p>
-                                <p className="mt-1 text-lg font-semibold">
-                                    {formatNzd(value)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    requires sign-off
-                                </p>
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
 
-                <FilterBar
-                    fields={fields}
-                    values={values}
-                    onChange={(key, value) =>
-                        applyFilters({ ...values, [key]: value || null })
-                    }
-                    onReset={() =>
-                        applyFilters({
-                            status: null,
-                            category: null,
-                            search: null,
-                        })
-                    }
-                    activeCount={Object.values(values).filter(Boolean).length}
-                    className="mb-4"
-                />
-
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle>Requests</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {approvals.data.length === 0 ? (
-                            <EmptyState
-                                icon={HandCoins}
-                                title="No spend approvals yet"
-                                description="Submit a request for board or finance-committee sign-off when spend exceeds the configured threshold."
-                                action={
-                                    <Button asChild>
-                                        <Link href="/governance/spend-approvals/create">
-                                            New Request
-                                        </Link>
+                    {approvals.data.length === 0 ? (
+                        <EmptyState
+                            icon={HandCoins}
+                            title={
+                                hasFilters
+                                    ? 'No spend requests match your filters'
+                                    : 'No spend requests yet'
+                            }
+                            description={
+                                hasFilters
+                                    ? 'Try clearing a filter or search term.'
+                                    : 'Ask for permission here before a purchase or contract that is over the limit.'
+                            }
+                            action={
+                                hasFilters ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearch('');
+                                            go({
+                                                status: null,
+                                                category: null,
+                                                search: null,
+                                            });
+                                        }}
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                        Clear filters
                                     </Button>
-                                }
-                            />
-                        ) : (
-                            approvals.data.map((a) => (
-                                <Link
-                                    key={a.id}
-                                    href={`/governance/spend-approvals/${a.id}`}
-                                    className="block rounded-lg border p-3 transition-colors hover:bg-muted/30"
-                                >
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="font-mono text-xs text-muted-foreground">
-                                            {a.reference}
+                                ) : can_create && form_options ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
+                                        <Plus className="h-3.5 w-3.5" />
+                                        New request
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
+                    ) : (
+                        <EntityTable
+                            rows={approvals.data}
+                            rowKey={(approval) => approval.id}
+                            identityLabel="Request"
+                            identity={(approval) => ({
+                                icon: HandCoins,
+                                name: approval.title,
+                                subline: `${categories[approval.category] ?? approval.category} · ${refSuffix(approval.reference)}`,
+                            })}
+                            hrefFor={(approval) =>
+                                `/governance/spend-approvals/${approval.id}`
+                            }
+                            onOpen={open}
+                            onRowContextMenu={ctxMenu.open}
+                            actionsFor={actionsFor}
+                            minWidth={1000}
+                            columns={[
+                                {
+                                    key: 'status',
+                                    label: 'Status',
+                                    width: '1fr',
+                                    cell: (approval) => {
+                                        const chip = governanceStatus(
+                                            'spend_status',
+                                            approval.status,
+                                        );
+                                        return (
+                                            <EntityStatusChip
+                                                variant={chip.variant}
+                                            >
+                                                {chip.label}
+                                            </EntityStatusChip>
+                                        );
+                                    },
+                                },
+                                {
+                                    key: 'amount',
+                                    label: 'Amount',
+                                    width: '0.8fr',
+                                    align: 'right',
+                                    cell: (approval) => (
+                                        <span className="font-semibold tabular-nums">
+                                            {formatNzd(approval.amount)}
                                         </span>
-                                        <Badge
-                                            className={
-                                                statusColors[a.status] ?? ''
-                                            }
-                                        >
-                                            {a.status}
-                                        </Badge>
-                                        <Badge variant="outline">
-                                            {categories[a.category] ??
-                                                a.category}
-                                        </Badge>
-                                        {a.requires_board && (
-                                            <Badge variant="outline">
-                                                Board sign-off
-                                            </Badge>
-                                        )}
-                                        <span className="ml-auto font-semibold">
-                                            {formatNzd(a.amount)}
-                                        </span>
-                                    </div>
-                                    <p className="mt-1 font-medium">
-                                        {a.title}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Requested by{' '}
-                                        {a.requestedBy?.name ?? 'unknown'} ·
-                                        created {a.created_at}
-                                        {a.decided_at && a.decidedBy && (
-                                            <>
-                                                {' '}
-                                                · decided by {
-                                                    a.decidedBy.name
-                                                }{' '}
-                                                ({a.decided_at})
-                                            </>
-                                        )}
-                                    </p>
-                                </Link>
-                            ))
-                        )}
-                    </CardContent>
-                </Card>
+                                    ),
+                                },
+                                {
+                                    key: 'approver',
+                                    label: 'Who approves',
+                                    width: '1fr',
+                                    cell: (approval) => (
+                                        <EntityChip>
+                                            {approval.requires_board
+                                                ? 'Board resolution'
+                                                : 'Finance approver'}
+                                        </EntityChip>
+                                    ),
+                                },
+                                {
+                                    key: 'requested_by',
+                                    label: 'Requested by',
+                                    width: '1fr',
+                                    cell: (approval) => (
+                                        <PersonCell
+                                            name={personName(
+                                                approval.requestedBy,
+                                                approval.requested_by,
+                                            )}
+                                        />
+                                    ),
+                                },
+                                {
+                                    key: 'created',
+                                    label: 'Created',
+                                    width: '0.8fr',
+                                    cell: (approval) =>
+                                        formatDateLong(approval.created_at),
+                                },
+                                {
+                                    key: 'decided',
+                                    label: 'Decided',
+                                    width: '1fr',
+                                    cell: (approval) =>
+                                        approval.decided_at ? (
+                                            <span className="truncate">
+                                                {formatDateLong(
+                                                    approval.decided_at,
+                                                )}
+                                                {' · '}
+                                                {personName(
+                                                    approval.decidedBy,
+                                                    approval.decided_by,
+                                                ) ?? 'a former user'}
+                                            </span>
+                                        ) : (
+                                            <EmptyValue />
+                                        ),
+                                },
+                            ]}
+                        />
+                    )}
 
-                {approvals.last_page > 1 && (
-                    <div className="mt-4 flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                            Page {approvals.current_page} of{' '}
-                            {approvals.last_page} ({approvals.total} total)
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={approvals.current_page <= 1}
-                                onClick={() =>
-                                    applyFilters({
-                                        ...values,
-                                        page: approvals.current_page - 1,
-                                    })
-                                }
-                            >
-                                <ChevronLeft className="mr-1 h-4 w-4" />{' '}
-                                Previous
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={
-                                    approvals.current_page >=
-                                    approvals.last_page
-                                }
-                                onClick={() =>
-                                    applyFilters({
-                                        ...values,
-                                        page: approvals.current_page + 1,
-                                    })
-                                }
-                            >
-                                Next <ChevronRight className="ml-1 h-4 w-4" />
-                            </Button>
-                        </div>
-                    </div>
-                )}
+                    <LaravelPagination
+                        links={approvals.links}
+                        lastPage={approvals.last_page}
+                        preserveScroll
+                    />
+                </div>
             </PageLayout>
+
+            {ctxMenu.ctx ? (
+                <EntityContextMenu
+                    x={ctxMenu.ctx.x}
+                    y={ctxMenu.ctx.y}
+                    icon={HandCoins}
+                    title={ctxMenu.ctx.record.title}
+                    items={actionsFor(ctxMenu.ctx.record)}
+                    onClose={ctxMenu.close}
+                />
+            ) : null}
+
+            {can_create && form_options ? (
+                <SpendApprovalWizardDialog
+                    isOpen={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    options={{
+                        categories,
+                        thresholds,
+                        sites: form_options.sites,
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }

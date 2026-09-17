@@ -86,7 +86,8 @@ export function WizardShell({
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent
-                className="overflow-hidden p-0 [&>button]:hidden"
+                className="overflow-hidden p-0"
+                showCloseButton={false}
                 style={{ maxWidth, width: maxWidth }}
                 onOpenAutoFocus={onOpenAutoFocus}
                 onCloseAutoFocus={onCloseAutoFocus}

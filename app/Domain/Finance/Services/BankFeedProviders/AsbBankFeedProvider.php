@@ -20,7 +20,7 @@ class AsbBankFeedProvider implements BankFeedProviderInterface
         $clientId = config('services.bank_feeds.asb.client_id');
 
         if (empty($clientId)) {
-            throw new \RuntimeException('API credentials not configured for ASB. Configure in finance settings.');
+            throw new RuntimeException('API credentials not configured for ASB. Configure in finance settings.');
         }
 
         $redirectUri = config('services.bank_feeds.asb.redirect_uri');
@@ -41,7 +41,7 @@ class AsbBankFeedProvider implements BankFeedProviderInterface
         $clientId = config('services.bank_feeds.asb.client_id');
 
         if (empty($clientId)) {
-            throw new \RuntimeException('API credentials not configured for ASB. Configure in finance settings.');
+            throw new RuntimeException('API credentials not configured for ASB. Configure in finance settings.');
         }
 
         $feed->update([
@@ -55,7 +55,7 @@ class AsbBankFeedProvider implements BankFeedProviderInterface
         $clientId = config('services.bank_feeds.asb.client_id');
 
         if (empty($clientId)) {
-            throw new \RuntimeException('API credentials not configured for ASB. Configure in finance settings.');
+            throw new RuntimeException('API credentials not configured for ASB. Configure in finance settings.');
         }
 
         $feed->update([

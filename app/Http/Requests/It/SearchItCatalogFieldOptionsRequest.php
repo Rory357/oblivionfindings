@@ -25,6 +25,7 @@ class SearchItCatalogFieldOptionsRequest extends FormRequest
             'query' => ['nullable', 'string', 'max:100'],
             'after' => ['nullable', 'integer', 'min:1'],
             'selected_id' => ['nullable', 'integer', 'min:1'],
+            'site_id' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

@@ -1,0 +1,1705 @@
+{
+  "schema_version": 2,
+  "id": "10000000-0000-4000-8000-000000000007",
+  "title": "Synthetic service playbook",
+  "pages": [
+    {
+      "id": "10000000-0000-4000-8000-00000000001d",
+      "name": "Service request journey",
+      "subtitle": "A shared process for thoughtful, timely support",
+      "width": 1080,
+      "height": 680,
+      "orientation": "landscape",
+      "paper": "a3",
+      "scale": "1:1",
+      "background": "#ffffff",
+      "grid": {
+        "enabled": true,
+        "size": 10,
+        "snap": true
+      },
+      "layers": [
+        {
+          "id": "10000000-0000-4000-8000-000000000008",
+          "name": "Diagram",
+          "visible": true,
+          "locked": false,
+          "print": true
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000009",
+          "name": "Notes & callouts",
+          "visible": true,
+          "locked": false,
+          "print": true
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000000a",
+          "name": "Lanes & structure",
+          "visible": true,
+          "locked": true,
+          "print": true
+        }
+      ],
+      "groups": [
+        {
+          "id": "10000000-0000-4000-8000-000000000044",
+          "name": "Intake steps",
+          "parentId": "10000000-0000-4000-8000-00000000000b"
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000045",
+          "name": "First contact",
+          "parentId": "10000000-0000-4000-8000-000000000044"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "10000000-0000-4000-8000-00000000000b",
+          "type": "lane",
+          "text": "SITE TEAM",
+          "x": 40,
+          "y": 145,
+          "w": 1000,
+          "h": 135,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000000a",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#faf9fd",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000000c",
+          "type": "lane",
+          "text": "SERVICE DESK",
+          "x": 40,
+          "y": 280,
+          "w": 1000,
+          "h": 165,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000000a",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#f4f1fc",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000000d",
+          "type": "lane",
+          "text": "TECHNICAL TEAM",
+          "x": 40,
+          "y": 445,
+          "w": 1000,
+          "h": 135,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000000a",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#faf9fd",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000000e",
+          "type": "terminator",
+          "text": "Need help",
+          "x": 145,
+          "y": 182,
+          "w": 128,
+          "h": 56,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "parentId": "10000000-0000-4000-8000-000000000045",
+          "locked": false,
+          "style": {
+            "fill": "#f0ecfc",
+            "stroke": "#6855cf",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000000f",
+          "type": "process",
+          "text": "Log a request",
+          "x": 318,
+          "y": 177,
+          "w": 160,
+          "h": 66,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "parentId": "10000000-0000-4000-8000-000000000044",
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000010",
+          "type": "process",
+          "text": "Triage & assign",
+          "x": 318,
+          "y": 324,
+          "w": 160,
+          "h": 66,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#f0ecfc",
+            "stroke": "#6855cf",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": true,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service desk"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            },
+            {
+              "key": "sla",
+              "value": "30 minutes"
+            },
+            {
+              "key": "status",
+              "value": "In progress"
+            },
+            {
+              "key": "progress",
+              "value": "62.5"
+            }
+          ],
+          "dataGraphic": "progress",
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000011",
+          "type": "decision",
+          "text": "Can we\nresolve it?",
+          "x": 525,
+          "y": 307,
+          "w": 126,
+          "h": 100,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#fff4da",
+            "stroke": "#b29560",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000012",
+          "type": "process",
+          "text": "Resolve &\ndocument",
+          "x": 716,
+          "y": 324,
+          "w": 164,
+          "h": 66,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#e9f5f0",
+            "stroke": "#247e77",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000013",
+          "type": "process",
+          "text": "Investigate\nwith specialist",
+          "x": 515,
+          "y": 479,
+          "w": 160,
+          "h": 66,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000014",
+          "type": "terminator",
+          "text": "Confirm & close",
+          "x": 886,
+          "y": 183,
+          "w": 138,
+          "h": 56,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#e9f5f0",
+            "stroke": "#247e77",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000015",
+          "type": "note",
+          "text": "A clear handover keeps\neveryone informed.",
+          "x": 735,
+          "y": 595,
+          "w": 290,
+          "h": 44,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000009",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#fff7df",
+            "stroke": "#c9b273",
+            "color": "#302b48",
+            "fontSize": 15,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000046",
+          "type": "ink",
+          "text": null,
+          "x": 100,
+          "y": 100,
+          "w": 130,
+          "h": 35,
+          "rotation": 12,
+          "layerId": "10000000-0000-4000-8000-000000000009",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "none",
+            "stroke": "#6855cf",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [],
+          "dataGraphic": null,
+          "points": [
+            {
+              "x": 0,
+              "y": 0.5
+            },
+            {
+              "x": 0.25,
+              "y": 0
+            },
+            {
+              "x": 0.5,
+              "y": 0.6
+            },
+            {
+              "x": 0.8,
+              "y": 1
+            },
+            {
+              "x": 1,
+              "y": 0.4
+            }
+          ],
+          "imageFileId": null
+        }
+      ],
+      "edges": [
+        {
+          "id": "10000000-0000-4000-8000-000000000016",
+          "from": "10000000-0000-4000-8000-00000000000e",
+          "to": "10000000-0000-4000-8000-00000000000f",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000017",
+          "from": "10000000-0000-4000-8000-00000000000f",
+          "to": "10000000-0000-4000-8000-000000000010",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000018",
+          "from": "10000000-0000-4000-8000-000000000010",
+          "to": "10000000-0000-4000-8000-000000000011",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000019",
+          "from": "10000000-0000-4000-8000-000000000011",
+          "to": "10000000-0000-4000-8000-000000000012",
+          "label": "Yes",
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000001a",
+          "from": "10000000-0000-4000-8000-000000000011",
+          "to": "10000000-0000-4000-8000-000000000013",
+          "label": "No",
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "route": "orthogonal",
+          "fromPort": "bottom",
+          "toPort": "top",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000001b",
+          "from": "10000000-0000-4000-8000-000000000013",
+          "to": "10000000-0000-4000-8000-000000000012",
+          "label": "Findings",
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "route": "orthogonal",
+          "fromPort": "right",
+          "toPort": "bottom",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000001c",
+          "from": "10000000-0000-4000-8000-000000000012",
+          "to": "10000000-0000-4000-8000-000000000014",
+          "label": "Resolved",
+          "layerId": "10000000-0000-4000-8000-000000000008",
+          "route": "orthogonal",
+          "fromPort": "right",
+          "toPort": "bottom",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        }
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000034",
+      "name": "Connected sites",
+      "subtitle": "Illustrative topology · synthetic devices and approved sites",
+      "width": 1080,
+      "height": 680,
+      "orientation": "landscape",
+      "paper": "a3",
+      "scale": "1:1",
+      "background": "#ffffff",
+      "grid": {
+        "enabled": true,
+        "size": 10,
+        "snap": true
+      },
+      "layers": [
+        {
+          "id": "10000000-0000-4000-8000-00000000001e",
+          "name": "Diagram",
+          "visible": true,
+          "locked": false,
+          "print": true
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000001f",
+          "name": "Notes & callouts",
+          "visible": true,
+          "locked": false,
+          "print": true
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000020",
+          "name": "Lanes & structure",
+          "visible": true,
+          "locked": true,
+          "print": true
+        }
+      ],
+      "groups": [],
+      "nodes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000021",
+          "type": "container",
+          "text": "HARBOUR HOUSE · APPROVED SITE",
+          "x": 52,
+          "y": 250,
+          "w": 455,
+          "h": 325,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000020",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#f6f9f8",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000022",
+          "type": "container",
+          "text": "KŌWHAI LODGE · APPROVED SITE",
+          "x": 565,
+          "y": 250,
+          "w": 455,
+          "h": 325,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000020",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#f8f6fc",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000023",
+          "type": "cloud",
+          "text": "Organisation\nSD-WAN",
+          "x": 433,
+          "y": 90,
+          "w": 220,
+          "h": 100,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#f0ecfc",
+            "stroke": "#6855cf",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": true,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000024",
+          "type": "firewall",
+          "text": "Site firewall",
+          "x": 190,
+          "y": 296,
+          "w": 175,
+          "h": 70,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#e9f5f0",
+            "stroke": "#247e77",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000025",
+          "type": "firewall",
+          "text": "Site firewall",
+          "x": 700,
+          "y": 296,
+          "w": 175,
+          "h": 70,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#f0ecfc",
+            "stroke": "#6855cf",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000026",
+          "type": "switch",
+          "text": "Managed switch",
+          "x": 190,
+          "y": 422,
+          "w": 175,
+          "h": 64,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000027",
+          "type": "switch",
+          "text": "Managed switch",
+          "x": 700,
+          "y": 422,
+          "w": 175,
+          "h": 64,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000028",
+          "type": "wifi",
+          "text": "Staff Wi-Fi",
+          "x": 78,
+          "y": 517,
+          "w": 144,
+          "h": 55,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000029",
+          "type": "server",
+          "text": "Local services",
+          "x": 323,
+          "y": 507,
+          "w": 145,
+          "h": 72,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000002a",
+          "type": "laptop",
+          "text": "Staff devices",
+          "x": 604,
+          "y": 511,
+          "w": 151,
+          "h": 66,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000002b",
+          "type": "wifi",
+          "text": "Staff Wi-Fi",
+          "x": 834,
+          "y": 517,
+          "w": 144,
+          "h": 55,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        }
+      ],
+      "edges": [
+        {
+          "id": "10000000-0000-4000-8000-00000000002c",
+          "from": "10000000-0000-4000-8000-000000000023",
+          "to": "10000000-0000-4000-8000-000000000024",
+          "label": "Encrypted link",
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000002d",
+          "from": "10000000-0000-4000-8000-000000000023",
+          "to": "10000000-0000-4000-8000-000000000025",
+          "label": "Encrypted link",
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000002e",
+          "from": "10000000-0000-4000-8000-000000000024",
+          "to": "10000000-0000-4000-8000-000000000026",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000002f",
+          "from": "10000000-0000-4000-8000-000000000025",
+          "to": "10000000-0000-4000-8000-000000000027",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000030",
+          "from": "10000000-0000-4000-8000-000000000026",
+          "to": "10000000-0000-4000-8000-000000000028",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000031",
+          "from": "10000000-0000-4000-8000-000000000026",
+          "to": "10000000-0000-4000-8000-000000000029",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000032",
+          "from": "10000000-0000-4000-8000-000000000027",
+          "to": "10000000-0000-4000-8000-00000000002a",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000033",
+          "from": "10000000-0000-4000-8000-000000000027",
+          "to": "10000000-0000-4000-8000-00000000002b",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-00000000001e",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        }
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000043",
+      "name": "Service team",
+      "subtitle": "Synthetic people · clear ownership across one organisation",
+      "width": 1080,
+      "height": 680,
+      "orientation": "landscape",
+      "paper": "a3",
+      "scale": "1:1",
+      "background": "#ffffff",
+      "grid": {
+        "enabled": true,
+        "size": 10,
+        "snap": true
+      },
+      "layers": [
+        {
+          "id": "10000000-0000-4000-8000-000000000035",
+          "name": "Diagram",
+          "visible": true,
+          "locked": false,
+          "print": true
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000036",
+          "name": "Notes & callouts",
+          "visible": true,
+          "locked": false,
+          "print": true
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000037",
+          "name": "Lanes & structure",
+          "visible": true,
+          "locked": true,
+          "print": true
+        }
+      ],
+      "groups": [],
+      "nodes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000038",
+          "type": "person",
+          "text": "Morgan Ellis\nOperations lead",
+          "x": 435,
+          "y": 145,
+          "w": 210,
+          "h": 90,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#f0ecfc",
+            "stroke": "#6855cf",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": true,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000039",
+          "type": "person",
+          "text": "Ari Taylor\nService desk lead",
+          "x": 185,
+          "y": 330,
+          "w": 210,
+          "h": 90,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000003a",
+          "type": "person",
+          "text": "Jamie Chen\nTechnical lead",
+          "x": 685,
+          "y": 330,
+          "w": 210,
+          "h": 90,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000003b",
+          "type": "person",
+          "text": "Sam Rivers\nSupport specialist",
+          "x": 90,
+          "y": 505,
+          "w": 190,
+          "h": 90,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#e9f5f0",
+            "stroke": "#247e77",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000003c",
+          "type": "position",
+          "text": "Open position\nSupport specialist",
+          "x": 333,
+          "y": 505,
+          "w": 190,
+          "h": 90,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "dashed",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000003d",
+          "type": "person",
+          "text": "Alex Bennett\nInfrastructure specialist",
+          "x": 685,
+          "y": 505,
+          "w": 210,
+          "h": 90,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#e9f5f0",
+            "stroke": "#247e77",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [
+            {
+              "key": "owner",
+              "value": "Service team"
+            },
+            {
+              "key": "site",
+              "value": "Harbour House"
+            }
+          ],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": null
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000047",
+          "type": "image",
+          "text": "Synthetic uploaded photo",
+          "x": 800,
+          "y": 35,
+          "w": 180,
+          "h": 90,
+          "rotation": 0,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "parentId": null,
+          "locked": false,
+          "style": {
+            "fill": "#ffffff",
+            "stroke": "#83749f",
+            "color": "#302b48",
+            "fontSize": 17,
+            "font": "sans",
+            "bold": false,
+            "italic": false,
+            "underline": false,
+            "align": "center",
+            "strokeWidth": 1.5,
+            "dash": "solid",
+            "opacity": 1
+          },
+          "properties": [],
+          "dataGraphic": null,
+          "points": [],
+          "imageFileId": 101
+        }
+      ],
+      "edges": [
+        {
+          "id": "10000000-0000-4000-8000-00000000003e",
+          "from": "10000000-0000-4000-8000-000000000038",
+          "to": "10000000-0000-4000-8000-000000000039",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-00000000003f",
+          "from": "10000000-0000-4000-8000-000000000038",
+          "to": "10000000-0000-4000-8000-00000000003a",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000040",
+          "from": "10000000-0000-4000-8000-000000000039",
+          "to": "10000000-0000-4000-8000-00000000003b",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000041",
+          "from": "10000000-0000-4000-8000-000000000039",
+          "to": "10000000-0000-4000-8000-00000000003c",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000042",
+          "from": "10000000-0000-4000-8000-00000000003a",
+          "to": "10000000-0000-4000-8000-00000000003d",
+          "label": null,
+          "layerId": "10000000-0000-4000-8000-000000000035",
+          "route": "orthogonal",
+          "fromPort": "auto",
+          "toPort": "auto",
+          "arrow": "triangle",
+          "startArrow": "none",
+          "stroke": "#83749f",
+          "width": 1.8,
+          "dash": "solid",
+          "bend": 0,
+          "labelPos": 0.5
+        }
+      ]
+    }
+  ]
+}

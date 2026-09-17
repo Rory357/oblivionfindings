@@ -1,0 +1,126 @@
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\it-wizards.tsx
+  415:19  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\it-wizards.tsx:415:19
+  413 |     }, [actorId, onClose]);
+  414 |     const draftRecoveryEnabled = page.props.draftRecovery?.enabled === true;
+> 415 |     if (!modal || modalActor.current !== actorId) return null;
+      |                   ^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  416 |     switch (modal.type) {
+  417 |         case 'ticket':
+  418 |             return (  react-hooks/refs
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\knowledge-draft-delete-dialog.tsx
+  80:9  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\knowledge-draft-delete-dialog.tsx:80:9
+  78 |     };
+  79 |
+> 80 |     if (originActor.current !== actorId) return null;
+     |         ^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  81 |     return (
+  82 |         <Dialog open={open} onOpenChange={(next) => { if (!submitting) onOpenChange(next); }}>
+  83 |             <DialogContent>  react-hooks/refs
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\knowledge-editor-context.tsx
+  39:5  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\knowledge-editor-context.tsx:39:5
+  37 |     const scope = `${actorId}:${articleId ?? 'new'}`;
+  38 |     const latestScope = useRef(scope);
+> 39 |     latestScope.current = scope;
+     |     ^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  40 |     const latestSignal = useRef(refreshSignal);
+  41 |     latestSignal.current = refreshSignal;
+  42 |     const [attempt, setAttempt] = useState(0);            react-hooks/refs
+  41:5  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\knowledge-editor-context.tsx:41:5
+  39 |     latestScope.current = scope;
+  40 |     const latestSignal = useRef(refreshSignal);
+> 41 |     latestSignal.current = refreshSignal;
+     |     ^^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  42 |     const [attempt, setAttempt] = useState(0);
+  43 |     const [result, setResult] = useState<Result>({ scope, status: 'loading' });
+  44 |     useEffect(() => {  react-hooks/refs
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\knowledge-revision-dialog.tsx
+  69:5  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\knowledge-revision-dialog.tsx:69:5
+  67 |     const [needsPageRefresh, setNeedsPageRefresh] = useState(false);
+  68 |     const latestArticle = useRef(article);
+> 69 |     latestArticle.current = article;
+     |     ^^^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  70 |     const closeLatest = useRef(onClose);
+  71 |     closeLatest.current = onClose;
+  72 |     const [error, setError] = useState('');            react-hooks/refs
+  71:5  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\knowledge-revision-dialog.tsx:71:5
+  69 |     latestArticle.current = article;
+  70 |     const closeLatest = useRef(onClose);
+> 71 |     closeLatest.current = onClose;
+     |     ^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  72 |     const [error, setError] = useState('');
+  73 |     const [reload, setReload] = useState(0);
+  74 |     const [beforeRevision, setBeforeRevision] = useState<number | null>(null);  react-hooks/refs
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\specialist-create-wizard.tsx
+  65:34  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\specialist-create-wizard.tsx:65:34
+  63 |     const actorId = usePage<SharedData>().props.auth.user.id;
+  64 |     const originActor = useRef(actorId);
+> 65 |     const permitted = allowed && originActor.current === actorId;
+     |                                  ^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  66 |     const handlers = useRef({ onDiscard, onClose });
+  67 |     handlers.current = { onDiscard, onClose };
+  68 |     const [step, setStep] = useState(0);  react-hooks/refs
+  67:5   error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\specialist-create-wizard.tsx:67:5
+  65 |     const permitted = allowed && originActor.current === actorId;
+  66 |     const handlers = useRef({ onDiscard, onClose });
+> 67 |     handlers.current = { onDiscard, onClose };
+     |     ^^^^^^^^^^^^^^^^ Cannot update ref during render
+  68 |     const [step, setStep] = useState(0);
+  69 |     const [discarding, setDiscarding] = useState(false);
+  70 |     const [reviewingCurrent, setReviewingCurrent] = useState(false);                  react-hooks/refs
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\specialist-record-list.tsx
+  93:17  warning  Consider Card/CardHeader/CardContent from @/components/ui/card for plain rounded bordered panels. Leave custom layout surfaces as raw divs with an inline disable comment  no-restricted-syntax
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\use-specialist-form-defaults.ts
+  11:5  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\use-specialist-form-defaults.ts:11:5
+   9 | ) {
+  10 |     const latest = useRef({ form, defaults });
+> 11 |     latest.current = { form, defaults };
+     |     ^^^^^^^^^^^^^^ Cannot update ref during render
+  12 |     const wasOpen = useRef(false);
+  13 |     useEffect(() => {
+  14 |         if (open && !wasOpen.current) {  react-hooks/refs
+
+✖ 10 problems (9 errors, 1 warning)
+

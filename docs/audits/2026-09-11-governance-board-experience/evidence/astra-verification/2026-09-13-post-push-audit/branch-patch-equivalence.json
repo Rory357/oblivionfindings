@@ -1,0 +1,28 @@
+[
+  {
+    "cherry": [
+      "- bd20d214a4f69bf11106b522ee6c053730fb89ee"
+    ],
+    "branch": "codex/gov-nested-01-current-main"
+  },
+  {
+    "cherry": [
+      "+ 5bb543a43a00bd7a7557e38c1d8fdbe42d8da419",
+      "+ c8e6ae37e21184a03dd2891bf1fe74d413b96f42"
+    ],
+    "branch": "codex/gov-resolution-quorum-01-current-main"
+  },
+  {
+    "cherry": [
+      "+ d20ae45f637498a7da0a2b013d653aa10c5e905d",
+      "+ dcde2163e5a1811677d8bc2e90e4c10bdf0e7d05"
+    ],
+    "branch": "codex/gov-spend-authority-01"
+  },
+  {
+    "cherry": [
+      "+ 6c56fd85ea2b8f6b5e80eb5e47f6fd48e5badab7"
+    ],
+    "branch": "codex/gov-spend-authority-01-current-main"
+  }
+]

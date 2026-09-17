@@ -31,6 +31,7 @@ class QueclinkListen extends Command
 
         if ($port < 1 || $port > 65535) {
             $this->error("Invalid port: {$port}");
+
             return self::FAILURE;
         }
 
@@ -65,7 +66,8 @@ class QueclinkListen extends Command
                 }
             });
         } catch (\Throwable $e) {
-            $this->error('Listener failed: ' . $e->getMessage());
+            $this->error('Listener failed: '.$e->getMessage());
+
             return self::FAILURE;
         }
 

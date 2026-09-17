@@ -7,6 +7,7 @@ use App\Domain\Governance\Jobs\SendPreReadReminders;
 use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Governance\Models\DashboardSnapshot;
 use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Notifications\BoardPackPublishedNotification;
 use App\Domain\Governance\Notifications\PreReadReminderNotification;
 use App\Domain\Governance\Services\BoardPackAccessService;
@@ -791,13 +792,26 @@ class GovernanceBoardPacksTest extends TestCase
         $manager = $this->createAdminUser();
         $recipient = $this->createUserWithRole('board_member');
         $recipientMember = $this->createBoardMember($recipient);
+        $ordinaryMember = $this->createUserWithRole('board_member');
+        $this->createBoardMember($ordinaryMember);
+        // The audit reader is an explicitly authorised Governance audit viewer
+        // who is still not a board pack manager. Ordinary board members do
+        // not hold governance.audit.view by default.
         $viewer = $this->createUserWithRole('board_member');
         $this->createBoardMember($viewer);
+        $viewer->permissionOverrides()->syncWithoutDetaching([
+            (int) Permission::query()->where('key', 'governance.audit.view')->value('id') => ['allowed' => true],
+        ]);
+        $viewer = $viewer->fresh();
+        $this->assertTrue($viewer->canDo('governance.audit.view'));
+        $this->assertFalse(app(BoardPackAccessService::class)->canManage($viewer));
         $pack = $this->createTestPack(
             $manager,
             $this->createMeeting($manager, ['title' => 'Audit event boundary']),
             [$recipientMember->id],
         );
+
+        $this->actingAs($ordinaryMember)->get('/governance/audit-log')->assertForbidden();
 
         DB::table('governance_audit_log')->insert([
             [
@@ -1139,6 +1153,195 @@ class GovernanceBoardPacksTest extends TestCase
         ]);
 
         $this->assertSame(5, $pack->actualDocumentCount());
+    }
+
+    public function test_safe_pack_is_discoverable_when_a_hidden_paper_id_is_a_decimal_prefix_of_its_paper_id(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->createAdminUser();
+        $member = $this->createUserWithRole('board_member');
+        $memberRecord = $this->createBoardMember($member);
+        $meeting = $this->createMeeting($admin, ['title' => 'Open board meeting']);
+        $privateMeeting = $this->createMeeting($admin, [
+            'title' => 'Executive session',
+            'meeting_type' => 'executive_session',
+        ]);
+        $hidden = $this->createResolution($admin, [
+            'title' => 'Executive-only paper',
+            'governance_meeting_id' => $privateMeeting->id,
+        ]);
+        $safeId = (int) ($hidden->id.'999');
+        $safe = Resolution::unguarded(fn () => $this->createResolution($admin, [
+            'id' => $safeId,
+            'title' => 'Safe member paper',
+            'governance_meeting_id' => $meeting->id,
+        ]));
+        $this->assertSame($safeId, (int) $safe->id);
+
+        $recordAccess = app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class);
+        $this->assertFalse($recordAccess->canViewResolution($member, $hidden->fresh()));
+        $this->assertTrue($recordAccess->canViewResolution($member, $safe->fresh()));
+
+        $pack = $this->createManifestPack($admin, $meeting, [$memberRecord->id], [$safe->fresh()]);
+
+        $this->assertSame(
+            [['source_type' => 'resolution', 'source_id' => $safeId]],
+            $pack->containedSources()->get(['source_type', 'source_id'])->map->only(['source_type', 'source_id'])->all(),
+        );
+        $this->assertStringContainsString('"id":'.$hidden->id, json_encode($pack->document_manifest));
+
+        $access = app(BoardPackAccessService::class);
+        $this->assertTrue($access->canView($member, $pack));
+        $this->assertTrue($access->visibleQuery($member)->whereKey($pack->id)->exists());
+        $this->assertSame(
+            $access->canView($member, $pack),
+            $access->visibleQuery($member)->whereKey($pack->id)->exists(),
+        );
+
+        $this->actingAs($member)->get('/governance/packs')->assertOk()
+            ->assertInertia(fn ($page) => $page->where(
+                'packs.data',
+                fn ($packs) => collect($packs)->pluck('id')->contains($pack->id),
+            ));
+        $this->actingAs($member)->get("/governance/packs/{$pack->id}")->assertOk();
+        $this->actingAs($member)->get("/governance/packs/{$pack->id}/download")->assertOk();
+    }
+
+    public function test_pack_embedding_a_private_paper_stays_hidden_from_discovery_view_and_download(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->createAdminUser();
+        $member = $this->createUserWithRole('board_member');
+        $memberRecord = $this->createBoardMember($member);
+        $meeting = $this->createMeeting($admin, ['title' => 'Open board meeting']);
+        $privateMeeting = $this->createMeeting($admin, [
+            'title' => 'Executive session',
+            'meeting_type' => 'executive_session',
+        ]);
+        $hidden = $this->createResolution($admin, [
+            'title' => 'Executive-only paper',
+            'governance_meeting_id' => $privateMeeting->id,
+        ]);
+
+        $access = app(BoardPackAccessService::class);
+        $shapes = [
+            'builder items shape' => fn () => ['agenda' => [], 'resolutions' => ['items' => [$hidden->fresh()->toArray()], 'total' => 1]],
+            'flat historical shape' => fn () => ['agenda' => [], 'resolutions' => [$hidden->fresh()->toArray()]],
+            'string id shape' => fn () => ['agenda' => [], 'resolutions' => ['items' => [['id' => (string) $hidden->id, 'title' => 'Executive-only paper']]]],
+        ];
+
+        $revision = 0;
+        foreach ($shapes as $shape => $content) {
+            $pack = $this->createManifestPack($admin, $meeting, [$memberRecord->id], content: $content(), revision: ++$revision);
+
+            $this->assertFalse($access->canView($member, $pack), $shape);
+            $this->assertFalse($access->visibleQuery($member)->whereKey($pack->id)->exists(), $shape);
+            $this->assertSame(
+                $access->canView($member, $pack),
+                $access->visibleQuery($member)->whereKey($pack->id)->exists(),
+                $shape,
+            );
+            $this->actingAs($member)->get("/governance/packs/{$pack->id}")->assertNotFound();
+            $this->actingAs($member)->get("/governance/packs/{$pack->id}/download")->assertNotFound();
+            $this->assertTrue($access->canView($admin, $pack), $shape);
+        }
+
+        $this->actingAs($member)->get('/governance/packs')->assertOk()
+            ->assertInertia(fn ($page) => $page->has('packs.data', 0));
+    }
+
+    public function test_changing_a_pack_manifest_reindexes_contained_sources_and_unindexed_packs_fail_closed(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->createAdminUser();
+        $member = $this->createUserWithRole('board_member');
+        $memberRecord = $this->createBoardMember($member);
+        $meeting = $this->createMeeting($admin, ['title' => 'Open board meeting']);
+        $privateMeeting = $this->createMeeting($admin, ['meeting_type' => 'executive_session']);
+        $hidden = $this->createResolution($admin, ['governance_meeting_id' => $privateMeeting->id]);
+        $safe = $this->createResolution($admin, ['governance_meeting_id' => $meeting->id]);
+        $access = app(BoardPackAccessService::class);
+
+        $pack = $this->createManifestPack($admin, $meeting, [$memberRecord->id], [$safe->fresh()]);
+        $this->assertTrue($access->canView($member, $pack));
+
+        $manifest = $pack->document_manifest;
+        $manifest['content_sections']['resolutions']['items'][] = $hidden->fresh()->toArray();
+        $pack->update(['document_manifest' => $manifest]);
+
+        $this->assertEqualsCanonicalizing(
+            [(int) $safe->id, (int) $hidden->id],
+            $pack->containedSources()->pluck('source_id')->map(fn ($id) => (int) $id)->all(),
+        );
+        $this->assertFalse($access->canView($member, $pack->fresh()));
+        $this->assertFalse($access->visibleQuery($member)->whereKey($pack->id)->exists());
+
+        // A pack whose typed index is missing is never released to a non-manager.
+        $unindexed = $this->createManifestPack($admin, $this->createMeeting($admin), [$memberRecord->id], [$safe->fresh()]);
+        DB::table('board_packs')->where('id', $unindexed->id)->update(['contained_sources_indexed_at' => null]);
+        $this->assertFalse($access->canView($member, $unindexed->fresh()));
+        $this->assertFalse($access->visibleQuery($member)->whereKey($unindexed->id)->exists());
+        $this->assertTrue($access->canView($admin, $unindexed->fresh()));
+    }
+
+    /**
+     * @param  array<int, int>  $recipientIds
+     * @param  array<int, Resolution>  $papers
+     * @param  array<string, mixed>|null  $content
+     */
+    private function createManifestPack(
+        User $creator,
+        GovernanceMeeting $meeting,
+        array $recipientIds,
+        array $papers = [],
+        ?array $content = null,
+        int $revision = 1,
+    ): BoardPack {
+        $snapshotData = ['widgets' => []];
+        $snapshot = DashboardSnapshot::create([
+            'snapshot_data' => $snapshotData,
+            'period_type' => 'month',
+            'period_start' => now()->startOfMonth()->toDateString(),
+            'period_end' => now()->toDateString(),
+            'checksum' => DashboardSnapshot::generateChecksum($snapshotData),
+            'captured_at' => now(),
+            'captured_by' => $creator->id,
+            'data_freshness' => [],
+        ]);
+
+        $content ??= [
+            'agenda' => [],
+            'resolutions' => ['items' => array_map(fn (Resolution $paper) => $paper->toArray(), $papers), 'total' => count($papers)],
+        ];
+        $filePath = "governance/board-packs/{$meeting->id}/pack-r{$revision}.json";
+        Storage::disk('local')->put($filePath, json_encode($content));
+
+        return BoardPack::create([
+            'governance_meeting_id' => $meeting->id,
+            'dashboard_snapshot_id' => $snapshot->id,
+            'revision_number' => $revision,
+            'build_status' => 'published',
+            'is_current' => true,
+            'document_manifest' => [
+                'manifest_sections' => array_map(fn (Resolution $paper) => [
+                    'id' => "res_{$paper->id}", 'title' => "Paper: {$paper->title}", 'type' => 'paper', 'included' => true,
+                ], $papers),
+                'content_sections' => $content,
+            ],
+            'generated_at' => now(),
+            'generated_by' => $creator->id,
+            'file_path' => $filePath,
+            'file_size' => 10,
+            'checksum' => hash('sha256', json_encode($content)),
+            'watermark_text' => 'CONFIDENTIAL - BOARD ONLY',
+            'distributed_at' => now(),
+            'distributed_to' => $recipientIds,
+            'download_tracking' => [],
+            'read_tracking' => [],
+        ]);
     }
 
     /**

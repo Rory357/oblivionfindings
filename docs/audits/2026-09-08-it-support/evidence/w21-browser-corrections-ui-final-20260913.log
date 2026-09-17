@@ -1,0 +1,14 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+stderr | resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > keeps the Service Desk rail focused on tickets and request entry points
+React does not recognize the `preserveState` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `preservestate` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `preserveScroll` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `preservescroll` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+
+··············
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  11:57:20
+   Duration  30.53s (transform 931ms, setup 2.05s, import 11.25s, tests 2.41s, environment 14.24s)
+

@@ -1,0 +1,14 @@
+Browser tab: 2, Title: "Board overview - Laravel", URL: "http://127.0.0.1:8783/governance/dashboard".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 270-367
+~			261 text Risks ranked by urgency.
+~				264 tab (selectable, settable, boolean) All 58, ID: radix-_r_31_-trigger-all, Value: 0
+All
+58
+~				267 tab (selected, settable, boolean) Risks, Value: 1, ID: radix-_r_31_-trigger-risks
++					460 image
++					461 text Risks
++			462 container Description: Risks, ID: radix-_r_31_-content-risks
++				463 text No risks need board attention
++				464 text All tracked risks are within appetite.
+The focused UI element is 267 tab (selected, settable, boolean) Risks, Value: 1, ID: radix-_r_31_-trigger-risks

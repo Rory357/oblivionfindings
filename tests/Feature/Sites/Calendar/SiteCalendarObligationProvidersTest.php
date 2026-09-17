@@ -1,11 +1,15 @@
 <?php
 
 use App\Models\Asset;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteCredential;
 use App\Models\SiteEmergencyPlan;
 use App\Models\SiteVendor;
+use App\Models\User;
 use App\Services\Sites\Calendar\SiteCalendarAggregator;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
@@ -23,6 +27,34 @@ function aggregate(Site $site, array $sources = []): Collection
         now()->addMonths(4),
         $sources ? ['sources' => $sources] : [],
     ));
+}
+
+/**
+ * Credential and vendor reminders are read through the vault/directory access
+ * boundaries (SiteCredentialAccess / SiteVendorAccessService), so they only
+ * appear for an approved reader holding the directory permissions.
+ */
+if (! function_exists('actAsObligationVaultReader')) {
+    function actAsObligationVaultReader(): User
+    {
+        test()->seed(RbacSeeder::class);
+
+        $role = Role::query()->create([
+            'name' => 'obligation-vault-reader-'.str()->uuid(),
+            'label' => 'Obligation vault reader fixture',
+            'level' => 10,
+            'type' => 'custom',
+        ]);
+        $role->permissions()->attach(Permission::query()->whereIn('key', [
+            'vendors.view', 'credentials.view', 'sites.viewAny', 'sites.viewAll',
+        ])->pluck('id'));
+
+        $reader = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $reader->roles()->sync([$role->id]);
+        test()->actingAs($reader);
+
+        return $reader;
+    }
 }
 
 test('asset maintenance obligations surface vehicle and asset due dates', function () {
@@ -103,6 +135,10 @@ test('credential reminders now fire for never-rotated credentials (created_at fa
         'encrypted_value' => Crypt::encryptString('secret'),
     ]);
 
+    // No authorised reader → no vault metadata on the calendar.
+    expect(aggregate($site, ['credential'])->firstWhere('source', 'credential'))->toBeNull();
+
+    actAsObligationVaultReader();
     $items = aggregate($site, ['credential']);
 
     $cred = $items->firstWhere('source', 'credential');
@@ -110,7 +146,7 @@ test('credential reminders now fire for never-rotated credentials (created_at fa
     expect($cred->title)->toContain('first rotation due');
 });
 
-test('vendor reminders cover contract renewal and the next scheduled visit', function () {
+test('vendor reminders cover insurance expiry and the next scheduled visit, not restricted contract renewals', function () {
     $site = Site::factory()->create(['type' => 'house']);
 
     SiteVendor::create([
@@ -119,15 +155,24 @@ test('vendor reminders cover contract renewal and the next scheduled visit', fun
         'company_name' => 'Pipes Ltd',
         'preferred_contact_method' => 'phone',
         'is_active' => true,
+        'insurance_expiry' => now()->subDays(3)->toDateString(),
         'contract_renewal_date' => now()->subDays(3)->toDateString(),
         'next_visit_date' => now()->addDays(7)->toDateString(),
     ]);
 
+    // No authorised reader → no directory records on the calendar.
+    expect(aggregate($site, ['vendor']))->toBeEmpty();
+
+    actAsObligationVaultReader();
     $items = aggregate($site, ['vendor']);
 
-    $contract = $items->first(fn ($i) => str_contains($i->title, 'contract renewal'));
-    expect($contract)->not->toBeNull();
-    expect($contract->status)->toBe('overdue');
+    $insurance = $items->first(fn ($i) => str_contains($i->title, 'insurance expiry'));
+    expect($insurance)->not->toBeNull();
+    expect($insurance->status)->toBe('overdue');
+
+    // Commercial contract renewals are restricted and surface through their
+    // dedicated task provider, never this operational vendor feed.
+    expect($items->first(fn ($i) => str_contains($i->title, 'contract renewal')))->toBeNull();
 
     // A forward booking is never "overdue".
     $visit = $items->first(fn ($i) => str_contains($i->title, 'scheduled visit'));

@@ -12,6 +12,7 @@ use App\Domain\Governance\Models\SpendApprovalDecision;
 use App\Domain\Governance\Services\SpendApprovalCommandService;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
+use App\Support\JsonEvidence;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -596,7 +597,9 @@ class AccountsPayableService
             && $decision->decided_at?->equalTo($approval->decided_at) === true
             && trim((string) $decision->reason) !== ''
             && trim((string) $approval->decision_notes) === trim((string) $decision->reason)
-            && $decisionSource === $sourceEvidence;
+            // Order-insensitive: parent_evidence is a MySQL json column, which
+            // normalises object key order on the way out (see JsonEvidence).
+            && JsonEvidence::matches($decisionSource, $sourceEvidence);
     }
 
     private function currentDecisionQuery(SpendApproval $approval, bool $lock = false)

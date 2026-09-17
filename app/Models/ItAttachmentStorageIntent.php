@@ -37,7 +37,7 @@ final class ItAttachmentStorageIntent extends Model
             if (! Str::isUuid((string) $intent->intent_uuid)
                 || $intent->path !== 'it_attachments/'.$intent->intent_uuid
                 || $intent->actor_user_id < 1 || $intent->parent_id < 1
-                || ! in_array($intent->parent_type, [(new ItTicket)->getMorphClass(), (new ItTicketComment)->getMorphClass()], true)
+                || ! in_array($intent->parent_type, [(new ItTicket)->getMorphClass(), (new ItTicketComment)->getMorphClass(), (new ItCatalogSubmission)->getMorphClass()], true)
                 || preg_match('/^[a-f0-9]{64}$/', (string) $intent->content_sha256) !== 1
                 || preg_match('/^[a-f0-9]{64}$/', (string) $intent->original_name_sha256) !== 1
                 || $intent->size < 0

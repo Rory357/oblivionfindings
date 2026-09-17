@@ -1,0 +1,16 @@
+{
+  "files_checked": 8442,
+  "changed": [
+    "app/Domain/Governance/Http/Controllers/BoardEvaluationController.php",
+    "app/Domain/Governance/Http/Controllers/GovernanceMeetingController.php",
+    "app/Domain/Governance/Models/Resolution.php",
+    "app/Domain/Governance/Services/GovernanceWorkflowService.php",
+    "resources/js/components/governance/MeetingPaperWorkspace.tsx",
+    "resources/js/components/governance/PriorityOverviewPanel.tsx",
+    "resources/js/pages/Governance/Meetings/Index.tsx",
+    "resources/js/pages/Governance/Meetings/Show.tsx",
+    "resources/js/pages/Governance/Records/Index.tsx"
+  ],
+  "removed": [],
+  "captured_at": "2026-09-13T05:44:27.5300471Z"
+}

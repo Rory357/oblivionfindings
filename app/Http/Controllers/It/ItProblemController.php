@@ -5,6 +5,7 @@ namespace App\Http\Controllers\It;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItProblemService;
 use App\Domain\It\Services\ItSlaReadService;
+use App\Domain\It\Services\ItSpecialistWorkspaceSummary;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Http\Controllers\Controller;
@@ -61,6 +62,7 @@ class ItProblemController extends Controller
             ->through(fn (ItProblem $problem) => $this->problemRow($problem));
 
         return Inertia::render('it/problems/index', [
+            'summary' => app(ItSpecialistWorkspaceSummary::class)->forWorkspace('problems', $user),
             'problems' => $problems,
             'filters' => [
                 'state' => $state ?: null,
@@ -81,7 +83,17 @@ class ItProblemController extends Controller
         try {
             $problem = $this->problemService->create($user, $data);
         } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            return redirect()->back()->withErrors(['form' => $exception->getMessage()]);
+        }
+
+        if ($request->boolean('wizard')) {
+            return redirect()->back()->with('it_ticket', [
+                'id' => (int) $problem->ticket_id,
+                'specialist_id' => (int) $problem->id,
+                'reference' => $problem->ticket->reference,
+                'workspace' => 'problems',
+                'actor_user_id' => (int) $user->id,
+            ]);
         }
 
         return redirect()->route('it.problems.show', $problem)->with('success', "Problem {$problem->ticket->reference} opened.");
@@ -154,7 +166,7 @@ class ItProblemController extends Controller
         try {
             $this->problemService->update($problem, $request->user(), $request->validated());
         } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            return redirect()->back()->withErrors(['form' => $exception->getMessage()]);
         }
 
         return redirect()->back()->with('success', 'Problem updated.');
@@ -176,9 +188,12 @@ class ItProblemController extends Controller
                 (string) $data['reason'],
                 $data['resolution_code'] ?? null,
                 $data['resolution_summary'] ?? null,
+                (int) $data['expected_version'],
+                $data['next_action'] ?? null,
+                $data['waiting_party'] ?? null,
             );
         } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            return redirect()->back()->withErrors(['form' => $exception->getMessage()]);
         }
 
         return redirect()->back()->with('success', 'Problem state updated.');
@@ -200,6 +215,7 @@ class ItProblemController extends Controller
     {
         return [
             'id' => $ticket->id,
+            'lock_version' => (int) $ticket->lock_version,
             'reference' => $ticket->reference,
             'title' => $ticket->title,
             'priority' => $ticket->priority,

@@ -137,18 +137,17 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/accounts', [ChartOfAccountsController::class, 'index'])
         ->name('accounts.index')
         ->middleware('permission:finance.ledger.view');
-    Route::get('/accounts/create', [ChartOfAccountsController::class, 'create'])
-        ->name('accounts.create')
-        ->middleware('permission:finance.ledger.manage');
+    // Adding and editing an account is the account wizard on the chart (and the
+    // record header) — the retired full-page forms redirect there. (Registered
+    // BEFORE /accounts/{account} so the literal isn't captured.)
+    Route::redirect('/accounts/create', '/finance/accounts')->name('accounts.create');
     Route::post('/accounts', [ChartOfAccountsController::class, 'store'])
         ->name('accounts.store')
         ->middleware('permission:finance.ledger.manage');
     Route::get('/accounts/{account}', [ChartOfAccountsController::class, 'show'])
         ->name('accounts.show')
         ->middleware('permission:finance.ledger.view');
-    Route::get('/accounts/{account}/edit', [ChartOfAccountsController::class, 'edit'])
-        ->name('accounts.edit')
-        ->middleware('permission:finance.ledger.manage');
+    Route::redirect('/accounts/{account}/edit', '/finance/accounts')->name('accounts.edit');
     Route::put('/accounts/{account}', [ChartOfAccountsController::class, 'update'])
         ->name('accounts.update')
         ->middleware('permission:finance.ledger.manage');
@@ -160,9 +159,9 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/journals', [JournalController::class, 'index'])
         ->name('journals.index')
         ->middleware('permission:finance.ledger.view');
-    Route::get('/journals/create', [JournalController::class, 'create'])
-        ->name('journals.create')
-        ->middleware('permission:finance.ledger.manage');
+    // New journal is the wizard on the journals list — the retired full-page
+    // form redirects there. (Registered BEFORE /journals/{journal}.)
+    Route::redirect('/journals/create', '/finance/journals')->name('journals.create');
     Route::post('/journals', [JournalController::class, 'store'])
         ->name('journals.store')
         ->middleware('permission:finance.ledger.manage');
@@ -212,41 +211,39 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/payables', [PayablesController::class, 'index'])->name('payables.index');
 
     // ── Vendors ─────────────────────────────────────────────────────────
+    // Create/edit are WizardShell modals on the index/show pages; the retired
+    // full-page URLs redirect to the list. (The create redirect must stay
+    // registered BEFORE /vendors/{vendor} so it isn't captured.)
     Route::get('/vendors', [VendorController::class, 'index'])
         ->name('vendors.index')
         ->middleware('permission:finance.ap.view');
-    Route::get('/vendors/create', [VendorController::class, 'create'])
-        ->name('vendors.create')
-        ->middleware('permission:finance.ap.manage');
+    Route::redirect('/vendors/create', '/finance/vendors')->name('vendors.create');
     Route::post('/vendors', [VendorController::class, 'store'])
         ->name('vendors.store')
         ->middleware('permission:finance.ap.manage');
     Route::get('/vendors/{vendor}', [VendorController::class, 'show'])
         ->name('vendors.show')
         ->middleware('permission:finance.ap.view');
-    Route::get('/vendors/{vendor}/edit', [VendorController::class, 'edit'])
-        ->name('vendors.edit')
-        ->middleware('permission:finance.ap.manage');
+    Route::redirect('/vendors/{vendor}/edit', '/finance/vendors')->name('vendors.edit');
     Route::put('/vendors/{vendor}', [VendorController::class, 'update'])
         ->name('vendors.update')
         ->middleware('permission:finance.ap.manage');
 
     // ── Purchase Orders ─────────────────────────────────────────────────
+    // Create/edit are WizardShell modals on the index/show pages; the retired
+    // full-page URLs redirect to the list. (The create redirect must stay
+    // registered BEFORE /purchase-orders/{purchaseOrder} so it isn't captured.)
     Route::get('/purchase-orders', [PurchaseOrderController::class, 'index'])
         ->name('purchase-orders.index')
         ->middleware('permission:finance.ap.view');
-    Route::get('/purchase-orders/create', [PurchaseOrderController::class, 'create'])
-        ->name('purchase-orders.create')
-        ->middleware('permission:finance.ap.manage');
+    Route::redirect('/purchase-orders/create', '/finance/purchase-orders')->name('purchase-orders.create');
     Route::post('/purchase-orders', [PurchaseOrderController::class, 'store'])
         ->name('purchase-orders.store')
         ->middleware('permission:finance.ap.manage');
     Route::get('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])
         ->name('purchase-orders.show')
         ->middleware('permission:finance.ap.view');
-    Route::get('/purchase-orders/{purchaseOrder}/edit', [PurchaseOrderController::class, 'edit'])
-        ->name('purchase-orders.edit')
-        ->middleware('permission:finance.ap.manage');
+    Route::redirect('/purchase-orders/{purchaseOrder}/edit', '/finance/purchase-orders')->name('purchase-orders.edit');
     Route::put('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'update'])
         ->name('purchase-orders.update')
         ->middleware('permission:finance.ap.manage');
@@ -258,21 +255,20 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         ->middleware('permission:finance.ap.manage');
 
     // ── Bills ───────────────────────────────────────────────────────────
+    // Create/edit are WizardShell modals on the index/show pages; the retired
+    // full-page URLs redirect to the list. (The create redirect must stay
+    // registered BEFORE /bills/{bill} so it isn't captured.)
     Route::get('/bills', [BillController::class, 'index'])
         ->name('bills.index')
         ->middleware('permission:finance.ap.view');
-    Route::get('/bills/create', [BillController::class, 'create'])
-        ->name('bills.create')
-        ->middleware('permission:finance.ap.manage');
+    Route::redirect('/bills/create', '/finance/bills')->name('bills.create');
     Route::post('/bills', [BillController::class, 'store'])
         ->name('bills.store')
         ->middleware('permission:finance.ap.manage');
     Route::get('/bills/{bill}', [BillController::class, 'show'])
         ->name('bills.show')
         ->middleware('permission:finance.ap.view');
-    Route::get('/bills/{bill}/edit', [BillController::class, 'edit'])
-        ->name('bills.edit')
-        ->middleware('permission:finance.ap.manage');
+    Route::redirect('/bills/{bill}/edit', '/finance/bills')->name('bills.edit');
     Route::put('/bills/{bill}', [BillController::class, 'update'])
         ->name('bills.update')
         ->middleware('permission:finance.ap.manage');
@@ -301,12 +297,13 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         ->middleware('permission:finance.ap.manage');
 
     // ── Payment Runs ────────────────────────────────────────────────────
+    // Creating a run is a WizardShell modal on the index page; the retired
+    // full-page URL redirects to the list. (It must stay registered BEFORE
+    // /payment-runs/{paymentRun} so it isn't captured.)
     Route::get('/payment-runs', [PaymentRunController::class, 'index'])
         ->name('payment-runs.index')
         ->middleware('permission:finance.ap.view');
-    Route::get('/payment-runs/create', [PaymentRunController::class, 'create'])
-        ->name('payment-runs.create')
-        ->middleware('permission:finance.ap.manage');
+    Route::redirect('/payment-runs/create', '/finance/payment-runs')->name('payment-runs.create');
     Route::post('/payment-runs', [PaymentRunController::class, 'store'])
         ->name('payment-runs.store')
         ->middleware('permission:finance.ap.manage');
@@ -344,9 +341,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     // workflows below; there is no generic polymorphic allocation write route.
 
     // ── Accounts Receivable ─────────────────────────────────────────────
+    // The Aged AR rail view IS the ageing report; the old /aging URL is kept as
+    // a bookmark redirect, with Statements as its tier-2 sibling.
+    Route::redirect('/receivables/aging', '/finance/receivables')->name('receivables.aging');
     Route::middleware('permission:finance.ar.view')->group(function () {
         Route::get('/receivables', [AccountsReceivableController::class, 'index'])->name('receivables.index');
-        Route::get('/receivables/aging', [AccountsReceivableController::class, 'aging'])->name('receivables.aging');
         Route::get('/receivables/statements', [AccountsReceivableController::class, 'statements'])->name('receivables.statements');
     });
 
@@ -355,9 +354,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         ->middleware('permission:finance.ar.manage');
 
     // ── Billing ────────────────────────────────────────────────────────
+    // The Billing index IS the entries register (client/status/date filters live
+    // in its header), so the old standalone entries URL redirects to it.
+    Route::redirect('/billing/entries', '/finance/billing')->name('billing.entries');
     Route::middleware('permission:finance.ar.view')->group(function () {
         Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
-        Route::get('/billing/entries', [BillingController::class, 'entries'])->name('billing.entries');
     });
 
     // ── Price Books ────────────────────────────────────────────────────
@@ -495,9 +496,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/bank-reconciliation', [BankReconciliationController::class, 'index'])
         ->name('bank-reconciliation.index')
         ->middleware('permission:finance.bank.view');
-    Route::get('/bank-reconciliation/create', [BankReconciliationController::class, 'create'])
-        ->name('bank-reconciliation.create')
-        ->middleware('permission:finance.bank.manage');
+    // Starting a reconciliation is a three-field dialog on the index (and on a
+    // bank account), so the old routed create page is gone and its URL
+    // redirects to the list. (Must stay registered BEFORE
+    // /bank-reconciliation/{reconciliation}.)
+    Route::redirect('/bank-reconciliation/create', '/finance/bank-reconciliation')
+        ->name('bank-reconciliation.create');
     Route::post('/bank-reconciliation', [BankReconciliationController::class, 'store'])
         ->name('bank-reconciliation.store')
         ->middleware('permission:finance.bank.manage');
@@ -590,6 +594,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::post('/petty-cash/{fund}/transaction', [PettyCashController::class, 'storeTransaction'])
         ->name('petty-cash.transaction')
         ->middleware('permission:finance.petty_cash.manage');
+    // Receipts live on the private disk and are streamed through this authorised
+    // route (ServesPrivateAttachments) — never a public /storage URL.
+    Route::get('/petty-cash/{fund}/transactions/{transaction}/receipt', [PettyCashController::class, 'receipt'])
+        ->name('petty-cash.receipt')
+        ->middleware('permission:finance.petty_cash.view');
 
     // ── FX Revaluations ──────────────────────────────────────────────────
     Route::middleware('permission:finance.ledger.manage')->group(function () {
@@ -680,18 +689,16 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/invoices/export', [InvoiceController::class, 'export'])
         ->name('invoices.export')
         ->middleware('permission:finance.ar.view');
-    Route::get('/invoices/create', [InvoiceController::class, 'create'])
-        ->name('invoices.create')
-        ->middleware('permission:finance.ar.manage');
+    // Create/edit are the NewInvoiceDialog WizardShell on the index and the
+    // invoice's own page; the retired full-page forms redirect back to the list.
+    Route::redirect('/invoices/create', '/finance/invoices')->name('invoices.create');
     Route::post('/invoices', [InvoiceController::class, 'store'])
         ->name('invoices.store')
         ->middleware('permission:finance.ar.manage');
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])
         ->name('invoices.show')
         ->middleware('permission:finance.ar.view');
-    Route::get('/invoices/{invoice}/edit', [InvoiceController::class, 'edit'])
-        ->name('invoices.edit')
-        ->middleware('permission:finance.ar.manage');
+    Route::redirect('/invoices/{invoice}/edit', '/finance/invoices')->name('invoices.edit');
     Route::put('/invoices/{invoice}', [InvoiceController::class, 'update'])
         ->name('invoices.update')
         ->middleware('permission:finance.ar.manage');

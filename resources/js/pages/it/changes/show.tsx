@@ -1,13 +1,11 @@
 import { ItModuleShell } from '@/components/it/it-module-shell';
-import { Button } from '@/components/ui/button';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+    SpecialistCommandWizard,
+    specialistReviewNames,
+} from '@/components/it/specialist-create-wizard';
+import { SpecialistRecordHeader } from '@/components/it/specialist-record-header';
+import { useSpecialistFormDefaults } from '@/components/it/use-specialist-form-defaults';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -16,18 +14,21 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import type { BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
 import {
-    ArrowLeft,
+    formatDateOnly,
+    formatDateTimeLong,
+    toDatetimeLocal,
+    WORKER_TIMEZONE,
+} from '@/lib/datetime';
+import type { BreadcrumbItem, SharedData } from '@/types';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import {
     CalendarClock,
     ExternalLink,
     FileCheck2,
     Link2,
-    Save,
     ShieldCheck,
 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
@@ -89,6 +90,7 @@ interface Props {
         reviewed_by: UserOption | null;
     };
     ticket: ChangeTicketOption & {
+        lock_version: number;
         description: string | null;
         category: string;
         next_action: string | null;
@@ -129,16 +131,31 @@ const nextStates: Record<string, string[]> = {
     closed: ['draft'],
 };
 
-export default function ItChangeShow({
+export default function ItChangeShow(props: Props) {
+    const { auth } = usePage<SharedData>().props;
+    return (
+        <ItChangeRecord
+            key={`${auth.user.id}:${props.ticket.id}`}
+            {...props}
+            actorId={auth.user.id}
+        />
+    );
+}
+
+function ItChangeRecord({
+    actorId,
     change,
     ticket,
     links,
     options,
     can,
-}: Props) {
+}: Props & { actorId: number }) {
     const [editing, setEditing] = useState(false);
     const [transitioning, setTransitioning] = useState(false);
-    const edit = useForm({
+    const editDefaults = {
+        maintenance_timezone: WORKER_TIMEZONE,
+        actor_user_id: actorId,
+        expected_version: ticket.lock_version,
         title: ticket.title,
         description: ticket.description ?? '',
         category: ticket.category,
@@ -151,8 +168,8 @@ export default function ItChangeShow({
         implementation_plan: change.implementation_plan ?? '',
         validation_plan: change.validation_plan ?? '',
         backout_plan: change.backout_plan ?? '',
-        maintenance_starts_at: localDateTime(change.maintenance_starts_at),
-        maintenance_ends_at: localDateTime(change.maintenance_ends_at),
+        maintenance_starts_at: toDatetimeLocal(change.maintenance_starts_at),
+        maintenance_ends_at: toDatetimeLocal(change.maintenance_ends_at),
         actual_outcome: change.actual_outcome ?? '',
         validation_result: change.validation_result ?? '',
         validation_summary: change.validation_summary ?? '',
@@ -164,14 +181,20 @@ export default function ItChangeShow({
         alert_ids: links.alerts.map((item) => item.id),
         incident_ids: links.incidents.map((item) => item.id),
         problem_ids: links.problems.map((item) => item.id),
-    });
-    const transition = useForm({
+    };
+    const edit = useForm(editDefaults);
+    const transitionDefaults = {
+        next_action: ticket.next_action ?? '',
+        actor_user_id: actorId,
+        expected_version: ticket.lock_version,
         workflow_state: nextStates[ticket.workflow_state]?.[0] ?? 'closed',
         reason: '',
         resolution_code: '',
         resolution_summary: '',
-    });
+    };
+    const transition = useForm(transitionDefaults);
     const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
         { title: 'IT & Support', href: '/it' },
         { title: 'Changes', href: '/it/changes' },
         { title: ticket.reference, href: `/it/changes/${change.id}` },
@@ -179,6 +202,24 @@ export default function ItChangeShow({
 
     const save = (event: FormEvent) => {
         event.preventDefault();
+        edit.transform((data) => {
+            // Retain the precise stored instants when the minute-level controls
+            // were unchanged, including any existing seconds and DST offset.
+            if (
+                data.maintenance_starts_at ===
+                    toDatetimeLocal(change.maintenance_starts_at) &&
+                data.maintenance_ends_at ===
+                    toDatetimeLocal(change.maintenance_ends_at)
+            ) {
+                const {
+                    maintenance_starts_at: _start,
+                    maintenance_ends_at: _end,
+                    ...rest
+                } = data;
+                return rest;
+            }
+            return data;
+        });
         edit.patch(`/it/changes/${change.id}`, {
             onSuccess: () => setEditing(false),
         });
@@ -190,91 +231,135 @@ export default function ItChangeShow({
         });
     };
 
+    useSpecialistFormDefaults(editing, edit, editDefaults);
+    useSpecialistFormDefaults(transitioning, transition, transitionDefaults);
+
+    const editReview = (values: typeof editDefaults) => [
+        { label: 'Title', value: values.title },
+        { label: 'Description', value: values.description },
+        { label: 'Category', value: changeLabel(values.category) },
+        { label: 'Priority', value: changeLabel(values.priority) },
+        { label: 'Next action', value: values.next_action },
+        { label: 'Change type', value: changeLabel(values.change_type) },
+        { label: 'Risk', value: changeLabel(values.risk_level) },
+        { label: 'Restricted', value: values.is_restricted ? 'Yes' : 'No' },
+        { label: 'Impact', value: values.impact_summary },
+        { label: 'Implementation plan', value: values.implementation_plan },
+        { label: 'Validation plan', value: values.validation_plan },
+        { label: 'Backout plan', value: values.backout_plan },
+        {
+            label: 'Maintenance starts',
+            value: maintenanceWallLabel(values.maintenance_starts_at),
+        },
+        {
+            label: 'Maintenance ends',
+            value: maintenanceWallLabel(values.maintenance_ends_at),
+        },
+        { label: 'Actual outcome', value: values.actual_outcome },
+        {
+            label: 'Validation result',
+            value: changeLabel(values.validation_result),
+        },
+        { label: 'Validation evidence', value: values.validation_summary },
+        { label: 'Backout evidence', value: values.backout_summary },
+        { label: 'Post-implementation review', value: values.pir_summary },
+        {
+            label: 'Services',
+            value: specialistReviewNames(values.service_ids, [
+                ...options.services,
+                ...links.services,
+            ]),
+        },
+        {
+            label: 'Sites',
+            value: specialistReviewNames(values.site_ids, [
+                ...options.sites,
+                ...links.sites,
+            ]),
+        },
+        {
+            label: 'Devices',
+            value: specialistReviewNames(values.device_ids, [
+                ...options.devices,
+                ...links.devices,
+            ]),
+        },
+        {
+            label: 'Alerts',
+            value: specialistReviewNames(values.alert_ids, [
+                ...options.alerts,
+                ...links.alerts,
+            ]),
+        },
+        {
+            label: 'Incidents',
+            value: specialistReviewNames(values.incident_ids, [
+                ...options.incidents,
+                ...links.incidents,
+            ]),
+        },
+        {
+            label: 'Problems',
+            value: specialistReviewNames(values.problem_ids, [
+                ...options.problems,
+                ...links.problems,
+            ]),
+        },
+    ];
+    const currentRecord = {
+        version: ticket.lock_version,
+        review: [
+            {
+                label: 'Current state',
+                value: changeLabel(ticket.workflow_state),
+            },
+            {
+                label: 'Approval',
+                value: ticket.requires_approval
+                    ? changeLabel(ticket.approval?.status ?? 'not_requested')
+                    : 'Not required',
+            },
+            ...editReview(editDefaults),
+        ],
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${ticket.reference} · Change`} />
             <ItModuleShell>
-                <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
-                    <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                        <Link
-                            href="/it/changes"
-                            className="frontline-focus inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground"
-                        >
-                            <ArrowLeft className="h-4 w-4" aria-hidden="true" />{' '}
-                            Back to changes
-                        </Link>
-                        <div className="mt-2 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-                            <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="font-mono text-sm font-bold text-primary">
-                                        {ticket.reference}
-                                    </span>
-                                    <StatusBadge
-                                        variant={
-                                            changeStateVariant[
-                                                ticket.workflow_state
-                                            ] ?? 'neutral'
-                                        }
-                                    >
-                                        {changeLabel(ticket.workflow_state)}
-                                    </StatusBadge>
-                                    <StatusBadge
-                                        variant={
-                                            change.risk_level === 'critical' ||
-                                            change.risk_level === 'high'
-                                                ? 'critical'
-                                                : 'info'
-                                        }
-                                    >
-                                        {changeLabel(change.risk_level)} risk
-                                    </StatusBadge>
-                                    {change.is_restricted ? (
-                                        <StatusBadge variant="critical">
-                                            Restricted
-                                        </StatusBadge>
-                                    ) : null}
-                                </div>
-                                <h1 className="mt-3 text-2xl font-bold tracking-tight">
-                                    {ticket.title}
-                                </h1>
-                                <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
-                                    {ticket.description ||
-                                        'No change description recorded.'}
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    className="min-h-11"
-                                >
-                                    <Link href={ticket.href}>
-                                        Open canonical ticket workspace{' '}
-                                        <ExternalLink
-                                            className="h-4 w-4"
-                                            aria-hidden="true"
-                                        />
-                                    </Link>
-                                </Button>
-                                {can.manage ? (
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => setEditing(true)}
-                                    >
-                                        Edit change
-                                    </Button>
-                                ) : null}
-                                {can.manage &&
-                                nextStates[ticket.workflow_state]?.length ? (
-                                    <Button
-                                        onClick={() => setTransitioning(true)}
-                                    >
-                                        Update state
-                                    </Button>
-                                ) : null}
-                            </div>
-                        </div>
-                    </header>
+                <main className="min-w-0 space-y-5">
+                    <SpecialistRecordHeader
+                        icon={ShieldCheck}
+                        backHref="/it/changes"
+                        title={ticket.title}
+                        reference={ticket.reference}
+                        status={changeLabel(ticket.workflow_state)}
+                        statusVariant={
+                            changeStateVariant[ticket.workflow_state] ??
+                            'neutral'
+                        }
+                        subline={`${changeLabel(change.change_type)} change · ${changeLabel(change.risk_level)} risk${change.is_restricted ? ' · Restricted' : ''}`}
+                        ticket={ticket}
+                        primary={
+                            can.manage &&
+                            nextStates[ticket.workflow_state]?.length
+                                ? {
+                                      label: 'Update state',
+                                      run: () => setTransitioning(true),
+                                  }
+                                : undefined
+                        }
+                        actions={
+                            can.manage
+                                ? [
+                                      {
+                                          label: 'Edit change',
+                                          run: () => setEditing(true),
+                                      },
+                                  ]
+                                : []
+                        }
+                    />
 
                     <section
                         className="grid gap-4 md:grid-cols-3"
@@ -490,332 +575,373 @@ export default function ItChangeShow({
                 </main>
             </ItModuleShell>
 
-            <Dialog open={editing} onOpenChange={setEditing}>
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
-                    <form onSubmit={save}>
-                        <DialogHeader>
-                            <DialogTitle>Edit change controls</DialogTitle>
-                            <DialogDescription>
-                                Keep plans, evidence, timing, and affected
-                                records current before changing state.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-5 grid gap-4 md:grid-cols-2">
-                            <Field label="Title" className="md:col-span-2">
-                                <Input
-                                    value={edit.data.title}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'title',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
-                            <Field
-                                label="Next action"
-                                className="md:col-span-2"
-                            >
-                                <Input
-                                    value={edit.data.next_action}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'next_action',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
-                            <Field label="Change type">
-                                <FormSelect
-                                    value={edit.data.change_type}
-                                    onChange={(value) =>
-                                        edit.setData('change_type', value)
-                                    }
-                                    values={['standard', 'normal', 'emergency']}
-                                />
-                            </Field>
-                            <Field label="Risk level">
-                                <FormSelect
-                                    value={edit.data.risk_level}
-                                    onChange={(value) =>
-                                        edit.setData('risk_level', value)
-                                    }
-                                    values={[
-                                        'low',
-                                        'medium',
-                                        'high',
-                                        'critical',
-                                    ]}
-                                />
-                            </Field>
-                            <label className="flex items-center gap-3 rounded-lg border border-border px-3 py-3 text-sm font-medium md:col-span-2">
-                                <input
-                                    type="checkbox"
-                                    checked={edit.data.is_restricted}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'is_restricted',
-                                            event.target.checked,
-                                        )
-                                    }
-                                    className="h-4 w-4"
-                                />{' '}
-                                Restricted or privileged change
-                            </label>
-                            <Area
-                                label="Expected impact"
-                                value={edit.data.impact_summary}
-                                onChange={(value) =>
-                                    edit.setData('impact_summary', value)
-                                }
-                            />
-                            <Area
-                                label="Implementation plan"
-                                value={edit.data.implementation_plan}
-                                onChange={(value) =>
-                                    edit.setData('implementation_plan', value)
-                                }
-                            />
-                            <Area
-                                label="Validation plan"
-                                value={edit.data.validation_plan}
-                                onChange={(value) =>
-                                    edit.setData('validation_plan', value)
-                                }
-                            />
-                            <Area
-                                label="Backout plan"
-                                value={edit.data.backout_plan}
-                                onChange={(value) =>
-                                    edit.setData('backout_plan', value)
-                                }
-                            />
-                            <Field label="Maintenance starts">
-                                <Input
-                                    type="datetime-local"
-                                    value={edit.data.maintenance_starts_at}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'maintenance_starts_at',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
-                            <Field label="Maintenance ends">
-                                <Input
-                                    type="datetime-local"
-                                    value={edit.data.maintenance_ends_at}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'maintenance_ends_at',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
-                            <Area
-                                label="Actual outcome"
-                                value={edit.data.actual_outcome}
-                                onChange={(value) =>
-                                    edit.setData('actual_outcome', value)
-                                }
-                            />
-                            <Field label="Validation result">
-                                <FormSelect
-                                    value={
-                                        edit.data.validation_result || 'pending'
-                                    }
-                                    onChange={(value) =>
-                                        edit.setData(
-                                            'validation_result',
-                                            value === 'pending' ? '' : value,
-                                        )
-                                    }
-                                    values={[
-                                        'pending',
-                                        'successful',
-                                        'failed',
-                                        'inconclusive',
-                                    ]}
-                                />
-                            </Field>
-                            <Area
-                                label="Validation summary"
-                                value={edit.data.validation_summary}
-                                onChange={(value) =>
-                                    edit.setData('validation_summary', value)
-                                }
-                            />
-                            <Area
-                                label="Backout outcome"
-                                value={edit.data.backout_summary}
-                                onChange={(value) =>
-                                    edit.setData('backout_summary', value)
-                                }
-                            />
-                            <Area
-                                label="Post-implementation review"
-                                value={edit.data.pir_summary}
-                                onChange={(value) =>
-                                    edit.setData('pir_summary', value)
-                                }
-                                className="md:col-span-2"
-                            />
-                            <MultiSelect
-                                title="Affected services"
-                                values={options.services}
-                                selected={edit.data.service_ids}
-                                onChange={(ids) =>
-                                    edit.setData('service_ids', ids)
-                                }
-                            />
-                            <MultiSelect
-                                title="Affected sites"
-                                values={options.sites}
-                                selected={edit.data.site_ids}
-                                onChange={(ids) =>
-                                    edit.setData('site_ids', ids)
-                                }
-                            />
-                            <MultiSelect
-                                title="Affected devices"
-                                values={options.devices}
-                                selected={edit.data.device_ids}
-                                onChange={(ids) =>
-                                    edit.setData('device_ids', ids)
-                                }
-                            />
-                            <MultiSelect
-                                title="Monitoring alerts"
-                                values={options.alerts}
-                                selected={edit.data.alert_ids}
-                                onChange={(ids) =>
-                                    edit.setData('alert_ids', ids)
-                                }
-                            />
-                            <MultiSelect
-                                title="Related incidents"
-                                values={options.incidents.map((item) => ({
-                                    id: item.id,
-                                    name: `${item.reference} · ${item.title}`,
-                                }))}
-                                selected={edit.data.incident_ids}
-                                onChange={(ids) =>
-                                    edit.setData('incident_ids', ids)
-                                }
-                            />
-                            <MultiSelect
-                                title="Related problems"
-                                values={options.problems.map((item) => ({
-                                    id: item.id,
-                                    name: `${item.reference} · ${item.title}`,
-                                }))}
-                                selected={edit.data.problem_ids}
-                                onChange={(ids) =>
-                                    edit.setData('problem_ids', ids)
-                                }
-                            />
-                        </div>
-                        <DialogFooter className="mt-6">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setEditing(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={edit.processing}>
-                                <Save className="h-4 w-4" aria-hidden="true" />{' '}
-                                Save change
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <SpecialistCommandWizard
+                open={editing}
+                onClose={() => setEditing(false)}
+                onDiscard={() => edit.resetAndClearErrors()}
+                title="Edit change controls"
+                description="Update the record and linked work, then review the proposed changes."
+                icon={ShieldCheck}
+                submitLabel="Save changes"
+                allowed={can.manage}
+                processing={edit.processing}
+                dirty={edit.isDirty}
+                errors={edit.errors}
+                expectedVersion={edit.data.expected_version}
+                current={currentRecord}
+                onVersionReviewed={(version) => {
+                    edit.setData('expected_version', version);
+                    edit.clearErrors('expected_version');
+                }}
+                review={editReview(edit.data)}
+                onSubmit={save}
+            >
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <Field label="Description" className="md:col-span-2">
+                        <Textarea
+                            value={edit.data.description}
+                            maxLength={10000}
+                            rows={4}
+                            onChange={(event) =>
+                                edit.setData('description', event.target.value)
+                            }
+                        />
+                    </Field>
+                    <Field label="Category">
+                        <select
+                            className="frontline-focus min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            value={edit.data.category}
+                            onChange={(event) =>
+                                edit.setData('category', event.target.value)
+                            }
+                        >
+                            {['hardware', 'account', 'network', 'other'].map(
+                                (value) => (
+                                    <option key={value} value={value}>
+                                        {changeLabel(value)}
+                                    </option>
+                                ),
+                            )}
+                        </select>
+                    </Field>
+                    <Field label="Priority">
+                        <select
+                            className="frontline-focus min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            value={edit.data.priority}
+                            onChange={(event) =>
+                                edit.setData('priority', event.target.value)
+                            }
+                        >
+                            {['low', 'normal', 'high', 'urgent'].map(
+                                (value) => (
+                                    <option key={value} value={value}>
+                                        {changeLabel(value)}
+                                    </option>
+                                ),
+                            )}
+                        </select>
+                    </Field>
+                    <Field label="Title" className="md:col-span-2">
+                        <Input
+                            required
+                            maxLength={255}
+                            value={edit.data.title}
+                            onChange={(event) =>
+                                edit.setData('title', event.target.value)
+                            }
+                        />
+                    </Field>
+                    <Field label="Next action" className="md:col-span-2">
+                        <Input
+                            value={edit.data.next_action}
+                            onChange={(event) =>
+                                edit.setData('next_action', event.target.value)
+                            }
+                        />
+                    </Field>
+                    <Field label="Change type">
+                        <FormSelect
+                            value={edit.data.change_type}
+                            onChange={(value) =>
+                                edit.setData('change_type', value)
+                            }
+                            values={['standard', 'normal', 'emergency']}
+                        />
+                    </Field>
+                    <Field label="Risk level">
+                        <FormSelect
+                            value={edit.data.risk_level}
+                            onChange={(value) =>
+                                edit.setData('risk_level', value)
+                            }
+                            values={['low', 'medium', 'high', 'critical']}
+                        />
+                    </Field>
+                    <label className="flex items-center gap-3 rounded-lg border border-border px-3 py-3 text-sm font-medium md:col-span-2">
+                        <input
+                            type="checkbox"
+                            checked={edit.data.is_restricted}
+                            onChange={(event) =>
+                                edit.setData(
+                                    'is_restricted',
+                                    event.target.checked,
+                                )
+                            }
+                            className="h-4 w-4"
+                        />{' '}
+                        Restricted or privileged change
+                    </label>
+                    <Area
+                        label="Expected impact"
+                        value={edit.data.impact_summary}
+                        onChange={(value) =>
+                            edit.setData('impact_summary', value)
+                        }
+                    />
+                    <Area
+                        label="Implementation plan"
+                        value={edit.data.implementation_plan}
+                        onChange={(value) =>
+                            edit.setData('implementation_plan', value)
+                        }
+                    />
+                    <Area
+                        label="Validation plan"
+                        value={edit.data.validation_plan}
+                        onChange={(value) =>
+                            edit.setData('validation_plan', value)
+                        }
+                    />
+                    <Area
+                        label="Backout plan"
+                        value={edit.data.backout_plan}
+                        onChange={(value) =>
+                            edit.setData('backout_plan', value)
+                        }
+                    />
+                    <Field label="Maintenance starts (New Zealand time)">
+                        <Input
+                            type="datetime-local"
+                            value={edit.data.maintenance_starts_at}
+                            onChange={(event) =>
+                                edit.setData(
+                                    'maintenance_starts_at',
+                                    event.target.value,
+                                )
+                            }
+                        />
+                    </Field>
+                    <Field label="Maintenance ends (New Zealand time)">
+                        <Input
+                            type="datetime-local"
+                            value={edit.data.maintenance_ends_at}
+                            onChange={(event) =>
+                                edit.setData(
+                                    'maintenance_ends_at',
+                                    event.target.value,
+                                )
+                            }
+                        />
+                    </Field>
+                    <Area
+                        label="Actual outcome"
+                        value={edit.data.actual_outcome}
+                        onChange={(value) =>
+                            edit.setData('actual_outcome', value)
+                        }
+                    />
+                    <Field label="Validation result">
+                        <FormSelect
+                            value={edit.data.validation_result || 'pending'}
+                            onChange={(value) =>
+                                edit.setData(
+                                    'validation_result',
+                                    value === 'pending' ? '' : value,
+                                )
+                            }
+                            values={[
+                                'pending',
+                                'successful',
+                                'failed',
+                                'inconclusive',
+                            ]}
+                        />
+                    </Field>
+                    <Area
+                        label="Validation summary"
+                        value={edit.data.validation_summary}
+                        onChange={(value) =>
+                            edit.setData('validation_summary', value)
+                        }
+                    />
+                    <Area
+                        label="Backout outcome"
+                        value={edit.data.backout_summary}
+                        onChange={(value) =>
+                            edit.setData('backout_summary', value)
+                        }
+                    />
+                    <Area
+                        label="Post-implementation review"
+                        value={edit.data.pir_summary}
+                        onChange={(value) => edit.setData('pir_summary', value)}
+                        className="md:col-span-2"
+                    />
+                    <MultiSelect
+                        title="Affected services"
+                        values={options.services}
+                        selected={edit.data.service_ids}
+                        onChange={(ids) => edit.setData('service_ids', ids)}
+                    />
+                    <MultiSelect
+                        title="Affected sites"
+                        values={options.sites}
+                        selected={edit.data.site_ids}
+                        onChange={(ids) => edit.setData('site_ids', ids)}
+                    />
+                    <MultiSelect
+                        title="Affected devices"
+                        values={options.devices}
+                        selected={edit.data.device_ids}
+                        onChange={(ids) => edit.setData('device_ids', ids)}
+                    />
+                    <MultiSelect
+                        title="Monitoring alerts"
+                        values={options.alerts}
+                        selected={edit.data.alert_ids}
+                        onChange={(ids) => edit.setData('alert_ids', ids)}
+                    />
+                    <MultiSelect
+                        title="Related incidents"
+                        values={options.incidents.map((item) => ({
+                            id: item.id,
+                            name: `${item.reference} · ${item.title}`,
+                        }))}
+                        selected={edit.data.incident_ids}
+                        onChange={(ids) => edit.setData('incident_ids', ids)}
+                    />
+                    <MultiSelect
+                        title="Related problems"
+                        values={options.problems.map((item) => ({
+                            id: item.id,
+                            name: `${item.reference} · ${item.title}`,
+                        }))}
+                        selected={edit.data.problem_ids}
+                        onChange={(ids) => edit.setData('problem_ids', ids)}
+                    />
+                </div>
+            </SpecialistCommandWizard>
 
-            <Dialog open={transitioning} onOpenChange={setTransitioning}>
-                <DialogContent className="sm:max-w-xl">
-                    <form onSubmit={move}>
-                        <DialogHeader>
-                            <DialogTitle>Update change state</DialogTitle>
-                            <DialogDescription>
-                                Lifecycle gates verify plans, approval, timing,
-                                outcome, validation, and review evidence.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-5 space-y-4">
-                            <Field label="Next state">
-                                <FormSelect
-                                    value={transition.data.workflow_state}
-                                    onChange={(value) =>
+            <SpecialistCommandWizard
+                open={transitioning}
+                onClose={() => setTransitioning(false)}
+                onDiscard={() => transition.resetAndClearErrors()}
+                title="Update change state"
+                description="Review the next state and supporting evidence before updating the record."
+                icon={ShieldCheck}
+                submitLabel="Update state"
+                allowed={can.manage}
+                processing={transition.processing}
+                dirty={transition.isDirty}
+                errors={transition.errors}
+                expectedVersion={transition.data.expected_version}
+                current={currentRecord}
+                onVersionReviewed={(version) => {
+                    transition.setData('expected_version', version);
+                    transition.clearErrors('expected_version');
+                }}
+                review={[
+                    { label: 'Record', value: ticket.reference },
+                    {
+                        label: 'From',
+                        value: changeLabel(ticket.workflow_state),
+                    },
+                    {
+                        label: 'To',
+                        value: changeLabel(
+                            transition.data.workflow_state ?? '',
+                        ),
+                    },
+                    { label: 'Reason', value: transition.data.reason },
+                    {
+                        label: 'Next action',
+                        value: transition.data.next_action,
+                    },
+                    ...(transition.data.workflow_state === 'completed'
+                        ? [
+                              {
+                                  label: 'Resolution code',
+                                  value: transition.data.resolution_code,
+                              },
+                              {
+                                  label: 'Resolution summary',
+                                  value: transition.data.resolution_summary,
+                              },
+                          ]
+                        : []),
+                ]}
+                onSubmit={move}
+            >
+                <div className="mt-5 space-y-4">
+                    <Field label="Next state">
+                        <FormSelect
+                            value={transition.data.workflow_state}
+                            onChange={(value) =>
+                                transition.setData('workflow_state', value)
+                            }
+                            values={nextStates[ticket.workflow_state] ?? []}
+                        />
+                    </Field>
+                    <Field label="Next action">
+                        <Textarea
+                            value={transition.data.next_action}
+                            onChange={(event) =>
+                                transition.setData(
+                                    'next_action',
+                                    event.target.value,
+                                )
+                            }
+                            rows={2}
+                            maxLength={2000}
+                        />
+                    </Field>
+                    <Area
+                        label="Reason"
+                        required
+                        value={transition.data.reason}
+                        onChange={(value) =>
+                            transition.setData('reason', value)
+                        }
+                    />
+                    {transition.data.workflow_state === 'completed' ? (
+                        <>
+                            <Field label="Resolution code">
+                                <Input
+                                    value={transition.data.resolution_code}
+                                    onChange={(event) =>
                                         transition.setData(
-                                            'workflow_state',
-                                            value,
+                                            'resolution_code',
+                                            event.target.value,
                                         )
                                     }
-                                    values={
-                                        nextStates[ticket.workflow_state] ?? []
-                                    }
+                                    required
                                 />
                             </Field>
                             <Area
-                                label="Reason"
-                                value={transition.data.reason}
+                                label="Resolution summary"
+                                required
+                                value={transition.data.resolution_summary}
                                 onChange={(value) =>
-                                    transition.setData('reason', value)
+                                    transition.setData(
+                                        'resolution_summary',
+                                        value,
+                                    )
                                 }
                             />
-                            {transition.data.workflow_state === 'completed' ? (
-                                <>
-                                    <Field label="Resolution code">
-                                        <Input
-                                            value={
-                                                transition.data.resolution_code
-                                            }
-                                            onChange={(event) =>
-                                                transition.setData(
-                                                    'resolution_code',
-                                                    event.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                    </Field>
-                                    <Area
-                                        label="Resolution summary"
-                                        value={
-                                            transition.data.resolution_summary
-                                        }
-                                        onChange={(value) =>
-                                            transition.setData(
-                                                'resolution_summary',
-                                                value,
-                                            )
-                                        }
-                                    />
-                                </>
-                            ) : null}
-                        </div>
-                        <DialogFooter className="mt-6">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setTransitioning(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={transition.processing}
-                            >
-                                Update state
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                        </>
+                    ) : null}
+                </div>
+            </SpecialistCommandWizard>
         </AppLayout>
     );
 }
@@ -994,15 +1120,18 @@ function Area({
     value,
     onChange,
     className,
+    required = false,
 }: {
     label: string;
     value: string;
     onChange: (value: string) => void;
     className?: string;
+    required?: boolean;
 }) {
     return (
         <Field label={label} className={className}>
             <Textarea
+                required={required}
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
                 rows={4}
@@ -1080,17 +1209,17 @@ function MultiSelect({
         </fieldset>
     );
 }
-function localDateTime(value: string | null) {
-    return value ? new Date(value).toISOString().slice(0, 16) : '';
-}
 function formatDate(value: string) {
-    return new Intl.DateTimeFormat(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    }).format(new Date(value));
+    return formatDateTimeLong(value, 'Not recorded');
 }
 function windowText(start: string | null, end: string | null) {
     return start && end
         ? `${formatDate(start)} – ${formatDate(end)}`
         : 'No maintenance window recorded.';
+}
+
+function maintenanceWallLabel(value: string) {
+    if (!value) return 'Not scheduled';
+    const [date, time] = value.split('T');
+    return `${formatDateOnly(date)} at ${time} (New Zealand time)`;
 }

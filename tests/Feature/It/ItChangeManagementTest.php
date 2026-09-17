@@ -109,7 +109,7 @@ test('a standard change follows assessed scheduled implemented validated reviewe
     $change = changeAtSite('standard', $this->site);
 
     $this->actingAs($this->agent)
-        ->patch("/it/changes/{$change->id}", [
+        ->patch("/it/changes/{$change->id}", ['expected_version' => (int) $change->ticket()->value('lock_version'),
             'impact_summary' => 'One site will fail over for up to five minutes.',
             'implementation_plan' => 'Export configuration, apply tested policy, verify routes.',
             'validation_plan' => 'Check WAN, DNS, voice, and remote support probes.',
@@ -126,7 +126,7 @@ test('a standard change follows assessed scheduled implemented validated reviewe
 
     foreach (['assessment', 'approved', 'scheduled', 'implementing'] as $state) {
         $this->actingAs($this->agent)
-            ->post("/it/changes/{$change->id}/transitions", [
+            ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'),
                 'workflow_state' => $state,
                 'reason' => "Move change to {$state}.",
             ])
@@ -135,25 +135,25 @@ test('a standard change follows assessed scheduled implemented validated reviewe
     }
 
     $this->actingAs($this->agent)
-        ->patch("/it/changes/{$change->id}", [
+        ->patch("/it/changes/{$change->id}", ['expected_version' => (int) $change->ticket()->value('lock_version'),
             'actual_outcome' => 'Policy applied and all services remained reachable.',
         ])
         ->assertRedirect();
     $this->actingAs($this->agent)
-        ->post("/it/changes/{$change->id}/transitions", [
+        ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'),
             'workflow_state' => 'validation',
             'reason' => 'Implementation completed; validate the outcome.',
         ])
         ->assertRedirect();
     $this->actingAs($this->validator)
-        ->patch("/it/changes/{$change->id}", [
+        ->patch("/it/changes/{$change->id}", ['expected_version' => (int) $change->ticket()->value('lock_version'),
             'validation_result' => 'successful',
             'validation_summary' => 'WAN, DNS, voice, and remote support probes passed.',
             'pir_summary' => 'No customer impact and no follow-up actions required.',
         ])
         ->assertRedirect();
     $this->actingAs($this->validator)
-        ->post("/it/changes/{$change->id}/transitions", [
+        ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'),
             'workflow_state' => 'completed',
             'reason' => 'Independent validation passed.',
             'resolution_code' => 'successful_change',
@@ -162,7 +162,7 @@ test('a standard change follows assessed scheduled implemented validated reviewe
         ->assertRedirect();
     foreach (['review', 'closed'] as $state) {
         $this->actingAs($this->validator)
-            ->post("/it/changes/{$change->id}/transitions", [
+            ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'),
                 'workflow_state' => $state,
                 'reason' => "Move change to {$state}.",
             ])
@@ -192,16 +192,16 @@ test('normal high risk and restricted changes require approval and independent v
     ]);
 
     $this->actingAs($this->agent)
-        ->post("/it/changes/{$change->id}/transitions", ['workflow_state' => 'assessment', 'reason' => 'Assess risk.'])
+        ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'), 'workflow_state' => 'assessment', 'reason' => 'Assess risk.'])
         ->assertRedirect();
     $this->actingAs($this->agent)
-        ->post("/it/changes/{$change->id}/transitions", ['workflow_state' => 'approved', 'reason' => 'Try to bypass approval.'])
+        ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'), 'workflow_state' => 'approved', 'reason' => 'Try to bypass approval.'])
         ->assertRedirect()
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('form');
 
     $this->actingAs($this->agent)
-        ->post("/it/tickets/{$change->ticket_id}/approvals", ['reason' => 'Critical identity change.'])
-        ->assertRedirect();
+        ->post("/it/tickets/{$change->ticket_id}/approvals", ['reason' => 'Critical identity change.', 'primary_approver_user_id' => $this->approver->id])
+        ->assertRedirect()->assertSessionDoesntHaveErrors()->assertSessionMissing('error');
     $approval = $change->ticket->approvals()->firstOrFail();
     $this->actingAs($this->agent)
         ->post("/it/approvals/{$approval->id}/decide", ['decision' => 'approve'])
@@ -212,41 +212,41 @@ test('normal high risk and restricted changes require approval and independent v
 
     foreach (['approved', 'scheduled', 'implementing'] as $state) {
         $this->actingAs($this->agent)
-            ->post("/it/changes/{$change->id}/transitions", ['workflow_state' => $state, 'reason' => "Move to {$state}."])
+            ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'), 'workflow_state' => $state, 'reason' => "Move to {$state}."])
             ->assertRedirect();
     }
     $this->actingAs($this->agent)
-        ->patch("/it/changes/{$change->id}", ['actual_outcome' => 'New key active; old key retained for backout.'])
+        ->patch("/it/changes/{$change->id}", ['expected_version' => (int) $change->ticket()->value('lock_version'), 'actual_outcome' => 'New key active; old key retained for backout.'])
         ->assertRedirect();
     $this->actingAs($this->agent)
-        ->post("/it/changes/{$change->id}/transitions", ['workflow_state' => 'validation', 'reason' => 'Ready for independent validation.'])
+        ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'), 'workflow_state' => 'validation', 'reason' => 'Ready for independent validation.'])
         ->assertRedirect();
     $this->actingAs($this->agent)
-        ->patch("/it/changes/{$change->id}", [
+        ->patch("/it/changes/{$change->id}", ['expected_version' => (int) $change->ticket()->value('lock_version'),
             'validation_result' => 'successful',
             'validation_summary' => 'Implementer reports sign-in success.',
         ])
         ->assertRedirect();
     $this->actingAs($this->agent)
-        ->post("/it/changes/{$change->id}/transitions", [
+        ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'),
             'workflow_state' => 'completed',
             'reason' => 'Self-validation attempt.',
             'resolution_code' => 'successful_change',
             'resolution_summary' => 'Identity keys rotated.',
         ])
         ->assertRedirect()
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('form');
     $this->actingAs($this->approver)
-        ->post("/it/changes/{$change->id}/transitions", [
+        ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'),
             'workflow_state' => 'completed',
             'reason' => 'Approver validation attempt.',
             'resolution_code' => 'successful_change',
             'resolution_summary' => 'Identity keys rotated.',
         ])
         ->assertRedirect()
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('form');
     $this->actingAs($this->validator)
-        ->post("/it/changes/{$change->id}/transitions", [
+        ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'),
             'workflow_state' => 'completed',
             'reason' => 'Independent validation passed.',
             'resolution_code' => 'successful_change',
@@ -275,21 +275,21 @@ test('emergency changes still need approval and failed implementations can be ba
 
     foreach (['assessment', 'approved', 'implementing'] as $state) {
         $this->actingAs($this->agent)
-            ->post("/it/changes/{$change->id}/transitions", ['workflow_state' => $state, 'reason' => "Emergency move to {$state}."])
+            ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'), 'workflow_state' => $state, 'reason' => "Emergency move to {$state}."])
             ->assertRedirect();
     }
     $this->actingAs($this->agent)
-        ->patch("/it/changes/{$change->id}", [
+        ->patch("/it/changes/{$change->id}", ['expected_version' => (int) $change->ticket()->value('lock_version'),
             'actual_outcome' => 'Vendor mitigation interrupted the identity callback.',
             'backout_summary' => 'Previous policy restored in three minutes.',
             'pir_summary' => 'Mitigation rejected; vendor escalation and new test case opened.',
         ])
         ->assertRedirect();
     $this->actingAs($this->agent)
-        ->post("/it/changes/{$change->id}/transitions", ['workflow_state' => 'backed_out', 'reason' => 'Mitigation caused regression.'])
+        ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'), 'workflow_state' => 'backed_out', 'reason' => 'Mitigation caused regression.'])
         ->assertRedirect();
     $this->actingAs($this->agent)
-        ->post("/it/changes/{$change->id}/transitions", ['workflow_state' => 'review', 'reason' => 'Review failed emergency change.'])
+        ->post("/it/changes/{$change->id}/transitions", ['expected_version' => (int) $change->ticket()->value('lock_version'), 'workflow_state' => 'review', 'reason' => 'Review failed emergency change.'])
         ->assertRedirect();
 
     $change->refresh();
@@ -316,7 +316,7 @@ test('affected services Sites devices alerts incidents and problems use canonica
     $problem = ItTicket::factory()->create(['site_id' => $site->id, 'work_type' => 'problem']);
 
     $this->actingAs($this->agent)
-        ->patch("/it/changes/{$change->id}", [
+        ->patch("/it/changes/{$change->id}", ['expected_version' => (int) $change->ticket()->value('lock_version'),
             'service_ids' => [$service->id],
             'site_ids' => [$site->id],
             'device_ids' => [$device->id],
@@ -367,9 +367,37 @@ test('affected services Sites devices alerts incidents and problems use canonica
 
     $inactiveService = ItService::factory()->create(['is_active' => false]);
     $this->actingAs($this->agent)
-        ->patch("/it/changes/{$change->id}", ['service_ids' => [$inactiveService->id]])
+        ->patch("/it/changes/{$change->id}", ['expected_version' => (int) $change->ticket()->value('lock_version'), 'service_ids' => [$inactiveService->id]])
         ->assertRedirect()
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('form');
+});
+
+test('the change editor rejects skipped and repeated local maintenance hours without changing the record', function (string $local) {
+    config(['app.worker_timezone' => 'Pacific/Auckland']);
+    $change = changeAtSite('standard', $this->site);
+    $version = (int) $change->ticket()->value('lock_version');
+    $this->actingAs($this->agent)->patchJson("/it/changes/{$change->id}", [
+        'expected_version' => $version, 'maintenance_timezone' => 'Pacific/Auckland',
+        'maintenance_starts_at' => $local, 'maintenance_ends_at' => substr($local, 0, 11).'04:00',
+    ])->assertUnprocessable()->assertJsonValidationErrors('maintenance_starts_at');
+    expect($change->fresh()->maintenance_starts_at)->toBeNull()
+        ->and((int) $change->ticket()->value('lock_version'))->toBe($version);
+})->with(['spring skipped hour' => '2026-09-27T02:30', 'autumn repeated hour' => '2027-04-04T02:30']);
+
+test('local maintenance dates are stored as instants and ordinary edits preserve their seconds', function () {
+    config(['app.worker_timezone' => 'Pacific/Auckland']);
+    $change = changeAtSite('standard', $this->site);
+    $this->actingAs($this->agent)->patch("/it/changes/{$change->id}", [
+        'expected_version' => (int) $change->ticket()->value('lock_version'),
+        'maintenance_timezone' => 'Pacific/Auckland',
+        'maintenance_starts_at' => '2026-09-28T10:00', 'maintenance_ends_at' => '2026-09-28T11:00',
+    ])->assertRedirect()->assertSessionDoesntHaveErrors();
+    expect($change->fresh()->maintenance_starts_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-09-27 21:00:00');
+    $change->update(['maintenance_starts_at' => '2026-09-27 21:00:37']);
+    $this->patch("/it/changes/{$change->id}", [
+        'expected_version' => (int) $change->ticket()->value('lock_version'), 'impact_summary' => 'Updated impact only.',
+    ])->assertRedirect()->assertSessionDoesntHaveErrors();
+    expect($change->fresh()->maintenance_starts_at->format('Y-m-d H:i:s'))->toBe('2026-09-27 21:00:37');
 });
 
 test('the change workspace reuses shared ticket work and is agent only site concealed', function () {
@@ -392,7 +420,7 @@ test('the change workspace reuses shared ticket work and is agent only site conc
 
     $this->actingAs($this->requester)->get('/it/changes')->assertForbidden();
     $this->actingAs($this->requester)
-        ->patch("/it/changes/{$change->id}", ['risk_level' => 'low'])
+        ->patch("/it/changes/{$change->id}", ['expected_version' => (int) $change->ticket()->value('lock_version'), 'risk_level' => 'low'])
         ->assertForbidden();
 
     $otherSite = Site::factory()->create();

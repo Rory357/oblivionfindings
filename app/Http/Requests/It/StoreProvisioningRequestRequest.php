@@ -26,6 +26,9 @@ class StoreProvisioningRequestRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'actor_user_id' => ['required', 'integer', 'min:1'],
+            'request_uuid' => ['required', 'uuid'],
+            'expected_version' => ['required', 'integer', 'min:1'],
             'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
             'type' => ['required', Rule::in(ItProvisioningRequest::TYPES)],
             'item' => ['required', 'string', 'max:255'],

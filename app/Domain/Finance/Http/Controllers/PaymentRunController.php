@@ -49,12 +49,73 @@ class PaymentRunController extends Controller
             'processed_at' => $run->processed_at?->toDateTimeString(),
         ]);
 
+        // Whole-register counts for the header meter row — never the current
+        // page of results (DESIGN.md "Page-local counts labelled as totals").
+        $statusCounts = $this->service->scopeRunsForActor(
+            FinPaymentRun::forOrganization($orgId),
+            $request->user(),
+        )
+            ->selectRaw('status, COUNT(*) as aggregate, COALESCE(SUM(total_amount), 0) as value')
+            ->groupBy('status')
+            ->get()
+            ->keyBy('status');
+
+        $countOf = fn (array $statuses) => (int) $statusCounts
+            ->filter(fn ($row, $status) => in_array($status, $statuses, true))
+            ->sum('aggregate');
+        $valueOf = fn (array $statuses) => (float) $statusCounts
+            ->filter(fn ($row, $status) => in_array($status, $statuses, true))
+            ->sum('value');
+
+        $awaitingBank = ['prepared', 'exported', 'accepted'];
+
+        $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
+
         return Inertia::render('finance/payment-runs/Index', [
             'paymentRuns' => $paymentRuns,
             'filters' => [
                 'status' => $request->input('status', ''),
             ],
+            'summary' => [
+                'total' => (int) $statusCounts->sum('aggregate'),
+                'draft' => $countOf(['draft']),
+                'approved' => $countOf(['approved']),
+                'awaiting_bank' => $countOf($awaitingBank),
+                'awaiting_bank_value' => $valueOf($awaitingBank),
+                'settled' => $countOf(['settled', 'reconciled', 'completed']),
+                // Pre-settlement-workflow rows still carrying the old statuses.
+                // The filter only offers these options when real rows have them.
+                'legacy_processing' => $countOf(['processing']),
+                'legacy_completed' => $countOf(['completed']),
+            ],
+            'canManage' => $canManage,
+            // Reference data for the New Payment Run modal.
+            'bankAccounts' => $canManage
+                ? FinBankAccount::forOrganization($orgId)->active()->orderBy('name')
+                    ->get(['id', 'name', 'bank_name'])
+                : [],
+            'payableBills' => $canManage ? $this->payableBills($orgId, $request) : [],
         ]);
+    }
+
+    /** Approved / partially-paid bills the payment-run modal can batch. */
+    private function payableBills(int $orgId, Request $request)
+    {
+        return $this->service->getApprovedUnpaidBills($orgId, $request->user())
+            ->map(fn ($bill) => [
+                'id' => $bill->id,
+                'bill_number' => $bill->bill_number,
+                'bill_date' => $bill->bill_date->toDateString(),
+                'due_date' => $bill->due_date->toDateString(),
+                'total_amount' => (float) $bill->total_amount,
+                'amount_paid' => (float) $bill->amount_paid,
+                'amount_due' => $bill->getAmountDue(),
+                'vendor' => $bill->vendor ? [
+                    'id' => $bill->vendor->id,
+                    'name' => $bill->vendor->name,
+                ] : null,
+            ])
+            ->values();
     }
 
     /**
@@ -96,35 +157,8 @@ class PaymentRunController extends Controller
         );
     }
 
-    public function create(Request $request)
-    {
-        $orgId = $request->user()->organization_id;
-
-        $bankAccounts = FinBankAccount::forOrganization($orgId)
-            ->active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'bank_name']);
-
-        $bills = $this->service->getApprovedUnpaidBills($orgId, $request->user())
-            ->map(fn ($bill) => [
-                'id' => $bill->id,
-                'bill_number' => $bill->bill_number,
-                'bill_date' => $bill->bill_date->toDateString(),
-                'due_date' => $bill->due_date->toDateString(),
-                'total_amount' => (float) $bill->total_amount,
-                'amount_paid' => (float) $bill->amount_paid,
-                'amount_due' => $bill->getAmountDue(),
-                'vendor' => $bill->vendor ? [
-                    'id' => $bill->vendor->id,
-                    'name' => $bill->vendor->name,
-                ] : null,
-            ]);
-
-        return Inertia::render('finance/payment-runs/Create', [
-            'bankAccounts' => $bankAccounts,
-            'bills' => $bills,
-        ]);
-    }
+    // Creating a run is a WizardShell modal on the index page; the retired
+    // full-page URL redirects to the list (routes/finance.php).
 
     public function store(Request $request)
     {

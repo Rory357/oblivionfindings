@@ -53,6 +53,33 @@ class QuoteLifecycleService
                 );
             }
 
+            // Line items are replaced wholesale when supplied, then rolled back
+            // up onto the header (NZ GST 15%) exactly as creation does — a draft
+            // quote's lines are editable, so the header totals must follow them.
+            $lineItems = $attributes['line_items'] ?? null;
+            unset($attributes['line_items']);
+
+            if (is_array($lineItems)) {
+                $quote->lineItems()->delete();
+                $subtotal = '0';
+
+                foreach ($lineItems as $item) {
+                    $amount = bcmul((string) $item['quantity'], (string) $item['unit_price'], 2);
+                    $quote->lineItems()->create([
+                        'description' => $item['description'],
+                        'quantity' => $item['quantity'],
+                        'unit_price' => $item['unit_price'],
+                        'amount' => $amount,
+                    ]);
+                    $subtotal = bcadd($subtotal, $amount, 2);
+                }
+
+                $tax = bcmul($subtotal, '0.15', 2);
+                $attributes['subtotal'] = $subtotal;
+                $attributes['tax_amount'] = $tax;
+                $attributes['total_amount'] = bcadd($subtotal, $tax, 2);
+            }
+
             $quote->update($attributes);
 
             return $quote->refresh();

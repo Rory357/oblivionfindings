@@ -29,6 +29,10 @@ import {
 export type ItDraftBoundScope = Pick<
     ItDraftFields,
     | 'site_id'
+    | 'catalog_item_id'
+    | 'schema_version'
+    | 'catalogue_values'
+    | 'requested_for_user_id'
     | 'is_organisation_wide'
     | 'assigned_to_user_id'
     | 'owner_user_id'
@@ -53,7 +57,12 @@ interface CandidateContent {
     /** The original save can differ from newer text typed while its request ran. */
     pendingSave?: { snapshot: ItDraftSnapshot; revision: number };
     /** Preserve the original File object and upload identity; never fabricate a saved file. */
-    pendingUpload?: { file: File; uploadUuid: string; revision: number };
+    pendingUpload?: {
+        file: File;
+        uploadUuid: string;
+        revision: number;
+        catalogueField?: string;
+    };
     /** Immutable canonical reply intent; retained locally even if its saved draft was consumed. */
     pendingComment?: Readonly<ItCommentIntent>;
     /** Exact task command retained in the same bounded, authorized RAM inventory. */
@@ -176,6 +185,10 @@ const natural = (value: number) => Number.isSafeInteger(value) && value >= 0;
 const generation = (candidate: ItDraftMemoryCandidate) =>
     candidate.kind === 'memory' ? candidate.memoryUuid : candidate.draftUuid;
 const boundKeys = new Set([
+    'catalog_item_id',
+    'schema_version',
+    'catalogue_values',
+    'requested_for_user_id',
     'target_ticket_id',
     'site_id',
     'is_organisation_wide',
@@ -207,26 +220,29 @@ export function validItDraftBoundScopes(
                 Object.entries(scope).every(
                     ([key, value]) =>
                         boundKeys.has(key) &&
-                        (key === 'is_organisation_wide'
-                            ? typeof value === 'boolean'
-                            : [
-                                    'watchers',
-                                    'dependency_ids',
-                                    'ordered_ids',
-                                    'approval_ids',
-                                ].includes(key)
-                              ? value === null ||
-                                (Array.isArray(value) &&
-                                    value.length <=
-                                        (key === 'watchers' ? 100 : 1000) &&
-                                    new Set(value).size === value.length &&
-                                    value.every(
-                                        (id) =>
-                                            Number.isSafeInteger(id) && id > 0,
-                                    ))
-                              : value === null ||
-                                (Number.isSafeInteger(value) &&
-                                    (value as number) > 0)),
+                        (key === 'catalogue_values'
+                            ? typeof value === 'string' && value.length <= 60000
+                            : key === 'is_organisation_wide'
+                              ? typeof value === 'boolean'
+                              : [
+                                      'watchers',
+                                      'dependency_ids',
+                                      'ordered_ids',
+                                      'approval_ids',
+                                  ].includes(key)
+                                ? value === null ||
+                                  (Array.isArray(value) &&
+                                      value.length <=
+                                          (key === 'watchers' ? 100 : 1000) &&
+                                      new Set(value).size === value.length &&
+                                      value.every(
+                                          (id) =>
+                                              Number.isSafeInteger(id) &&
+                                              id > 0,
+                                      ))
+                                : value === null ||
+                                  (Number.isSafeInteger(value) &&
+                                      (value as number) > 0)),
                 ),
         )
     );
@@ -504,7 +520,11 @@ export function createItDraftMemoryStore(limits: {
                         !IT_DRAFT_UUID.test(
                             candidate.pendingUpload.uploadUuid,
                         ) ||
-                        !natural(candidate.pendingUpload.revision)))
+                        !natural(candidate.pendingUpload.revision) ||
+                        (candidate.context.purpose === 'catalogue_request' &&
+                            !/^[a-z][a-z0-9_]{0,79}$/.test(
+                                candidate.pendingUpload.catalogueField ?? '',
+                            ))))
             )
                 return { status: 'invalid' };
             const previous = bufferId ? entries.get(bufferId) : undefined;
@@ -531,6 +551,8 @@ export function createItDraftMemoryStore(limits: {
                         candidate.pendingUpload?.uploadUuid ||
                     previous.candidate.pendingUpload?.revision !==
                         candidate.pendingUpload?.revision ||
+                    previous.candidate.pendingUpload?.catalogueField !==
+                        candidate.pendingUpload?.catalogueField ||
                     previous.candidate.pendingSave?.revision !==
                         candidate.pendingSave?.revision ||
                     JSON.stringify(

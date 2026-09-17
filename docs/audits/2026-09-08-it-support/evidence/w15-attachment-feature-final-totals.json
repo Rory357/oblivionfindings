@@ -1,0 +1,9 @@
+{
+  "attachment_cases": 9,
+  "attachment_assertions": 145.0,
+  "other_cases": 47,
+  "other_assertions": 916.0,
+  "total_distinct_cases": 56,
+  "total_assertions": 1061.0,
+  "separate_runs": true
+}

@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
 import type { CalendarItem } from '@/lib/calendar/recur';
+import { toDateInput } from '@/lib/datetime';
 import type {
     CalendarDataAdapter,
     CalView,
@@ -7,30 +8,40 @@ import type {
 } from '@/pages/sites/calendar/SiteCalendar';
 import type { Decorated, SourceDef } from '@/pages/sites/calendar/_parts';
 
+/**
+ * The Governance calendar sources in plain words. Mirrors SOURCE_LABELS in
+ * GovernanceCalendarController — the Governance calendar page receives these
+ * from the server, already filtered to the registers the viewer can open.
+ * Colours come from the `--src-meetings` / `--src-decisions` /
+ * `--src-obligations` / `--src-policies` token triples in app.css.
+ */
 export const GOVERNANCE_CALENDAR_SOURCES: SourceDef[] = [
     {
         key: 'meetings',
         label: 'Meetings',
         short: 'Meetings',
-        group: 'manual',
+        group: 'auto',
         icon: 'CalendarDays',
-        origin: 'Governance meetings',
+        origin: 'Meetings',
+        note: 'Board or committee meeting',
     },
     {
         key: 'decisions',
-        label: 'Decision deadlines',
-        short: 'Decisions',
+        label: 'Voting deadlines',
+        short: 'Voting',
         group: 'auto',
         icon: 'Vote',
-        origin: 'Board resolutions',
+        origin: 'Resolutions',
+        note: 'When voting on a resolution closes',
     },
     {
         key: 'obligations',
-        label: 'Obligations',
-        short: 'Obligations',
+        label: 'Requirements',
+        short: 'Requirements',
         group: 'auto',
         icon: 'ShieldCheck',
-        origin: 'Compliance register',
+        origin: 'Compliance',
+        note: 'When a compliance requirement is due',
     },
     {
         key: 'policies',
@@ -38,7 +49,8 @@ export const GOVERNANCE_CALENDAR_SOURCES: SourceDef[] = [
         short: 'Policies',
         group: 'auto',
         icon: 'BookOpen',
-        origin: 'Policy register',
+        origin: 'Policies',
+        note: 'When a policy is due for review',
     },
 ];
 
@@ -49,27 +61,50 @@ export interface GovernanceCalendarAdapterOptions {
     initialView?: CalView;
     sourceFilters?: SourceDef[];
     committeeOptions?: { value: string; label: string }[];
+    /** Optional glass back link in the calendar header. */
+    backLink?: { href: string; label: string };
     onOpenItem?: (item: Decorated) => void;
     onCreate?: (seed: CreateSeed) => void;
+}
+
+/** Where "add" on a calendar day goes: the meeting wizard, seeded with that NZ date and hour. */
+export function meetingCreateHref(seed: CreateSeed | null | undefined): string {
+    const params = new URLSearchParams();
+    if (seed?.date) {
+        const date = toDateInput(seed.date);
+        if (date) params.set('date', date);
+    }
+    if (seed?.hour !== undefined && seed?.hour !== null) {
+        params.set('hour', String(seed.hour));
+    }
+    const query = params.toString();
+    return query
+        ? `/governance/meetings/create?${query}`
+        : '/governance/meetings/create';
 }
 
 export function createGovernanceCalendarAdapter(
     options?: GovernanceCalendarAdapterOptions,
 ): CalendarDataAdapter {
+    const sourceFilters = options?.sourceFilters ?? GOVERNANCE_CALENDAR_SOURCES;
+
     return {
-        title: options?.title ?? 'Governance calendar',
+        title: options?.title ?? 'Calendar',
         subline:
             options?.subline ??
-            'Board meetings, decisions, obligations, and policy reviews',
+            'Board meetings, voting deadlines, requirements and policy reviews',
         allowSubscriptions: false,
-        initialSources: options?.initialSources ?? [
-            'meetings',
-            'decisions',
-            'obligations',
-            'policies',
-        ],
+        // Governance entries never wait for calendar sign-off, so a
+        // "To approve" meter would always read 0 — leave it out.
+        showApprovalMeter: false,
+        mineLink: { href: '/governance/my-work', label: 'Open My work' },
+        backLink: options?.backLink,
+        searchPlaceholder: 'Search meetings, resolutions, requirements…',
+        exportFilename: 'governance-calendar.ics',
+        initialSources:
+            options?.initialSources ?? sourceFilters.map((source) => source.key),
         initialView: options?.initialView ?? 'month',
-        sourceFilters: options?.sourceFilters ?? GOVERNANCE_CALENDAR_SOURCES,
+        sourceFilters,
         committeeOptions: options?.committeeOptions,
         loadItems: async ({ start, end, signal, committeeId }) => {
             const params = new URLSearchParams({
@@ -84,9 +119,10 @@ export function createGovernanceCalendarAdapter(
                 headers: { Accept: 'application/json' },
             });
             if (!res.ok) {
-                const error = new Error('Failed to load governance calendar entries');
-                (error as any).status = res.status;
-                throw error;
+                throw Object.assign(
+                    new Error("The calendar couldn't be loaded."),
+                    { status: res.status },
+                );
             }
             const data = (await res.json()) as {
                 events?: CalendarItem[];
@@ -113,14 +149,7 @@ export function createGovernanceCalendarAdapter(
                 options.onCreate(seed);
                 return;
             }
-            const params = new URLSearchParams();
-            if (seed?.date) {
-                const d = seed.date instanceof Date ? seed.date : new Date(seed.date);
-                params.set('date', d.toISOString().slice(0, 10));
-            }
-            if (seed?.hour !== undefined && seed?.hour !== null) params.set('hour', String(seed.hour));
-            const query = params.toString();
-            router.visit(query ? `/governance/meetings/create?${query}` : '/governance/meetings/create');
+            router.visit(meetingCreateHref(seed));
         },
     };
 }

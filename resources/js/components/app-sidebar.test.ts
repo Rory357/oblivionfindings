@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildNavSearchCatalog, isIconActive } from './app-sidebar';
+import {
+    buildNavSearchCatalog,
+    governanceActionableTabKeys,
+    isIconActive,
+    isSubItemActive,
+} from './app-sidebar';
 
 describe('app sidebar workforce navigation', () => {
     it('keeps IT destinations in the app sidebar without duplicating tabs or device navigation', () => {
@@ -10,6 +15,7 @@ describe('app sidebar workforce navigation', () => {
         expect(catalog.map((item) => item.href)).toEqual([
             '/it',
             '/it/knowledge',
+            '/it/provisioning',
             '/it/work',
             '/it/problems',
             '/it/changes',
@@ -89,7 +95,7 @@ describe('app sidebar workforce navigation', () => {
         );
     });
 
-    it('moves billing navigation into Finance and leaves funding with client management', () => {
+    it('reaches billing through the Finance hubs and leaves funding with client management', () => {
         const catalog = buildNavSearchCatalog({
             can: {
                 clients: { viewAny: true },
@@ -121,40 +127,35 @@ describe('app sidebar workforce navigation', () => {
         expect(operationsItems.map((item) => item.group)).not.toContain(
             'Time & Billing',
         );
-        expect(operationsItems.map((item) => item.label)).not.toEqual(
-            expect.arrayContaining([
-                'Billing',
-                'Invoices',
-                'Price Books',
-                'Quotes',
-                'Recurring Charges',
-            ]),
-        );
+        // None of the AR registers may reappear under Operations.
+        for (const label of [
+            'Billing',
+            'Invoices',
+            'Price Books',
+            'Quotes',
+            'Recurring Charges',
+        ]) {
+            expect(operationsItems.map((item) => item.label)).not.toContain(
+                label,
+            );
+        }
 
+        // Finance shows ONE entry per hub (2026-09-16 design migration), so the
+        // AR registers are reached through Receivables rather than as six
+        // sibling links — anti-pattern "One sidebar link per register".
         expect(financeItems).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({
-                    label: 'Billing',
-                    href: '/finance/billing',
-                }),
-                expect.objectContaining({
-                    label: 'Invoices',
+                    label: 'Receivables',
                     href: '/finance/invoices',
                 }),
                 expect.objectContaining({
-                    label: 'Price Books',
-                    href: '/finance/price-books',
-                }),
-                expect.objectContaining({
-                    label: 'Quotes',
-                    href: '/finance/quotes',
-                }),
-                expect.objectContaining({
-                    label: 'Recurring Charges',
-                    href: '/finance/recurring-charges',
+                    label: 'Overview',
+                    href: '/finance',
                 }),
             ]),
         );
+        expect(financeItems.map((item) => item.label)).not.toContain('Quotes');
     });
 
     it('groups shift, handover, and time navigation under Workforce instead of Operations', () => {
@@ -373,5 +374,153 @@ describe('app sidebar workforce navigation', () => {
                 operationsGroups,
             ),
         ).toBe(true);
+    });
+});
+
+describe('app sidebar governance hubs', () => {
+    const governanceCatalog = (can: Record<string, unknown>) =>
+        buildNavSearchCatalog({ can }).filter(
+            (item) => item.section === 'Governance',
+        );
+
+    const memberBase = {
+        view: true,
+        meetings: { view: true },
+        resolutions: { view: true, vote: true },
+        risks: { view: true },
+        compliance: { view: true },
+        performance: { view: true },
+        strategy: { view: true },
+        packs: { view: true },
+        actions: { view: true },
+        policies: { view: true },
+        'ceo-reports': { view: true },
+        interests: { view: true, manage: true },
+        evaluations: { view: true },
+        documents: { view: true },
+        clinical: { view: true },
+    };
+
+    it('keeps view-only members on the four member destinations', () => {
+        const catalog = governanceCatalog({
+            governance: { ...memberBase, budgets: { view: true } },
+        });
+
+        expect(catalog.map((item) => item.href)).toEqual([
+            '/governance/dashboard',
+            '/governance/my-work',
+            '/governance/calendar',
+            '/governance/records',
+        ]);
+    });
+
+    it('gives a treasurer the Board finance hub, opening a page they act in', () => {
+        const catalog = governanceCatalog({
+            governance: {
+                ...memberBase,
+                budgets: { view: true, create: true, submit: true },
+                spend: { view: true, request: true },
+            },
+        });
+
+        expect(catalog.map((item) => item.label)).toEqual([
+            'Home',
+            'My work',
+            'Calendar',
+            'Records',
+            'Board finance',
+        ]);
+        expect(
+            catalog.find((item) => item.label === 'Board finance')?.href,
+        ).toBe('/governance/budgets');
+    });
+
+    it('routes the CEO to CEO reports and, as reviewee, to their own review', () => {
+        const ceo = {
+            view: true,
+            'ceo-reports': { view: true, manage: true },
+        };
+
+        expect(
+            governanceCatalog({
+                governance: { ...ceo, performance: { view: true } },
+            }).map((item) => [item.label, item.href]),
+        ).toEqual([
+            ['Home', '/governance/dashboard'],
+            ['My work', '/governance/my-work'],
+            ['Calendar', '/governance/calendar'],
+            ['Records', '/governance/records'],
+            ['Meetings', '/governance/ceo-reports'],
+        ]);
+
+        const reviewee = governanceCatalog({
+            governance: {
+                ...ceo,
+                performance: { view: true, reviewee: true },
+            },
+        });
+        expect(
+            reviewee.find((item) => item.label === 'Strategy & performance')
+                ?.href,
+        ).toBe('/governance/performance');
+    });
+
+    it('never treats hidden navigation as access: no view, no hub', () => {
+        const actions = governanceActionableTabKeys({
+            governance: { budgets: { approve: true } },
+        });
+        expect([...actions]).toEqual(['budgets']);
+        expect(
+            governanceCatalog({
+                governance: { budgets: { approve: true } },
+            }),
+        ).toEqual([]);
+    });
+});
+
+describe('finance sidebar highlighting', () => {
+    const HUBS = [
+        '/finance',
+        '/finance/ledger',
+        '/finance/payables',
+        '/finance/invoices',
+        '/finance/banking',
+        '/finance/tax',
+        '/finance/reports',
+        '/finance/settings',
+    ];
+
+    // The sidebar lights every entry whose match score is positive — there is
+    // no single winner — and Overview lives at /finance, a prefix of every
+    // other finance URL. Without the finance-hub branch in matchScore the
+    // generic "starts with" rule lit Overview on top of the real hub on every
+    // finance page.
+    it.each([
+        ['/finance', '/finance'],
+        ['/finance/calendar', '/finance'],
+        ['/finance/bills', '/finance/payables'],
+        ['/finance/bills/12', '/finance/payables'],
+        ['/finance/accounts', '/finance/ledger'],
+        ['/finance/journals/4', '/finance/ledger'],
+        ['/finance/invoices', '/finance/invoices'],
+        ['/finance/receivables/statements', '/finance/invoices'],
+        ['/finance/bank-accounts', '/finance/banking'],
+        ['/finance/eftpos/batches/9', '/finance/banking'],
+        ['/finance/petty-cash', '/finance/banking'],
+        ['/finance/gst-returns', '/finance/tax'],
+        ['/finance/donor-funds/3', '/finance/tax'],
+        ['/finance/reports/balance-sheet', '/finance/reports'],
+        ['/finance/cash-flow-forecast', '/finance/reports'],
+        ['/finance/integrations', '/finance/settings'],
+        ['/finance/match-rules', '/finance/settings'],
+    ])('lights exactly one hub on %s', (url, expected) => {
+        const lit = HUBS.filter((href) => isSubItemActive(url, href));
+
+        expect(lit).toEqual([expected]);
+    });
+
+    it('lights no finance hub outside the module', () => {
+        expect(HUBS.filter((href) => isSubItemActive('/governance/meetings', href))).toEqual([]);
+        expect(HUBS.filter((href) => isSubItemActive('/dashboard', href))).toEqual([]);
     });
 });

@@ -16,19 +16,41 @@ class PriceBookController extends Controller
 
         $data = $request->validate([
             'active' => ['nullable', 'boolean'],
+            // The index's own search box + status pill (they were posted but
+            // never applied, so both controls did nothing).
+            'q' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'string', 'in:active,inactive'],
         ]);
 
         $priceBooks = PriceBook::query()
             ->withCount('items')
             ->when(isset($data['active']), fn ($q) => $q->where('is_active', $data['active']))
+            ->when(
+                ($data['status'] ?? null) !== null,
+                fn ($q) => $q->where('is_active', ($data['status'] ?? null) === 'active'),
+            )
+            ->when(! empty($data['q']), function ($query) use ($data): void {
+                $search = '%'.$data['q'].'%';
+                $query->where(function ($inner) use ($search): void {
+                    $inner->where('name', 'like', $search)
+                        ->orWhere('description', 'like', $search);
+                });
+            })
             ->orderByDesc('updated_at')
             ->paginate(20)
             ->withQueryString();
 
         return inertia('finance/price-books/Index', [
             'price_books' => $priceBooks,
-            'filters' => $request->only(['active']),
+            'filters' => $request->only(['active', 'q', 'status']),
             'canManage' => (bool) $auth->canDo('finance.ar.manage'),
+            // The page header's meters — org totals, not page-local counts.
+            'stats' => [
+                'total' => PriceBook::query()->count(),
+                'active' => PriceBook::query()->where('is_active', true)->count(),
+                'active_items' => PriceBookItem::query()->where('is_active', true)->count(),
+                'default_book' => PriceBook::query()->where('is_default', true)->value('name') ?? 'None',
+            ],
         ]);
     }
 
@@ -134,6 +156,9 @@ class PriceBookController extends Controller
             'unit_price' => ['sometimes', 'required', 'numeric', 'min:0'],
             'unit' => ['nullable', 'string', 'max:50'],
             'description' => ['nullable', 'string'],
+            // Retiring a rate is a deactivation, not a delete — quotes and
+            // invoices already built from it keep their provenance.
+            'is_active' => ['sometimes', 'boolean'],
         ]);
 
         $priceBookItem->update([
@@ -142,6 +167,7 @@ class PriceBookController extends Controller
             ...(array_key_exists('unit_price', $data) ? ['rate' => $data['unit_price']] : []),
             ...(array_key_exists('unit', $data) ? ['unit' => $data['unit'] ?? 'hour'] : []),
             ...(array_key_exists('description', $data) ? ['description' => $data['description']] : []),
+            ...(array_key_exists('is_active', $data) ? ['is_active' => (bool) $data['is_active']] : []),
         ]);
 
         return redirect()->back()->with('success', 'Item updated.');

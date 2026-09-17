@@ -155,8 +155,7 @@ final class ItCatalogFieldOptionService
     private function profileQuery(User $actor): Builder
     {
         return $this->provisioningAccess
-            ->selectableProfiles($actor)
-            ->when(! $actor->canDo('it.manage'), fn ($query) => $query->where('user_id', $actor->id))
+            ->requestableProfiles($actor)
             ->with(['user:id,name', 'primarySite:id,name'])
             ->orderBy('id');
     }

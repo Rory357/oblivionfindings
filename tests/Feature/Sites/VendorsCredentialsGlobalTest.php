@@ -160,34 +160,37 @@ test('vendor flags endpoint toggles preferred and active', function () {
     expect($vendor->fresh()->is_active)->toBeFalse();
 });
 
-test('credential rotate stamps last_rotated_at and audits a rotate row', function () {
+test('credential external rotation requires evidence and identity and records the attestation', function () {
     $credential = gvcCredential($this->site, ['last_rotated_at' => now()->subDays(300)]);
 
     $this->actingAs($this->admin)
         ->from('/vendors')
-        ->post("/sites/{$this->site->id}/credentials/{$credential->id}/rotate")
-        ->assertRedirect();
+        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/rotate", [
+            'lock_version' => 1, 'rotation_kind' => 'external_attestation', 'changed_at' => now()->toIso8601String(),
+            'evidence' => 'Synthetic external change independently confirmed', 'password' => 'password',
+        ])
+        ->assertOk();
 
     expect($credential->fresh()->last_rotated_at->diffInMinutes(now()))->toBeLessThan(2);
     expect(SiteCredentialAuditLog::query()
         ->where('credential_id', $credential->id)
-        ->where('action', 'rotate')
+        ->where('action', 'external_attestation')
         ->exists())->toBeTrue();
 });
 
-test('credential reauth endpoint toggles the flag and audits an edit row', function () {
-    $credential = gvcCredential($this->site, ['requires_reauth' => false]);
+test('credential reauth cannot be disabled by the legacy toggle endpoint', function () {
+    $credential = gvcCredential($this->site, ['requires_reauth' => true]);
 
     $this->actingAs($this->admin)
         ->from('/vendors')
-        ->patch("/sites/{$this->site->id}/credentials/{$credential->id}/reauth", ['requires_reauth' => true])
-        ->assertRedirect();
+        ->patchJson("/sites/{$this->site->id}/credentials/{$credential->id}/reauth", ['requires_reauth' => false])
+        ->assertUnprocessable();
 
     expect($credential->fresh()->requires_reauth)->toBeTrue();
     expect(SiteCredentialAuditLog::query()
         ->where('credential_id', $credential->id)
         ->where('action', 'edit')
-        ->exists())->toBeTrue();
+        ->exists())->toBeFalse();
 });
 
 test('global audit feed returns scoped JSON for credential auditors', function () {
@@ -303,12 +306,13 @@ test('credential update without a vendor_id key keeps the existing vendor link',
     $this->actingAs($this->admin)
         ->from('/vendors')
         ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'lock_version' => $credential->fresh()->lock_version,
             'label' => 'renamed',
             'credential_type' => 'password',
             'value' => '',
             // no vendor_id key sent — must not wipe the link
         ])
-        ->assertRedirect();
+        ->assertOk();
 
     expect($credential->fresh()->vendor_id)->toBe($vendor->id);
 });
@@ -319,14 +323,16 @@ test('credential update can set and clear the vendor link when vendor_id is sent
 
     $this->actingAs($this->admin)->from('/vendors')
         ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'lock_version' => $credential->fresh()->lock_version,
             'label' => $credential->label, 'credential_type' => 'password', 'value' => '', 'vendor_id' => $vendor->id,
-        ])->assertRedirect();
+        ])->assertOk();
     expect($credential->fresh()->vendor_id)->toBe($vendor->id);
 
     $this->actingAs($this->admin)->from('/vendors')
         ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'lock_version' => $credential->fresh()->lock_version,
             'label' => $credential->label, 'credential_type' => 'password', 'value' => '', 'vendor_id' => null,
-        ])->assertRedirect();
+        ])->assertOk();
     expect($credential->fresh()->vendor_id)->toBeNull();
 });
 
@@ -335,7 +341,7 @@ test('a failed re-auth reveal is recorded as reauth_failed', function () {
 
     $this->actingAs($this->admin)
         ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/reveal", ['password' => 'definitely-wrong'])
-        ->assertStatus(403);
+        ->assertUnprocessable();
 
     expect(SiteCredentialAuditLog::query()
         ->where('credential_id', $credential->id)

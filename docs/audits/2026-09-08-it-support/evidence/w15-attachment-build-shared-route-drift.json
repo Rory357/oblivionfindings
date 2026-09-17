@@ -1,0 +1,10 @@
+{
+  "independent_additions_explain_difference": true,
+  "added_lines": [
+    "Route::put('/my-day/tasks/{task}/help-response', [\\App\\Http\\Controllers\\MyDayTaskController::class, 'respondHelp'])->name('my-day.tasks.help-response');",
+    "Route::put('/my-day/tasks/{task}/help', [\\App\\Http\\Controllers\\MyDayTaskController::class, 'requestHelp'])->name('my-day.tasks.help');",
+    "Route::get('/my-day/tasks/{task}/help-recipients', [\\App\\Http\\Controllers\\MyDayTaskController::class, 'helpRecipients'])->name('my-day.tasks.help-recipients');",
+    "Route::put('/my-day/tasks/{task}/steps', [\\App\\Http\\Controllers\\MyDayTaskController::class, 'step'])->name('my-day.tasks.steps');"
+  ],
+  "files_mutated": false
+}

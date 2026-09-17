@@ -1,29 +1,23 @@
 import { ItModuleShell } from '@/components/it/it-module-shell';
-import { Button } from '@/components/ui/button';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+    SpecialistCommandWizard,
+    specialistReviewNames,
+} from '@/components/it/specialist-create-wizard';
+import { SpecialistRecordHeader } from '@/components/it/specialist-record-header';
+import { useSpecialistFormDefaults } from '@/components/it/use-specialist-form-defaults';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import type { BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
+import type { BreadcrumbItem, SharedData } from '@/types';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import {
-    ArrowLeft,
     Clock3,
     ExternalLink,
     Link2,
     Megaphone,
-    Pencil,
     Radio,
-    Save,
-    Send,
     Siren,
     Users,
 } from 'lucide-react';
@@ -85,6 +79,7 @@ interface Props {
         reviewed_at: string | null;
     };
     ticket: MajorIncidentTicketOption & {
+        lock_version: number;
         description: string | null;
         category: string;
         next_action: string | null;
@@ -121,18 +116,32 @@ const formatDateTime = (value: string | null) =>
           }).format(new Date(value))
         : 'Not recorded';
 
-export default function ItMajorIncidentShow({
+export default function ItMajorIncidentShow(props: Props) {
+    const { auth } = usePage<SharedData>().props;
+    return (
+        <ItMajorIncidentRecord
+            key={`${auth.user.id}:${props.ticket.id}`}
+            {...props}
+            actorId={auth.user.id}
+        />
+    );
+}
+
+function ItMajorIncidentRecord({
+    actorId,
     majorIncident,
     ticket,
     updates,
     links,
     options,
     can,
-}: Props) {
+}: Props & { actorId: number }) {
     const [editing, setEditing] = useState(false);
     const [publishing, setPublishing] = useState(false);
     const [transitioning, setTransitioning] = useState(false);
-    const edit = useForm({
+    const editDefaults = {
+        actor_user_id: actorId,
+        expected_version: ticket.lock_version,
         title: ticket.title,
         description: ticket.description ?? '',
         category: ticket.category,
@@ -152,20 +161,29 @@ export default function ItMajorIncidentShow({
         site_ids: links.sites.map((item) => item.id),
         incident_ids: links.incidents.map((item) => item.id),
         control_room_alert_id: String(links.alert?.id ?? ''),
-    });
-    const communication = useForm({
+    };
+    const edit = useForm(editDefaults);
+    const communicationDefaults = {
+        actor_user_id: actorId,
+        expected_version: ticket.lock_version,
         update_kind: 'stakeholder_update',
         audience: 'staff',
         summary: '',
         service_status: 'investigating',
-    });
-    const transition = useForm({
+    };
+    const communication = useForm(communicationDefaults);
+    const transitionDefaults = {
+        next_action: ticket.next_action ?? '',
+        actor_user_id: actorId,
+        expected_version: ticket.lock_version,
         workflow_state: nextStates[ticket.workflow_state]?.[0] ?? 'closed',
         reason: '',
         resolution_code: '',
         resolution_summary: '',
-    });
+    };
+    const transition = useForm(transitionDefaults);
     const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
         { title: 'IT & Support', href: '/it' },
         { title: 'Major incidents', href: '/it/major-incidents' },
         {
@@ -196,130 +214,137 @@ export default function ItMajorIncidentShow({
         });
     };
 
+    useSpecialistFormDefaults(editing, edit, editDefaults);
+    useSpecialistFormDefaults(transitioning, transition, transitionDefaults);
+    useSpecialistFormDefaults(publishing, communication, communicationDefaults);
+
+    const editReview = (values: typeof editDefaults) => [
+        { label: 'Title', value: values.title },
+        { label: 'Description', value: values.description },
+        { label: 'Category', value: majorIncidentLabel(values.category) },
+        { label: 'Priority', value: majorIncidentLabel(values.priority) },
+        { label: 'Next action', value: values.next_action },
+        { label: 'Severity', value: values.severity.toUpperCase() },
+        { label: 'Impact', value: values.impact_summary },
+        {
+            label: 'Commander',
+            value: specialistReviewNames(
+                values.commander_user_id
+                    ? [Number(values.commander_user_id)]
+                    : [],
+                options.agents,
+            ),
+        },
+        {
+            label: 'Communications lead',
+            value: specialistReviewNames(
+                values.communications_lead_user_id
+                    ? [Number(values.communications_lead_user_id)]
+                    : [],
+                options.agents,
+            ),
+        },
+        {
+            label: 'Update interval',
+            value: `${values.target_update_minutes} minutes`,
+        },
+        { label: 'Restoration evidence', value: values.restoration_summary },
+        { label: 'Root cause', value: values.root_cause_summary },
+        { label: 'Review', value: values.review_summary },
+        {
+            label: 'Services',
+            value: specialistReviewNames(values.service_ids, [
+                ...options.services,
+                ...links.services,
+            ]),
+        },
+        {
+            label: 'Sites',
+            value: specialistReviewNames(values.site_ids, [
+                ...options.sites,
+                ...links.sites,
+            ]),
+        },
+        {
+            label: 'Incidents',
+            value: specialistReviewNames(values.incident_ids, [
+                ...options.incidents,
+                ...links.incidents,
+            ]),
+        },
+        {
+            label: 'Control room alert',
+            value: specialistReviewNames(
+                values.control_room_alert_id
+                    ? [Number(values.control_room_alert_id)]
+                    : [],
+                [...options.alerts, ...(links.alert ? [links.alert] : [])],
+            ),
+        },
+    ];
+    const currentRecord = {
+        version: ticket.lock_version,
+        review: [
+            {
+                label: 'Current state',
+                value: majorIncidentLabel(ticket.workflow_state),
+            },
+            {
+                label: 'Next update due',
+                value: formatDateTime(majorIncident.next_update_due_at),
+            },
+            ...editReview(editDefaults),
+            ...updates.slice(0, 3).map((update) => ({
+                label: `Recent update · ${formatDateTime(update.published_at)} · ${update.id}`,
+                value: `${majorIncidentLabel(update.audience)} · ${majorIncidentLabel(update.update_kind)}\n${update.summary}`,
+            })),
+        ],
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${ticket.reference} · Major incident`} />
             <ItModuleShell>
-                <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
-                    <header className="overflow-hidden rounded-2xl border border-status-critical/30 bg-card shadow-sm">
-                        <div className="border-l-4 border-status-critical p-5">
-                            <Link
-                                href="/it/major-incidents"
-                                className="frontline-focus inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground"
-                            >
-                                <ArrowLeft
-                                    className="h-4 w-4"
-                                    aria-hidden="true"
-                                />{' '}
-                                Back to major incidents
-                            </Link>
-                            <div className="mt-2 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-                                <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <StatusBadge
-                                            variant={
-                                                majorIncident.severity ===
-                                                    'sev1' ||
-                                                majorIncident.severity ===
-                                                    'sev2'
-                                                    ? 'critical'
-                                                    : 'warning'
-                                            }
-                                        >
-                                            {majorIncident.severity.toUpperCase()}
-                                        </StatusBadge>
-                                        <StatusBadge
-                                            variant={
-                                                majorIncidentStateVariant[
-                                                    ticket.workflow_state
-                                                ] ?? 'neutral'
-                                            }
-                                        >
-                                            {majorIncidentLabel(
-                                                ticket.workflow_state,
-                                            )}
-                                        </StatusBadge>
-                                        {majorIncident.update_state ===
-                                        'overdue' ? (
-                                            <StatusBadge variant="critical">
-                                                Update overdue
-                                            </StatusBadge>
-                                        ) : (
-                                            <StatusBadge variant="success">
-                                                Updates on time
-                                            </StatusBadge>
-                                        )}
-                                    </div>
-                                    <div className="mt-3 flex items-center gap-2">
-                                        <Siren
-                                            className="h-5 w-5 text-status-critical"
-                                            aria-hidden="true"
-                                        />
-                                        <span className="font-mono text-sm font-bold text-primary">
-                                            {ticket.reference}
-                                        </span>
-                                    </div>
-                                    <h1 className="mt-1 text-2xl font-bold tracking-tight">
-                                        {ticket.title}
-                                    </h1>
-                                    <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
-                                        {ticket.description ||
-                                            'No incident description recorded.'}
-                                    </p>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        asChild
-                                        variant="outline"
-                                        className="min-h-11"
-                                    >
-                                        <Link href={ticket.href}>
-                                            Open canonical ticket workspace{' '}
-                                            <ExternalLink
-                                                className="h-4 w-4"
-                                                aria-hidden="true"
-                                            />
-                                        </Link>
-                                    </Button>
-                                    {can.manage ? (
-                                        <>
-                                            <Button
-                                                variant="outline"
-                                                className="min-h-11"
-                                                onClick={() => setEditing(true)}
-                                            >
-                                                <Pencil
-                                                    className="h-4 w-4"
-                                                    aria-hidden="true"
-                                                />{' '}
-                                                Edit command
-                                            </Button>
-                                            <Button
-                                                className="min-h-11"
-                                                onClick={() =>
-                                                    setPublishing(true)
-                                                }
-                                            >
-                                                <Send
-                                                    className="h-4 w-4"
-                                                    aria-hidden="true"
-                                                />{' '}
-                                                Publish update
-                                            </Button>
-                                        </>
-                                    ) : null}
-                                </div>
-                            </div>
-                        </div>
-                    </header>
+                <main className="min-w-0 space-y-5">
+                    <SpecialistRecordHeader
+                        icon={Siren}
+                        backHref="/it/major-incidents"
+                        title={ticket.title}
+                        reference={ticket.reference}
+                        status={majorIncidentLabel(ticket.workflow_state)}
+                        statusVariant={
+                            majorIncidentStateVariant[ticket.workflow_state] ??
+                            'neutral'
+                        }
+                        subline={`${majorIncident.severity.toUpperCase()} · ${majorIncident.commander?.name ?? 'Commander unassigned'} · ${majorIncident.update_state === 'overdue' ? 'Update overdue' : majorIncident.next_update_due_at ? `Next update ${formatDateTime(majorIncident.next_update_due_at)}` : 'No next update scheduled'}`}
+                        ticket={ticket}
+                        primary={
+                            can.manage
+                                ? {
+                                      label: 'Publish update',
+                                      run: () => setPublishing(true),
+                                  }
+                                : undefined
+                        }
+                        actions={
+                            can.manage
+                                ? [
+                                      {
+                                          label: 'Edit command',
+                                          run: () => setEditing(true),
+                                      },
+                                  ]
+                                : []
+                        }
+                    />
 
                     <section
-                        className={`rounded-2xl border p-4 ${majorIncident.update_state === 'overdue' ? 'border-status-critical/40 bg-status-critical-bg' : 'border-status-success/30 bg-status-success-bg'}`}
+                        className={`rounded-2xl border p-4 ${majorIncident.update_state === 'overdue' ? 'border-status-critical/40 bg-status-critical-bg' : majorIncident.update_state === 'on_time' ? 'border-status-success/30 bg-status-success-bg' : 'border-border bg-muted/30'}`}
                     >
                         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                             <div className="flex items-start gap-3">
                                 <Clock3
-                                    className={`mt-0.5 h-5 w-5 ${majorIncident.update_state === 'overdue' ? 'text-status-critical' : 'text-status-success'}`}
+                                    className={`mt-0.5 h-5 w-5 ${majorIncident.update_state === 'overdue' ? 'text-status-critical' : majorIncident.update_state === 'on_time' ? 'text-status-success' : 'text-muted-foreground'}`}
                                     aria-hidden="true"
                                 />
                                 <div>
@@ -327,14 +352,21 @@ export default function ItMajorIncidentShow({
                                         {majorIncident.update_state ===
                                         'overdue'
                                             ? 'Update overdue'
-                                            : 'Communication cadence on track'}
+                                            : majorIncident.update_state ===
+                                                'on_time'
+                                              ? 'Next update scheduled'
+                                              : majorIncident.update_state ===
+                                                  'not_required'
+                                                ? 'Regular updates are no longer required'
+                                                : 'No next update scheduled'}
                                     </h2>
                                     <p className="text-sm text-muted-foreground">
-                                        Next audience update:{' '}
-                                        {formatDateTime(
-                                            majorIncident.next_update_due_at,
-                                        )}{' '}
-                                        · every{' '}
+                                        {majorIncident.next_update_due_at
+                                            ? 'Next audience update: '
+                                            : 'Update interval: '}
+                                        {majorIncident.next_update_due_at
+                                            ? `${formatDateTime(majorIncident.next_update_due_at)} · every `
+                                            : ''}
                                         {majorIncident.target_update_minutes}{' '}
                                         minutes
                                     </p>
@@ -611,387 +643,432 @@ export default function ItMajorIncidentShow({
                 </main>
             </ItModuleShell>
 
-            <Dialog open={publishing} onOpenChange={setPublishing}>
-                <DialogContent className="sm:max-w-xl">
-                    <form onSubmit={publish}>
-                        <DialogHeader>
-                            <DialogTitle>
-                                Publish major incident update
-                            </DialogTitle>
-                            <DialogDescription>
-                                Choose the audience deliberately. Internal
-                                command notes never appear in the staff status
-                                feed.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                            <NativeSelect
-                                label="Update type"
-                                value={communication.data.update_kind}
-                                onChange={(value) =>
-                                    communication.setData('update_kind', value)
-                                }
-                                values={[
-                                    'command_note',
-                                    'stakeholder_update',
-                                    'service_restored',
-                                    'resolution',
-                                    'review',
-                                ]}
-                            />
-                            <NativeSelect
-                                label="Audience"
-                                value={communication.data.audience}
-                                onChange={(value) =>
-                                    communication.setData('audience', value)
-                                }
-                                values={[
-                                    'internal',
-                                    'staff',
-                                    'clients',
-                                    'public',
-                                ]}
-                            />
-                            <NativeSelect
-                                label="Service status"
-                                value={communication.data.service_status}
-                                onChange={(value) =>
-                                    communication.setData(
-                                        'service_status',
-                                        value,
-                                    )
-                                }
-                                values={[
-                                    'investigating',
-                                    'identified',
-                                    'monitoring',
-                                    'major_outage',
-                                    'degraded',
-                                    'operational',
-                                ]}
-                            />
-                            <Field label="Update" className="sm:col-span-2">
-                                <Textarea
-                                    value={communication.data.summary}
-                                    onChange={(event) =>
-                                        communication.setData(
-                                            'summary',
-                                            event.target.value,
-                                        )
-                                    }
-                                    rows={5}
-                                    required
-                                />
-                            </Field>
-                        </div>
-                        <DialogFooter className="mt-6">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setPublishing(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={communication.processing}
-                            >
-                                <Send className="h-4 w-4" aria-hidden="true" />{' '}
-                                Publish update
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <SpecialistCommandWizard
+                open={publishing}
+                onClose={() => setPublishing(false)}
+                onDiscard={() => communication.resetAndClearErrors()}
+                title="Publish major incident update"
+                description="Check the message and audience before publishing this update."
+                icon={Megaphone}
+                submitLabel="Publish update"
+                allowed={can.manage}
+                processing={communication.processing}
+                dirty={communication.isDirty}
+                errors={communication.errors}
+                expectedVersion={communication.data.expected_version}
+                current={currentRecord}
+                onVersionReviewed={(version) => {
+                    communication.setData('expected_version', version);
+                    communication.clearErrors('expected_version');
+                }}
+                review={[
+                    { label: 'Record', value: ticket.reference },
+                    {
+                        label: 'Update type',
+                        value: majorIncidentLabel(
+                            communication.data.update_kind,
+                        ),
+                    },
+                    {
+                        label: 'Audience',
+                        value: majorIncidentLabel(communication.data.audience),
+                    },
+                    {
+                        label: 'Service status',
+                        value: majorIncidentLabel(
+                            communication.data.service_status,
+                        ),
+                    },
+                    { label: 'Message', value: communication.data.summary },
+                ]}
+                onSubmit={publish}
+            >
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <NativeSelect
+                        label="Update type"
+                        value={communication.data.update_kind}
+                        onChange={(value) =>
+                            communication.setData('update_kind', value)
+                        }
+                        values={[
+                            'command_note',
+                            'stakeholder_update',
+                            'service_restored',
+                            'resolution',
+                            'review',
+                        ]}
+                    />
+                    <NativeSelect
+                        label="Audience"
+                        value={communication.data.audience}
+                        onChange={(value) =>
+                            communication.setData('audience', value)
+                        }
+                        values={['internal', 'staff', 'clients', 'public']}
+                    />
+                    <NativeSelect
+                        label="Service status"
+                        value={communication.data.service_status}
+                        onChange={(value) =>
+                            communication.setData('service_status', value)
+                        }
+                        values={[
+                            'investigating',
+                            'identified',
+                            'monitoring',
+                            'major_outage',
+                            'degraded',
+                            'operational',
+                        ]}
+                    />
+                    <Field label="Update" className="sm:col-span-2">
+                        <Textarea
+                            value={communication.data.summary}
+                            onChange={(event) =>
+                                communication.setData(
+                                    'summary',
+                                    event.target.value,
+                                )
+                            }
+                            rows={5}
+                            required
+                        />
+                    </Field>
+                </div>
+            </SpecialistCommandWizard>
 
-            <Dialog open={transitioning} onOpenChange={setTransitioning}>
-                <DialogContent className="sm:max-w-xl">
-                    <form onSubmit={move}>
-                        <DialogHeader>
-                            <DialogTitle>Move major incident state</DialogTitle>
-                            <DialogDescription>
-                                Restoration, resolution, review, and closure
-                                enforce their required evidence.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-5 space-y-4">
-                            <NativeSelect
-                                label="Next state"
-                                value={transition.data.workflow_state}
-                                onChange={(value) =>
-                                    transition.setData('workflow_state', value)
-                                }
-                                values={nextStates[ticket.workflow_state] ?? []}
-                            />
-                            <Field label="Reason">
-                                <Textarea
-                                    value={transition.data.reason}
+            <SpecialistCommandWizard
+                open={transitioning}
+                onClose={() => setTransitioning(false)}
+                onDiscard={() => transition.resetAndClearErrors()}
+                title="Update major incident state"
+                description="Review the next state and supporting evidence before updating the record."
+                icon={Siren}
+                submitLabel="Update state"
+                allowed={can.manage}
+                processing={transition.processing}
+                dirty={transition.isDirty}
+                errors={transition.errors}
+                expectedVersion={transition.data.expected_version}
+                current={currentRecord}
+                onVersionReviewed={(version) => {
+                    transition.setData('expected_version', version);
+                    transition.clearErrors('expected_version');
+                }}
+                review={[
+                    { label: 'Record', value: ticket.reference },
+                    {
+                        label: 'From',
+                        value: majorIncidentLabel(ticket.workflow_state),
+                    },
+                    {
+                        label: 'To',
+                        value: majorIncidentLabel(
+                            transition.data.workflow_state ?? '',
+                        ),
+                    },
+                    { label: 'Reason', value: transition.data.reason },
+                    {
+                        label: 'Next action',
+                        value: transition.data.next_action,
+                    },
+                    ...(transition.data.workflow_state === 'resolved'
+                        ? [
+                              {
+                                  label: 'Resolution code',
+                                  value: transition.data.resolution_code,
+                              },
+                              {
+                                  label: 'Resolution summary',
+                                  value: transition.data.resolution_summary,
+                              },
+                          ]
+                        : []),
+                ]}
+                onSubmit={move}
+            >
+                <div className="mt-5 space-y-4">
+                    <NativeSelect
+                        label="Next state"
+                        value={transition.data.workflow_state}
+                        onChange={(value) =>
+                            transition.setData('workflow_state', value)
+                        }
+                        values={nextStates[ticket.workflow_state] ?? []}
+                    />
+                    <Field label="Next action">
+                        <Textarea
+                            value={transition.data.next_action}
+                            onChange={(event) =>
+                                transition.setData(
+                                    'next_action',
+                                    event.target.value,
+                                )
+                            }
+                            rows={2}
+                            maxLength={2000}
+                        />
+                    </Field>
+                    <Field label="Reason">
+                        <Textarea
+                            value={transition.data.reason}
+                            onChange={(event) =>
+                                transition.setData('reason', event.target.value)
+                            }
+                            rows={3}
+                            required
+                        />
+                    </Field>
+                    {transition.data.workflow_state === 'resolved' ? (
+                        <>
+                            <Field label="Resolution code">
+                                <Input
+                                    value={transition.data.resolution_code}
                                     onChange={(event) =>
                                         transition.setData(
-                                            'reason',
+                                            'resolution_code',
                                             event.target.value,
                                         )
                                     }
-                                    rows={3}
                                     required
                                 />
                             </Field>
-                            {transition.data.workflow_state === 'resolved' ? (
-                                <>
-                                    <Field label="Resolution code">
-                                        <Input
-                                            value={
-                                                transition.data.resolution_code
-                                            }
-                                            onChange={(event) =>
-                                                transition.setData(
-                                                    'resolution_code',
-                                                    event.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                    </Field>
-                                    <Field label="Resolution summary">
-                                        <Textarea
-                                            value={
-                                                transition.data
-                                                    .resolution_summary
-                                            }
-                                            onChange={(event) =>
-                                                transition.setData(
-                                                    'resolution_summary',
-                                                    event.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                    </Field>
-                                </>
-                            ) : null}
-                        </div>
-                        <DialogFooter className="mt-6">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setTransitioning(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={transition.processing}
-                            >
-                                Update state
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                            <Field label="Resolution summary">
+                                <Textarea
+                                    value={transition.data.resolution_summary}
+                                    onChange={(event) =>
+                                        transition.setData(
+                                            'resolution_summary',
+                                            event.target.value,
+                                        )
+                                    }
+                                    required
+                                />
+                            </Field>
+                        </>
+                    ) : null}
+                </div>
+            </SpecialistCommandWizard>
 
-            <Dialog open={editing} onOpenChange={setEditing}>
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-                    <form onSubmit={save}>
-                        <DialogHeader>
-                            <DialogTitle>Edit incident command</DialogTitle>
-                            <DialogDescription>
-                                Maintain accountability, evidence, cadence, and
-                                typed operational links.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                            <Field label="Title" className="sm:col-span-2">
-                                <Input
-                                    value={edit.data.title}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'title',
-                                            event.target.value,
-                                        )
-                                    }
-                                    required
-                                />
-                            </Field>
-                            <NativeSelect
-                                label="Severity"
-                                value={edit.data.severity}
-                                onChange={(value) =>
-                                    edit.setData('severity', value)
-                                }
-                                values={['sev1', 'sev2', 'sev3', 'sev4']}
-                            />
-                            <Field label="Update cadence (minutes)">
-                                <Input
-                                    type="number"
-                                    min={5}
-                                    max={240}
-                                    value={edit.data.target_update_minutes}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'target_update_minutes',
-                                            Number(event.target.value),
-                                        )
-                                    }
-                                />
-                            </Field>
-                            <AgentSelect
-                                label="Incident commander"
-                                value={edit.data.commander_user_id}
-                                agents={options.agents}
-                                onChange={(value) =>
-                                    edit.setData('commander_user_id', value)
-                                }
-                            />
-                            <AgentSelect
-                                label="Communications lead"
-                                value={edit.data.communications_lead_user_id}
-                                agents={options.agents}
-                                onChange={(value) =>
-                                    edit.setData(
-                                        'communications_lead_user_id',
-                                        value,
-                                    )
-                                }
-                            />
-                            <Field
-                                label="Current impact"
-                                className="sm:col-span-2"
-                            >
-                                <Textarea
-                                    value={edit.data.impact_summary}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'impact_summary',
-                                            event.target.value,
-                                        )
-                                    }
-                                    rows={3}
-                                />
-                            </Field>
-                            <Field
-                                label="Next action"
-                                className="sm:col-span-2"
-                            >
-                                <Textarea
-                                    value={edit.data.next_action}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'next_action',
-                                            event.target.value,
-                                        )
-                                    }
-                                    rows={2}
-                                />
-                            </Field>
-                            <Field
-                                label="Restoration evidence"
-                                className="sm:col-span-2"
-                            >
-                                <Textarea
-                                    value={edit.data.restoration_summary}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'restoration_summary',
-                                            event.target.value,
-                                        )
-                                    }
-                                    rows={3}
-                                />
-                            </Field>
-                            <Field
-                                label="Root-cause summary"
-                                className="sm:col-span-2"
-                            >
-                                <Textarea
-                                    value={edit.data.root_cause_summary}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'root_cause_summary',
-                                            event.target.value,
-                                        )
-                                    }
-                                    rows={3}
-                                />
-                            </Field>
-                            <Field
-                                label="Post-incident review"
-                                className="sm:col-span-2"
-                            >
-                                <Textarea
-                                    value={edit.data.review_summary}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'review_summary',
-                                            event.target.value,
-                                        )
-                                    }
-                                    rows={3}
-                                />
-                            </Field>
-                            <MultiSelect
-                                label="Affected services"
-                                options={options.services}
-                                selected={edit.data.service_ids}
-                                onChange={(value) =>
-                                    edit.setData('service_ids', value)
-                                }
-                            />
-                            <MultiSelect
-                                label="Affected sites"
-                                options={options.sites}
-                                selected={edit.data.site_ids}
-                                onChange={(value) =>
-                                    edit.setData('site_ids', value)
-                                }
-                            />
-                            <MultiSelect
-                                label="Related incidents"
-                                options={options.incidents.map((item) => ({
-                                    id: item.id,
-                                    name: `${item.reference} · ${item.title}`,
-                                }))}
-                                selected={edit.data.incident_ids}
-                                onChange={(value) =>
-                                    edit.setData('incident_ids', value)
-                                }
-                            />
-                            <label className="space-y-1.5 text-sm font-medium">
-                                Canonical Control Room alert
-                                <select
-                                    className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                    value={edit.data.control_room_alert_id}
-                                    onChange={(event) =>
-                                        edit.setData(
-                                            'control_room_alert_id',
-                                            event.target.value,
-                                        )
-                                    }
-                                >
-                                    <option value="">No linked alert</option>
-                                    {options.alerts.map((item) => (
-                                        <option key={item.id} value={item.id}>
-                                            {item.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                        </div>
-                        <DialogFooter className="mt-6">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setEditing(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={edit.processing}>
-                                <Save className="h-4 w-4" aria-hidden="true" />{' '}
-                                Save command
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <SpecialistCommandWizard
+                open={editing}
+                onClose={() => setEditing(false)}
+                onDiscard={() => edit.resetAndClearErrors()}
+                title="Edit incident command"
+                description="Update the record and linked work, then review the proposed changes."
+                icon={Siren}
+                submitLabel="Save changes"
+                allowed={can.manage}
+                processing={edit.processing}
+                dirty={edit.isDirty}
+                errors={edit.errors}
+                expectedVersion={edit.data.expected_version}
+                current={currentRecord}
+                onVersionReviewed={(version) => {
+                    edit.setData('expected_version', version);
+                    edit.clearErrors('expected_version');
+                }}
+                review={editReview(edit.data)}
+                onSubmit={save}
+            >
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <Field label="Description" className="sm:col-span-2">
+                        <Textarea
+                            value={edit.data.description}
+                            maxLength={10000}
+                            rows={4}
+                            onChange={(event) =>
+                                edit.setData('description', event.target.value)
+                            }
+                        />
+                    </Field>
+                    <Field label="Category">
+                        <select
+                            className="frontline-focus min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            value={edit.data.category}
+                            onChange={(event) =>
+                                edit.setData('category', event.target.value)
+                            }
+                        >
+                            {['hardware', 'account', 'network', 'other'].map(
+                                (value) => (
+                                    <option key={value} value={value}>
+                                        {majorIncidentLabel(value)}
+                                    </option>
+                                ),
+                            )}
+                        </select>
+                    </Field>
+                    <Field label="Priority">
+                        <select
+                            className="frontline-focus min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            value={edit.data.priority}
+                            onChange={(event) =>
+                                edit.setData('priority', event.target.value)
+                            }
+                        >
+                            {['low', 'normal', 'high', 'urgent'].map(
+                                (value) => (
+                                    <option key={value} value={value}>
+                                        {majorIncidentLabel(value)}
+                                    </option>
+                                ),
+                            )}
+                        </select>
+                    </Field>
+                    <Field label="Title" className="sm:col-span-2">
+                        <Input
+                            value={edit.data.title}
+                            onChange={(event) =>
+                                edit.setData('title', event.target.value)
+                            }
+                            required
+                        />
+                    </Field>
+                    <NativeSelect
+                        label="Severity"
+                        value={edit.data.severity}
+                        onChange={(value) => edit.setData('severity', value)}
+                        values={['sev1', 'sev2', 'sev3', 'sev4']}
+                    />
+                    <Field label="Update cadence (minutes)">
+                        <Input
+                            type="number"
+                            min={5}
+                            max={240}
+                            value={edit.data.target_update_minutes}
+                            onChange={(event) =>
+                                edit.setData(
+                                    'target_update_minutes',
+                                    Number(event.target.value),
+                                )
+                            }
+                        />
+                    </Field>
+                    <AgentSelect
+                        label="Incident commander"
+                        value={edit.data.commander_user_id}
+                        agents={options.agents}
+                        onChange={(value) =>
+                            edit.setData('commander_user_id', value)
+                        }
+                    />
+                    <AgentSelect
+                        label="Communications lead"
+                        value={edit.data.communications_lead_user_id}
+                        agents={options.agents}
+                        onChange={(value) =>
+                            edit.setData('communications_lead_user_id', value)
+                        }
+                    />
+                    <Field label="Current impact" className="sm:col-span-2">
+                        <Textarea
+                            value={edit.data.impact_summary}
+                            onChange={(event) =>
+                                edit.setData(
+                                    'impact_summary',
+                                    event.target.value,
+                                )
+                            }
+                            rows={3}
+                        />
+                    </Field>
+                    <Field label="Next action" className="sm:col-span-2">
+                        <Textarea
+                            value={edit.data.next_action}
+                            onChange={(event) =>
+                                edit.setData('next_action', event.target.value)
+                            }
+                            rows={2}
+                        />
+                    </Field>
+                    <Field
+                        label="Restoration evidence"
+                        className="sm:col-span-2"
+                    >
+                        <Textarea
+                            value={edit.data.restoration_summary}
+                            onChange={(event) =>
+                                edit.setData(
+                                    'restoration_summary',
+                                    event.target.value,
+                                )
+                            }
+                            rows={3}
+                        />
+                    </Field>
+                    <Field label="Root-cause summary" className="sm:col-span-2">
+                        <Textarea
+                            value={edit.data.root_cause_summary}
+                            onChange={(event) =>
+                                edit.setData(
+                                    'root_cause_summary',
+                                    event.target.value,
+                                )
+                            }
+                            rows={3}
+                        />
+                    </Field>
+                    <Field
+                        label="Post-incident review"
+                        className="sm:col-span-2"
+                    >
+                        <Textarea
+                            value={edit.data.review_summary}
+                            onChange={(event) =>
+                                edit.setData(
+                                    'review_summary',
+                                    event.target.value,
+                                )
+                            }
+                            rows={3}
+                        />
+                    </Field>
+                    <MultiSelect
+                        label="Affected services"
+                        options={options.services}
+                        selected={edit.data.service_ids}
+                        onChange={(value) => edit.setData('service_ids', value)}
+                    />
+                    <MultiSelect
+                        label="Affected sites"
+                        options={options.sites}
+                        selected={edit.data.site_ids}
+                        onChange={(value) => edit.setData('site_ids', value)}
+                    />
+                    <MultiSelect
+                        label="Related incidents"
+                        options={options.incidents.map((item) => ({
+                            id: item.id,
+                            name: `${item.reference} · ${item.title}`,
+                        }))}
+                        selected={edit.data.incident_ids}
+                        onChange={(value) =>
+                            edit.setData('incident_ids', value)
+                        }
+                    />
+                    <label className="space-y-1.5 text-sm font-medium">
+                        Canonical Control Room alert
+                        <select
+                            className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            value={edit.data.control_room_alert_id}
+                            onChange={(event) =>
+                                edit.setData(
+                                    'control_room_alert_id',
+                                    event.target.value,
+                                )
+                            }
+                        >
+                            <option value="">No linked alert</option>
+                            {options.alerts.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                    {item.name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+            </SpecialistCommandWizard>
         </AppLayout>
     );
 }

@@ -1,20 +1,24 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
-    Bell,
     BookOpen,
+    CalendarDays,
     CheckCircle2,
-    ChevronLeft,
-    ChevronRight,
     Copy,
     ExternalLink,
-    Inbox,
     ListChecks,
     Search,
     Vote as VoteIcon,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
+import { GovernanceHomeRail } from '@/components/governance/GovernanceHomeRail';
+import {
+    receiptTitle,
+    unavailableWorkMessage,
+    workKindLabel,
+    workStatusChip,
+} from '@/components/governance/governance-work';
 import {
     EntityTable,
     type EntityTableColumn,
@@ -26,13 +30,18 @@ import {
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
-    PageHeaderRail,
     PageHeaderSearch,
+    PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -41,8 +50,17 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { governanceStatusColor } from '@/lib/governance-status';
+import {
+    formatDateLong,
+    formatDateOnly,
+    formatDateTimeLong,
+    toDateInput,
+} from '@/lib/datetime';
+import { refSuffix, voteLabel } from '@/lib/governance-labels';
 import { cn } from '@/lib/utils';
 import { PageProps } from '@/types';
 
@@ -72,13 +90,15 @@ export interface GovernanceWorkItemData {
     };
     source_version?: number | null;
     available_as_of?: string | null;
+    /** Only what the server recorded when the work was finished. */
     receipt?: {
-        receipt_id: string;
+        receipt_id?: string | null;
         completed_at?: string | null;
         vote?: string;
+        paper_version?: number;
         revision_number?: number;
         version?: string | number;
-        completion_notes?: string;
+        completion_notes?: string | null;
         [key: string]: unknown;
     } | null;
     area?: string;
@@ -91,6 +111,8 @@ export interface GovernanceWorkItemData {
 
 export interface GovernanceWorkFeed {
     items: GovernanceWorkItemData[];
+    /** Meetings coming up — for your information, never counted as work to do. */
+    coming_up?: GovernanceWorkItemData[];
     totals: {
         all: number;
         vote: number;
@@ -107,6 +129,7 @@ export interface GovernanceWorkFeed {
         per_page: number;
         current_page: number;
         last_page: number;
+        links?: Array<{ url: string | null; label: string; active: boolean }>;
     };
     scope: {
         viewer: {
@@ -139,54 +162,58 @@ function getKindIcon(kind: string) {
             return VoteIcon;
         case 'read':
             return BookOpen;
-        case 'act':
-            return ListChecks;
         case 'know':
-            return Bell;
+            return CalendarDays;
         default:
             return ListChecks;
     }
 }
 
-function formatDueDate(dueDateString: string | null | undefined): {
+const plural = (count: number, one: string, many: string) =>
+    count === 1 ? one : many;
+
+/** Whole days between two YYYY-MM-DD calendar dates (no timezone drift). */
+function calendarDayDiff(from: string, to: string): number {
+    const toUtc = (value: string) => {
+        const [y, m, d] = value.split('-').map(Number);
+        return Date.UTC(y, (m ?? 1) - 1, d ?? 1);
+    };
+    return Math.round((toUtc(to) - toUtc(from)) / 86_400_000);
+}
+
+function dueText(dueDateString: string | null | undefined): {
     text: string;
     tone: 'critical' | 'warning' | 'neutral';
 } {
     if (!dueDateString) {
-        return { text: 'No deadline', tone: 'neutral' };
+        return { text: 'No due date', tone: 'neutral' };
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const due = new Date(dueDateString);
-    due.setHours(0, 0, 0, 0);
-
-    const diffDays = Math.round(
-        (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-    );
+    // Compare NZ calendar dates — parsing YYYY-MM-DD with `new Date()`
+    // shifts the day in non-NZ browser timezones.
+    const dueDay = dueDateString.substring(0, 10);
+    const diffDays = calendarDayDiff(toDateInput(new Date()), dueDay);
 
     if (diffDays < 0) {
-        const overdueDays = Math.abs(diffDays);
+        const late = Math.abs(diffDays);
         return {
-            text: `Overdue (${overdueDays}d)`,
+            text: `Overdue by ${late} ${plural(late, 'day', 'days')}`,
             tone: 'critical',
         };
     }
-    if (diffDays === 0) {
-        return { text: 'Due today', tone: 'warning' };
-    }
-    if (diffDays === 1) {
-        return { text: 'Due tomorrow', tone: 'warning' };
-    }
-    if (diffDays <= 7) {
-        return { text: `Due in ${diffDays}d`, tone: 'warning' };
-    }
-    return {
-        text: dueDateString.substring(0, 10),
-        tone: 'neutral',
-    };
+    if (diffDays === 0) return { text: 'Due today', tone: 'warning' };
+    if (diffDays === 1) return { text: 'Due tomorrow', tone: 'warning' };
+    if (diffDays <= 7) return { text: `Due in ${diffDays} days`, tone: 'warning' };
+    return { text: `Due ${formatDateOnly(dueDay, dueDay)}`, tone: 'neutral' };
 }
+
+const KIND_OPTIONS = (totals: GovernanceWorkFeed['totals']) => [
+    { value: 'all', label: `All kinds (${totals.all})` },
+    { value: 'vote', label: `Vote (${totals.vote})` },
+    { value: 'read', label: `Read (${totals.read})` },
+    { value: 'act', label: `Do (${totals.act})` },
+    { value: 'know', label: `For your information (${totals.know})` },
+];
 
 export default function MyWorkIndex({ auth, feed, filters }: Props) {
     const [searchQuery, setSearchQuery] = useState(filters.search ?? '');
@@ -205,7 +232,7 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                 ...newFilters,
             };
 
-            // Remove empty/default parameters to keep URL clean
+            // Leave defaults out so the URL stays clean.
             const cleanedParams: Record<string, string> = {};
             if (merged.kind && merged.kind !== 'all') {
                 cleanedParams.kind = String(merged.kind);
@@ -250,9 +277,10 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
     const currentStatus = filters.status ?? 'pending';
     const currentDue = filters.due ?? 'all';
 
-    const unavailableSources = Object.entries(feed.availability ?? {})
-        .filter(([_, status]) => status === 'unavailable')
-        .map(([src]) => src.replace(/_/g, ' '));
+    const missingMessage = unavailableWorkMessage(feed.availability);
+    const comingUp = feed.coming_up ?? [];
+    const showComingUp =
+        comingUp.length > 0 && currentKind !== 'know' && currentStatus !== 'completed';
 
     const isFiltered =
         currentKind !== 'all' ||
@@ -260,53 +288,52 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
         currentDue !== 'all' ||
         Boolean(searchQuery);
 
+    const openRow = (row: GovernanceWorkItemData) => {
+        if (row.status === 'completed' && row.receipt) {
+            setSelectedReceiptItem(row);
+        } else if (row.required_action?.href && row.required_action.allowed !== false) {
+            router.visit(row.required_action.href);
+        }
+    };
+
     const columns: EntityTableColumn<GovernanceWorkItemData>[] = [
         {
             key: 'kind',
             label: 'Kind',
-            width: '95px',
-            cell: (row) => {
-                const label = row.kind.toUpperCase();
-                const variant =
-                    row.kind === 'vote'
-                        ? 'border-purple-300/40 bg-purple-500/10 text-purple-700 dark:text-purple-300'
-                        : row.kind === 'read'
-                          ? 'border-blue-300/40 bg-blue-500/10 text-blue-700 dark:text-blue-300'
-                          : row.kind === 'act'
-                            ? 'border-amber-300/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
-                            : 'border-slate-300/40 bg-slate-500/10 text-slate-700 dark:text-slate-300';
-                return (
-                    <Badge
-                        variant="outline"
-                        className={cn(
-                            'text-[11px] font-medium tracking-wide uppercase',
-                            variant,
-                        )}
-                    >
-                        {label}
-                    </Badge>
-                );
-            },
+            width: '150px',
+            cell: (row) => (
+                <StatusBadge size="sm" variant="neutral">
+                    {workKindLabel(row.kind)}
+                </StatusBadge>
+            ),
         },
         {
             key: 'due',
-            label: 'Due',
-            width: '130px',
+            label: 'When',
+            width: '150px',
             cell: (row) => {
                 if (row.status === 'completed') {
                     return (
                         <span className="text-xs text-muted-foreground">
-                            Completed
+                            {row.receipt?.completed_at
+                                ? `Done ${formatDateLong(row.receipt.completed_at)}`
+                                : 'Done'}
                         </span>
                     );
                 }
-                const { text, tone } = formatDueDate(row.due_date);
+                if (row.status === 'upcoming') {
+                    return (
+                        <span className="text-xs text-muted-foreground">
+                            {row.due_date ? formatDateOnly(row.due_date) : 'Date to be confirmed'}
+                        </span>
+                    );
+                }
+                const { text, tone } = dueText(row.due_date);
                 return (
                     <span
                         className={cn(
                             'text-xs font-medium',
-                            tone === 'critical' &&
-                                'font-semibold text-status-critical',
+                            tone === 'critical' && 'text-status-critical',
                             tone === 'warning' && 'text-status-warning',
                             tone === 'neutral' && 'text-muted-foreground',
                         )}
@@ -318,82 +345,66 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
         },
         {
             key: 'status',
-            label: 'Status / Blocker',
-            width: '160px',
+            label: 'Status',
+            width: '170px',
             cell: (row) => {
-                const isBlocked = row.status === 'blocked';
-                const colorClass = governanceStatusColor(row.status);
+                const chip = workStatusChip(row.status);
                 const blockerReason =
-                    row.required_action?.blocked_reason ||
-                    (isBlocked ? 'Awaiting prerequisites' : null);
+                    row.status === 'blocked'
+                        ? row.required_action?.blocked_reason || 'Waiting on something else'
+                        : null;
 
                 return (
-                    <div className="flex flex-col gap-0.5">
-                        <span
-                            className={cn(
-                                'inline-flex w-fit items-center rounded-md border px-2 py-0.5 text-[11px] font-medium',
-                                colorClass,
-                            )}
-                        >
-                            {row.status.replace(/_/g, ' ')}
-                        </span>
-                        {isBlocked && blockerReason && (
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                        <StatusBadge size="sm" variant={chip.variant} className="w-fit">
+                            {chip.label}
+                        </StatusBadge>
+                        {blockerReason ? (
                             <span
-                                className="max-w-[150px] truncate text-[10.5px] text-status-critical"
+                                className="truncate text-xs text-status-critical"
                                 title={blockerReason}
                             >
                                 {blockerReason}
                             </span>
-                        )}
+                        ) : null}
                     </div>
                 );
             },
         },
         {
-            key: 'owner',
-            label: 'Owner',
-            width: '75px',
-            cell: () => (
-                <span className="text-xs font-medium text-foreground">You</span>
-            ),
-        },
-        {
             key: 'action',
-            label: 'Action',
-            width: '135px',
+            label: 'Next step',
+            width: '170px',
             align: 'right',
             cell: (row) => {
                 if (row.status === 'completed') {
-                    return (
+                    return row.receipt ? (
                         <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-xs"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedReceiptItem(row);
                             }}
                         >
-                            View receipt
+                            View record
                         </Button>
-                    );
+                    ) : null;
                 }
 
                 const action = row.required_action;
-                const isAllowed = action?.allowed !== false;
-                const buttonLabel = action?.label || 'View';
+                if (action?.allowed === false) {
+                    return (
+                        <span className="text-xs text-muted-foreground">
+                            {action.blocked_reason || "You can't open this"}
+                        </span>
+                    );
+                }
 
                 return (
                     <Button
                         size="sm"
-                        variant={
-                            row.priority === 'critical' ||
-                            row.status === 'overdue'
-                                ? 'destructive'
-                                : 'default'
-                        }
-                        disabled={!isAllowed}
-                        className="h-7 text-xs"
+                        variant={row.status === 'upcoming' ? 'outline' : 'default'}
                         onClick={(e) => {
                             e.stopPropagation();
                             if (action?.href) {
@@ -401,7 +412,7 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                             }
                         }}
                     >
-                        {buttonLabel}
+                        {action?.label || 'Open'}
                     </Button>
                 );
             },
@@ -409,28 +420,27 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
     ];
 
     const getActionsFor = (row: GovernanceWorkItemData): MenuItem[] => {
-        const menuItems: MenuItem[] = [
-            {
-                label: 'Open record',
-                onClick: () => {
-                    if (row.required_action?.href) {
-                        router.visit(row.required_action.href);
-                    }
-                },
-            },
-            {
+        const menuItems: MenuItem[] = [];
+
+        if (row.required_action?.href && row.required_action.allowed !== false) {
+            menuItems.push({
+                label: row.required_action.label || 'Open',
+                onClick: () => router.visit(row.required_action.href),
+            });
+        }
+
+        if (row.source?.reference) {
+            menuItems.push({
                 label: 'Copy reference',
                 onClick: () => {
-                    if (row.source?.reference) {
-                        void navigator.clipboard.writeText(row.source.reference);
-                    }
+                    void navigator.clipboard.writeText(row.source.reference);
                 },
-            },
-        ];
+            });
+        }
 
         if (row.receipt) {
             menuItems.push({
-                label: 'View receipt',
+                label: 'View record of completion',
                 onClick: () => setSelectedReceiptItem(row),
             });
         }
@@ -438,13 +448,15 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
         return menuItems;
     };
 
-    const handleRowOpen = (row: GovernanceWorkItemData) => {
-        if (row.status === 'completed' && row.receipt) {
-            setSelectedReceiptItem(row);
-        } else if (row.required_action?.href && row.required_action.allowed) {
-            router.visit(row.required_action.href);
-        }
-    };
+    const receipt = selectedReceiptItem?.receipt ?? null;
+    const firstShown =
+        feed.pagination.total === 0
+            ? 0
+            : (feed.pagination.current_page - 1) * feed.pagination.per_page + 1;
+    const lastShown = Math.min(
+        feed.pagination.current_page * feed.pagination.per_page,
+        feed.pagination.total,
+    );
 
     return (
         <AppLayout
@@ -463,15 +475,23 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                         variant="index"
                         icon={ListChecks}
                         title="My work"
+                        titleDusk="governance-my-work-heading"
                         titleChip={
-                            <span
-                                dusk="governance-my-work-heading"
-                                className="hidden"
-                            >
-                                My work
-                            </span>
+                            feed.totals.overdue > 0 ? (
+                                <PageHeaderStatusChip variant="critical">
+                                    {feed.totals.overdue} overdue
+                                </PageHeaderStatusChip>
+                            ) : missingMessage ? (
+                                <PageHeaderStatusChip variant="warning">
+                                    Some work not loaded
+                                </PageHeaderStatusChip>
+                            ) : feed.totals.pending === 0 ? (
+                                <PageHeaderStatusChip variant="success">
+                                    Up to date
+                                </PageHeaderStatusChip>
+                            ) : null
                         }
-                        subline="Your board decisions, reading and follow-up"
+                        subline="Your votes, reading and actions for the board, most urgent first"
                         actions={
                             <form
                                 onSubmit={handleSearchSubmit}
@@ -480,76 +500,72 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                                 <PageHeaderSearch
                                     value={searchQuery}
                                     onChange={setSearchQuery}
-                                    placeholder="Search personal work..."
+                                    placeholder="Search my work…"
                                 />
                             </form>
                         }
                         meters={
                             <>
                                 <PageHeaderMeterBlock
-                                    label="Decisions to vote"
+                                    label="To vote"
                                     href="/governance/my-work?kind=vote"
-                                    tone={
-                                        feed.totals.vote > 0
-                                            ? 'warning'
-                                            : 'brand'
-                                    }
+                                    tone={feed.totals.vote > 0 ? 'warning' : 'brand'}
+                                    ariaLabel="Show resolutions to vote on"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {feed.totals.vote}
-                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterBig>{feed.totals.vote}</PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        {feed.totals.vote === 1
-                                            ? '1 vote waiting'
-                                            : `${feed.totals.vote} votes waiting`}
+                                        {feed.totals.vote > 0
+                                            ? `${plural(feed.totals.vote, 'resolution', 'resolutions')} waiting for your vote`
+                                            : 'Nothing to vote on'}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Reading & packs"
+                                    label="To read"
                                     href="/governance/my-work?kind=read"
-                                    tone="brand"
+                                    ariaLabel="Show board packs and policies to read"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {feed.totals.read}
-                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterBig>{feed.totals.read}</PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        {feed.totals.read === 1
-                                            ? '1 pack / policy'
-                                            : `${feed.totals.read} packs / policies`}
+                                        {feed.totals.read > 0
+                                            ? 'board packs and policies'
+                                            : 'Nothing to read'}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Assigned actions"
+                                    label="To do"
                                     href="/governance/my-work?kind=act"
-                                    tone={
-                                        feed.totals.act > 0
-                                            ? feed.totals.overdue > 0
-                                                ? 'critical'
-                                                : 'warning'
-                                            : 'brand'
-                                    }
+                                    ariaLabel="Show things for you to do"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {feed.totals.act}
-                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterBig>{feed.totals.act}</PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        {feed.totals.act === 1
-                                            ? '1 action pending'
-                                            : `${feed.totals.act} actions pending`}
+                                        {feed.totals.act > 0
+                                            ? `${plural(feed.totals.act, 'thing', 'things')} for you to do`
+                                            : 'Nothing for you to do'}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Awareness & updates"
+                                    label="Coming up"
                                     href="/governance/my-work?kind=know"
-                                    tone="brand"
+                                    ariaLabel="Show what's coming up"
                                 >
-                                    <PageHeaderMeterBig>
-                                        {feed.totals.know}
-                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterBig>{feed.totals.know}</PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        {feed.totals.know === 1
-                                            ? '1 update'
-                                            : `${feed.totals.know} updates`}
+                                        {feed.totals.know > 0
+                                            ? `${plural(feed.totals.know, 'item', 'items')} — for your information`
+                                            : 'Nothing coming up'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Done"
+                                    href="/governance/my-work?status=completed"
+                                    tone={feed.totals.completed > 0 ? 'success' : 'brand'}
+                                    ariaLabel="Show work you've finished"
+                                >
+                                    <PageHeaderMeterBig>{feed.totals.completed}</PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {feed.totals.completed > 0
+                                            ? 'with a record of completion'
+                                            : 'Nothing finished yet'}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                             </>
@@ -557,39 +573,34 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                         filters={
                             <div className="flex flex-wrap items-center gap-2">
                                 <PageHeaderFilterSelect
-                                    label="Status"
+                                    icon={ListChecks}
+                                    label="All kinds"
+                                    value={currentKind}
+                                    options={KIND_OPTIONS(feed.totals)}
+                                    onChange={(val) =>
+                                        applyFilters({ kind: val, page: 1 })
+                                    }
+                                />
+                                <PageHeaderFilterSelect
+                                    label="To do"
                                     value={currentStatus}
+                                    allValue="pending"
                                     options={[
-                                        {
-                                            value: 'pending',
-                                            label: 'Pending',
-                                        },
-                                        {
-                                            value: 'completed',
-                                            label: 'Completed',
-                                        },
-                                        { value: 'all', label: 'All status' },
+                                        { value: 'pending', label: 'To do' },
+                                        { value: 'completed', label: 'Done' },
+                                        { value: 'all', label: 'To do and done' },
                                     ]}
                                     onChange={(val) =>
                                         applyFilters({ status: val, page: 1 })
                                     }
                                 />
                                 <PageHeaderFilterSelect
-                                    label="Due"
+                                    label="Any due date"
                                     value={currentDue}
                                     options={[
-                                        {
-                                            value: 'all',
-                                            label: 'All deadlines',
-                                        },
-                                        {
-                                            value: 'overdue',
-                                            label: 'Overdue only',
-                                        },
-                                        {
-                                            value: 'next7',
-                                            label: 'Next 7 days',
-                                        },
+                                        { value: 'all', label: 'Any due date' },
+                                        { value: 'overdue', label: 'Overdue' },
+                                        { value: 'next7', label: 'Next 7 days' },
                                     ]}
                                     onChange={(val) =>
                                         applyFilters({ due: val, page: 1 })
@@ -598,357 +609,271 @@ export default function MyWorkIndex({ auth, feed, filters }: Props) {
                             </div>
                         }
                         rail={
-                            <PageHeaderRail
-                                items={[
-                                    {
-                                        key: 'all',
-                                        label: 'All work',
-                                        count: feed.totals.all,
-                                    },
-                                    {
-                                        key: 'vote',
-                                        label: 'Vote',
-                                        count: feed.totals.vote,
-                                    },
-                                    {
-                                        key: 'read',
-                                        label: 'Read',
-                                        count: feed.totals.read,
-                                    },
-                                    {
-                                        key: 'act',
-                                        label: 'Act',
-                                        count: feed.totals.act,
-                                    },
-                                    {
-                                        key: 'know',
-                                        label: 'Know',
-                                        count: feed.totals.know,
-                                    },
-                                ]}
-                                value={currentKind}
-                                onSelect={(key) =>
-                                    applyFilters({ kind: key, page: 1 })
-                                }
+                            <GovernanceHomeRail
+                                value="my-work"
+                                myWorkCount={feed.totals.pending}
                             />
                         }
                     />
                 }
             >
-                <div className="space-y-4">
-                    {/* Source availability banner if any source failed */}
-                    {unavailableSources.length > 0 && (
+                <div className="flex flex-col gap-5">
+                    {missingMessage ? (
                         <div
+                            role="alert"
                             data-dusk="source-unavailable-banner"
-                            className="flex items-center gap-3 rounded-lg border border-amber-300/40 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200"
+                            className="flex items-center gap-3 rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-sm text-status-warning"
                         >
-                            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-                            <div>
-                                <span className="font-semibold">
-                                    Notice: Some source systems could not be
-                                    reached ({unavailableSources.join(', ')}).
-                                </span>{' '}
-                                Your work list may be incomplete. Missing
-                                records from unavailable sources are not marked
-                                as completed.
-                            </div>
+                            <AlertTriangle
+                                className="size-5 shrink-0"
+                                aria-hidden="true"
+                            />
+                            <span>{missingMessage}</span>
                         </div>
-                    )}
+                    ) : null}
 
-                    {/* Work feed table or empty states */}
                     {feed.items.length === 0 ? (
-                        <Card className="rounded-[14px] p-12 text-center">
-                            <CardContent className="flex flex-col items-center justify-center space-y-3">
-                                {isFiltered ? (
-                                    <>
-                                        <div className="rounded-full bg-muted p-4">
-                                            <Search className="h-8 w-8 text-muted-foreground" />
-                                        </div>
-                                        <h3 className="text-base font-semibold text-foreground">
-                                            No results for these filters
-                                        </h3>
-                                        <p className="max-w-md text-sm text-muted-foreground">
-                                            No personal obligations match the
-                                            selected kind, status, or search
-                                            criteria.
-                                        </p>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                setSearchQuery('');
-                                                router.get('/governance/my-work');
-                                            }}
-                                        >
-                                            Reset filters
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="rounded-full bg-status-success-bg p-4 text-status-success">
-                                            <CheckCircle2 className="h-8 w-8" />
-                                        </div>
-                                        <h3 className="text-base font-semibold text-foreground">
-                                            Nothing pending for you
-                                        </h3>
-                                        <p className="max-w-md text-sm text-muted-foreground">
-                                            You are completely caught up on all
-                                            board votes, required reading, and
-                                            assigned action items.
-                                        </p>
-                                    </>
-                                )}
-                            </CardContent>
-                        </Card>
+                        isFiltered ? (
+                            <EmptyState
+                                icon={Search}
+                                title="Nothing matches these filters"
+                                description="Try a different kind, status, due date or search."
+                                action={
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearchQuery('');
+                                            router.get('/governance/my-work');
+                                        }}
+                                    >
+                                        Clear filters
+                                    </Button>
+                                }
+                            />
+                        ) : missingMessage ? (
+                            <EmptyState
+                                icon={AlertTriangle}
+                                title="Nothing to show from what loaded"
+                                description="There may still be things for you to do once everything loads."
+                            />
+                        ) : (
+                            <EmptyState
+                                icon={CheckCircle2}
+                                title="Nothing to do right now"
+                                description={
+                                    feed.totals.completed > 0
+                                        ? `No votes, reading or actions are waiting for you. You've finished ${feed.totals.completed} ${plural(feed.totals.completed, 'thing', 'things')} — see Done.`
+                                        : 'No votes, reading or actions are waiting for you.'
+                                }
+                            />
+                        )
                     ) : (
-                        <>
+                        <div className="flex flex-col gap-3">
                             <EntityTable<GovernanceWorkItemData>
                                 rows={feed.items}
                                 rowKey={(row) => row.id}
-                                identityLabel="Obligation"
+                                identityLabel="What"
                                 identityWidth="2.3fr"
                                 identity={(row) => ({
                                     icon: getKindIcon(row.kind),
                                     name: row.title,
-                                    subline: `${row.source.reference}${row.reason ? ` · ${row.reason}` : ''}`,
+                                    subline: [row.reason, refSuffix(row.source.reference)]
+                                        .filter(Boolean)
+                                        .join(' · '),
                                     linkLabel: row.title,
                                 })}
-                                hrefFor={(row) =>
-                                    row.status !== 'completed' &&
-                                    row.required_action?.href &&
-                                    row.required_action.allowed
-                                        ? row.required_action.href
-                                        : '#'
-                                }
-                                onOpen={handleRowOpen}
+                                onOpen={openRow}
                                 columns={columns}
                                 actionsFor={getActionsFor}
                             />
 
-                            {/* Pagination controls */}
-                            {feed.pagination.last_page > 1 && (
-                                <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-2">
-                                    <span className="text-xs text-muted-foreground">
-                                        Showing{' '}
-                                        {(feed.pagination.current_page - 1) *
-                                            feed.pagination.per_page +
-                                            1}{' '}
-                                        to{' '}
-                                        {Math.min(
-                                            feed.pagination.current_page *
-                                                feed.pagination.per_page,
-                                            feed.pagination.total,
-                                        )}{' '}
-                                        of {feed.pagination.total} items
+                            {feed.pagination.last_page > 1 ? (
+                                <div className="flex flex-col items-center gap-2">
+                                    <span className="text-caption">
+                                        Showing {firstShown}–{lastShown} of {feed.pagination.total}
                                     </span>
-                                    <div className="flex items-center gap-1">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            disabled={
-                                                feed.pagination.current_page <=
-                                                1
-                                            }
-                                            onClick={() =>
-                                                applyFilters({
-                                                    page:
-                                                        feed.pagination
-                                                            .current_page - 1,
-                                                })
-                                            }
-                                            aria-label="Previous page"
-                                        >
-                                            <ChevronLeft className="h-4 w-4" />
-                                        </Button>
-                                        <span className="px-3 text-xs font-medium text-foreground">
-                                            Page {feed.pagination.current_page}{' '}
-                                            of {feed.pagination.last_page}
-                                        </span>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            disabled={
-                                                feed.pagination.current_page >=
-                                                feed.pagination.last_page
-                                            }
-                                            onClick={() =>
-                                                applyFilters({
-                                                    page:
-                                                        feed.pagination
-                                                            .current_page + 1,
-                                                })
-                                            }
-                                            aria-label="Next page"
-                                        >
-                                            <ChevronRight className="h-4 w-4" />
-                                        </Button>
-                                    </div>
+                                    <LaravelPagination
+                                        links={feed.pagination.links ?? []}
+                                        lastPage={feed.pagination.last_page}
+                                        preserveScroll
+                                    />
                                 </div>
-                            )}
-                        </>
+                            ) : null}
+                        </div>
                     )}
+
+                    {showComingUp ? (
+                        <Card data-dusk="my-work-coming-up">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-section-title">
+                                    Coming up
+                                </CardTitle>
+                                <CardDescription>
+                                    For your information — upcoming meetings and
+                                    finished reviews. There's nothing to do for these yet.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ul className="flex flex-col divide-y divide-border">
+                                    {comingUp.map((item) => (
+                                        <li
+                                            key={item.id}
+                                            className="flex flex-wrap items-center justify-between gap-3 py-2.5"
+                                        >
+                                            <span className="min-w-0">
+                                                <span className="block text-sm font-medium text-foreground">
+                                                    {item.title}
+                                                </span>
+                                                <span className="block text-caption">
+                                                    {[item.reason, refSuffix(item.source.reference)]
+                                                        .filter(Boolean)
+                                                        .join(' · ')}
+                                                </span>
+                                            </span>
+                                            <Button asChild size="sm" variant="outline">
+                                                <Link href={item.required_action.href}>
+                                                    {item.required_action.label || 'Open meeting'}
+                                                </Link>
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </CardContent>
+                        </Card>
+                    ) : null}
                 </div>
             </PageLayout>
 
-            {/* Durable Receipt Dialog */}
             <Dialog
                 open={selectedReceiptItem !== null}
                 onOpenChange={(open) => {
                     if (!open) setSelectedReceiptItem(null);
                 }}
             >
-                <DialogContent className="max-w-lg">
+                <DialogContent style={{ maxWidth: 'min(92vw, 520px)' }}>
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <CheckCircle2 className="h-5 w-5 text-status-success" />
-                            Completion receipt
+                            <CheckCircle2
+                                className="size-5 text-status-success"
+                                aria-hidden="true"
+                            />
+                            {receiptTitle(selectedReceiptItem?.kind)}
                         </DialogTitle>
                         <DialogDescription>
-                            Durable cryptographic or audit receipt proving
-                            completion of this governance obligation.
+                            What was recorded when you finished this.
                         </DialogDescription>
                     </DialogHeader>
 
-                    {selectedReceiptItem && (
-                        <div className="space-y-4 py-2">
-                            <div className="rounded-lg border bg-muted/40 p-4 space-y-2.5">
-                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    Obligation
-                                </div>
-                                <div className="text-sm font-semibold text-foreground">
-                                    {selectedReceiptItem.title}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                    Reference:{' '}
-                                    <span className="font-mono text-foreground">
-                                        {selectedReceiptItem.source.reference}
+                    {selectedReceiptItem ? (
+                        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                            <dt className="text-muted-foreground">What</dt>
+                            <dd className="font-medium text-foreground">
+                                {selectedReceiptItem.title}
+                                {selectedReceiptItem.source.reference ? (
+                                    <span className="ml-1.5 text-caption font-normal">
+                                        {refSuffix(selectedReceiptItem.source.reference)}
                                     </span>
-                                </div>
-                            </div>
+                                ) : null}
+                            </dd>
 
-                            <div className="rounded-lg border p-4 space-y-3">
-                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    Receipt Details
-                                </div>
-                                <div className="grid grid-cols-2 gap-3 text-xs">
-                                    <div>
-                                        <span className="text-muted-foreground">
-                                            Receipt ID:
-                                        </span>
-                                        <div className="mt-0.5 font-mono text-[11px] font-semibold text-foreground break-all">
-                                            {selectedReceiptItem.receipt
-                                                ?.receipt_id || 'N/A'}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <span className="text-muted-foreground">
-                                            Completed at:
-                                        </span>
-                                        <div className="mt-0.5 text-foreground font-medium">
-                                            {selectedReceiptItem.receipt
-                                                ?.completed_at
-                                                ? new Date(
-                                                      selectedReceiptItem.receipt.completed_at,
-                                                  ).toLocaleString()
-                                                : 'Confirmed'}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {selectedReceiptItem.receipt?.vote && (
-                                    <div className="pt-2 border-t text-xs">
-                                        <span className="text-muted-foreground">
-                                            Vote cast:
-                                        </span>
-                                        <span className="ml-2 font-semibold uppercase text-foreground">
-                                            {selectedReceiptItem.receipt.vote}
-                                        </span>
-                                    </div>
+                            <dt className="text-muted-foreground">When</dt>
+                            <dd className="text-foreground">
+                                {receipt?.completed_at ? (
+                                    <time dateTime={receipt.completed_at}>
+                                        {formatDateTimeLong(receipt.completed_at)}
+                                    </time>
+                                ) : (
+                                    'Time not recorded'
                                 )}
+                            </dd>
 
-                                {selectedReceiptItem.receipt
-                                    ?.revision_number !== undefined && (
-                                    <div className="pt-2 border-t text-xs">
-                                        <span className="text-muted-foreground">
-                                            Pack revision confirmed:
-                                        </span>
-                                        <span className="ml-2 font-mono font-semibold text-foreground">
-                                            Rev{' '}
-                                            {
-                                                selectedReceiptItem.receipt
-                                                    .revision_number
-                                            }
-                                        </span>
-                                    </div>
-                                )}
+                            {receipt?.vote ? (
+                                <>
+                                    <dt className="text-muted-foreground">Your vote</dt>
+                                    <dd className="text-foreground">
+                                        {voteLabel(receipt.vote)}
+                                    </dd>
+                                </>
+                            ) : null}
 
-                                {selectedReceiptItem.receipt?.version !==
-                                    undefined && (
-                                    <div className="pt-2 border-t text-xs">
-                                        <span className="text-muted-foreground">
-                                            Policy version attested:
-                                        </span>
-                                        <span className="ml-2 font-mono font-semibold text-foreground">
-                                            v{selectedReceiptItem.receipt.version}
-                                        </span>
-                                    </div>
-                                )}
+                            {receipt?.paper_version !== undefined ? (
+                                <>
+                                    <dt className="text-muted-foreground">Paper</dt>
+                                    <dd className="text-foreground">
+                                        Version {receipt.paper_version}
+                                    </dd>
+                                </>
+                            ) : null}
 
-                                {selectedReceiptItem.receipt
-                                    ?.completion_notes && (
-                                    <div className="pt-2 border-t text-xs">
-                                        <span className="text-muted-foreground">
-                                            Completion notes:
-                                        </span>
-                                        <p className="mt-1 italic text-foreground">
-                                            {
-                                                selectedReceiptItem.receipt
-                                                    .completion_notes
-                                            }
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                            {receipt?.revision_number !== undefined ? (
+                                <>
+                                    <dt className="text-muted-foreground">Board pack</dt>
+                                    <dd className="text-foreground">
+                                        Version {receipt.revision_number}
+                                    </dd>
+                                </>
+                            ) : null}
 
-                    <DialogFooter className="flex flex-col sm:flex-row items-center justify-between gap-2">
-                        {selectedReceiptItem?.receipt?.receipt_id && (
+                            {receipt?.version !== undefined ? (
+                                <>
+                                    <dt className="text-muted-foreground">Policy</dt>
+                                    <dd className="text-foreground">
+                                        Version {receipt.version}
+                                    </dd>
+                                </>
+                            ) : null}
+
+                            {receipt?.completion_notes ? (
+                                <>
+                                    <dt className="text-muted-foreground">Notes</dt>
+                                    <dd className="text-foreground">
+                                        {receipt.completion_notes}
+                                    </dd>
+                                </>
+                            ) : null}
+
+                            {receipt?.receipt_id ? (
+                                <>
+                                    <dt className="text-muted-foreground">Reference</dt>
+                                    <dd className="font-mono text-xs break-all text-foreground">
+                                        {receipt.receipt_id}
+                                    </dd>
+                                </>
+                            ) : null}
+                        </dl>
+                    ) : null}
+
+                    <DialogFooter className="flex flex-col items-center justify-between gap-2 sm:flex-row">
+                        {receipt?.receipt_id ? (
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-xs"
-                                onClick={() =>
-                                    handleCopyReceipt(
-                                        selectedReceiptItem.receipt
-                                            ?.receipt_id ?? '',
-                                    )
-                                }
+                                onClick={() => handleCopyReceipt(receipt.receipt_id ?? '')}
                             >
-                                <Copy className="mr-1.5 h-3.5 w-3.5" />
-                                {copiedReceipt ? 'Copied!' : 'Copy receipt ID'}
+                                <Copy className="mr-1.5 size-4" aria-hidden="true" />
+                                {copiedReceipt ? 'Copied' : 'Copy reference'}
                             </Button>
+                        ) : (
+                            <span />
                         )}
-                        <div className="flex items-center gap-2 ml-auto">
-                            {selectedReceiptItem?.source?.href && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    asChild
-                                >
-                                    <Link
-                                        href={selectedReceiptItem.source.href}
-                                    >
-                                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                                        Open source record
+                        <div className="flex items-center gap-2">
+                            {selectedReceiptItem?.source?.href ? (
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={selectedReceiptItem.source.href}>
+                                        <ExternalLink
+                                            className="mr-1.5 size-4"
+                                            aria-hidden="true"
+                                        />
+                                        Open record
                                     </Link>
                                 </Button>
-                            )}
+                            ) : null}
                             <Button
                                 size="sm"
                                 onClick={() => setSelectedReceiptItem(null)}
                             >
-                                Return to My work
+                                Close
                             </Button>
                         </div>
                     </DialogFooter>

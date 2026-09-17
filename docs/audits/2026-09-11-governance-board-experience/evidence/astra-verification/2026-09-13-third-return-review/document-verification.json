@@ -1,0 +1,14 @@
+{
+  "prompt_words": 2350,
+  "broken_local_links": [],
+  "reviewed_files": [
+    "astra-third-return-review-2026-09-13.md",
+    "astra-verification.md",
+    "gemini-fresh-context-prompt.md",
+    "gemini-correction-prompt.md",
+    "implementation-progress.md",
+    "acceptance-checklist.md",
+    "navigation-workflow-decision-2026-09-13.md"
+  ],
+  "checked": "2026-09-13T17:14:58.1429485+12:00"
+}

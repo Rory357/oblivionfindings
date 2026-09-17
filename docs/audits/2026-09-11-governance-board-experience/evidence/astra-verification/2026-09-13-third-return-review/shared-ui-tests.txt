@@ -1,0 +1,13 @@
+
+> test
+> vitest run --run resources/js/components/wizard/shell.test.tsx resources/js/components/wizard/shell-focus.test.tsx resources/js/components/page/page-header-rail.test.tsx
+
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+
+ Test Files  3 passed (3)
+      Tests  15 passed (15)
+   Start at  16:40:45
+   Duration  20.80s (transform 575ms, setup 5.67s, import 11.74s, tests 1.46s, environment 40.43s)
+

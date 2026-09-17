@@ -1,386 +1,512 @@
-import { formatMoney } from '@/components/finance/money';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Button } from '@/components/ui/button';
+import {
+    ConfirmDialog,
+    FinanceSectionRail,
+    formatMoney,
+    QuoteDialog,
+    type QuoteClientOption,
+    type QuotePriceBook,
+} from '@/components/finance';
+import { EntityTable, ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
 import {
-    CalendarDays,
+    Calculator,
     CheckCircle2,
     FileText,
     Pencil,
     Receipt,
     Send,
 } from 'lucide-react';
+import { useState } from 'react';
 
 type LineItem = {
     id: number;
     description: string;
-    quantity: number;
-    unit: string;
-    unit_price: number;
-    amount: number;
+    quantity: number | string;
+    unit: string | null;
+    unit_price: number | string;
+    amount: number | string;
+};
+
+type Quote = {
+    id: number;
+    quote_number: string;
+    title: string;
+    status: string;
+    client_id: number | null;
+    client_name: string | null;
+    client_email: string | null;
+    client_phone: string | null;
+    valid_until: string | null;
+    notes: string | null;
+    terms: string | null;
+    subtotal: number | string;
+    tax_amount: number | string;
+    total_amount: number | string;
+    created_at: string;
+    client: { id: number; first_name: string; last_name: string } | null;
+    creator: { id: number; name: string } | null;
+    line_items: LineItem[];
 };
 
 type Props = {
-    quote: {
-        id: number;
-        title: string;
-        status: string;
-        client_id: number | null;
-        client_name: string | null;
-        client_email: string | null;
-        client_phone: string | null;
-        valid_until: string | null;
-        notes: string | null;
-        terms: string | null;
-        subtotal: number;
-        tax: number;
-        total: number;
-        created_at: string;
-        client: { id: number; first_name: string; last_name: string } | null;
-        line_items: LineItem[];
-    };
+    quote: Quote;
+    canManage: boolean;
+    clients: QuoteClientOption[];
+    priceBooks: QuotePriceBook[];
 };
 
-const STATUS_STEPS = ['draft', 'sent', 'accepted', 'converted'];
+type PendingAction = 'send' | 'accept' | 'convert' | 'convert-to-invoice';
 
-function formatDate(d: string | null): string {
-    if (!d) return '-';
-    return new Date(d).toLocaleDateString('en-NZ', {
+const ACTION_COPY: Record<
+    PendingAction,
+    { title: string; description: string; confirmText: string }
+> = {
+    send: {
+        title: 'Send this quote?',
+        description:
+            'This moves the quote to Sent and records the send date. The line items are locked from then on.',
+        confirmText: 'Send quote',
+    },
+    accept: {
+        title: 'Mark this quote as accepted?',
+        description:
+            'This records the client’s acceptance and unlocks conversion to a service agreement or an invoice.',
+        confirmText: 'Mark accepted',
+    },
+    convert: {
+        title: 'Convert to a service agreement?',
+        description:
+            'This creates a draft service agreement from the quote’s lines and closes the quote as converted. It can’t be undone.',
+        confirmText: 'Convert to agreement',
+    },
+    'convert-to-invoice': {
+        title: 'Convert to an AR invoice?',
+        description:
+            'This creates a draft invoice from the quote’s lines, applies NZ GST and closes the quote as converted. It can’t be undone.',
+        confirmText: 'Convert to invoice',
+    },
+};
+
+function formatDate(value: string | null): string {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString('en-NZ', {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
     });
 }
 
-export default function QuoteShow({ quote }: Props) {
+export default function QuoteShow({
+    quote,
+    canManage = false,
+    clients = [],
+    priceBooks = [],
+}: Props) {
+    const [pending, setPending] = useState<PendingAction | null>(null);
+    const [processing, setProcessing] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
+
     const clientDisplay = quote.client
         ? `${quote.client.first_name} ${quote.client.last_name}`
         : (quote.client_name ?? 'Unknown');
 
-    const currentStepIndex = STATUS_STEPS.indexOf(quote.status);
+    const expired =
+        quote.valid_until &&
+        new Date(quote.valid_until) < new Date() &&
+        !['accepted', 'converted'].includes(quote.status);
 
-    const handleAction = (action: string) => {
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Receivables', href: '/finance/invoices' },
+        { title: 'Quotes', href: '/finance/quotes' },
+        { title: quote.quote_number },
+    ];
+
+    const runAction = (action: PendingAction) => {
         router.post(
             `/finance/quotes/${quote.id}/${action}`,
             {},
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onStart: () => setProcessing(true),
+                onFinish: () => {
+                    setProcessing(false);
+                    setPending(null);
+                },
+            },
         );
     };
 
-    return (
-        <AppLayout>
-            <Head title={quote.title} />
-            <PageHero
-                category="finance"
-                variant="compact"
-                title={quote.title}
-                description={clientDisplay}
-                backHref="/finance/quotes"
-            />
-            <PageShell>
-                {/* Header */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge status={quote.status} />
-                    {quote.valid_until && (
-                        <span
-                            className={`flex items-center gap-1 text-xs ${new Date(quote.valid_until) < new Date() ? 'font-medium text-status-warning' : 'text-muted-foreground'}`}
-                        >
-                            <CalendarDays className="h-3 w-3" /> Valid until:{' '}
-                            {formatDate(quote.valid_until)}
-                        </span>
-                    )}
-                    <div className="ml-auto flex gap-1">
-                        {quote.status === 'draft' && (
-                            <>
-                                <Button asChild size="sm" variant="outline">
-                                    <Link href="/finance/quotes">
-                                        <Pencil className="mr-1.5 h-3.5 w-3.5" />{' '}
-                                        Edit
-                                    </Link>
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    onClick={() => handleAction('send')}
-                                >
-                                    <Send className="mr-1.5 h-3.5 w-3.5" /> Send
-                                </Button>
-                            </>
-                        )}
-                        {quote.status === 'sent' && (
-                            <Button
-                                size="sm"
-                                onClick={() => handleAction('accept')}
+    const header = (
+        <PageHeader
+            variant="profile"
+            icon={Calculator}
+            backHref="/finance/quotes"
+            title={quote.quote_number}
+            titleChip={
+                expired ? (
+                    <PageHeaderStatusChip variant="critical">
+                        Expired
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip
+                        variant={
+                            ['accepted', 'converted'].includes(quote.status)
+                                ? 'success'
+                                : quote.status === 'declined'
+                                  ? 'critical'
+                                  : quote.status === 'draft'
+                                    ? 'neutral'
+                                    : 'info'
+                        }
+                    >
+                        {quote.status.charAt(0).toUpperCase() +
+                            quote.status.slice(1)}
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={`${quote.title} · ${clientDisplay} · raised ${formatDate(quote.created_at)}`}
+            actions={
+                <>
+                    {canManage && quote.status === 'draft' && (
+                        <>
+                            <PageHeaderGlassButton
+                                icon={Pencil}
+                                onClick={() => setEditOpen(true)}
                             >
-                                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />{' '}
-                                Accept
-                            </Button>
-                        )}
-                        {quote.status === 'accepted' && (
-                            <>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleAction('convert')}
-                                >
-                                    <FileText className="mr-1.5 h-3.5 w-3.5" />{' '}
-                                    Convert to Agreement
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        handleAction('convert-to-invoice')
-                                    }
-                                >
-                                    <Receipt className="mr-1.5 h-3.5 w-3.5" />{' '}
-                                    Convert to Invoice
-                                </Button>
-                            </>
-                        )}
-                    </div>
-                </div>
+                                Edit
+                            </PageHeaderGlassButton>
+                            <PageHeaderPrimaryButton
+                                icon={Send}
+                                onClick={() => setPending('send')}
+                            >
+                                Send quote
+                            </PageHeaderPrimaryButton>
+                        </>
+                    )}
+                    {canManage && quote.status === 'sent' && (
+                        <PageHeaderPrimaryButton
+                            icon={CheckCircle2}
+                            onClick={() => setPending('accept')}
+                        >
+                            Mark accepted
+                        </PageHeaderPrimaryButton>
+                    )}
+                    {canManage && quote.status === 'accepted' && (
+                        <>
+                            <PageHeaderGlassButton
+                                icon={FileText}
+                                onClick={() => setPending('convert')}
+                            >
+                                Convert to agreement
+                            </PageHeaderGlassButton>
+                            <PageHeaderPrimaryButton
+                                icon={Receipt}
+                                onClick={() =>
+                                    setPending('convert-to-invoice')
+                                }
+                            >
+                                Convert to invoice
+                            </PageHeaderPrimaryButton>
+                        </>
+                    )}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Quote total"
+                        href="/finance/quotes"
+                        ariaLabel="Back to the quote register"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(quote.total_amount)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Incl. {formatMoney(quote.tax_amount)} GST
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Lines"
+                        href="/finance/price-books"
+                        ariaLabel="View the price books these rates come from"
+                    >
+                        <PageHeaderMeterBig>
+                            {quote.line_items.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Priced service lines
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Valid until"
+                        tone={expired ? 'critical' : 'brand'}
+                        href="/finance/quotes?status=sent"
+                        ariaLabel="View open quotes"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatDate(quote.valid_until)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {expired
+                                ? 'Past its valid-until date'
+                                : 'Offer open until this date'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Client"
+                        href={`/finance/invoices?search=${encodeURIComponent(
+                            clientDisplay,
+                        )}`}
+                        ariaLabel="View this client's invoices"
+                    >
+                        <PageHeaderMeterBig>
+                            {clientDisplay}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {quote.client_email ?? 'No email on file'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
-                {/* Status Workflow */}
-                <Card className="mt-4">
-                    <CardContent className="py-4">
-                        <div className="flex items-center justify-between">
-                            {STATUS_STEPS.map((step, index) => (
-                                <div key={step} className="flex items-center">
-                                    <div className="flex flex-col items-center">
-                                        <div
-                                            className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium ${
-                                                index <= currentStepIndex
-                                                    ? 'bg-primary text-primary-foreground'
-                                                    : 'bg-muted text-muted-foreground'
-                                            }`}
-                                        >
-                                            {index + 1}
-                                        </div>
-                                        <span className="mt-1 text-[10px] text-muted-foreground capitalize">
-                                            {step}
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title={quote.quote_number} />
+
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Quote details
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">
+                                        Status
+                                    </span>
+                                    <StatusBadge status={quote.status} />
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">
+                                        Title
+                                    </span>
+                                    <span className="font-medium">
+                                        {quote.title}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">
+                                        Raised
+                                    </span>
+                                    <span className="font-medium">
+                                        {formatDate(quote.created_at)}
+                                    </span>
+                                </div>
+                                {quote.creator && (
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">
+                                            Raised by
+                                        </span>
+                                        <span className="font-medium">
+                                            {quote.creator.name}
                                         </span>
                                     </div>
-                                    {index < STATUS_STEPS.length - 1 && (
-                                        <div
-                                            className={`mx-2 h-0.5 w-12 sm:w-20 ${index < currentStepIndex ? 'bg-primary' : 'bg-muted'}`}
-                                        />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
+                                )}
+                            </CardContent>
+                        </Card>
 
-                {/* Client Info + Details */}
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Client Information
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-1 text-xs">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    Name
-                                </span>
-                                <span className="font-medium">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Client
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 text-sm">
+                                <div className="text-base font-medium">
                                     {clientDisplay}
-                                </span>
-                            </div>
-                            {quote.client_email && (
+                                </div>
+                                {quote.client_email && (
+                                    <div>{quote.client_email}</div>
+                                )}
+                                {quote.client_phone && (
+                                    <div className="text-muted-foreground">
+                                        {quote.client_phone}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Totals
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 text-sm">
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">
-                                        Email
+                                        Subtotal
                                     </span>
-                                    <span>{quote.client_email}</span>
+                                    <span className="tabular-nums">
+                                        {formatMoney(quote.subtotal)}
+                                    </span>
                                 </div>
-                            )}
-                            {quote.client_phone && (
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">
-                                        Phone
+                                        GST (15%)
                                     </span>
-                                    <span>{quote.client_phone}</span>
+                                    <span className="tabular-nums">
+                                        {formatMoney(quote.tax_amount)}
+                                    </span>
                                 </div>
-                            )}
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    Created
-                                </span>
-                                <span>{formatDate(quote.created_at)}</span>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Quote Summary
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-1 text-xs">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    Subtotal
-                                </span>
-                                <span className="tabular-nums">
-                                    {formatMoney(quote.subtotal)}
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    GST (15%)
-                                </span>
-                                <span className="tabular-nums">
-                                    {formatMoney(quote.tax)}
-                                </span>
-                            </div>
-                            <div className="flex justify-between border-t pt-1 font-semibold">
-                                <span>Total (NZD)</span>
-                                <span className="tabular-nums">
-                                    {formatMoney(quote.total)}
-                                </span>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Line Items */}
-                <Card className="mt-4">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Line Items ({quote.line_items.length})
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        {quote.line_items.length === 0 ? (
-                            <p className="py-8 text-center text-sm text-muted-foreground">
-                                No line items.
-                            </p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b text-left text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                            <th className="px-4 py-2">
-                                                Description
-                                            </th>
-                                            <th className="px-4 py-2 text-right">
-                                                Qty
-                                            </th>
-                                            <th className="px-4 py-2">Unit</th>
-                                            <th className="px-4 py-2 text-right">
-                                                Unit Price
-                                            </th>
-                                            <th className="px-4 py-2 text-right">
-                                                Amount
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {quote.line_items.map((item) => (
-                                            <tr
-                                                key={item.id}
-                                                className="border-b last:border-0"
-                                            >
-                                                <td className="px-4 py-2 text-xs font-medium">
-                                                    {item.description}
-                                                </td>
-                                                <td className="px-4 py-2 text-right text-xs tabular-nums">
-                                                    {item.quantity}
-                                                </td>
-                                                <td className="px-4 py-2 text-xs text-muted-foreground capitalize">
-                                                    {item.unit}
-                                                </td>
-                                                <td className="px-4 py-2 text-right text-xs tabular-nums">
-                                                    {formatMoney(
-                                                        item.unit_price,
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-2 text-right text-xs font-medium tabular-nums">
-                                                    {formatMoney(item.amount)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr className="border-t">
-                                            <td
-                                                colSpan={4}
-                                                className="px-4 py-2 text-right text-xs text-muted-foreground"
-                                            >
-                                                Subtotal
-                                            </td>
-                                            <td className="px-4 py-2 text-right text-xs tabular-nums">
-                                                {formatMoney(quote.subtotal)}
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td
-                                                colSpan={4}
-                                                className="px-4 py-1 text-right text-xs text-muted-foreground"
-                                            >
-                                                GST (15%)
-                                            </td>
-                                            <td className="px-4 py-1 text-right text-xs tabular-nums">
-                                                {formatMoney(quote.tax)}
-                                            </td>
-                                        </tr>
-                                        <tr className="border-t font-semibold">
-                                            <td
-                                                colSpan={4}
-                                                className="px-4 py-2 text-right text-xs"
-                                            >
-                                                Total (NZD)
-                                            </td>
-                                            <td className="px-4 py-2 text-right text-xs tabular-nums">
-                                                {formatMoney(quote.total)}
-                                            </td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Notes & Terms */}
-                {(quote.notes || quote.terms) && (
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
-                        {quote.notes && (
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium">
-                                        Notes
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-xs whitespace-pre-wrap">
-                                        {quote.notes}
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        )}
-                        {quote.terms && (
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium">
-                                        Terms & Conditions
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-xs whitespace-pre-wrap">
-                                        {quote.terms}
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        )}
+                                <Separator />
+                                <div className="flex justify-between text-base font-bold">
+                                    <span>Total (NZD)</span>
+                                    <span className="tabular-nums">
+                                        {formatMoney(quote.total_amount)}
+                                    </span>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
-                )}
-            </PageShell>
+
+                    <ListCaption
+                        title="Line items"
+                        caption={`${quote.line_items.length} ${
+                            quote.line_items.length === 1 ? 'line' : 'lines'
+                        }`}
+                    />
+                    <EntityTable
+                        rows={quote.line_items}
+                        rowKey={(line) => line.id}
+                        identityLabel="Description"
+                        identity={(line) => ({
+                            icon: FileText,
+                            name: line.description,
+                            subline: line.unit
+                                ? `Priced per ${line.unit}`
+                                : undefined,
+                        })}
+                        actionsFor={() => []}
+                        minWidth={820}
+                        columns={[
+                            {
+                                key: 'quantity',
+                                label: 'Qty',
+                                width: '0.5fr',
+                                align: 'right',
+                                cell: (line) => Number(line.quantity).toFixed(2),
+                            },
+                            {
+                                key: 'unit_price',
+                                label: 'Unit price',
+                                width: '0.8fr',
+                                align: 'right',
+                                cell: (line) => formatMoney(line.unit_price),
+                            },
+                            {
+                                key: 'amount',
+                                label: 'Amount',
+                                width: '0.8fr',
+                                align: 'right',
+                                cell: (line) => (
+                                    <span className="font-medium tabular-nums">
+                                        {formatMoney(line.amount)}
+                                    </span>
+                                ),
+                            },
+                        ]}
+                    />
+
+                    {(quote.notes || quote.terms) && (
+                        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                            {quote.notes && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base">
+                                            Notes
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                                            {quote.notes}
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            )}
+                            {quote.terms && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base">
+                                            Terms and conditions
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                                            {quote.terms}
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </PageLayout>
+
+            <ConfirmDialog
+                variant="default"
+                open={pending !== null}
+                onClose={() => setPending(null)}
+                title={pending ? ACTION_COPY[pending].title : ''}
+                description={pending ? ACTION_COPY[pending].description : ''}
+                confirmText={pending ? ACTION_COPY[pending].confirmText : ''}
+                processing={processing}
+                onConfirm={() => pending && runAction(pending)}
+            />
+
+            {canManage && quote.status === 'draft' && editOpen && (
+                <QuoteDialog
+                    open
+                    onClose={() => setEditOpen(false)}
+                    clients={clients}
+                    priceBooks={priceBooks}
+                    quote={{
+                        id: quote.id,
+                        client_id: quote.client_id,
+                        title: quote.title,
+                        valid_until: quote.valid_until,
+                        notes: quote.notes,
+                        lines: quote.line_items.map((line) => ({
+                            description: line.description,
+                            quantity: line.quantity,
+                            unit_price: line.unit_price,
+                        })),
+                    }}
+                />
+            )}
         </AppLayout>
     );
 }

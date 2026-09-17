@@ -1,4 +1,3 @@
-import { TaxTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -178,7 +177,6 @@ export default function ConsolidationIndex({ groups }: PageProps) {
                             { label: 'Total entities', value: totalEntities },
                         ]}
                         actions={<CreateGroupDialog />}
-                        footer={<TaxTabsFooter active="consolidation" />}
                     />
                 }
             >

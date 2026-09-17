@@ -41,7 +41,7 @@ class PostSiteUtilitiesJob implements ShouldQueue
     public function handle(FinancialEventService $service): void
     {
         $period = $this->periodMonth
-            ? Carbon::parse($this->periodMonth . '-01')
+            ? Carbon::parse($this->periodMonth.'-01')
             : Carbon::now()->subMonthNoOverflow()->startOfMonth();
 
         $periodStr = $period->format('Y-m');
@@ -122,9 +122,9 @@ class PostSiteUtilitiesJob implements ShouldQueue
             'source_type' => SiteUtility::class,
             'source_id' => $utility->id,
             'event_type' => 'site_utilities_expense',
-            'description' => ucfirst($utility->type) . ": {$site->name} — {$periodStr}"
-                . ($utility->provider ? " ({$utility->provider})" : '')
-                . " {$label}",
+            'description' => ucfirst($utility->type).": {$site->name} — {$periodStr}"
+                .($utility->provider ? " ({$utility->provider})" : '')
+                ." {$label}",
             'amount' => $amount,
             'event_date' => $eventDate,
             'debit_account_code' => $accountConfig['debit'],
@@ -196,8 +196,8 @@ class PostSiteUtilitiesJob implements ShouldQueue
             'source_type' => SiteUtility::class,
             'source_id' => $utility->id,
             'event_type' => 'site_utilities_true_up',
-            'description' => ucfirst($utility->type) . ": {$site->name} — {$periodStr}"
-                . " [true-up: estimate \${$estimateAmount} → actual \${$actualAmount}, delta \${$delta}]",
+            'description' => ucfirst($utility->type).": {$site->name} — {$periodStr}"
+                ." [true-up: estimate \${$estimateAmount} → actual \${$actualAmount}, delta \${$delta}]",
             'amount' => $absDelta,
             'event_date' => $eventDate,
             'debit_account_code' => $debitCode,

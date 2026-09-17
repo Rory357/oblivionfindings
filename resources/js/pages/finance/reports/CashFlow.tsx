@@ -1,10 +1,19 @@
-import { ReportsTabsFooter } from '@/components/finance';
 import { chartColor } from '@/components/finance/chart-palette';
+import { FinancePeriodFilter } from '@/components/finance/finance-period-filter';
 import { formatMoney } from '@/components/finance/money';
-import { PageHero, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import {
+    FinanceReportPage,
+    ReportCard,
+    formatReportDate,
+    reportRangeLabel,
+} from '@/components/finance/report-page';
+import {
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDelta,
+} from '@/components/page';
 import {
     Table,
     TableBody,
@@ -13,18 +22,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import AppLayout from '@/layouts/app-layout';
-import { PageProps, type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import {
-    Activity,
-    ArrowDownCircle,
-    ArrowUpCircle,
-    Printer,
-    TrendingUp,
-    Wallet,
-} from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { PageProps } from '@/types';
+import { router } from '@inertiajs/react';
+import { Printer, Wallet } from 'lucide-react';
+import { useMemo } from 'react';
 import {
     Bar,
     BarChart,
@@ -60,18 +61,10 @@ interface Props extends PageProps {
     filters: { start_date: string; end_date: string };
 }
 
-const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('en-NZ', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-    });
+const URL = '/finance/reports/cash-flow';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance' },
-    { title: 'Reports' },
-    { title: 'Cash Flow' },
-];
+const POSITIVE_COLOUR = chartColor(0);
+const NEGATIVE_COLOUR = chartColor(3);
 
 function CashFlowSection({
     title,
@@ -93,7 +86,7 @@ function CashFlowSection({
                 <TableRow key={`${title}-${idx}`}>
                     <TableCell className="pl-8">{entry.account_name}</TableCell>
                     <TableCell
-                        className={`text-right ${entry.amount < 0 ? 'text-status-critical dark:text-status-critical' : ''}`}
+                        className={`text-right tabular-nums ${entry.amount < 0 ? 'text-status-critical' : ''}`}
                     >
                         {formatMoney(entry.amount)}
                     </TableCell>
@@ -110,9 +103,9 @@ function CashFlowSection({
                 </TableRow>
             )}
             <TableRow className="border-t font-semibold">
-                <TableCell>Net {title}</TableCell>
+                <TableCell>Net {title.toLowerCase()}</TableCell>
                 <TableCell
-                    className={`text-right ${total < 0 ? 'text-status-critical dark:text-status-critical' : ''}`}
+                    className={`text-right tabular-nums ${total < 0 ? 'text-status-critical' : ''}`}
                 >
                     {formatMoney(total)}
                 </TableCell>
@@ -122,17 +115,6 @@ function CashFlowSection({
 }
 
 export default function CashFlow({ report, filters }: Props) {
-    const [startDate, setStartDate] = useState(filters.start_date);
-    const [endDate, setEndDate] = useState(filters.end_date);
-
-    const applyFilter = () => {
-        router.get(
-            '/finance/reports/cash-flow',
-            { start_date: startDate, end_date: endDate },
-            { preserveState: true },
-        );
-    };
-
     const barData = useMemo(
         () => [
             { name: 'Operating', amount: report.total_operating },
@@ -148,391 +130,235 @@ export default function CashFlow({ report, filters }: Props) {
 
     const cashCompareData = useMemo(
         () => [
-            { name: 'Opening Cash', amount: report.opening_cash },
-            { name: 'Closing Cash', amount: report.closing_cash },
+            { name: 'Opening cash', amount: report.opening_cash },
+            { name: 'Closing cash', amount: report.closing_cash },
         ],
         [report.opening_cash, report.closing_cash],
     );
 
-    return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Cash Flow Statement" />
+    const cashUp = report.net_cash_change >= 0;
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Activity}
-                        title="Cash Flow Statement"
-                        description="Cash inflows and outflows across operating, investing, and financing activities."
-                        stats={[
-                            {
-                                label: 'Operating',
-                                value: formatMoney(report.total_operating),
-                            },
-                            {
-                                label: 'Investing',
-                                value: formatMoney(report.total_investing),
-                            },
-                            {
-                                label: 'Financing',
-                                value: formatMoney(report.total_financing),
-                            },
-                            {
-                                label: 'Net Change',
-                                value: formatMoney(report.net_cash_change),
-                            },
-                        ]}
-                        actions={
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.print()}
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Printer className="mr-1 h-4 w-4" />
-                                Print
-                            </Button>
-                        }
-                        footer={<ReportsTabsFooter active="cash-flow" />}
-                    />
-                }
+    const meters = (
+        <>
+            <PageHeaderMeterBlock
+                label="Operating"
+                tone={report.total_operating >= 0 ? 'success' : 'critical'}
+                href="/finance/reports/profit-loss"
+                ariaLabel="View the profit and loss statement"
             >
-                {/* KPI Summary Cards */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div
-                                className={`rounded-full p-3 ${
-                                    report.total_operating >= 0
-                                        ? 'bg-status-success-bg'
-                                        : 'bg-status-critical-bg'
-                                }`}
-                            >
-                                <ArrowUpCircle
-                                    className={`h-5 w-5 ${
-                                        report.total_operating >= 0
-                                            ? 'text-status-success dark:text-status-success'
-                                            : 'text-status-critical dark:text-status-critical'
-                                    }`}
-                                />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Operating
-                                </p>
-                                <p
-                                    className={`text-2xl font-bold ${
-                                        report.total_operating >= 0
-                                            ? 'text-status-success dark:text-status-success'
-                                            : 'text-status-critical dark:text-status-critical'
-                                    }`}
-                                >
-                                    {formatMoney(report.total_operating)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div
-                                className={`rounded-full p-3 ${
-                                    report.total_investing >= 0
-                                        ? 'bg-status-success-bg'
-                                        : 'bg-status-critical-bg'
-                                }`}
-                            >
-                                <ArrowDownCircle
-                                    className={`h-5 w-5 ${
-                                        report.total_investing >= 0
-                                            ? 'text-status-success dark:text-status-success'
-                                            : 'text-status-critical dark:text-status-critical'
-                                    }`}
-                                />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Investing
-                                </p>
-                                <p
-                                    className={`text-2xl font-bold ${
-                                        report.total_investing >= 0
-                                            ? 'text-status-success dark:text-status-success'
-                                            : 'text-status-critical dark:text-status-critical'
-                                    }`}
-                                >
-                                    {formatMoney(report.total_investing)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div
-                                className={`rounded-full p-3 ${
-                                    report.total_financing >= 0
-                                        ? 'bg-status-success-bg'
-                                        : 'bg-status-critical-bg'
-                                }`}
-                            >
-                                <TrendingUp
-                                    className={`h-5 w-5 ${
-                                        report.total_financing >= 0
-                                            ? 'text-status-success dark:text-status-success'
-                                            : 'text-status-critical dark:text-status-critical'
-                                    }`}
-                                />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Financing
-                                </p>
-                                <p
-                                    className={`text-2xl font-bold ${
-                                        report.total_financing >= 0
-                                            ? 'text-status-success dark:text-status-success'
-                                            : 'text-status-critical dark:text-status-critical'
-                                    }`}
-                                >
-                                    {formatMoney(report.total_financing)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div
-                                className={`rounded-full p-3 ${
-                                    report.net_cash_change >= 0
-                                        ? 'bg-status-success-bg'
-                                        : 'bg-status-critical-bg'
-                                }`}
-                            >
-                                <Wallet
-                                    className={`h-5 w-5 ${
-                                        report.net_cash_change >= 0
-                                            ? 'text-status-success dark:text-status-success'
-                                            : 'text-status-critical dark:text-status-critical'
-                                    }`}
-                                />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Net Cash Change
-                                </p>
-                                <p
-                                    className={`text-2xl font-bold ${
-                                        report.net_cash_change >= 0
-                                            ? 'text-status-success dark:text-status-success'
-                                            : 'text-status-critical dark:text-status-critical'
-                                    }`}
-                                >
-                                    {formatMoney(report.net_cash_change)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                <PageHeaderMeterBig>
+                    {formatMoney(report.total_operating)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {report.operating.length} accounts
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Investing"
+                href="/finance/fixed-assets"
+                ariaLabel="View fixed assets"
+            >
+                <PageHeaderMeterBig>
+                    {formatMoney(report.total_investing)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {report.investing.length} accounts
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Financing"
+                href="/finance/bank-accounts"
+                ariaLabel="View bank accounts"
+            >
+                <PageHeaderMeterBig>
+                    {formatMoney(report.total_financing)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {report.financing.length} accounts
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Net change"
+                tone={cashUp ? 'success' : 'critical'}
+                href="/finance/bank-transactions"
+                ariaLabel="View bank transactions"
+            >
+                <PageHeaderMeterBig>
+                    {formatMoney(report.net_cash_change)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterDelta trend={cashUp ? 'up' : 'down'} good={cashUp}>
+                    {cashUp ? 'Cash up on the period' : 'Cash down on the period'}
+                </PageHeaderMeterDelta>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Closing cash"
+                href="/finance/cash-position"
+                ariaLabel="View the cash position"
+            >
+                <PageHeaderMeterBig>
+                    {formatMoney(report.closing_cash)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    Opened at {formatMoney(report.opening_cash)}
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+        </>
+    );
 
-                {/* Filter */}
-                <Card>
-                    <CardContent className="flex items-end gap-4 pt-6">
-                        <div>
-                            <label className="mb-1 block text-sm font-medium">
-                                Start Date
-                            </label>
-                            <Input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="w-48"
-                            />
-                        </div>
-                        <div>
-                            <label className="mb-1 block text-sm font-medium">
-                                End Date
-                            </label>
-                            <Input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="w-48"
-                            />
-                        </div>
-                        <Button onClick={applyFilter}>Generate</Button>
-                    </CardContent>
-                </Card>
-
-                {/* Charts Row */}
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    {/* Activity Bar Chart */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Cash Flow by Activity
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={barData}
-                                        margin={{
-                                            top: 5,
-                                            right: 20,
-                                            bottom: 5,
-                                            left: 20,
-                                        }}
-                                    >
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="name" />
-                                        <YAxis
-                                            tickFormatter={(v) =>
-                                                formatMoney(v)
+    return (
+        <FinanceReportPage
+            icon={Wallet}
+            title="Cash flow"
+            headTitle="Cash flow statement"
+            periodLabel={reportRangeLabel(filters.start_date, filters.end_date)}
+            subline="Cash in and out across operating, investing and financing activities"
+            actions={
+                <PageHeaderGlassButton
+                    icon={Printer}
+                    onClick={() => window.print()}
+                >
+                    Print
+                </PageHeaderGlassButton>
+            }
+            meters={meters}
+            filters={
+                <FinancePeriodFilter
+                    url={URL}
+                    from={filters.start_date}
+                    to={filters.end_date}
+                    idPrefix="cash-flow-period"
+                    onApply={({ from, to }) =>
+                        router.get(
+                            URL,
+                            { start_date: from, end_date: to },
+                            { preserveScroll: true },
+                        )
+                    }
+                />
+            }
+        >
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <ReportCard title="Cash flow by activity" scroll={false}>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={barData}
+                                margin={{
+                                    top: 5,
+                                    right: 20,
+                                    bottom: 5,
+                                    left: 20,
+                                }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis tickFormatter={(v) => formatMoney(v)} />
+                                <Tooltip
+                                    formatter={(value?: number) => [
+                                        formatMoney(value ?? 0),
+                                        'Amount',
+                                    ]}
+                                />
+                                <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                                    {barData.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={
+                                                entry.amount >= 0
+                                                    ? POSITIVE_COLOUR
+                                                    : NEGATIVE_COLOUR
                                             }
                                         />
-                                        <Tooltip
-                                            formatter={(value?: number) => [
-                                                formatMoney(value ?? 0),
-                                                'Amount',
-                                            ]}
-                                        />
-                                        <Bar
-                                            dataKey="amount"
-                                            radius={[4, 4, 0, 0]}
-                                        >
-                                            {barData.map((entry, index) => (
-                                                <Cell
-                                                    key={`cell-${index}`}
-                                                    fill={
-                                                        entry.amount >= 0
-                                                            ? 'var(--status-success)'
-                                                            : 'var(--status-critical)'
-                                                    }
-                                                />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </ReportCard>
 
-                    {/* Opening vs Closing Cash */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Opening vs Closing Cash
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={cashCompareData}
-                                        margin={{
-                                            top: 5,
-                                            right: 20,
-                                            bottom: 5,
-                                            left: 20,
-                                        }}
-                                    >
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="name" />
-                                        <YAxis
-                                            tickFormatter={(v) =>
-                                                formatMoney(v)
-                                            }
-                                        />
-                                        <Tooltip
-                                            formatter={(value?: number) => [
-                                                formatMoney(value ?? 0),
-                                                'Cash',
-                                            ]}
-                                        />
-                                        <Bar
-                                            dataKey="amount"
-                                            radius={[4, 4, 0, 0]}
-                                        >
-                                            <Cell fill={chartColor(0)} />
-                                            <Cell fill={chartColor(1)} />
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Existing Table */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>
-                            Cash Flow: {formatDate(report.start_date)} to{' '}
-                            {formatDate(report.end_date)}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">
-                                        Amount
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {/* Opening Cash */}
-                                <TableRow className="font-semibold">
-                                    <TableCell>Opening Cash Balance</TableCell>
-                                    <TableCell className="text-right">
-                                        {formatMoney(report.opening_cash)}
-                                    </TableCell>
-                                </TableRow>
-
-                                <CashFlowSection
-                                    title="Operating Activities"
-                                    entries={report.operating}
-                                    total={report.total_operating}
+                <ReportCard title="Opening vs closing cash" scroll={false}>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={cashCompareData}
+                                margin={{
+                                    top: 5,
+                                    right: 20,
+                                    bottom: 5,
+                                    left: 20,
+                                }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis tickFormatter={(v) => formatMoney(v)} />
+                                <Tooltip
+                                    formatter={(value?: number) => [
+                                        formatMoney(value ?? 0),
+                                        'Cash',
+                                    ]}
                                 />
-                                <CashFlowSection
-                                    title="Investing Activities"
-                                    entries={report.investing}
-                                    total={report.total_investing}
-                                />
-                                <CashFlowSection
-                                    title="Financing Activities"
-                                    entries={report.financing}
-                                    total={report.total_financing}
-                                />
+                                <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                                    <Cell fill={chartColor(0)} />
+                                    <Cell fill={chartColor(1)} />
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </ReportCard>
+            </div>
 
-                                {/* Net Cash Change */}
-                                <TableRow className="border-t-2 text-lg font-bold">
-                                    <TableCell>Net Cash Change</TableCell>
-                                    <TableCell
-                                        className={`text-right ${
-                                            report.net_cash_change >= 0
-                                                ? 'text-status-success dark:text-status-success'
-                                                : 'text-status-critical dark:text-status-critical'
-                                        }`}
-                                    >
-                                        {formatMoney(report.net_cash_change)}
-                                    </TableCell>
-                                </TableRow>
+            <ReportCard
+                title={`Cash flow: ${formatReportDate(report.start_date)} to ${formatReportDate(report.end_date)}`}
+            >
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Description</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow className="font-semibold">
+                            <TableCell>Opening cash balance</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                                {formatMoney(report.opening_cash)}
+                            </TableCell>
+                        </TableRow>
 
-                                {/* Closing Cash */}
-                                <TableRow className="text-lg font-bold">
-                                    <TableCell>Closing Cash Balance</TableCell>
-                                    <TableCell className="text-right">
-                                        {formatMoney(report.closing_cash)}
-                                    </TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            </PageLayout>
-        </AppLayout>
+                        <CashFlowSection
+                            title="Operating activities"
+                            entries={report.operating}
+                            total={report.total_operating}
+                        />
+                        <CashFlowSection
+                            title="Investing activities"
+                            entries={report.investing}
+                            total={report.total_investing}
+                        />
+                        <CashFlowSection
+                            title="Financing activities"
+                            entries={report.financing}
+                            total={report.total_financing}
+                        />
+
+                        <TableRow className="border-t-2 font-bold">
+                            <TableCell>Net cash change</TableCell>
+                            <TableCell
+                                className={`text-right tabular-nums ${cashUp ? 'text-status-success' : 'text-status-critical'}`}
+                            >
+                                {formatMoney(report.net_cash_change)}
+                            </TableCell>
+                        </TableRow>
+
+                        <TableRow className="font-bold">
+                            <TableCell>Closing cash balance</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                                {formatMoney(report.closing_cash)}
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </ReportCard>
+        </FinanceReportPage>
     );
 }

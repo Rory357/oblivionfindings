@@ -1,5 +1,14 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import { GovernanceSectionRail } from '@/components/governance/GovernanceSectionRail';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDelta,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import {
     Card,
     CardContent,
@@ -7,11 +16,35 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
+import { formatDateLong, formatDateOnly } from '@/lib/datetime';
 import { PageProps } from '@/types';
 import { Head } from '@inertiajs/react';
-import { AlertCircle, AlertTriangle, Shield, TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    LabelList,
+    Legend,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+
+import { RiskViewToggle, riskLevelVariant } from './_shared';
 
 interface Snapshot {
     id: number;
@@ -23,345 +56,397 @@ interface Snapshot {
         low: number;
         above_appetite: number;
     };
-    by_category: Record<string, { count: number; avg_score: number }>;
+    by_category: Array<{
+        category: string;
+        label: string;
+        count: number;
+        avg_score: number;
+    }>;
 }
 
 interface Props extends PageProps {
     snapshots: Snapshot[];
+    nextSnapshotOn: string;
 }
 
-const severityColor = (level: string) => {
-    switch (level) {
-        case 'critical':
-            return 'bg-status-critical text-white';
-        case 'high':
-            return 'bg-status-warning text-white';
-        case 'medium':
-            return 'bg-status-warning text-black';
-        case 'low':
-            return 'bg-status-success text-white';
-        default:
-            return 'bg-muted-foreground/80 text-white';
-    }
+type SummaryKey = keyof Snapshot['summary'];
+
+const RANGE_OPTIONS = [
+    { value: '12', label: 'Last 12 months' },
+    { value: '6', label: 'Last 6 months' },
+    { value: '3', label: 'Last 3 months' },
+];
+
+/** Semantic tokens only (DESIGN.md) — safety colours never retint. */
+const TOKEN = {
+    critical: 'var(--status-critical)',
+    high: 'var(--status-warning)',
+    grid: 'var(--border)',
+    axis: 'var(--muted-foreground)',
+    label: 'var(--foreground)',
+    halo: 'var(--card)',
 };
 
-export default function RiskTrends({ auth, snapshots }: Props) {
-    const latest = snapshots[0] ?? null;
-    const displaySnapshots = snapshots.slice(0, 12);
+function monthOf(date: string): string {
+    const [year, month] = date.slice(0, 10).split('-').map(Number);
+    if (!year || !month) return date;
+    return new Date(Date.UTC(year, month - 1, 15)).toLocaleDateString('en-NZ', {
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC',
+    });
+}
 
-    const maxCritHigh = Math.max(
-        ...displaySnapshots.map((s) => s.summary.critical + s.summary.high),
-        1,
+function scrollTo(id: string) {
+    document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ChartTooltip({ active, payload, label }: any) {
+    if (!active || !payload?.length) return null;
+    return (
+        // eslint-disable-next-line no-restricted-syntax -- chart tooltip popover, not a content card
+        <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg">
+            <p className="mb-1 font-semibold text-foreground">{label}</p>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {payload.map((p: any) => (
+                <p key={p.name} className="flex items-center gap-1.5 text-muted-foreground">
+                    <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ backgroundColor: p.fill }}
+                    />
+                    {p.name}
+                    <span className="ml-auto pl-3 font-semibold text-foreground tabular-nums">
+                        {p.value}
+                    </span>
+                </p>
+            ))}
+        </div>
     );
+}
 
-    const formatDate = (d: string) =>
-        new Date(d).toLocaleDateString('en-NZ', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-        });
+export default function RiskTrends({ snapshots, nextSnapshotOn }: Props) {
+    const [range, setRange] = useState('12');
+    const latest = snapshots[0] ?? null;
+    const previous = snapshots[1] ?? null;
+    const displaySnapshots = snapshots.slice(0, Number(range));
+    const chartData = displaySnapshots
+        .slice()
+        .reverse()
+        .map((snap) => ({
+            month: monthOf(snap.snapshot_date),
+            critical: snap.summary.critical,
+            high: snap.summary.high,
+        }));
+
+    /** Latest value + movement since the previous month's record. */
+    const meter = (
+        key: SummaryKey,
+        label: string,
+        href: string,
+        tone: 'critical' | 'warning' | 'success' | 'brand',
+    ): ReactNode => {
+        if (!latest) return null;
+        const value = latest.summary[key] ?? 0;
+        const change = previous ? value - (previous.summary[key] ?? 0) : 0;
+        return (
+            <PageHeaderMeterBlock
+                label={label}
+                ariaLabel={`View ${label.toLowerCase()} risks on the register now`}
+                href={href}
+                tone={value > 0 ? tone : 'brand'}
+            >
+                <PageHeaderMeterBig>{value}</PageHeaderMeterBig>
+                {previous && change !== 0 ? (
+                    <PageHeaderMeterDelta
+                        trend={change > 0 ? 'up' : 'down'}
+                        good={key === 'low' ? change > 0 : change < 0}
+                    >
+                        {Math.abs(change)} since {monthOf(previous.snapshot_date)}
+                    </PageHeaderMeterDelta>
+                ) : (
+                    <PageHeaderMeterCaption>
+                        on {formatDateOnly(latest.snapshot_date)}
+                    </PageHeaderMeterCaption>
+                )}
+            </PageHeaderMeterBlock>
+        );
+    };
+
+    const header = (
+        <PageHeader
+            icon={TrendingUp}
+            title="Risk trends"
+            titleChip={
+                latest ? (
+                    <PageHeaderStatusChip variant="info">
+                        Last recorded {formatDateOnly(latest.snapshot_date)}
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="neutral">
+                        No monthly records yet
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={`How the register changes month by month · recorded on the 1st of each month · ${snapshots.length} ${snapshots.length === 1 ? 'record' : 'records'}`}
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Monthly records"
+                        ariaLabel="View the month-by-month table"
+                        onClick={() => scrollTo('risk-trend-table')}
+                    >
+                        <PageHeaderMeterBig>{snapshots.length}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            next on {formatDateOnly(nextSnapshotOn)}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {meter('critical', 'Critical', '/governance/risks?severity=critical', 'critical')}
+                    {meter('high', 'High', '/governance/risks?severity=high', 'warning')}
+                    {meter('medium', 'Medium', '/governance/risks?severity=medium', 'warning')}
+                    {meter('low', 'Low', '/governance/risks?severity=low', 'success')}
+                    {meter(
+                        'above_appetite',
+                        "Above the board's limit",
+                        '/governance/risks?above_appetite=1',
+                        'critical',
+                    )}
+                </>
+            }
+            filters={
+                <>
+                    <RiskViewToggle value="trends" />
+                    <PageHeaderFilterSelect
+                        label="Last 12 months"
+                        value={range}
+                        allValue="12"
+                        options={RANGE_OPTIONS}
+                        onChange={setRange}
+                    />
+                </>
+            }
+            rail={<GovernanceSectionRail />}
+        />
+    );
 
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Risks', href: '/governance/risks' },
+                { title: 'Risk register', href: '/governance/risks' },
                 { title: 'Trends', href: '/governance/risks/trends' },
             ]}
         >
-            <Head title="Risk Trends" />
+            <Head title="Risk trends" />
 
-            <PageLayout
-                hero={
-                    <PageHero
+            <PageLayout hero={header}>
+                {snapshots.length === 0 ? (
+                    <EmptyState
                         icon={TrendingUp}
-                        title="Risk Trends"
-                        description="Historical risk snapshot analysis."
-                        stats={[
-                            { label: 'Snapshots', value: snapshots.length },
-                            {
-                                label: 'Critical',
-                                value: latest?.summary.critical ?? 0,
-                            },
-                            { label: 'High', value: latest?.summary.high ?? 0 },
-                            {
-                                label: 'Above Appetite',
-                                value: latest?.summary.above_appetite ?? 0,
-                            },
-                        ]}
+                        title="No monthly records yet"
+                        description={`Monthly risk records start on ${formatDateLong(nextSnapshotOn)}. From then, this page shows how the number of critical and high risks changes each month.`}
                     />
-                }
-            >
-                {/* Current Summary */}
-                {latest && (
-                    <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-5">
-                        <Card className="border-status-critical/30">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-status-critical">
-                                            Critical
-                                        </p>
-                                        <p className="text-3xl font-bold text-status-critical">
-                                            {latest.summary.critical}
-                                        </p>
-                                    </div>
-                                    <AlertTriangle className="h-8 w-8 text-status-critical" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-status-warning/30">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-status-warning">
-                                            High
-                                        </p>
-                                        <p className="text-3xl font-bold text-status-warning">
-                                            {latest.summary.high}
-                                        </p>
-                                    </div>
-                                    <AlertCircle className="h-8 w-8 text-status-warning" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-status-warning/30">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-status-warning">
-                                            Medium
-                                        </p>
-                                        <p className="text-3xl font-bold text-status-warning">
-                                            {latest.summary.medium}
-                                        </p>
-                                    </div>
-                                    <Shield className="h-8 w-8 text-status-warning" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-status-success/30">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-status-success">
-                                            Low
-                                        </p>
-                                        <p className="text-3xl font-bold text-status-success">
-                                            {latest.summary.low}
-                                        </p>
-                                    </div>
-                                    <Shield className="h-8 w-8 text-status-success" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-primary">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-primary">
-                                            Above Appetite
-                                        </p>
-                                        <p className="text-3xl font-bold text-primary">
-                                            {latest.summary.above_appetite}
-                                        </p>
-                                    </div>
-                                    <TrendingUp className="h-8 w-8 text-primary" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-
-                {/* Historical Trend Bar Chart */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle>Critical + High Risk Trend</CardTitle>
-                        <CardDescription>
-                            Count of critical and high risks per snapshot
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex h-40 items-end gap-2">
-                            {displaySnapshots
-                                .slice()
-                                .reverse()
-                                .map((snap) => {
-                                    const total =
-                                        snap.summary.critical +
-                                        snap.summary.high;
-                                    const pct = (total / maxCritHigh) * 100;
-                                    return (
-                                        <div
-                                            key={snap.id}
-                                            className="group relative flex-1"
+                ) : (
+                    <div className="flex flex-col gap-5">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Critical and high risks each month</CardTitle>
+                                <CardDescription>
+                                    Risks on the register at each monthly record,
+                                    by their score after controls ·{' '}
+                                    {displaySnapshots.length} shown
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <figure
+                                    className="m-0"
+                                    role="group"
+                                    aria-label="Critical and high risks each month"
+                                >
+                                    <ResponsiveContainer width="100%" height={240}>
+                                        <BarChart
+                                            data={chartData}
+                                            margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
                                         >
-                                            <div className="flex flex-col items-center">
-                                                <div
-                                                    className="w-full min-w-[12px] rounded-t bg-status-critical transition-all"
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                stroke={TOKEN.grid}
+                                                vertical={false}
+                                            />
+                                            <XAxis
+                                                dataKey="month"
+                                                tick={{ fontSize: 11, fill: TOKEN.axis }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                allowDecimals={false}
+                                                tick={{ fontSize: 11, fill: TOKEN.axis }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                                width={30}
+                                            />
+                                            <Tooltip
+                                                content={<ChartTooltip />}
+                                                cursor={{ fill: 'var(--accent)', fillOpacity: 0.5 }}
+                                            />
+                                            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+                                            <Bar
+                                                dataKey="critical"
+                                                name="Critical (20–25)"
+                                                stackId="risks"
+                                                fill={TOKEN.critical}
+                                                maxBarSize={36}
+                                                isAnimationActive={false}
+                                            >
+                                                <LabelList
+                                                    dataKey="critical"
+                                                    position="center"
+                                                    formatter={(value: unknown) =>
+                                                        Number(value) > 0 ? String(value) : ''
+                                                    }
                                                     style={{
-                                                        height: `${Math.max(pct, 4)}%`,
+                                                        fontSize: 11,
+                                                        fontWeight: 700,
+                                                        fill: TOKEN.label,
+                                                        stroke: TOKEN.halo,
+                                                        strokeWidth: 3,
+                                                        paintOrder: 'stroke',
                                                     }}
                                                 />
-                                            </div>
-                                            <div className="absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 rounded bg-popover px-2 py-1 text-xs whitespace-nowrap shadow-md group-hover:block">
-                                                {formatDate(snap.snapshot_date)}
-                                                : {snap.summary.critical}C /{' '}
-                                                {snap.summary.high}H
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                        </div>
-                        {displaySnapshots.length > 0 && (
-                            <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-                                <span>
-                                    {formatDate(
-                                        displaySnapshots[
-                                            displaySnapshots.length - 1
-                                        ].snapshot_date,
-                                    )}
-                                </span>
-                                <span>
-                                    {formatDate(
-                                        displaySnapshots[0].snapshot_date,
-                                    )}
-                                </span>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* By Category Breakdown */}
-                {latest && Object.keys(latest.by_category).length > 0 && (
-                    <Card className="mb-6">
-                        <CardHeader>
-                            <CardTitle>Risk by Category</CardTitle>
-                            <CardDescription>
-                                Latest snapshot breakdown
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <table className="w-full text-sm">
-                                <thead className="border-b bg-muted/50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left font-medium">
-                                            Category
-                                        </th>
-                                        <th className="px-4 py-3 text-center font-medium">
-                                            Count
-                                        </th>
-                                        <th className="px-4 py-3 text-center font-medium">
-                                            Avg Score
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {Object.entries(latest.by_category).map(
-                                        ([cat, data]) => (
-                                            <tr
-                                                key={cat}
-                                                className="hover:bg-muted/30"
+                                            </Bar>
+                                            <Bar
+                                                dataKey="high"
+                                                name="High (15–19)"
+                                                stackId="risks"
+                                                fill={TOKEN.high}
+                                                radius={[3, 3, 0, 0]}
+                                                maxBarSize={36}
+                                                isAnimationActive={false}
                                             >
-                                                <td className="px-4 py-3 font-medium capitalize">
-                                                    {cat.replace(/_/g, ' ')}
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    {data.count}
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <Badge
-                                                        className={cn(
-                                                            data.avg_score >= 20
-                                                                ? severityColor(
-                                                                      'critical',
-                                                                  )
-                                                                : data.avg_score >=
-                                                                    15
-                                                                  ? severityColor(
-                                                                        'high',
-                                                                    )
-                                                                  : data.avg_score >=
-                                                                      10
-                                                                    ? severityColor(
-                                                                          'medium',
-                                                                      )
-                                                                    : severityColor(
-                                                                          'low',
-                                                                      ),
-                                                        )}
-                                                    >
-                                                        {data.avg_score.toFixed(
-                                                            1,
-                                                        )}
-                                                    </Badge>
-                                                </td>
-                                            </tr>
-                                        ),
-                                    )}
-                                </tbody>
-                            </table>
-                        </CardContent>
-                    </Card>
-                )}
+                                                <LabelList
+                                                    dataKey="high"
+                                                    position="center"
+                                                    formatter={(value: unknown) =>
+                                                        Number(value) > 0 ? String(value) : ''
+                                                    }
+                                                    style={{
+                                                        fontSize: 11,
+                                                        fontWeight: 700,
+                                                        fill: TOKEN.label,
+                                                        stroke: TOKEN.halo,
+                                                        strokeWidth: 3,
+                                                        paintOrder: 'stroke',
+                                                    }}
+                                                />
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </figure>
+                            </CardContent>
+                        </Card>
 
-                {/* Snapshot Timeline */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Snapshot Timeline</CardTitle>
-                        <CardDescription>
-                            Last {displaySnapshots.length} snapshots
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-3">
-                            {displaySnapshots.map((snap) => (
-                                <div
-                                    key={snap.id}
-                                    className="flex items-center gap-4 rounded-lg border p-3 hover:bg-muted"
-                                >
-                                    <div className="w-28 shrink-0 text-sm font-medium text-muted-foreground">
-                                        {formatDate(snap.snapshot_date)}
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        <Badge
-                                            className={severityColor(
-                                                'critical',
-                                            )}
-                                        >
-                                            {snap.summary.critical} Critical
-                                        </Badge>
-                                        <Badge
-                                            className={severityColor('high')}
-                                        >
-                                            {snap.summary.high} High
-                                        </Badge>
-                                        <Badge
-                                            className={severityColor('medium')}
-                                        >
-                                            {snap.summary.medium} Medium
-                                        </Badge>
-                                        <Badge className={severityColor('low')}>
-                                            {snap.summary.low} Low
-                                        </Badge>
-                                        {snap.summary.above_appetite > 0 && (
-                                            <Badge className="bg-primary/10 text-primary">
-                                                {snap.summary.above_appetite}{' '}
-                                                Above Appetite
-                                            </Badge>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                            {displaySnapshots.length === 0 && (
-                                <div className="py-8 text-center text-sm text-muted-foreground">
-                                    No snapshots recorded yet.
-                                </div>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                        <Card id="risk-trend-table" className="scroll-mt-5">
+                            <CardHeader>
+                                <CardTitle>Month by month</CardTitle>
+                                <CardDescription>
+                                    Risks on the register at each record, by score
+                                    after controls
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Recorded</TableHead>
+                                            <TableHead className="text-center">Critical</TableHead>
+                                            <TableHead className="text-center">High</TableHead>
+                                            <TableHead className="text-center">Medium</TableHead>
+                                            <TableHead className="text-center">Low</TableHead>
+                                            <TableHead className="text-center">
+                                                Above the board&apos;s limit
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {displaySnapshots.map((snap) => (
+                                            <TableRow key={snap.id}>
+                                                <TableCell className="font-medium">
+                                                    {formatDateLong(snap.snapshot_date)}
+                                                </TableCell>
+                                                <TableCell className="text-center tabular-nums">
+                                                    {snap.summary.critical}
+                                                </TableCell>
+                                                <TableCell className="text-center tabular-nums">
+                                                    {snap.summary.high}
+                                                </TableCell>
+                                                <TableCell className="text-center tabular-nums">
+                                                    {snap.summary.medium}
+                                                </TableCell>
+                                                <TableCell className="text-center tabular-nums">
+                                                    {snap.summary.low}
+                                                </TableCell>
+                                                <TableCell className="text-center tabular-nums">
+                                                    {snap.summary.above_appetite}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+
+                        {latest && latest.by_category.length > 0 ? (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>By kind of risk</CardTitle>
+                                    <CardDescription>
+                                        Recorded {formatDateLong(latest.snapshot_date)}
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Kind of risk</TableHead>
+                                                <TableHead className="text-center">
+                                                    Risks
+                                                </TableHead>
+                                                <TableHead className="text-center">
+                                                    Average risk after controls
+                                                </TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {latest.by_category.map((row) => (
+                                                <TableRow key={row.category}>
+                                                    <TableCell className="font-medium">
+                                                        {row.label}
+                                                    </TableCell>
+                                                    <TableCell className="text-center tabular-nums">
+                                                        {row.count}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <StatusBadge
+                                                            variant={riskLevelVariant(
+                                                                row.avg_score,
+                                                            )}
+                                                        >
+                                                            {Number(row.avg_score).toFixed(1)}
+                                                        </StatusBadge>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        ) : null}
+                    </div>
+                )}
             </PageLayout>
         </AppLayout>
     );

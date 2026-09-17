@@ -608,10 +608,12 @@ describe('Ticket workspace', () => {
                 .spyOn(router, 'reload')
                 .mockImplementation(() => {});
             render(<ItTicketShow {...props} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
             fireEvent.change(
                 screen.getByRole('textbox', { name: 'Your reply' }),
                 { target: { value: 'Retained confidential draft' } },
             );
+            fireEvent.click(screen.getByRole('button', { name: 'Close' }));
             fireEvent.click(
                 screen.getByRole('button', { name: 'Refresh delivery status' }),
             );
@@ -691,6 +693,9 @@ describe('Ticket workspace', () => {
                         },
                     } as never),
                 );
+                fireEvent.click(
+                    await screen.findByRole('button', { name: 'Continue note' }),
+                );
                 expect(
                     await screen.findByRole('textbox', { name: 'Your reply' }),
                 ).toHaveValue('Retained confidential draft');
@@ -721,9 +726,11 @@ describe('Ticket workspace', () => {
         ];
         const reload = vi.spyOn(router, 'reload').mockImplementation(() => {});
         const view = render(<ItTicketShow {...props} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
         fireEvent.change(screen.getByRole('textbox', { name: 'Your reply' }), {
             target: { value: 'Previous actor secret draft' },
         });
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
         fireEvent.click(
             screen.getByRole('button', { name: 'Refresh delivery status' }),
         );

@@ -15,6 +15,7 @@ use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventSearchIndexing;
 use App\Http\Middleware\ProtectItDraftResponses;
+use App\Http\Middleware\ProtectVendorVaultResponses;
 use App\Http\Middleware\RecordItApiRequest;
 use App\Http\Middleware\RoleScope;
 use App\Http\Middleware\TraceItTicketCreation;
@@ -51,6 +52,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(TraceItTicketCreation::class);
         $middleware->prepend(ProtectItDraftResponses::class);
+        $middleware->prepend(ProtectVendorVaultResponses::class);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->web(append: [
@@ -81,11 +83,17 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(fn (Throwable $exception, Request $request) => ProtectItDraftResponses::render($exception, $request));
         $exceptions->report(fn (Throwable $exception) => ProtectItDraftResponses::report($exception));
+        $exceptions->render(fn (Throwable $exception, Request $request) => ProtectVendorVaultResponses::render($exception, $request));
+        $exceptions->report(fn (Throwable $exception) => ProtectVendorVaultResponses::report($exception));
         $exceptions->respond(function (Response $response, Throwable $exception, Request $request): Response {
             return ItTicketRequestTrace::from($request)?->finish($response, $exception) ?? $response;
         });
 
         $exceptions->dontFlash([
+            'value',
+            'totp_secret',
+            'verification_code',
+            'rotation_evidence',
             'secret_manager_reference',
             'credential_material',
             'lease_id',

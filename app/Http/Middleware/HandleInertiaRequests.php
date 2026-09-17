@@ -188,7 +188,7 @@ class HandleInertiaRequests extends Middleware
                 ? fn () => app(FinanceHubCountsService::class)->forApplication()
                 : null,
 
-            'itNavigation' => $user && str_starts_with((string) $request->route()?->getName(), 'it.')
+            'itNavigation' => $user && (str_starts_with((string) $request->route()?->getName(), 'it.') || $request->is('vendors', 'vendors/*'))
                 ? fn () => ItModuleNavigation::forUser($user)
                 : null,
 
@@ -483,7 +483,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v7';
+    protected const PERMISSIONS_CACHE_VERSION = 'v8';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -492,11 +492,17 @@ class HandleInertiaRequests extends Middleware
      */
     protected function getUserPermissions($user): array
     {
-        return once(fn () => Cache::remember(
+        $permissions = once(fn () => Cache::remember(
             sprintf('user:%d:capabilities:%s', $user->id, self::PERMISSIONS_CACHE_VERSION),
             300,
             fn () => $this->buildUserPermissions($this->preparePermissionLookup($user)),
         ));
+        $registers = ItModuleNavigation::registerCapabilities($user);
+        $permissions['vendors']['view'] = $registers['vendors'];
+        $permissions['vendors']['contracts_view'] = $registers['contracts'];
+        $permissions['credentials']['view'] = $registers['credentials'];
+
+        return $permissions;
     }
 
     protected function preparePermissionLookup(User $user): User
@@ -1000,6 +1006,13 @@ class HandleInertiaRequests extends Middleware
                 'performance' => [
                     'view' => $user->canDo('governance.performance.view'),
                     'manage' => $user->canDo('governance.performance.manage'),
+                    // The person being reviewed (e.g. the CEO) reaches their
+                    // own review from the sidebar. Navigation only — the
+                    // review policy still authorises every page.
+                    'reviewee' => $user->canDo('governance.performance.view')
+                        && \App\Domain\Governance\Models\PerformanceReview::query()
+                            ->where('reviewee_id', $user->id)
+                            ->exists(),
                 ],
                 'strategy' => [
                     'view' => $user->canDo('governance.strategy.view'),

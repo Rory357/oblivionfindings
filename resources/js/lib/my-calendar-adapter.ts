@@ -4,6 +4,14 @@ import type { SourceDef } from '@/pages/sites/calendar/_parts';
 import type { PersonalCalendarEntry } from './personal-calendar';
 
 export const MY_CALENDAR_SOURCES: SourceDef[] = [
+    {
+        key: 'it_booking',
+        label: 'IT bookings',
+        short: 'IT bookings',
+        group: 'auto',
+        icon: 'CalendarDays',
+        origin: 'Your requested and accepted ticket bookings',
+    },
     ...(['task', 'meeting', 'appointment', 'reminder'] as const).map(
         (kind) => ({
             key: `personal_${kind}`,

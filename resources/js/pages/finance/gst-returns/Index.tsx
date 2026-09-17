@@ -1,35 +1,35 @@
+import { FinanceSectionRail, formatMoney } from '@/components/finance';
 import {
-    TaxTabsFooter,
-    formatMoney,
-    useRowContextMenu,
-    type RowCtxItem,
-} from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
+    EntityChip,
+    EntityContextMenu,
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import {
-    Calculator,
-    DollarSign,
-    Download,
-    Eye,
-    FileText,
-    Plus,
-    TrendingDown,
-    TrendingUp,
-} from 'lucide-react';
-import { useMemo } from 'react';
+import { Calculator, Download, Eye, Plus, X } from 'lucide-react';
 
 type GstReturn = {
     id: number;
@@ -52,63 +52,74 @@ type PaginatedData = {
     links: { url: string | null; label: string; active: boolean }[];
     current_page: number;
     last_page: number;
+    total: number;
+};
+
+/** Org-wide totals for the CURRENT filter — never the page in front of you. */
+type Summary = {
+    returns: number;
+    gst_collected: number;
+    gst_paid: number;
+    gst_payable: number;
+    draft: number;
+    filed: number;
 };
 
 type PageProps = {
     gstReturns: PaginatedData;
+    summary: Summary;
     filters: {
         status?: string;
         year?: string;
     };
 };
 
-const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
+const shortDate = (value: string) => formatDateOnly(value.slice(0, 10), value);
 
-const frequencyLabels: Record<string, string> = {
+const FREQUENCY_LABELS: Record<string, string> = {
     monthly: 'Monthly',
-    two_monthly: 'Two-Monthly',
-    six_monthly: 'Six-Monthly',
+    two_monthly: 'Two-monthly',
+    six_monthly: 'Six-monthly',
 };
 
-const basisLabels: Record<string, string> = {
+const BASIS_LABELS: Record<string, string> = {
     invoice: 'Invoice',
     payments: 'Payments',
     hybrid: 'Hybrid',
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance' },
-    { title: 'GST Returns', href: '/finance/gst-returns' },
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'All statuses' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'filed', label: 'Filed' },
+    { value: 'amended', label: 'Amended' },
 ];
 
-export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Finance', href: '/finance' },
+    { title: 'Tax & compliance', href: '/finance/tax' },
+    { title: 'GST returns', href: '/finance/gst-returns' },
+];
+
+export default function GstReturnsIndex({
+    gstReturns,
+    summary,
+    filters,
+}: PageProps) {
     const currentYear = new Date().getFullYear();
-    const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+    const yearOptions = [
+        { value: 'all', label: 'All years' },
+        ...Array.from({ length: 5 }, (_, i) => {
+            const year = String(currentYear - i);
+            return { value: year, label: year };
+        }),
+    ];
 
-    const kpis = useMemo(() => {
-        const data = gstReturns.data;
-        const totalCollected = data.reduce(
-            (sum, r) => sum + Number(r.total_gst_collected),
-            0,
-        );
-        const totalPaid = data.reduce(
-            (sum, r) => sum + Number(r.total_gst_paid),
-            0,
-        );
-        const totalPayable = data.reduce(
-            (sum, r) => sum + Number(r.gst_payable),
-            0,
-        );
-        const draftCount = data.filter((r) => r.status === 'draft').length;
-        return { totalCollected, totalPaid, totalPayable, draftCount };
-    }, [gstReturns.data]);
+    const status = filters.status ?? 'all';
+    const year = filters.year ?? 'all';
 
-    function applyFilter(key: string, value: string | undefined) {
+    const applyFilter = (key: string, value: string | undefined) => {
         const params: Record<string, string> = { ...filters };
         if (value && value !== 'all') {
             params[key] = value;
@@ -116,397 +127,316 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
             delete params[key];
         }
         router.get('/finance/gst-returns', params, { preserveState: true });
-    }
+    };
 
     const clearFilters = () => {
         router.get('/finance/gst-returns', {}, { preserveState: true });
     };
 
-    const hasFilters = Boolean(
-        (filters.status && filters.status !== 'all') ||
-        (filters.year && filters.year !== 'all'),
-    );
+    const hasFilters = status !== 'all' || year !== 'all';
 
-    // Right-click row menu — mirrors the row's existing navigation (Open).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (gstReturn: GstReturn): RowCtxItem[] => [
+    const exportUrl = `/finance/gst-returns/export?${new URLSearchParams(
+        Object.entries({
+            status: filters.status ?? '',
+            year: filters.year ?? '',
+        }).filter(([, v]) => v) as [string, string][],
+    ).toString()}`;
+
+    const ctx = useEntityContextMenu<GstReturn>();
+
+    const actionsFor = (gstReturn: GstReturn): MenuItem[] => [
         {
-            kind: 'item',
-            label: 'Open',
+            label: 'Open return',
             icon: Eye,
-            onSelect: () =>
-                router.visit(`/finance/gst-returns/${gstReturn.id}`),
+            onClick: () => router.visit(`/finance/gst-returns/${gstReturn.id}`),
         },
     ];
 
+    const columns: EntityTableColumn<GstReturn>[] = [
+        {
+            key: 'frequency',
+            label: 'Frequency',
+            width: '140px',
+            cell: (r) => (
+                <EntityChip>
+                    {FREQUENCY_LABELS[r.filing_frequency] ?? r.filing_frequency}
+                </EntityChip>
+            ),
+        },
+        {
+            key: 'basis',
+            label: 'Basis',
+            width: '110px',
+            cell: (r) => (
+                <span className="text-muted-foreground">
+                    {BASIS_LABELS[r.basis] ?? r.basis}
+                </span>
+            ),
+        },
+        {
+            key: 'sales',
+            label: 'Total sales',
+            width: '150px',
+            align: 'right',
+            cell: (r) => (
+                <span className="tabular-nums">
+                    {formatMoney(r.total_sales)}
+                </span>
+            ),
+        },
+        {
+            key: 'collected',
+            label: 'GST collected',
+            width: '150px',
+            align: 'right',
+            cell: (r) => (
+                <span className="tabular-nums">
+                    {formatMoney(r.total_gst_collected)}
+                </span>
+            ),
+        },
+        {
+            key: 'paid',
+            label: 'GST paid',
+            width: '140px',
+            align: 'right',
+            cell: (r) => (
+                <span className="tabular-nums">
+                    {formatMoney(r.total_gst_paid)}
+                </span>
+            ),
+        },
+        {
+            key: 'payable',
+            label: 'Net payable',
+            width: '160px',
+            align: 'right',
+            cell: (r) => {
+                const payable = Number(r.gst_payable);
+                return (
+                    <span className="font-semibold tabular-nums">
+                        {formatMoney(Math.abs(payable))}
+                        {payable < 0 ? ' refund' : ''}
+                    </span>
+                );
+            },
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '120px',
+            cell: (r) => <StatusBadge status={r.status} />,
+        },
+    ];
+
+    const netPayable = summary.gst_payable;
+
+    const header = (
+        <PageHeader
+            icon={Calculator}
+            title="GST returns"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={summary.draft > 0 ? 'warning' : 'success'}
+                >
+                    {summary.draft} draft{summary.draft === 1 ? '' : 's'}
+                </PageHeaderStatusChip>
+            }
+            subline={`Tax & compliance · ${summary.returns} return${
+                summary.returns === 1 ? '' : 's'
+            } in this view · ${summary.filed} filed with IRD`}
+            actions={
+                <>
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={() => {
+                            window.location.href = exportUrl;
+                        }}
+                    >
+                        Export CSV
+                    </PageHeaderGlassButton>
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() =>
+                            router.visit('/finance/gst-returns/prepare')
+                        }
+                    >
+                        Prepare return
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="GST collected"
+                        tone="success"
+                        href="/finance/gst-returns"
+                        ariaLabel="View every GST return"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.gst_collected)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            output tax on sales
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="GST paid"
+                        href="/finance/gst-returns"
+                        ariaLabel="View every GST return"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.gst_paid)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            input tax on purchases
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label={netPayable < 0 ? 'Net refund' : 'Net payable'}
+                        tone={netPayable < 0 ? 'success' : 'warning'}
+                        href="/finance/ird-filings"
+                        ariaLabel="View IRD filings"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(Math.abs(netPayable))}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {netPayable < 0
+                                ? 'due back from IRD'
+                                : 'owing to IRD'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Filed"
+                        tone="success"
+                        href="/finance/gst-returns?status=filed"
+                        ariaLabel="View filed GST returns"
+                    >
+                        <PageHeaderMeterDonut
+                            percent={
+                                summary.returns === 0
+                                    ? 0
+                                    : (summary.filed / summary.returns) * 100
+                            }
+                            caption={`${summary.filed} of ${summary.returns} lodged`}
+                        />
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Drafts"
+                        tone={summary.draft > 0 ? 'warning' : 'brand'}
+                        href="/finance/gst-returns?status=draft"
+                        ariaLabel="View draft GST returns"
+                    >
+                        <PageHeaderMeterBig>{summary.draft}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            waiting to be filed
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={status}
+                        allValue="all"
+                        options={STATUS_OPTIONS}
+                        onChange={(value) => applyFilter('status', value)}
+                    />
+                    <PageHeaderFilterSelect
+                        label="Year"
+                        value={year}
+                        allValue="all"
+                        options={yearOptions}
+                        onChange={(value) => applyFilter('year', value)}
+                    />
+                    {hasFilters ? (
+                        <PageHeaderFilterButton icon={X} onClick={clearFilters}>
+                            Clear filters
+                        </PageHeaderFilterButton>
+                    ) : null}
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="GST Returns" />
+            <Head title="GST returns" />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={Calculator}
-                        title="GST Returns"
-                        description="Manage and file GST returns with IRD"
-                        stats={[
-                            {
-                                label: 'GST collected',
-                                value: formatMoney(kpis.totalCollected),
-                            },
-                            {
-                                label: 'GST paid',
-                                value: formatMoney(kpis.totalPaid),
-                            },
-                            {
-                                label: 'Net payable',
-                                value: formatMoney(Math.abs(kpis.totalPayable)),
-                            },
-                            { label: 'Drafts', value: kpis.draftCount },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button size="sm" variant="outline" asChild>
-                                    <a
-                                        href={`/finance/gst-returns/export?${new URLSearchParams(Object.entries({ status: filters.status ?? '', year: filters.year ?? '' }).filter(([, v]) => v)).toString()}`}
-                                    >
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Export CSV
-                                    </a>
-                                </Button>
-                                <Link href={'/finance/gst-returns/prepare'}>
-                                    <Button size="sm">
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Prepare Return
-                                    </Button>
-                                </Link>
-                            </div>
-                        }
-                        footer={<TaxTabsFooter active="gst-returns" />}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Returns"
+                        caption={`${gstReturns.data.length} of ${summary.returns} shown`}
                     />
-                }
-            >
-                {/* KPI Summary Cards */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-success p-2">
-                                    <TrendingUp className="h-5 w-5 text-status-success" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        GST Collected
-                                    </p>
-                                    <p className="font-mono text-xl font-bold tabular-nums">
-                                        {formatMoney(kpis.totalCollected)}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-info p-2">
-                                    <TrendingDown className="h-5 w-5 text-status-info" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        GST Paid
-                                    </p>
-                                    <p className="font-mono text-xl font-bold tabular-nums">
-                                        {formatMoney(kpis.totalPaid)}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-warning p-2">
-                                    <DollarSign className="h-5 w-5 text-status-warning" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Net Payable
-                                    </p>
-                                    <p
-                                        className={`font-mono text-xl font-bold tabular-nums ${kpis.totalPayable < 0 ? 'text-status-success' : ''}`}
-                                    >
-                                        {formatMoney(
-                                            Math.abs(kpis.totalPayable),
-                                        )}
-                                        {kpis.totalPayable < 0
-                                            ? ' (Refund)'
-                                            : ''}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-muted-foreground/10 p-2">
-                                    <FileText className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Draft Returns
-                                    </p>
-                                    <p className="text-xl font-bold">
-                                        {kpis.draftCount}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+
+                    {gstReturns.data.length === 0 ? (
+                        hasFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                title="No GST returns match your filters"
+                            />
+                        ) : (
+                            <EmptyList
+                                icon={Calculator}
+                                itemName="GST return"
+                                title="No GST returns yet"
+                                description="Prepare your first return to get started."
+                                action={
+                                    <Button size="sm" asChild>
+                                        <Link href="/finance/gst-returns/prepare">
+                                            Prepare return
+                                        </Link>
+                                    </Button>
+                                }
+                            />
+                        )
+                    ) : (
+                        <>
+                            <EntityTable
+                                rows={gstReturns.data}
+                                rowKey={(r) => r.id}
+                                identityLabel="Period"
+                                minWidth={1180}
+                                identity={(r) => ({
+                                    icon: Calculator,
+                                    name: `${shortDate(r.period_start)} – ${shortDate(r.period_end)}`,
+                                    subline: `IRD period ${r.ird_period}`,
+                                })}
+                                hrefFor={(r) => `/finance/gst-returns/${r.id}`}
+                                columns={columns}
+                                actionsFor={actionsFor}
+                                onOpen={(r) =>
+                                    router.visit(`/finance/gst-returns/${r.id}`)
+                                }
+                                onRowContextMenu={(e, r) => ctx.open(e, r)}
+                            />
+                            <LaravelPagination
+                                links={gstReturns.links}
+                                lastPage={gstReturns.last_page}
+                            />
+                        </>
+                    )}
                 </div>
-
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <FileText className="h-5 w-5 text-muted-foreground" />
-                                <CardTitle>Returns</CardTitle>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Select
-                                    value={filters.status ?? 'all'}
-                                    onValueChange={(v) =>
-                                        applyFilter('status', v)
-                                    }
-                                >
-                                    <SelectTrigger
-                                        className="w-[140px]"
-                                        aria-label="Filter by status"
-                                    >
-                                        <SelectValue placeholder="Status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All Statuses
-                                        </SelectItem>
-                                        <SelectItem value="draft">
-                                            Draft
-                                        </SelectItem>
-                                        <SelectItem value="filed">
-                                            Filed
-                                        </SelectItem>
-                                        <SelectItem value="amended">
-                                            Amended
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Select
-                                    value={filters.year ?? 'all'}
-                                    onValueChange={(v) =>
-                                        applyFilter('year', v)
-                                    }
-                                >
-                                    <SelectTrigger
-                                        className="w-[120px]"
-                                        aria-label="Filter by year"
-                                    >
-                                        <SelectValue placeholder="Year" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All Years
-                                        </SelectItem>
-                                        {years.map((y) => (
-                                            <SelectItem
-                                                key={y}
-                                                value={String(y)}
-                                            >
-                                                {y}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b text-left text-muted-foreground">
-                                        <th className="pr-4 pb-3 font-medium">
-                                            Period
-                                        </th>
-                                        <th className="pr-4 pb-3 font-medium">
-                                            Frequency
-                                        </th>
-                                        <th className="pr-4 pb-3 font-medium">
-                                            Basis
-                                        </th>
-                                        <th className="pr-4 pb-3 text-right font-medium">
-                                            Total Sales
-                                        </th>
-                                        <th className="pr-4 pb-3 text-right font-medium">
-                                            GST Collected
-                                        </th>
-                                        <th className="pr-4 pb-3 text-right font-medium">
-                                            GST Paid
-                                        </th>
-                                        <th className="pr-4 pb-3 text-right font-medium">
-                                            Net Payable
-                                        </th>
-                                        <th className="pb-3 font-medium">
-                                            Status
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {gstReturns.data.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={8} className="p-0">
-                                                {hasFilters ? (
-                                                    <EmptySearch
-                                                        onClear={clearFilters}
-                                                        title="No GST returns match your filters"
-                                                        className="border-0"
-                                                    />
-                                                ) : (
-                                                    <EmptyList
-                                                        icon={Calculator}
-                                                        itemName="GST return"
-                                                        title="No GST returns yet"
-                                                        description="Prepare your first return to get started."
-                                                        className="border-0"
-                                                        action={
-                                                            <Link href="/finance/gst-returns/prepare">
-                                                                <Button size="sm">
-                                                                    New GST
-                                                                    return
-                                                                </Button>
-                                                            </Link>
-                                                        }
-                                                    />
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        gstReturns.data.map((gstReturn) => {
-                                            const payable = Number(
-                                                gstReturn.gst_payable,
-                                            );
-                                            const isRefund = payable < 0;
-
-                                            return (
-                                                <tr
-                                                    key={gstReturn.id}
-                                                    className="cursor-pointer border-b last:border-0 hover:bg-muted/50"
-                                                    onClick={() =>
-                                                        router.visit(
-                                                            `/finance/gst-returns/${gstReturn.id}`,
-                                                        )
-                                                    }
-                                                    onContextMenu={rowMenu.open(
-                                                        rowMenuItems(gstReturn),
-                                                    )}
-                                                >
-                                                    <td className="py-3 pr-4">
-                                                        <div className="font-medium">
-                                                            {formatDate(
-                                                                gstReturn.period_start,
-                                                            )}{' '}
-                                                            &ndash;{' '}
-                                                            {formatDate(
-                                                                gstReturn.period_end,
-                                                            )}
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            IRD Period:{' '}
-                                                            {
-                                                                gstReturn.ird_period
-                                                            }
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-3 pr-4">
-                                                        {frequencyLabels[
-                                                            gstReturn
-                                                                .filing_frequency
-                                                        ] ??
-                                                            gstReturn.filing_frequency}
-                                                    </td>
-                                                    <td className="py-3 pr-4">
-                                                        {basisLabels[
-                                                            gstReturn.basis
-                                                        ] ?? gstReturn.basis}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatMoney(
-                                                            gstReturn.total_sales,
-                                                        )}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatMoney(
-                                                            gstReturn.total_gst_collected,
-                                                        )}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatMoney(
-                                                            gstReturn.total_gst_paid,
-                                                        )}
-                                                    </td>
-                                                    <td
-                                                        className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${
-                                                            isRefund
-                                                                ? 'text-status-success'
-                                                                : 'text-destructive'
-                                                        }`}
-                                                    >
-                                                        {isRefund ? '(' : ''}
-                                                        {formatMoney(
-                                                            Math.abs(payable),
-                                                        )}
-                                                        {isRefund ? ')' : ''}
-                                                    </td>
-                                                    <td className="py-3">
-                                                        <StatusBadge
-                                                            status={
-                                                                gstReturn.status
-                                                            }
-                                                        />
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {gstReturns.last_page > 1 && (
-                            <div className="mt-4 flex items-center justify-center gap-1">
-                                {gstReturns.links.map((link, i) => (
-                                    <Button
-                                        key={i}
-                                        variant={
-                                            link.active ? 'default' : 'outline'
-                                        }
-                                        size="sm"
-                                        disabled={!link.url}
-                                        onClick={() =>
-                                            link.url && router.visit(link.url)
-                                        }
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {rowMenu.element}
             </PageLayout>
+
+            {ctx.ctx ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Calculator}
+                    title={`IRD period ${ctx.ctx.record.ird_period}`}
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
         </AppLayout>
     );
 }

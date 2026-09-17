@@ -1,0 +1,35 @@
+{
+  "captured_utc": "2026-09-13T06:10:54.9719933Z",
+  "files_checked": 7054,
+  "changed": [
+    "resources\\js\\pages\\Governance\\CeoReports\\Create.tsx",
+    "resources\\js\\pages\\Governance\\CeoReports\\Index.tsx",
+    "resources\\js\\pages\\Governance\\CeoReports\\Show.tsx",
+    "resources\\js\\pages\\Governance\\Clinical\\Dashboard.tsx",
+    "resources\\js\\pages\\Governance\\Clinical\\Trends.tsx",
+    "resources\\js\\pages\\Governance\\Evaluations\\Create.tsx",
+    "resources\\js\\pages\\Governance\\Evaluations\\Results.tsx",
+    "resources\\js\\pages\\Governance\\Evaluations\\Show.tsx",
+    "resources\\js\\pages\\Governance\\Interests\\Index.tsx",
+    "resources\\js\\pages\\Governance\\Performance\\Create.tsx",
+    "resources\\js\\pages\\Governance\\Performance\\Edit.tsx",
+    "resources\\js\\pages\\Governance\\Performance\\Index.tsx",
+    "resources\\js\\pages\\Governance\\Performance\\Show.tsx",
+    "resources\\js\\pages\\Governance\\Strategy\\Changes.tsx",
+    "resources\\js\\pages\\Governance\\Strategy\\Create.tsx",
+    "resources\\js\\pages\\Governance\\Strategy\\Edit.tsx",
+    "resources\\js\\pages\\Governance\\Strategy\\Index.tsx",
+    "resources\\js\\pages\\Governance\\Strategy\\Show.tsx",
+    "resources\\js\\pages\\Governance\\TeTiriti\\Index.tsx"
+  ],
+  "removed": [],
+  "added": [],
+  "manifest_unchanged": true,
+  "app": "app-1if2QQuE.js",
+  "browser_tabs_closed": [
+    1,
+    2
+  ],
+  "vendor_records_saved": 0,
+  "credential_reveals": 0
+}

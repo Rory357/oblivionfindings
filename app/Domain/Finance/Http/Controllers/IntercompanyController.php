@@ -96,7 +96,7 @@ class IntercompanyController extends Controller
             return redirect()->route('finance.intercompany.index', $group)
                 ->with('success', 'Intercompany transaction posted successfully.');
         } catch (\Throwable $e) {
-            return back()->withErrors(['transaction' => 'Failed to post: ' . $e->getMessage()]);
+            return back()->withErrors(['transaction' => 'Failed to post: '.$e->getMessage()]);
         }
     }
 

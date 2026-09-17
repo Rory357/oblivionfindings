@@ -28,7 +28,7 @@ describe('Security & Devices canonical workflow links', () => {
         expect(siteTechnology).toContain('<SiteProfileDestination');
         expect(siteTechnology).toContain('canView={can.view_site_profile}');
         expect(ticket).toContain('href={ticket.site.href}');
-        expect(ticket).toContain('Open {ticket.site.name} profile');
+        expect(ticket).toContain('v={ticket.site.name}');
     });
 
     it('keeps Healthcare Site context visible without emitting inaccessible profile links', () => {
@@ -120,7 +120,7 @@ describe('Security & Devices canonical workflow links', () => {
         );
         expect(itWorkspace).toContain('const VIEW_TABS = new Set([');
         expect(itWorkspace).toContain(
-            "const REQUEST_TABS = new Set(['catalog', 'my-tickets', 'knowledge']);",
+            "const REQUEST_TABS = new Set(['catalog', 'my-tickets']);",
         );
         expect(itWorkspace).toContain(
             'if (VIEW_TABS.has(id)) return can.view;',
@@ -129,9 +129,8 @@ describe('Security & Devices canonical workflow links', () => {
             'if (REQUEST_TABS.has(id)) return can.request;',
         );
         expect(itWorkspace).toContain(
-            'const [requestedTab, setTab] = useHrTab(',
+            'const tab = tabIsAllowed(requestedTab) ? requestedTab : capabilityDefault;',
         );
-        expect(itWorkspace).toContain('if (requestedTab !== tab) setTab(tab);');
         expect(itWorkspace).not.toContain(
             'return can.view; // overview / tickets / provisioning / reports',
         );

@@ -24,6 +24,11 @@ import {
     XCircle,
     type LucideIcon,
 } from 'lucide-react';
+import { ItOverviewBoard } from './it-overview-board';
+import type {
+    OverviewTicket,
+    OverviewWorkboard,
+} from './it-overview-workboard';
 import {
     TicketConversationSummary,
     type TicketConversation,
@@ -75,6 +80,7 @@ interface ActivityRow {
 }
 
 export interface OverviewPayload {
+    workboard?: OverviewWorkboard | null;
     conversation_ready?: boolean;
     awaiting_it_lane?: AwaitingItLaneRow[];
     avg_first_response_mins: number | null;
@@ -121,7 +127,38 @@ function fmtMins(m: number | null): string {
  * awaiting agent reply, aging, and unassigned-by-priority. Clicking a lane row
  * quick-peeks the ticket; "View all" jumps to the matching saved view.
  */
-export function ItOverview({
+export function ItOverview(props: {
+    overview: OverviewPayload;
+    priority?: string | null;
+    onOpenTicket: (id: number) => void;
+    onAssign?: (ticket: OverviewTicket) => void;
+    actorId?: number;
+    canManage?: boolean;
+    assignmentBusy?: boolean;
+    onClearPriority?: () => void;
+}) {
+    if (props.overview.workboard) {
+        return (
+            <ItOverviewBoard
+                {...props}
+                board={props.overview.workboard}
+                conversationReady={props.overview.conversation_ready === true}
+                average={props.overview.avg_first_response_mins}
+                activity={
+                    <ActivityFeed
+                        rows={props.overview.recent_activity.slice(0, 3)}
+                        onOpenTicket={props.onOpenTicket}
+                        compact
+                    />
+                }
+            />
+        );
+    }
+    return <LegacyOverview {...props} />;
+}
+
+/** Retain a safe presentation for older cached payloads without the bounded workboard. */
+function LegacyOverview({
     overview,
     priority = null,
     onOpenTicket,
@@ -378,12 +415,20 @@ function activityVerb(
 function ActivityFeed({
     rows,
     onOpenTicket,
+    compact = false,
 }: {
     rows: ActivityRow[];
     onOpenTicket: (id: number) => void;
+    compact?: boolean;
 }) {
     return (
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div
+            className={
+                compact
+                    ? 'border-t border-border pt-4'
+                    : 'rounded-2xl border border-border bg-card p-4'
+            }
+        >
             <div className="mb-2 flex items-center gap-2">
                 <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
                     <Activity className="h-3.5 w-3.5" />
@@ -396,7 +441,11 @@ function ActivityFeed({
                     queue.
                 </p>
             ) : (
-                <div className="flex flex-col">
+                <div
+                    className={
+                        compact ? 'grid gap-4 lg:grid-cols-3' : 'flex flex-col'
+                    }
+                >
                     {rows.map((row) => {
                         const Icon = ACTIVITY_ICON[row.type] ?? Timer;
                         return (
@@ -404,7 +453,7 @@ function ActivityFeed({
                                 key={row.id}
                                 type="button"
                                 onClick={() => onOpenTicket(row.ticket_id)}
-                                className="flex items-center gap-2.5 border-b border-border/55 py-2 text-left last:border-0 hover:bg-muted/40"
+                                className="flex min-w-0 items-center gap-2.5 border-b border-border/55 py-2 text-left last:border-0 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                             >
                                 <span className="grid h-6 w-6 flex-none place-items-center rounded-md bg-muted text-muted-foreground">
                                     <Icon className="h-3 w-3" />

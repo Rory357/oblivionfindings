@@ -1,0 +1,128 @@
+{
+    "checked_at": "2026-09-13T04:50:18+00:00",
+    "database": "oblivion_gov_review3_runtime_20260913_22816",
+    "cases": {
+        "rules_generic_proposal_still_activates": {
+            "unrelated_subject": "New laundry appliances",
+            "motion": "That the Board approves the proposal as presented.",
+            "profile_active": true
+        },
+        "strategy_generic_proposal_still_approves": {
+            "motion_subject": "New laundry appliances",
+            "plan": "Five-year property replacement strategy",
+            "status": "approved"
+        },
+        "budget_generic_tokens_still_approve_unbound_adjustment": {
+            "motion": "Annual budget increase",
+            "explicit_adjustment_id": null,
+            "adjustment_status": "approved",
+            "budget_total": "106000.00"
+        },
+        "quorum_calculators_disagree": {
+            "configured": 4,
+            "settings_calculator": 2,
+            "vote_calculator": 4
+        },
+        "parent_meeting_quorum_changes_open_vote": {
+            "before": {
+                "present": 0,
+                "apologies": 0,
+                "total_eligible": 4,
+                "required": 3,
+                "met": false,
+                "percentage_present": 0,
+                "resolution_mode": "meeting"
+            },
+            "after": {
+                "present": 0,
+                "apologies": 0,
+                "total_eligible": 4,
+                "required": 4,
+                "met": false,
+                "percentage_present": 0,
+                "resolution_mode": "meeting"
+            },
+            "opening_electorate_count": 4
+        },
+        "real_manifest_shape_private_paper_downloads": {
+            "shape": "content_sections.resolutions.items (actual builder schema)",
+            "source_visible": false,
+            "can_view": true,
+            "discoverable": true,
+            "http_status": 200,
+            "private_bytes": true,
+            "limit": "Manufactured published edition uses actual manifest shape and real download controller; no PDF layout claim."
+        },
+        "borrowed_private_managed_evidence_completes_action": {
+            "source_action_visible": false,
+            "completed_status": "complete",
+            "receipt": "ACT-REC-ACT-IRGCBG-20260913045018",
+            "evidence": [
+                "private-action-evidence/restricted.txt"
+            ]
+        },
+        "missing_action_version_bypasses_concurrency": {
+            "http_status": 302,
+            "client_saw_version": 1,
+            "final": {
+                "version_number": 3,
+                "progress_pct": 80,
+                "progress_notes": "Stale client omitted version"
+            }
+        },
+        "future_policy_attestation_still_saves": {
+            "http_status": 302,
+            "effective_from": "2027-01-01",
+            "receipt_count": 1
+        },
+        "evaluation_ui_yes_answer_rejected": {
+            "actual_ui_value": "Yes",
+            "http_status": 422,
+            "response_count": 0
+        },
+        "evaluation_fractional_rating_accepted": {
+            "http_status": 302,
+            "response": [
+                {
+                    "type": "rating",
+                    "answer": 5.9,
+                    "rating": 5,
+                    "question": "Question",
+                    "question_id": 1
+                }
+            ]
+        },
+        "evaluation_inactive_member_can_submit": {
+            "http_status": 302,
+            "response_count": 1
+        },
+        "invalid_escalation_recipient_saved": {
+            "http_status": 302,
+            "value": "999999.5"
+        },
+        "failed_reminder_suppresses_retry": {
+            "first_attempt_error": "Synthetic transport failure",
+            "retry_notifications": 0,
+            "cache_claimed": true
+        },
+        "verify_invalid_compliance_evidence_claims_provided": {
+            "future_from": "2027-01-01",
+            "file_exists": false,
+            "evidence_provided": true,
+            "verified": true
+        },
+        "ordinary_member_admin_gate_from_audit_read": {
+            "role": "board_member",
+            "gate_permissions": {
+                "governance.meetings.manage": false,
+                "governance.actions.manage": false,
+                "governance.settings.manage": false,
+                "governance.settings.view": false,
+                "governance.audit.view": true,
+                "governance.executive.view": false,
+                "governance.performance.manage": false
+            },
+            "admin_gate": true
+        }
+    }
+}

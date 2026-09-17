@@ -1,9 +1,19 @@
-import { ReportsTabsFooter } from '@/components/finance';
+import { chartColor } from '@/components/finance/chart-palette';
+import { FinancePeriodFilter } from '@/components/finance/finance-period-filter';
 import { formatMoney } from '@/components/finance/money';
-import { PageHero, PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import {
+    FinanceReportPage,
+    ReportCard,
+    formatReportDate,
+    reportRangeLabel,
+} from '@/components/finance/report-page';
+import {
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+} from '@/components/page';
 import {
     Table,
     TableBody,
@@ -12,11 +22,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import AppLayout from '@/layouts/app-layout';
-import { PageProps, type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import { DollarSign, Printer, TrendingDown, TrendingUp } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { PageProps } from '@/types';
+import { router } from '@inertiajs/react';
+import { Printer, TrendingUp } from 'lucide-react';
+import { useMemo } from 'react';
 import {
     Bar,
     BarChart,
@@ -50,45 +59,30 @@ interface Props extends PageProps {
     filters: { start_date: string; end_date: string };
 }
 
-const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('en-NZ', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-    });
+const URL = '/finance/reports/profit-loss';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Finance', href: '/finance' },
-    { title: 'Reports' },
-    { title: 'Profit & Loss' },
-];
+const REVENUE_COLOUR = chartColor(0);
+const EXPENSE_COLOUR = chartColor(1);
+
+const truncate = (value: string, max: number) =>
+    value.length > max ? `${value.substring(0, max)}…` : value;
 
 export default function ProfitAndLoss({ report, filters }: Props) {
-    const [startDate, setStartDate] = useState(filters.start_date);
-    const [endDate, setEndDate] = useState(filters.end_date);
+    const inProfit = report.net_profit >= 0;
 
-    const applyFilter = () => {
-        router.get(
-            '/finance/reports/profit-loss',
-            { start_date: startDate, end_date: endDate },
-            { preserveState: true },
-        );
-    };
+    const marginPct =
+        report.total_revenue > 0
+            ? (report.net_profit / report.total_revenue) * 100
+            : 0;
 
     const chartData = useMemo(() => {
         const revenueAccounts = report.revenue.map((r) => ({
-            name:
-                r.account_name.length > 25
-                    ? r.account_name.substring(0, 25) + '...'
-                    : r.account_name,
+            name: truncate(r.account_name, 25),
             amount: Math.abs(r.amount),
             type: 'revenue' as const,
         }));
         const expenseAccounts = report.expenses.map((e) => ({
-            name:
-                e.account_name.length > 25
-                    ? e.account_name.substring(0, 25) + '...'
-                    : e.account_name,
+            name: truncate(e.account_name, 25),
             amount: Math.abs(e.amount),
             type: 'expense' as const,
         }));
@@ -97,336 +91,258 @@ export default function ProfitAndLoss({ report, filters }: Props) {
             .slice(0, 8);
     }, [report.revenue, report.expenses]);
 
-    return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Profit & Loss" />
-
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        icon={TrendingUp}
-                        title="Profit & Loss Statement"
-                        description="Revenue and expense summary for the selected period."
-                        stats={[
-                            {
-                                label: 'Revenue',
-                                value: formatMoney(report.total_revenue),
-                            },
-                            {
-                                label: 'Expenses',
-                                value: formatMoney(report.total_expenses),
-                            },
-                            {
-                                label:
-                                    report.net_profit >= 0
-                                        ? 'Net Profit'
-                                        : 'Net Loss',
-                                value: formatMoney(report.net_profit),
-                            },
-                        ]}
-                        actions={
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.print()}
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Printer className="mr-1 h-4 w-4" />
-                                Print
-                            </Button>
-                        }
-                        footer={<ReportsTabsFooter active="profit-loss" />}
-                    />
-                }
+    const meters = (
+        <>
+            <PageHeaderMeterBlock
+                label="Revenue"
+                tone="success"
+                href="/finance/invoices"
+                ariaLabel="View invoices, where revenue is billed"
             >
-                {/* KPI Summary Cards */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-status-success-bg p-3">
-                                <TrendingUp className="h-5 w-5 text-status-success dark:text-status-success" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Total Revenue
-                                </p>
-                                <p className="text-2xl font-bold text-status-success dark:text-status-success">
-                                    {formatMoney(report.total_revenue)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-status-critical-bg p-3">
-                                <TrendingDown className="h-5 w-5 text-status-critical dark:text-status-critical" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Total Expenses
-                                </p>
-                                <p className="text-2xl font-bold text-status-critical dark:text-status-critical">
-                                    {formatMoney(report.total_expenses)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 pt-6">
-                            <div
-                                className={`rounded-full p-3 ${
-                                    report.net_profit >= 0
-                                        ? 'bg-status-success-bg'
-                                        : 'bg-status-critical-bg'
-                                }`}
-                            >
-                                <DollarSign
-                                    className={`h-5 w-5 ${
-                                        report.net_profit >= 0
-                                            ? 'text-status-success dark:text-status-success'
-                                            : 'text-status-critical dark:text-status-critical'
-                                    }`}
+                <PageHeaderMeterBig>
+                    {formatMoney(report.total_revenue)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {report.revenue.length} revenue accounts
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Expenses"
+                href="/finance/bills"
+                ariaLabel="View bills, where expenses are recorded"
+            >
+                <PageHeaderMeterBig>
+                    {formatMoney(report.total_expenses)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    {report.expenses.length} expense accounts
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label={inProfit ? 'Net profit' : 'Net loss'}
+                tone={inProfit ? 'success' : 'critical'}
+                href="/finance/reports/cash-flow"
+                ariaLabel="View the cash flow statement"
+            >
+                <PageHeaderMeterBig>
+                    {formatMoney(report.net_profit)}
+                </PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    Revenue less expenses
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Net margin"
+                tone={inProfit ? 'success' : 'critical'}
+                href="/finance/reports/funding-stream-summary"
+                ariaLabel="View margin by funding stream"
+            >
+                <PageHeaderMeterDonut
+                    percent={marginPct}
+                    caption={
+                        report.total_revenue > 0
+                            ? inProfit
+                                ? `${formatMoney(report.net_profit)} kept of ${formatMoney(report.total_revenue)}`
+                                : `${formatMoney(Math.abs(report.net_profit))} short of breaking even`
+                            : 'No revenue in this period'
+                    }
+                />
+            </PageHeaderMeterBlock>
+        </>
+    );
+
+    return (
+        <FinanceReportPage
+            icon={TrendingUp}
+            title="Profit & loss"
+            periodLabel={reportRangeLabel(filters.start_date, filters.end_date)}
+            subline={`Revenue and expenses for the period · ${report.revenue.length + report.expenses.length} accounts with movement`}
+            actions={
+                <PageHeaderGlassButton
+                    icon={Printer}
+                    onClick={() => window.print()}
+                >
+                    Print
+                </PageHeaderGlassButton>
+            }
+            meters={meters}
+            filters={
+                <FinancePeriodFilter
+                    url={URL}
+                    from={filters.start_date}
+                    to={filters.end_date}
+                    idPrefix="profit-loss-period"
+                    onApply={({ from, to }) =>
+                        router.get(
+                            URL,
+                            { start_date: from, end_date: to },
+                            { preserveScroll: true },
+                        )
+                    }
+                />
+            }
+        >
+            {chartData.length > 0 && (
+                <ReportCard
+                    title="Largest accounts"
+                    caption="The eight biggest revenue and expense accounts in the period"
+                    scroll={false}
+                    right={
+                        <div className="flex items-center gap-3 text-caption">
+                            <span className="flex items-center gap-1.5">
+                                <span
+                                    className="inline-block h-3 w-3 rounded-sm"
+                                    style={{
+                                        backgroundColor: REVENUE_COLOUR,
+                                    }}
                                 />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    {report.net_profit >= 0
-                                        ? 'Net Profit'
-                                        : 'Net Loss'}
-                                </p>
-                                <p
-                                    className={`text-2xl font-bold ${
-                                        report.net_profit >= 0
-                                            ? 'text-status-success dark:text-status-success'
-                                            : 'text-status-critical dark:text-status-critical'
-                                    }`}
-                                >
-                                    {formatMoney(report.net_profit)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Filter */}
-                <Card>
-                    <CardContent className="flex items-end gap-4 pt-6">
-                        <div>
-                            <label className="mb-1 block text-sm font-medium">
-                                Start Date
-                            </label>
-                            <Input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="w-48"
-                            />
+                                Revenue
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                                <span
+                                    className="inline-block h-3 w-3 rounded-sm"
+                                    style={{
+                                        backgroundColor: EXPENSE_COLOUR,
+                                    }}
+                                />
+                                Expense
+                            </span>
                         </div>
-                        <div>
-                            <label className="mb-1 block text-sm font-medium">
-                                End Date
-                            </label>
-                            <Input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="w-48"
-                            />
-                        </div>
-                        <Button onClick={applyFilter}>Generate</Button>
-                    </CardContent>
-                </Card>
-
-                {/* Bar Chart - Top Accounts */}
-                {chartData.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Top Accounts by Amount
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={chartData}
-                                        layout="vertical"
-                                        margin={{ left: 20, right: 20 }}
-                                    >
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis
-                                            type="number"
-                                            tickFormatter={(v) =>
-                                                formatMoney(v)
+                    }
+                >
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={chartData}
+                                layout="vertical"
+                                margin={{ left: 20, right: 20 }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis
+                                    type="number"
+                                    tickFormatter={(v) => formatMoney(v)}
+                                />
+                                <YAxis
+                                    type="category"
+                                    dataKey="name"
+                                    width={160}
+                                    tick={{ fontSize: 12 }}
+                                />
+                                <Tooltip
+                                    formatter={(value?: number) => [
+                                        formatMoney(value ?? 0),
+                                        'Amount',
+                                    ]}
+                                />
+                                <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
+                                    {chartData.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={
+                                                entry.type === 'revenue'
+                                                    ? REVENUE_COLOUR
+                                                    : EXPENSE_COLOUR
                                             }
                                         />
-                                        <YAxis
-                                            type="category"
-                                            dataKey="name"
-                                            width={160}
-                                            tick={{ fontSize: 12 }}
-                                        />
-                                        <Tooltip
-                                            formatter={(value?: number) => [
-                                                formatMoney(value ?? 0),
-                                                'Amount',
-                                            ]}
-                                        />
-                                        <Bar
-                                            dataKey="amount"
-                                            radius={[0, 4, 4, 0]}
-                                        >
-                                            {chartData.map((entry, index) => (
-                                                <Cell
-                                                    key={`cell-${index}`}
-                                                    fill={
-                                                        entry.type === 'revenue'
-                                                            ? 'var(--status-success)'
-                                                            : 'var(--status-critical)'
-                                                    }
-                                                />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
-                                <span className="flex items-center gap-1.5">
-                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-success" />{' '}
-                                    Revenue
-                                </span>
-                                <span className="flex items-center gap-1.5">
-                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-critical" />{' '}
-                                    Expense
-                                </span>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </ReportCard>
+            )}
 
-                {/* Existing Table */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>
-                            Profit & Loss: {formatDate(report.start_date)} to{' '}
-                            {formatDate(report.end_date)}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-32">
-                                        Account Code
-                                    </TableHead>
-                                    <TableHead>Account Name</TableHead>
-                                    <TableHead className="text-right">
-                                        Amount
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {/* Revenue Section */}
-                                <TableRow className="bg-muted/50">
-                                    <TableCell
-                                        colSpan={3}
-                                        className="font-semibold"
-                                    >
-                                        Revenue
-                                    </TableCell>
-                                </TableRow>
-                                {report.revenue.map((row, idx) => (
-                                    <TableRow key={`rev-${idx}`}>
-                                        <TableCell className="font-mono text-sm">
-                                            {row.account_code}
-                                        </TableCell>
-                                        <TableCell>
-                                            {row.account_name}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {formatMoney(row.amount)}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {report.revenue.length === 0 && (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={3}
-                                            className="text-muted-foreground"
-                                        >
-                                            No revenue for this period.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                <TableRow className="border-t font-semibold">
-                                    <TableCell colSpan={2}>
-                                        Total Revenue
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {formatMoney(report.total_revenue)}
-                                    </TableCell>
-                                </TableRow>
+            <ReportCard
+                title={`Profit & loss: ${formatReportDate(report.start_date)} to ${formatReportDate(report.end_date)}`}
+            >
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="w-32">Account code</TableHead>
+                            <TableHead>Account name</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={3} className="font-semibold">
+                                Revenue
+                            </TableCell>
+                        </TableRow>
+                        {report.revenue.map((row, idx) => (
+                            <TableRow key={`rev-${idx}`}>
+                                <TableCell className="font-mono text-sm">
+                                    {row.account_code}
+                                </TableCell>
+                                <TableCell>{row.account_name}</TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                    {formatMoney(row.amount)}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                        {report.revenue.length === 0 && (
+                            <TableRow>
+                                <TableCell
+                                    colSpan={3}
+                                    className="text-muted-foreground"
+                                >
+                                    No revenue for this period.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        <TableRow className="border-t font-semibold">
+                            <TableCell colSpan={2}>Total revenue</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                                {formatMoney(report.total_revenue)}
+                            </TableCell>
+                        </TableRow>
 
-                                {/* Expenses Section */}
-                                <TableRow className="bg-muted/50">
-                                    <TableCell
-                                        colSpan={3}
-                                        className="font-semibold"
-                                    >
-                                        Expenses
-                                    </TableCell>
-                                </TableRow>
-                                {report.expenses.map((row, idx) => (
-                                    <TableRow key={`exp-${idx}`}>
-                                        <TableCell className="font-mono text-sm">
-                                            {row.account_code}
-                                        </TableCell>
-                                        <TableCell>
-                                            {row.account_name}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {formatMoney(row.amount)}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {report.expenses.length === 0 && (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={3}
-                                            className="text-muted-foreground"
-                                        >
-                                            No expenses for this period.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                <TableRow className="border-t font-semibold">
-                                    <TableCell colSpan={2}>
-                                        Total Expenses
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {formatMoney(report.total_expenses)}
-                                    </TableCell>
-                                </TableRow>
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={3} className="font-semibold">
+                                Expenses
+                            </TableCell>
+                        </TableRow>
+                        {report.expenses.map((row, idx) => (
+                            <TableRow key={`exp-${idx}`}>
+                                <TableCell className="font-mono text-sm">
+                                    {row.account_code}
+                                </TableCell>
+                                <TableCell>{row.account_name}</TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                    {formatMoney(row.amount)}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                        {report.expenses.length === 0 && (
+                            <TableRow>
+                                <TableCell
+                                    colSpan={3}
+                                    className="text-muted-foreground"
+                                >
+                                    No expenses for this period.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        <TableRow className="border-t font-semibold">
+                            <TableCell colSpan={2}>Total expenses</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                                {formatMoney(report.total_expenses)}
+                            </TableCell>
+                        </TableRow>
 
-                                {/* Net Profit */}
-                                <TableRow className="border-t-2 text-lg font-bold">
-                                    <TableCell colSpan={2}>
-                                        {report.net_profit >= 0
-                                            ? 'Net Profit'
-                                            : 'Net Loss'}
-                                    </TableCell>
-                                    <TableCell
-                                        className={`text-right ${report.net_profit >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}
-                                    >
-                                        {formatMoney(report.net_profit)}
-                                    </TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            </PageLayout>
-        </AppLayout>
+                        <TableRow className="border-t-2 font-bold">
+                            <TableCell colSpan={2}>
+                                {inProfit ? 'Net profit' : 'Net loss'}
+                            </TableCell>
+                            <TableCell
+                                className={`text-right tabular-nums ${inProfit ? 'text-status-success' : 'text-status-critical'}`}
+                            >
+                                {formatMoney(report.net_profit)}
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </ReportCard>
+        </FinanceReportPage>
     );
 }

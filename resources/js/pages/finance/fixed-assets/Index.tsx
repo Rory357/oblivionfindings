@@ -1,16 +1,36 @@
 import {
+    FinanceSectionRail,
     FixedAssetDialog,
-    LedgerTabsFooter,
+    FixedAssetDisposeDialog,
     formatMoney,
-    useRowContextMenu,
+    type DisposableGlAccount,
     type EditableFixedAsset,
     type FixedAssetGlAccount,
-    type RowCtxItem,
 } from '@/components/finance';
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import {
+    EmptyValue,
+    EntityChip,
+    EntityContextMenu,
+    EntityTable,
+    type EntityTableColumn,
+    ListCaption,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -18,43 +38,26 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
-import { EmptyList } from '@/components/ui/empty-state';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { formatDateOnly } from '@/lib/datetime';
+import type { BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/react';
 import {
     Calculator,
-    DollarSign,
     Download,
     Eye,
-    Hash,
     Package,
+    PackageMinus,
     Pencil,
     Plus,
-    Search,
-    TrendingDown,
 } from 'lucide-react';
-import { FormEvent, useCallback, useState } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 
 interface FixedAsset {
     id: number;
@@ -71,6 +74,8 @@ interface FixedAsset {
     gl_asset_account_id: number | null;
     gl_depreciation_account_id: number | null;
     gl_expense_account_id: number | null;
+    gl_asset_account: DisposableGlAccount;
+    gl_depreciation_account: DisposableGlAccount;
     notes: string | null;
     has_depreciations: boolean;
 }
@@ -107,28 +112,34 @@ interface Props {
     expenseAccounts: FixedAssetGlAccount[];
 }
 
-const categoryLabels: Record<string, string> = {
-    vehicle: 'Vehicle',
-    equipment: 'Equipment',
-    building: 'Building',
-    furniture: 'Furniture',
-    it_equipment: 'IT Equipment',
-    land: 'Land',
-};
-
-const categoryColors: Record<string, string> = {
-    vehicle: 'bg-status-info-bg text-status-info',
-    equipment: 'bg-primary/10 text-primary',
-    building: 'bg-status-warning-bg text-status-warning',
-    furniture: 'bg-status-info-bg text-status-info',
-    it_equipment: 'bg-primary/10 text-primary',
-    land: 'bg-status-success-bg text-status-success',
-};
-
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
-    { title: 'Fixed Assets', href: '/finance/fixed-assets' },
+    { title: 'General ledger', href: '/finance/ledger' },
+    { title: 'Fixed assets', href: '/finance/fixed-assets' },
 ];
+
+const CATEGORY_OPTIONS = [
+    { value: 'all', label: 'All categories' },
+    { value: 'vehicle', label: 'Vehicle' },
+    { value: 'equipment', label: 'Equipment' },
+    { value: 'building', label: 'Building' },
+    { value: 'furniture', label: 'Furniture' },
+    { value: 'it_equipment', label: 'IT equipment' },
+    { value: 'land', label: 'Land' },
+];
+
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'All statuses' },
+    { value: 'active', label: 'Active' },
+    { value: 'fully_depreciated', label: 'Fully depreciated' },
+    { value: 'disposed', label: 'Disposed' },
+];
+
+const categoryLabel = (value: string) =>
+    CATEGORY_OPTIONS.find((o) => o.value === value)?.label ?? value;
+
+const assetDate = (value: string) => formatDateOnly(value.slice(0, 10), value);
 
 export default function FixedAssetsIndex({
     assets,
@@ -142,6 +153,9 @@ export default function FixedAssetsIndex({
     const [depModalOpen, setDepModalOpen] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [editAsset, setEditAsset] = useState<EditableFixedAsset | null>(null);
+    const [disposeAsset, setDisposeAsset] = useState<FixedAsset | null>(null);
+
+    const ctx = useEntityContextMenu<FixedAsset>();
 
     const openEdit = (asset: FixedAsset) =>
         setEditAsset({
@@ -176,535 +190,426 @@ export default function FixedAssetsIndex({
         [filters],
     );
 
-    const handleSearch = useCallback(() => {
-        applyFilters({ search });
-    }, [search, applyFilters]);
-
-    const handleSearchKeyDown = useCallback(
-        (e: React.KeyboardEvent) => {
-            if (e.key === 'Enter') {
-                handleSearch();
-            }
-        },
-        [handleSearch],
-    );
-
-    function handleRunDepreciation(e: FormEvent) {
+    const handleRunDepreciation = (e: FormEvent) => {
         e.preventDefault();
         depForm.post('/finance/fixed-assets/run-depreciation', {
             onSuccess: () => setDepModalOpen(false),
         });
-    }
+    };
 
-    // Right-click row menu — mirrors the row's existing inline actions (Open first).
-    const rowMenu = useRowContextMenu();
-    const rowMenuItems = (asset: FixedAsset): RowCtxItem[] => {
-        const items: RowCtxItem[] = [
+    const hasFilters = Boolean(
+        filters.search || filters.category || filters.status,
+    );
+
+    const exportUrl = `/finance/fixed-assets/export?${new URLSearchParams(
+        Object.entries({
+            category: filters.category ?? '',
+            status: filters.status ?? '',
+            search: filters.search ?? '',
+        }).filter(([, v]) => v) as [string, string][],
+    ).toString()}`;
+
+    const depreciatedPercent =
+        summary.total_cost > 0
+            ? (summary.total_depreciation / summary.total_cost) * 100
+            : 0;
+
+    /* ---------------- Row actions ---------------- */
+
+    const actionsFor = (asset: FixedAsset): MenuItem[] => {
+        const items: MenuItem[] = [
             {
-                kind: 'item',
-                label: 'Open',
+                label: 'Open asset',
                 icon: Eye,
-                onSelect: () => router.get(`/finance/fixed-assets/${asset.id}`),
+                onClick: () => router.visit(`/finance/fixed-assets/${asset.id}`),
             },
         ];
         if (canManage && asset.status !== 'disposed') {
             items.push({
-                kind: 'item',
-                label: 'Edit',
+                label: 'Edit asset',
                 icon: Pencil,
-                onSelect: () => openEdit(asset),
+                onClick: () => openEdit(asset),
+            });
+            items.push({
+                label: 'Dispose asset',
+                icon: PackageMinus,
+                danger: true,
+                onClick: () => setDisposeAsset(asset),
             });
         }
         return items;
     };
 
-    return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Fixed Assets" />
+    /* ---------------- Columns ---------------- */
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="finance"
-                        footer={<LedgerTabsFooter active="fixed-assets" />}
-                        icon={Package}
-                        title="Fixed Assets"
-                        description="Manage your organisation's fixed asset register"
-                        stats={[
-                            {
-                                label: 'Total assets',
-                                value: summary.total_count,
-                            },
-                            {
-                                label: 'Total cost',
-                                value: formatMoney(summary.total_cost),
-                            },
-                            {
-                                label: 'Depreciation',
-                                value: formatMoney(summary.total_depreciation),
-                            },
-                            {
-                                label: 'Book value',
-                                value: formatMoney(summary.net_book_value),
-                            },
-                        ]}
-                        actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    asChild
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <a
-                                        href={`/finance/fixed-assets/export?${new URLSearchParams(Object.entries({ category: filters.category ?? '', status: filters.status ?? '', search: filters.search ?? '' }).filter(([, v]) => v)).toString()}`}
-                                    >
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Export CSV
-                                    </a>
-                                </Button>
-                                <Dialog
-                                    open={depModalOpen}
-                                    onOpenChange={setDepModalOpen}
-                                >
-                                    <DialogTrigger asChild>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                        >
-                                            <Calculator className="mr-1.5 h-4 w-4" />
-                                            Run Depreciation
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>
-                                                Run Depreciation
-                                            </DialogTitle>
-                                            <DialogDescription>
-                                                Process monthly depreciation for
-                                                all active assets. This will
-                                                create depreciation records and
-                                                post GL journals.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <form onSubmit={handleRunDepreciation}>
-                                            <div className="space-y-4 py-4">
-                                                <div className="space-y-1.5">
-                                                    <Label htmlFor="depreciation_date">
-                                                        Depreciation Date
-                                                    </Label>
-                                                    <Input
-                                                        id="depreciation_date"
-                                                        type="date"
-                                                        value={
-                                                            depForm.data
-                                                                .depreciation_date
-                                                        }
-                                                        onChange={(e) =>
-                                                            depForm.setData(
-                                                                'depreciation_date',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                    {depForm.errors
-                                                        .depreciation_date && (
-                                                        <p className="text-sm text-destructive">
-                                                            {
-                                                                depForm.errors
-                                                                    .depreciation_date
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <DialogFooter>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setDepModalOpen(false)
-                                                    }
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={
-                                                        depForm.processing
-                                                    }
-                                                >
-                                                    {depForm.processing
-                                                        ? 'Processing...'
-                                                        : 'Run Depreciation'}
-                                                </Button>
-                                            </DialogFooter>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-                                {canManage && (
-                                    <Button
-                                        size="sm"
-                                        onClick={() => setCreateOpen(true)}
-                                    >
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Add Asset
-                                    </Button>
-                                )}
-                            </div>
+    const columns: EntityTableColumn<FixedAsset>[] = [
+        {
+            key: 'category',
+            label: 'Category',
+            width: '160px',
+            cell: (asset) => (
+                <EntityChip>{categoryLabel(asset.category)}</EntityChip>
+            ),
+        },
+        {
+            key: 'purchase_date',
+            label: 'Purchased',
+            width: '140px',
+            cell: (asset) =>
+                asset.purchase_date ? (
+                    <span className="whitespace-nowrap text-muted-foreground">
+                        {assetDate(asset.purchase_date)}
+                    </span>
+                ) : (
+                    <EmptyValue />
+                ),
+        },
+        {
+            key: 'cost',
+            label: 'Cost',
+            width: '140px',
+            align: 'right',
+            cell: (asset) => (
+                <span className="tabular-nums">
+                    {formatMoney(asset.purchase_cost)}
+                </span>
+            ),
+        },
+        {
+            key: 'depreciation',
+            label: 'Accum. depr.',
+            width: '150px',
+            align: 'right',
+            cell: (asset) => (
+                <span className="tabular-nums">
+                    {formatMoney(asset.accumulated_depreciation)}
+                </span>
+            ),
+        },
+        {
+            key: 'book_value',
+            label: 'Book value',
+            width: '150px',
+            align: 'right',
+            cell: (asset) => (
+                <span className="font-semibold tabular-nums">
+                    {formatMoney(
+                        Number(asset.purchase_cost) -
+                            Number(asset.accumulated_depreciation),
+                    )}
+                </span>
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            width: '150px',
+            cell: (asset) => <StatusBadge status={asset.status} />,
+        },
+    ];
+
+    /* ---------------- Event Horizon header ---------------- */
+
+    const header = (
+        <PageHeader
+            icon={Package}
+            title="Fixed assets"
+            titleChip={
+                <PageHeaderStatusChip variant="success">
+                    {summary.active_count} active
+                </PageHeaderStatusChip>
+            }
+            subline={`General ledger · ${summary.total_count} assets · ${formatMoney(summary.net_book_value)} book value`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') applyFilters({ search });
+                        }}
+                        placeholder="Search name or tag…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={() => {
+                            window.location.href = exportUrl;
+                        }}
+                    >
+                        Export CSV
+                    </PageHeaderGlassButton>
+                    {canManage ? (
+                        <PageHeaderGlassButton
+                            icon={Calculator}
+                            onClick={() => setDepModalOpen(true)}
+                        >
+                            Run depreciation
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {canManage ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setCreateOpen(true)}
+                        >
+                            New asset
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Assets"
+                        href="/finance/fixed-assets"
+                        ariaLabel="View the whole fixed-asset register"
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.total_count}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {summary.active_count} still depreciating
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Cost"
+                        href="/finance/fixed-assets"
+                        ariaLabel="View assets at cost"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.total_cost)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            original purchase cost
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Depreciation"
+                        tone="warning"
+                        href="/finance/journals?type=standard"
+                        ariaLabel="View the depreciation journals"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.total_depreciation)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBar percent={depreciatedPercent} />
+                        <PageHeaderMeterCaption>
+                            {depreciatedPercent.toFixed(1)}% of cost written
+                            down
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+
+                    <PageHeaderMeterBlock
+                        label="Book value"
+                        tone="success"
+                        href="/finance/reports/balance-sheet"
+                        ariaLabel="View the balance sheet"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatMoney(summary.net_book_value)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            carried on the balance sheet
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        label="Category"
+                        value={filters.category || 'all'}
+                        allValue="all"
+                        options={CATEGORY_OPTIONS}
+                        onChange={(value) =>
+                            applyFilters({
+                                category: value === 'all' ? '' : value,
+                            })
                         }
                     />
-                }
-            >
-                {/* Summary Cards - 4 KPIs */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-primary/10 p-2">
-                                    <Hash className="h-5 w-5 text-primary" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Total Assets
-                                    </p>
-                                    <p className="text-2xl font-bold">
-                                        {summary.total_count}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-info p-2">
-                                    <DollarSign className="h-5 w-5 text-status-info" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Total Cost
-                                    </p>
-                                    <p className="font-mono text-2xl font-bold tabular-nums">
-                                        {formatMoney(summary.total_cost)}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-warning p-2">
-                                    <TrendingDown className="h-5 w-5 text-status-warning" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Total Depreciation
-                                    </p>
-                                    <p className="font-mono text-2xl font-bold tabular-nums">
-                                        {formatMoney(
-                                            summary.total_depreciation,
-                                        )}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-success p-2">
-                                    <Package className="h-5 w-5 text-status-success" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Net Book Value
-                                    </p>
-                                    <p className="font-mono text-2xl font-bold tabular-nums">
-                                        {formatMoney(summary.net_book_value)}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                    <PageHeaderFilterSelect
+                        label="Status"
+                        value={filters.status || 'all'}
+                        allValue="all"
+                        options={STATUS_OPTIONS}
+                        onChange={(value) =>
+                            applyFilters({
+                                status: value === 'all' ? '' : value,
+                            })
+                        }
+                    />
+                </>
+            }
+            rail={<FinanceSectionRail />}
+        />
+    );
 
-                {/* Filters */}
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex flex-col gap-4 sm:flex-row">
-                            <div className="flex-1">
-                                <div className="relative">
-                                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Search by name or tag..."
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        onKeyDown={handleSearchKeyDown}
-                                        className="pl-10"
-                                    />
-                                </div>
-                            </div>
-                            <Select
-                                value={filters.category || 'all'}
-                                onValueChange={(value) =>
-                                    applyFilters({
-                                        category: value === 'all' ? '' : value,
-                                    })
-                                }
-                            >
-                                <SelectTrigger
-                                    className="w-[180px]"
-                                    aria-label="Filter by category"
-                                >
-                                    <SelectValue placeholder="All Categories" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Categories
-                                    </SelectItem>
-                                    <SelectItem value="vehicle">
-                                        Vehicle
-                                    </SelectItem>
-                                    <SelectItem value="equipment">
-                                        Equipment
-                                    </SelectItem>
-                                    <SelectItem value="building">
-                                        Building
-                                    </SelectItem>
-                                    <SelectItem value="furniture">
-                                        Furniture
-                                    </SelectItem>
-                                    <SelectItem value="it_equipment">
-                                        IT Equipment
-                                    </SelectItem>
-                                    <SelectItem value="land">Land</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={filters.status || 'all'}
-                                onValueChange={(value) =>
-                                    applyFilters({
-                                        status: value === 'all' ? '' : value,
-                                    })
-                                }
-                            >
-                                <SelectTrigger
-                                    className="w-[180px]"
-                                    aria-label="Filter by status"
-                                >
-                                    <SelectValue placeholder="All Statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Statuses
-                                    </SelectItem>
-                                    <SelectItem value="active">
-                                        Active
-                                    </SelectItem>
-                                    <SelectItem value="fully_depreciated">
-                                        Fully Depreciated
-                                    </SelectItem>
-                                    <SelectItem value="disposed">
-                                        Disposed
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Button variant="outline" onClick={handleSearch}>
-                                Search
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Fixed assets" />
 
-                {/* Table */}
-                <Card>
-                    <CardContent className="p-0">
-                        {assets.data.length === 0 ? (
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title="Fixed assets"
+                        caption={`${assets.data.length} of ${assets.total} shown`}
+                    />
+
+                    {assets.data.length === 0 ? (
+                        hasFilters ? (
+                            <EmptySearch
+                                searchTerm={filters.search}
+                                onClear={() => {
+                                    setSearch('');
+                                    applyFilters({
+                                        search: '',
+                                        category: '',
+                                        status: '',
+                                    });
+                                }}
+                                title="No assets match your search"
+                            />
+                        ) : (
                             <EmptyList
                                 icon={Package}
                                 itemName="fixed asset"
                                 title="No fixed assets yet"
-                                description="Get started by adding your first fixed asset."
-                                className="border-0"
+                                description="Register your first fixed asset to start tracking cost, depreciation and book value."
                                 action={
                                     canManage ? (
                                         <Button
                                             size="sm"
                                             onClick={() => setCreateOpen(true)}
                                         >
-                                            Add asset
+                                            New asset
                                         </Button>
                                     ) : undefined
                                 }
                             />
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Tag</TableHead>
-                                        <TableHead>Category</TableHead>
-                                        <TableHead>Purchase Date</TableHead>
-                                        <TableHead className="text-right">
-                                            Cost
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Accum. Depr.
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Book Value
-                                        </TableHead>
-                                        <TableHead>Status</TableHead>
-                                        {canManage && (
-                                            <TableHead className="w-12 text-right" />
-                                        )}
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {assets.data.map((asset) => {
-                                        const bookValue =
-                                            Number(asset.purchase_cost) -
-                                            Number(
-                                                asset.accumulated_depreciation,
-                                            );
-                                        return (
-                                            <TableRow
-                                                key={asset.id}
-                                                onContextMenu={rowMenu.open(
-                                                    rowMenuItems(asset),
-                                                )}
-                                            >
-                                                <TableCell>
-                                                    <Link
-                                                        href={`/finance/fixed-assets/${asset.id}`}
-                                                        className="font-medium text-primary hover:underline"
-                                                    >
-                                                        {asset.asset_name}
-                                                    </Link>
-                                                </TableCell>
-                                                <TableCell className="font-mono text-sm text-muted-foreground">
-                                                    {asset.asset_tag || '-'}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className={
-                                                            categoryColors[
-                                                                asset.category
-                                                            ] || ''
-                                                        }
-                                                    >
-                                                        {categoryLabels[
-                                                            asset.category
-                                                        ] || asset.category}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-sm">
-                                                    {new Date(
-                                                        asset.purchase_date,
-                                                    ).toLocaleDateString(
-                                                        'en-NZ',
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono text-sm tabular-nums">
-                                                    {formatMoney(
-                                                        asset.purchase_cost,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono text-sm tabular-nums">
-                                                    {formatMoney(
-                                                        asset.accumulated_depreciation,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
-                                                    {formatMoney(bookValue)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <StatusBadge
-                                                        status={asset.status}
-                                                    />
-                                                </TableCell>
-                                                {canManage && (
-                                                    <TableCell className="text-right">
-                                                        {asset.status !==
-                                                            'disposed' && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                className="h-7 w-7 p-0"
-                                                                aria-label={`Edit ${asset.asset_name}`}
-                                                                onClick={() =>
-                                                                    openEdit(
-                                                                        asset,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Pencil className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        )}
-                                                    </TableCell>
-                                                )}
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Pagination */}
-                {assets.last_page > 1 && (
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                            Showing{' '}
-                            {(assets.current_page - 1) * assets.per_page + 1} to{' '}
-                            {Math.min(
-                                assets.current_page * assets.per_page,
-                                assets.total,
-                            )}{' '}
-                            of {assets.total} assets
-                        </p>
-                        <div className="flex gap-1">
-                            {assets.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={
-                                        link.active ? 'default' : 'outline'
-                                    }
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() =>
-                                        link.url && router.get(link.url)
-                                    }
-                                    dangerouslySetInnerHTML={{
-                                        __html: link.label,
-                                    }}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {rowMenu.element}
+                        )
+                    ) : (
+                        <>
+                            <EntityTable
+                                rows={assets.data}
+                                rowKey={(asset) => asset.id}
+                                identityLabel="Asset"
+                                minWidth={1180}
+                                identity={(asset) => ({
+                                    icon: Package,
+                                    name: asset.asset_name,
+                                    subline: asset.asset_tag ?? undefined,
+                                })}
+                                hrefFor={(asset) =>
+                                    `/finance/fixed-assets/${asset.id}`
+                                }
+                                columns={columns}
+                                actionsFor={actionsFor}
+                                mutedFor={(asset) => asset.status === 'disposed'}
+                                onOpen={(asset) =>
+                                    router.visit(
+                                        `/finance/fixed-assets/${asset.id}`,
+                                    )
+                                }
+                                onRowContextMenu={(e, asset) =>
+                                    ctx.open(e, asset)
+                                }
+                            />
+                            <LaravelPagination
+                                links={assets.links}
+                                lastPage={assets.last_page}
+                            />
+                        </>
+                    )}
+                </div>
             </PageLayout>
 
-            {canManage && (
+            {ctx.ctx ? (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    icon={Package}
+                    title={ctx.ctx.record.asset_name}
+                    items={actionsFor(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            ) : null}
+
+            {canManage ? (
+                <Dialog open={depModalOpen} onOpenChange={setDepModalOpen}>
+                    <DialogContent
+                        style={{
+                            maxWidth: 'min(92vw, 480px)',
+                            width: 'min(92vw, 480px)',
+                        }}
+                    >
+                        <DialogHeader>
+                            <DialogTitle>Run depreciation</DialogTitle>
+                            <DialogDescription>
+                                This posts this month&rsquo;s depreciation for
+                                every active asset: it creates a depreciation
+                                record per asset and posts the matching journals
+                                to the general ledger.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form
+                            onSubmit={handleRunDepreciation}
+                            className="flex flex-col gap-4"
+                        >
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="depreciation_date">
+                                    Depreciation date
+                                </Label>
+                                <Input
+                                    id="depreciation_date"
+                                    type="date"
+                                    value={depForm.data.depreciation_date}
+                                    onChange={(e) =>
+                                        depForm.setData(
+                                            'depreciation_date',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                                {depForm.errors.depreciation_date ? (
+                                    <p className="text-sm text-destructive">
+                                        {depForm.errors.depreciation_date}
+                                    </p>
+                                ) : null}
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setDepModalOpen(false)}
+                                    disabled={depForm.processing}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={depForm.processing}
+                                >
+                                    {depForm.processing
+                                        ? 'Processing…'
+                                        : 'Run depreciation'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+            ) : null}
+
+            {canManage ? (
                 <FixedAssetDialog
                     open={createOpen}
                     onClose={() => setCreateOpen(false)}
                     assetAccounts={assetAccounts}
                     expenseAccounts={expenseAccounts}
                 />
-            )}
+            ) : null}
 
-            {canManage && editAsset && (
+            {canManage && editAsset ? (
                 <FixedAssetDialog
                     key={editAsset.id}
                     open
@@ -713,7 +618,26 @@ export default function FixedAssetsIndex({
                     assetAccounts={assetAccounts}
                     expenseAccounts={expenseAccounts}
                 />
-            )}
+            ) : null}
+
+            {canManage && disposeAsset ? (
+                <FixedAssetDisposeDialog
+                    key={`dispose-${disposeAsset.id}`}
+                    open
+                    onClose={() => setDisposeAsset(null)}
+                    asset={{
+                        id: disposeAsset.id,
+                        asset_name: disposeAsset.asset_name,
+                        asset_tag: disposeAsset.asset_tag,
+                        purchase_cost: disposeAsset.purchase_cost,
+                        accumulated_depreciation:
+                            disposeAsset.accumulated_depreciation,
+                        gl_asset_account: disposeAsset.gl_asset_account,
+                        gl_depreciation_account:
+                            disposeAsset.gl_depreciation_account,
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }

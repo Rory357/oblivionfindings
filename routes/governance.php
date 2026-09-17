@@ -56,6 +56,11 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         ->name('calendar.items')
         ->middleware('permission:governance.view');
 
+    // Governance Records / Document Discovery (L5)
+    Route::get('/records', [\App\Domain\Governance\Http\Controllers\GovernanceRecordsController::class, 'index'])
+        ->name('records.index')
+        ->middleware('permission:governance.view');
+
     // Reports & Exports
     Route::middleware('permission:governance.view')->group(function () {
         Route::get('/reports/board-monthly', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'boardMonthly'])->name('reports.board-monthly');
@@ -134,6 +139,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
             Route::post('/resolutions', [ResolutionController::class, 'store'])->name('resolutions.store');
             Route::put('/resolutions/{resolution}', [ResolutionController::class, 'update'])->name('resolutions.update');
             Route::post('/resolutions/{resolution}/open', [ResolutionController::class, 'openVoting'])->name('resolutions.open');
+            // For discussion / For information papers are shared, never voted on.
+            Route::post('/resolutions/{resolution}/publish', [ResolutionController::class, 'publish'])->name('resolutions.publish');
             Route::post('/resolutions/{resolution}/close', [ResolutionController::class, 'closeVoting'])->name('resolutions.close');
             Route::post('/resolutions/{resolution}/finalize', [ResolutionController::class, 'finalize'])->name('resolutions.finalize');
             Route::post('/resolutions/{resolution}/attachments', [ResolutionController::class, 'attachFiles'])->name('resolutions.attachments.store');
@@ -167,6 +174,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
             Route::post('/risks/{risk}/accept', [RiskRegisterController::class, 'accept'])->name('risks.accept');
             Route::post('/risks/{risk}/close', [RiskRegisterController::class, 'close'])->name('risks.close');
             Route::post('/risks/{risk}/treatments', [RiskRegisterController::class, 'addTreatment'])->name('risks.treatments.add');
+            Route::post('/risks/{risk}/treatments/{treatment}/complete', [RiskRegisterController::class, 'completeTreatment'])->name('risks.treatments.complete');
+            Route::put('/risks/{risk}/treatments/{treatment}/due-date', [RiskRegisterController::class, 'updateTreatmentDueDate'])->name('risks.treatments.due-date');
             Route::post('/risks/{risk}/link-event', [RiskRegisterController::class, 'linkEvent'])->name('risks.events.link');
             Route::post('/risks/{risk}/treatments/{treatment}/attachments', [RiskRegisterController::class, 'attachTreatmentFiles'])->name('risks.treatments.attachments.store');
             Route::delete('/risks/{risk}/treatments/{treatment}/attachments/{attachment}', [RiskRegisterController::class, 'deleteTreatmentAttachment'])->name('risks.treatments.attachments.destroy');
@@ -179,7 +188,9 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::get('/compliance/create', [ComplianceController::class, 'create'])->name('compliance.create');
         Route::get('/compliance/calendar', [ComplianceController::class, 'calendar'])->name('compliance.calendar');
         Route::get('/compliance/{obligation}', [ComplianceController::class, 'show'])->name('compliance.show');
-        
+        // Open or download evidence — authorised against the requirement it belongs to.
+        Route::get('/compliance/{obligation}/evidence/{evidence}/download', [ComplianceController::class, 'downloadEvidence'])->name('compliance.evidence.download');
+
         Route::get('/compliance/{obligation}/edit', [ComplianceController::class, 'edit'])->name('compliance.edit');
 
         Route::middleware('permission:governance.compliance.manage')->group(function () {
@@ -257,6 +268,7 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
 
         Route::middleware('permission:governance.budgets.submit')->group(function () {
             Route::post('/budgets/{budget}/propose', [BudgetController::class, 'propose'])->name('budgets.propose');
+            Route::post('/budgets/{budget}/return-to-drafting', [BudgetController::class, 'returnToDrafting'])->name('budgets.return-to-drafting');
         });
 
         Route::middleware('permission:governance.budgets.approve')->group(function () {
@@ -277,7 +289,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     Route::middleware('permission:governance.policies.view')->group(function () {
         Route::get('/policies', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'index'])->name('policies.index');
         Route::get('/policies/attestations', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'attestations'])->name('policies.attestations');
-        Route::get('/policies/{policy}', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'show'])->name('policies.show');
+        // Numeric constraint keeps /policies/create (registered below) reachable.
+        Route::get('/policies/{policy}', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'show'])->whereNumber('policy')->name('policies.show');
         Route::post('/policies/{policy}/attest', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'attest'])->name('policies.attest');
 
         Route::middleware('permission:governance.policies.manage')->group(function () {
@@ -317,6 +330,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     Route::middleware('permission:governance.interests.manage')->group(function () {
         Route::post('/interests', [\App\Domain\Governance\Http\Controllers\BoardInterestController::class, 'store'])->name('interests.store');
         Route::put('/interests/{interest}', [\App\Domain\Governance\Http\Controllers\BoardInterestController::class, 'update'])->name('interests.update');
+        // "This interest has ended" — own declaration or a board manager (policy).
+        Route::post('/interests/{interest}/end', [\App\Domain\Governance\Http\Controllers\BoardInterestController::class, 'end'])->name('interests.end');
     });
 
     // Board Evaluations
@@ -329,6 +344,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
 
         Route::middleware('permission:governance.evaluations.manage')->group(function () {
             Route::post('/evaluations', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'store'])->name('evaluations.store');
+            // Drafts only (the controller refuses open or closed evaluations).
+            Route::put('/evaluations/{evaluation}', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'update'])->name('evaluations.update');
             Route::post('/evaluations/{evaluation}/launch', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'launch'])->name('evaluations.launch');
             Route::post('/evaluations/{evaluation}/close', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'close'])->name('evaluations.close');
         });
@@ -384,6 +401,13 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::post('/actions/{action}/unblock', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'unblock'])->name('actions.unblock');
         Route::post('/actions/{action}/escalate', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'escalate'])->name('actions.escalate');
         Route::post('/actions/{action}/reassign', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'reassign'])->name('actions.reassign');
+
+        // Evidence: files uploaded as proof an action is done (private disk,
+        // action policy decides who may add or open them).
+        Route::post('/actions/{action}/evidence', [\App\Domain\Governance\Http\Controllers\ActionItemEvidenceController::class, 'store'])->name('actions.evidence.store');
+        Route::delete('/actions/{action}/evidence/{evidence}', [\App\Domain\Governance\Http\Controllers\ActionItemEvidenceController::class, 'destroy'])->whereNumber('evidence')->name('actions.evidence.destroy');
+        Route::get('/actions/{action}/evidence/{evidence}/download', [\App\Domain\Governance\Http\Controllers\ActionItemEvidenceController::class, 'download'])->whereNumber('evidence')->name('actions.evidence.download');
+        Route::get('/actions/{action}/evidence/earlier/{index}/download', [\App\Domain\Governance\Http\Controllers\ActionItemEvidenceController::class, 'downloadEarlier'])->whereNumber('index')->name('actions.evidence.earlier.download');
     });
 
     // Governance Audit Log (cross-module changes + action events)
@@ -422,6 +446,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
             Route::put('/settings', [GovernanceSettingController::class, 'update'])->name('settings.update');
             Route::post('/settings/rules', [GovernanceSettingController::class, 'updateRules'])->name('settings.rules.update');
             Route::post('/settings/rules/activate', [GovernanceSettingController::class, 'activateRules'])->name('settings.rules.activate');
+            // First switch-on: the chair or secretary records the board's existing approval.
+            Route::post('/settings/rules/record-approval', [GovernanceSettingController::class, 'recordRulesApproval'])->name('settings.rules.record-approval');
         });
     });
 });

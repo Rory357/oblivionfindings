@@ -185,6 +185,7 @@ final class ItSetupCommandService
         // lockedActor revalidates it for every create, recovery and cancellation;
         // receipt ownership alone never grants access to an archived record.
         if ($record instanceof ItCatalogItem) {
+            abort_unless(app(ItCatalogManagementService::class)->canManage($actor, $record), 404);
             return $this->result($actor, $receipt, $record, $replayed);
         }
         $fields = match (true) {
