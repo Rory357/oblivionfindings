@@ -172,6 +172,12 @@ class JournalPostingService
             $organizationChanged = false;
 
             try {
+                // Three attempts: two workers reversing at once contend for the
+                // sequence mutex, and MySQL rolls the whole transaction back on
+                // a deadlock, so a retry is clean. The closure re-reads under
+                // the lock and returns any reversal that already exists, so
+                // retrying converges on the one reversal rather than making a
+                // second.
                 return DB::transaction(function () use (
                     $journalId,
                     $organizationId,
@@ -247,7 +253,7 @@ class JournalPostingService
                     $journal->forceFill(['reversed_by_journal_id' => $reversingJournal->id])->save();
 
                     return $reversingJournal->load('lines');
-                });
+                }, 3);
             } catch (RuntimeException $exception) {
                 if ($organizationChanged && $attempt === 0) {
                     continue;
@@ -326,6 +332,17 @@ class JournalPostingService
             throw new InvalidArgumentException('An organisation is required to allocate a journal number.');
         }
 
+        // This insert must stay UNCONDITIONAL, and must stay the first
+        // statement of the transaction. Guarding it with a `->exists()` check
+        // looks like an optimisation but breaks the mutex: `exists()` is a
+        // non-locking consistent read, so under REPEATABLE READ it pins the
+        // transaction's snapshot before the row is locked. The `lockForUpdate`
+        // below still sees the latest committed row (locking reads bypass the
+        // snapshot), but the plain read of `next_number` in
+        // generateJournalNumber() afterwards does not — against a row another
+        // worker has only just created it reads NULL, and the sequence is
+        // rejected as invalid. Writing first establishes no read snapshot,
+        // which is what keeps the subsequent reads current.
         $inserted = DB::table('fin_journal_sequences')->insertOrIgnore([
             'organization_id' => $organizationId,
             'next_number' => 1,
